@@ -1,0 +1,122 @@
+name: Build and Deploy to Linux Server
+
+on:
+    push:
+        branches: [main]
+        paths:
+          - backend/**
+          - frontend/**
+    pull_request:
+        branches: [main]
+        paths:
+          - backend/**
+          - frontend/**
+    workflow_dispatch:
+
+jobs:
+    build_frontend:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v5
+              with:
+                  version: 10
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+                  cache-dependency-path: frontend/pnpm-lock.yaml
+
+            - name: Install frontend dependencies
+              run: pnpm install --frozen-lockfile
+              working-directory: frontend
+
+            - name: Build frontend
+              run: pnpm build
+              working-directory: frontend
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  name: frontend
+                  path: ./frontend/dist
+                  retention-days: 7
+
+    build_backend:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v5
+              with:
+                  dotnet-version: 8.0.x
+                  cache: true
+                  cache-dependency-path: backend/packages.lock.json
+
+            - name: Restore dependencies
+              run: dotnet restore --runtime linux-x64
+              working-directory: backend
+
+            - name: Build publish backend
+              run: dotnet publish -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true
+              working-directory: backend
+
+            - name: Upload Artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  name: linux-x64-backend
+                  path: ./backend/bin/Release/net8.0/linux-x64/publish/
+                  retention-days: 7
+
+
+    deploy:
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' # 仅在推送到 main 时部署
+
+        # 只允许同时进行一个部署任务，后续排队
+        concurrency:
+            group: deploy-db-project
+            cancel-in-progress: false
+        environment:
+            name: server
+        needs: [build_frontend, build_backend]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Download artifacts
+              uses: actions/download-artifact@v8
+              with:
+                  path: ./artifacts
+
+            - name: Upload packages to server
+              uses: appleboy/scp-action@v1
+              with:
+                  host: ${{ secrets.HOST }}
+                  username: ${{ secrets.USERNAME }}
+                  key: ${{ secrets.PRIVATE_KEY }}
+                  port: ${{ secrets.PORT }}
+                  source: artifacts/*
+                  target: /var/www/cd_tmp
+
+            - name: Deploy and restart service
+              uses: appleboy/ssh-action@v1
+              with:
+                  host: ${{ secrets.HOST }}
+                  username: ${{ secrets.USERNAME }}
+                  key: ${{ secrets.PRIVATE_KEY }}
+                  port: ${{ secrets.PORT }}
+                  script: |
+                      set -e
+                      sudo systemctl stop DB-Project
+                      cd /var/www
+                      rm -rf frontend backend
+                      mv cd_tmp/artifacts/frontend frontend
+                      mv cd_tmp/artifacts/linux-x64-backend backend
+                      chmod +x backend/backend
+                      sudo systemctl start DB-Project
+                      sudo systemctl --no-pager --full status DB-Project | head -n 30

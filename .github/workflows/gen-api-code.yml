@@ -1,0 +1,46 @@
+name: Generate Code from OpenAPI Spec
+
+on:
+    push:
+        branches-ignore: [main]
+        paths:
+            - api/**
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    generate-code:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v6
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+
+            - name: Install OpenAPI Generator
+              run: npm install @openapitools/openapi-generator-cli -g
+
+            - name: Generate API client code
+              run: openapi-generator-cli generate -i ./api/openapi.yaml -g typescript-axios -o ./api-client --additional-properties=useSingleRequestParameter=true
+
+            - name: Generate API server code
+              run: openapi-generator-cli generate -i ./api/openapi.yaml -g aspnetcore -o ./api-server --additional-properties=useSingleRequestParameter=true
+
+            - name: Move code
+              run: mv ./api-client/api.ts ./frontend/src/api/ -f && mv ./api-client/base.ts ./frontend/src/api/ -f && mv ./api-client/common.ts ./frontend/src/api/ -f && mv ./api-client/configuration.ts ./frontend/src/api/ -f && mv ./api-client/index.ts ./frontend/src/api/ -f && mv ./api-server/src/Org.OpenAPITools/Converters/* ./backend/Converters/ -f && mv ./api-server/src/Org.OpenAPITools/Models/* ./backend/Models/ -f
+
+            - name: Clean up
+              run: rm -rf ./api-client && rm -rf ./api-server && rm ./openapitools.json
+
+            - name: Commit and push changes
+              run: |
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                  git add .
+                  git commit -m "chore: update API client and server code" || echo "No changes to commit"
+                  git push

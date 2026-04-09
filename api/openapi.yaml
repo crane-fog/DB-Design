@@ -1,0 +1,65 @@
+openapi: 3.0.3
+
+info:
+    title: 测试
+    description: 这是一个示例项目
+    version: 0.1.0
+
+servers:
+    - url: http://localhost:5000
+
+paths:
+    /user-test:
+        get:
+            summary: 获取测试用户数据表
+            operationId: getUserTest
+            responses:
+                "200":
+                    description: 成功返回用户列表
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/UserData"
+                                example:
+                                    - id: 113
+                                      name: "李四"
+                                      createdAt: "2026-03-02T21:44:02.29113"
+                                    - id: 114
+                                      name: "王七"
+                                      createdAt: "2026-03-03T10:15:30.12345"
+    /get-status:
+        get:
+            summary: 获取系统状态
+            operationId: getStatus
+            responses:
+                "200":
+                    description: 成功返回系统状态
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    status:
+                                        type: string
+                                        example: "ok"
+                                    uptime:
+                                        type: integer
+                                        example: 123456
+components:
+    schemas:
+        UserData:
+            type: object
+            properties:
+                id:
+                    type: integer
+                    format: int64
+                    example: 113
+                name:
+                    type: string
+                    example: "李四"
+                createdAt:
+                    type: string
+                    format: date-time
+                    example: "2026-03-02T21:44:02.29113"

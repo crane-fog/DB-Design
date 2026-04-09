@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "vue"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "style": "error"
+  },
+  "ignorePatterns": [
+    "src/api/api.ts",
+    "src/api/base.ts",
+    "src/api/common.ts",
+    "src/api/configuration.ts",
+    "src/api/index.ts"
+  ],
+  "rules": {
+    "capitalized-comments": "off",
+    "func-style": "off",
+    "no-magic-numbers": "off",
+    "unicorn/catch-error-name": "off",
+    "unicorn/filename-case": [
+      "error",
+      {
+        "cases": {
+          "kebabCase": true,
+          "pascalCase": true
+        }
+      }
+    ]
+  }
+}

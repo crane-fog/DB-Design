@@ -1,0 +1,51 @@
+exclude: |
+    (?x)^(
+        frontend/src/api/api\.ts|
+        frontend/src/api/base\.ts|
+        frontend/src/api/common\.ts|
+        frontend/src/api/configuration\.ts|
+        frontend/src/api/index\.ts|
+
+        backend/Converters/.*|
+        backend/Models/.*
+    )$
+
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v6.0.0
+      hooks:
+          - id: trailing-whitespace
+          - id: end-of-file-fixer
+          - id: check-yaml
+          - id: check-added-large-files
+            args: ["--maxkb=2048"]
+
+    - repo: local
+      hooks:
+          - id: frontend-lint
+            name: Frontend Lint
+            entry: pnpm --prefix=frontend lint
+            language: system
+            files: ^frontend/.*\.(ts|vue|css)$
+            pass_filenames: false
+
+          - id: frontend-format
+            name: Frontend Format
+            entry: pnpm --prefix=frontend format
+            language: system
+            files: ^frontend/.*\.(ts|vue|css)$
+            pass_filenames: false
+
+          - id: backend-format
+            name: Backend Format
+            entry: dotnet format backend/backend.sln --include
+            language: system
+            types:
+              - c#
+
+          - id: backend-analyze
+            name: Backend Analyze
+            entry: dotnet build backend/backend.sln -warnaserror --no-incremental
+            language: system
+            files: ^backend/.*\.(cs|csproj|sln|editorconfig)$
+            pass_filenames: false
