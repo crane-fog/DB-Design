@@ -14,9 +14,9 @@ public class UserTestService(string connString) : IUserTestService
         conn.Open();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"SELECT ID, NAME, CREATED_AT
-                            FROM USER_TEST
-                            ORDER BY ID DESC
+        cmd.CommandText = @"SELECT EMPLOYEE_NO, USER_NAME, CREATED_TIME
+                            FROM SYS_USER
+                            ORDER BY USER_ID DESC
                             FETCH FIRST 20 ROWS ONLY";
 
         using var reader = cmd.ExecuteReader();
@@ -24,7 +24,7 @@ public class UserTestService(string connString) : IUserTestService
         {
             rows.Add(new UserData
             {
-                Id = reader.GetInt64(0),
+                Id = reader.IsDBNull(0) ? 0 : Convert.ToInt64(reader.GetValue(0)),
                 Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
                 CreatedAt = reader.IsDBNull(2) ? default : reader.GetDateTime(2)
             });
