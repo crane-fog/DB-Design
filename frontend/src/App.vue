@@ -1,99 +1,95 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { Api } from '@/api/client'
-import type { UserData } from '@/api'
+import { type ModuleKey, pages } from '@/router'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { computed, ref, watch } from 'vue'
 
-const loading = ref(false)
-const error = ref('')
-const rows = ref<UserData[]>([])
+const route = useRoute()
+const expandedPageKeys = ref<ModuleKey[]>([])
 
-async function loadRows() {
-  loading.value = true
-  error.value = ''
-  const startTime = Date.now()
-  const end_time = Date.now()
-  try {
-    const response = await Api.getUserTest()
-    rows.value = response.data
-  } catch (err: any) {
-    error.value = err.response?.data?.message || err.message || '请求失败'
-  } finally {
-    loading.value = false
-  }
+const activeModuleKey = computed(() => route.meta.moduleKey as ModuleKey | undefined)
+const activeSubPageKey = computed(() => route.meta.subPageKey as string | undefined)
+
+function isActiveModule(key: ModuleKey) {
+  return activeModuleKey.value === key
 }
 
-onMounted(loadRows)
+function isActiveModuleOverview(key: ModuleKey) {
+  return activeModuleKey.value === key && !activeSubPageKey.value
+}
+
+function isActiveSubPage(key: string) {
+  return activeSubPageKey.value === key
+}
+
+function isPageExpanded(key: ModuleKey) {
+  return expandedPageKeys.value.includes(key)
+}
+
+function togglePage(key: ModuleKey) {
+  if (isPageExpanded(key)) {
+    expandedPageKeys.value = expandedPageKeys.value.filter((pageKey) => pageKey !== key)
+    return
+  }
+
+  expandedPageKeys.value = [...expandedPageKeys.value, key]
+}
+
+watch(
+  activeModuleKey,
+  (key) => {
+    if (key && !isPageExpanded(key)) {
+      expandedPageKeys.value = [...expandedPageKeys.value, key]
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
-  <main class="page">
-    <h1>数据库查询结果</h1>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <RouterLink class="brand-link" to="/">
+          <p class="brand-title">工业制造物料管理系统</p>
+        </RouterLink>
+      </div>
 
-    <button type="button" @click="loadRows" :disabled="loading">
-      {{ loading ? '加载中......' : '刷新数据' }}
-    </button>
+      <nav class="nav-list">
+        <div v-for="page in pages" :key="page.key" class="nav-group">
+          <div class="nav-row" :class="{ active: isActiveModuleOverview(page.key) }">
+            <RouterLink class="nav-item" :to="page.path">
+              <span>{{ page.title }}</span>
+            </RouterLink>
 
-    <p v-if="error" class="error">{{ error }}</p>
+            <button
+              v-if="page.subPages.length"
+              type="button"
+              class="nav-toggle"
+              :aria-expanded="isPageExpanded(page.key)"
+              :aria-label="`${isPageExpanded(page.key) ? '折叠' : '展开'}${page.title}子页面`"
+              @click="togglePage(page.key)"
+            >
+              <span class="nav-arrow" :class="{ expanded: isPageExpanded(page.key) }">›</span>
+            </button>
+          </div>
 
-    <table v-if="rows.length" class="table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>NAME</th>
-          <th>CREATED_AT</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in rows" :key="row.id">
-          <td>{{ row.id }}</td>
-          <td>{{ row.name || '-' }}</td>
-          <td>{{ row.createdAt ? new Date(row.createdAt).toLocaleString() : '-' }}</td>
-        </tr>
-      </tbody>
-    </table>
+          <div v-if="page.subPages.length && isPageExpanded(page.key)" class="sub-nav">
+            <RouterLink
+              v-for="subPage in page.subPages"
+              :key="subPage.key"
+              class="sub-nav-item"
+              :class="{ active: isActiveModule(page.key) && isActiveSubPage(subPage.key) }"
+              :to="subPage.path"
+            >
+              {{ subPage.title }}
+            </RouterLink>
+          </div>
+        </div>
+      </nav>
+    </aside>
 
-    <p v-else-if="!loading && !error">暂无数据</p>
-  </main>
+    <main class="content">
+      <RouterView />
+    </main>
+  </div>
 </template>
-
-<style scoped>
-.page {
-  max-width: 960px;
-  margin: 32px auto;
-  padding: 0 16px;
-}
-
-h1 {
-  margin: 0 0 12px;
-}
-
-button {
-  margin-bottom: 12px;
-  padding: 8px 14px;
-  border: 1px solid #aaa;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.error {
-  color: #c62828;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.table th,
-.table td {
-  padding: 8px;
-  border: 1px solid #ddd;
-  text-align: left;
-}
-</style>
