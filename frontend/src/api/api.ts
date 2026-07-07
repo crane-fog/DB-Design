@@ -77,12 +77,12 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
         /**
          * 
          * @summary 登录
-         * @param {string} [username] 
+         * @param {string} [userNo] 
          * @param {string} [password] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost: async (username?: string, password?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        loginPost: async (userNo?: string, password?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/login`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -97,8 +97,8 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarFormParams = new URLSearchParams();
 
 
-            if (username !== undefined) { 
-                localVarFormParams.set('username', username as any);
+            if (userNo !== undefined) { 
+                localVarFormParams.set('userNo', userNo as any);
             }
 
             if (password !== undefined) { 
@@ -141,13 +141,13 @@ export const DefaultApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary 登录
-         * @param {string} [username] 
+         * @param {string} [userNo] 
          * @param {string} [password] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async loginPost(username?: string, password?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(username, password, options);
+        async loginPost(userNo?: string, password?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(userNo, password, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['DefaultApi.loginPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -178,7 +178,7 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @throws {RequiredError}
          */
         loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
-            return localVarFp.loginPost(requestParameters.username, requestParameters.password, options).then((request) => request(axios, basePath));
+            return localVarFp.loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -187,7 +187,7 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
  * Request parameters for loginPost operation in DefaultApi.
  */
 export interface DefaultApiLoginPostRequest {
-    readonly username?: string
+    readonly userNo?: string
 
     readonly password?: string
 }
@@ -214,7 +214,7 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      */
     public loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).loginPost(requestParameters.username, requestParameters.password, options).then((request) => request(this.axios, this.basePath));
+        return DefaultApiFp(this.configuration).loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
