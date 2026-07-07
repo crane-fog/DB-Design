@@ -162,3 +162,25 @@ export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 })
+
+function hasValidToken() {
+  const token = localStorage.getItem('jwt')
+  const expires = Number(localStorage.getItem('expires'))
+
+  if (!token || !Number.isFinite(expires)) {
+    return false
+  }
+
+  return Date.now() < expires * 1000
+}
+
+router.beforeEach((to) => {
+  if (hasValidToken()) {
+    return true
+  }
+
+  localStorage.removeItem('jwt')
+  localStorage.removeItem('expires')
+  globalThis.location.href = `/login.html?redirect=${encodeURIComponent(to.fullPath)}`
+  return false
+})

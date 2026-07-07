@@ -27,6 +27,7 @@
           "pascalCase": true
         }
       }
-    ]
+    ],
+    "max-statements": ["error", 20]
   }
 }
