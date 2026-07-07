@@ -6,6 +6,15 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: {
+        app: fileURLToPath(new URL('./index.html', import.meta.url)),
+        login: fileURLToPath(new URL('./login.html', import.meta.url)),
+        register: fileURLToPath(new URL('./register.html', import.meta.url)),
+      },
+    },
+  },
   plugins: [vue(), vueDevTools()],
   server: {
     proxy: {

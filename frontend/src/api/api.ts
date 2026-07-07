@@ -23,9 +23,13 @@ import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerMap } from './base';
 
-export interface GetStatus200Response {
-    'status'?: string;
-    'uptime'?: number;
+export interface LoginPost200Response {
+    'msg': string;
+    'accessToken'?: string;
+    'expires'?: number;
+}
+export interface RegisterPost200Response {
+    'msg': string;
 }
 export interface UserData {
     'id'?: number;
@@ -38,36 +42,6 @@ export interface UserData {
  */
 export const DefaultApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
-        /**
-         * 
-         * @summary 获取系统状态
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getStatus: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/get-status`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
         /**
          * 
          * @summary 获取测试用户数据表
@@ -87,11 +61,124 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
             localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary 登录
+         * @param {string} [userNo] 
+         * @param {string} [password] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        loginPost: async (userNo?: string, password?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/login`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+            const localVarFormParams = new URLSearchParams();
+
+
+            if (userNo !== undefined) { 
+                localVarFormParams.set('userNo', userNo as any);
+            }
+
+            if (password !== undefined) { 
+                localVarFormParams.set('password', password as any);
+            }
+            localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = localVarFormParams.toString();
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary 注册系统用户
+         * @param {string} userNo 
+         * @param {string} password 
+         * @param {string} userName 
+         * @param {string} phone 
+         * @param {string} [email] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        registerPost: async (userNo: string, password: string, userName: string, phone: string, email?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userNo' is not null or undefined
+            assertParamExists('registerPost', 'userNo', userNo)
+            // verify required parameter 'password' is not null or undefined
+            assertParamExists('registerPost', 'password', password)
+            // verify required parameter 'userName' is not null or undefined
+            assertParamExists('registerPost', 'userName', userName)
+            // verify required parameter 'phone' is not null or undefined
+            assertParamExists('registerPost', 'phone', phone)
+            const localVarPath = `/register`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+            const localVarFormParams = new URLSearchParams();
+
+
+            if (userNo !== undefined) { 
+                localVarFormParams.set('userNo', userNo as any);
+            }
+
+            if (password !== undefined) { 
+                localVarFormParams.set('password', password as any);
+            }
+
+            if (userName !== undefined) { 
+                localVarFormParams.set('userName', userName as any);
+            }
+
+            if (phone !== undefined) { 
+                localVarFormParams.set('phone', phone as any);
+            }
+
+            if (email !== undefined) { 
+                localVarFormParams.set('email', email as any);
+            }
+            localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = localVarFormParams.toString();
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -109,18 +196,6 @@ export const DefaultApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
-         * @summary 获取系统状态
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async getStatus(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GetStatus200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getStatus(options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.getStatus']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
          * @summary 获取测试用户数据表
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -129,6 +204,37 @@ export const DefaultApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.getUserTest(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['DefaultApi.getUserTest']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary 登录
+         * @param {string} [userNo] 
+         * @param {string} [password] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async loginPost(userNo?: string, password?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(userNo, password, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['DefaultApi.loginPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary 注册系统用户
+         * @param {string} userNo 
+         * @param {string} password 
+         * @param {string} userName 
+         * @param {string} phone 
+         * @param {string} [email] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async registerPost(userNo: string, password: string, userName: string, phone: string, email?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RegisterPost200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.registerPost(userNo, password, userName, phone, email, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['DefaultApi.registerPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
@@ -142,15 +248,6 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
     return {
         /**
          * 
-         * @summary 获取系统状态
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getStatus(options?: RawAxiosRequestConfig): AxiosPromise<GetStatus200Response> {
-            return localVarFp.getStatus(options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary 获取测试用户数据表
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -158,23 +255,57 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
         getUserTest(options?: RawAxiosRequestConfig): AxiosPromise<Array<UserData>> {
             return localVarFp.getUserTest(options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @summary 登录
+         * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
+            return localVarFp.loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary 注册系统用户
+         * @param {DefaultApiRegisterPostRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        registerPost(requestParameters: DefaultApiRegisterPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<RegisterPost200Response> {
+            return localVarFp.registerPost(requestParameters.userNo, requestParameters.password, requestParameters.userName, requestParameters.phone, requestParameters.email, options).then((request) => request(axios, basePath));
+        },
     };
 };
+
+/**
+ * Request parameters for loginPost operation in DefaultApi.
+ */
+export interface DefaultApiLoginPostRequest {
+    readonly userNo?: string
+
+    readonly password?: string
+}
+
+/**
+ * Request parameters for registerPost operation in DefaultApi.
+ */
+export interface DefaultApiRegisterPostRequest {
+    readonly userNo: string
+
+    readonly password: string
+
+    readonly userName: string
+
+    readonly phone: string
+
+    readonly email?: string
+}
 
 /**
  * DefaultApi - object-oriented interface
  */
 export class DefaultApi extends BaseAPI {
-    /**
-     * 
-     * @summary 获取系统状态
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public getStatus(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getStatus(options).then((request) => request(this.axios, this.basePath));
-    }
-
     /**
      * 
      * @summary 获取测试用户数据表
@@ -183,6 +314,28 @@ export class DefaultApi extends BaseAPI {
      */
     public getUserTest(options?: RawAxiosRequestConfig) {
         return DefaultApiFp(this.configuration).getUserTest(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary 登录
+     * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary 注册系统用户
+     * @param {DefaultApiRegisterPostRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public registerPost(requestParameters: DefaultApiRegisterPostRequest, options?: RawAxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).registerPost(requestParameters.userNo, requestParameters.password, requestParameters.userName, requestParameters.phone, requestParameters.email, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
