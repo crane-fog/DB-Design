@@ -18,14 +18,14 @@ paths:
             schema:
               type: object
               properties:
-                username:
+                userNo:
                   example: ''
                   type: string
                 password:
                   example: ''
                   type: string
             example:
-              username: ''
+              userNo: ''
               password: ''
         required: true
       responses:
