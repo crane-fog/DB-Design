@@ -23,10 +23,6 @@ import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerMap } from './base';
 
-export interface LoginData {
-    'username': string;
-    'password': string;
-}
 export interface LoginPost200Response {
     'msg': string;
     'accessToken'?: string;
@@ -81,13 +77,12 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
         /**
          * 
          * @summary 登录
-         * @param {LoginData} login 
+         * @param {string} [username] 
+         * @param {string} [password] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost: async (login: LoginData, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'login' is not null or undefined
-            assertParamExists('loginPost', 'login', login)
+        loginPost: async (username?: string, password?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/login`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -102,8 +97,12 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarFormParams = new URLSearchParams();
 
 
-            if (login !== undefined) { 
-                localVarFormParams.set('login', login as any);
+            if (username !== undefined) { 
+                localVarFormParams.set('username', username as any);
+            }
+
+            if (password !== undefined) { 
+                localVarFormParams.set('password', password as any);
             }
             localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -142,12 +141,13 @@ export const DefaultApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary 登录
-         * @param {LoginData} login 
+         * @param {string} [username] 
+         * @param {string} [password] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async loginPost(login: LoginData, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(login, options);
+        async loginPost(username?: string, password?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(username, password, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['DefaultApi.loginPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -177,8 +177,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost(requestParameters: DefaultApiLoginPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
-            return localVarFp.loginPost(requestParameters.login, options).then((request) => request(axios, basePath));
+        loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
+            return localVarFp.loginPost(requestParameters.username, requestParameters.password, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -187,7 +187,9 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
  * Request parameters for loginPost operation in DefaultApi.
  */
 export interface DefaultApiLoginPostRequest {
-    readonly login: LoginData
+    readonly username?: string
+
+    readonly password?: string
 }
 
 /**
@@ -211,8 +213,8 @@ export class DefaultApi extends BaseAPI {
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public loginPost(requestParameters: DefaultApiLoginPostRequest, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).loginPost(requestParameters.login, options).then((request) => request(this.axios, this.basePath));
+    public loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).loginPost(requestParameters.username, requestParameters.password, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
