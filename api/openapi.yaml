@@ -14,12 +14,14 @@ paths:
       parameters: []
       requestBody:
         content:
-          multipart/form-data:
+          application/x-www-form-urlencoded:
             schema:
               type: object
               properties:
                 login:
                   $ref: '#/components/schemas/LoginData'
+              required:
+                - login
             examples: {}
         required: true
       responses:
