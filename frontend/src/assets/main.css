@@ -178,6 +178,10 @@
   padding: 30px;
 }
 
+.register-panel {
+  width: min(100%, 460px);
+}
+
 .login-heading {
   margin-bottom: 24px;
 }
@@ -230,6 +234,11 @@
 
 .login-error {
   color: #b42318;
+  font-size: 14px;
+}
+
+.login-success {
+  color: #027a48;
   font-size: 14px;
 }
 

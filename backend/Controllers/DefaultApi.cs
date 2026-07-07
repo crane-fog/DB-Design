@@ -46,6 +46,48 @@ public class DefaultApiController(
         return Ok(response);
     }
 
+    [HttpPost]
+    [Consumes("application/x-www-form-urlencoded")]
+    [Route("register")]
+    public IActionResult Register(
+        [FromForm] string? userNo,
+        [FromForm(Name = "password")] string? passwordHash,
+        [FromForm] string? userName,
+        [FromForm] string? phone,
+        [FromForm] string? email)
+    {
+        if (string.IsNullOrWhiteSpace(userNo)
+            || string.IsNullOrWhiteSpace(passwordHash)
+            || string.IsNullOrWhiteSpace(userName)
+            || string.IsNullOrWhiteSpace(phone))
+        {
+            return BadRequest(new RegisterPost200Response
+            {
+                Msg = "请填写必填项"
+            });
+        }
+
+        var errorMessage = authService.Register(
+            userNo.Trim(),
+            passwordHash,
+            userName.Trim(),
+            phone.Trim(),
+            string.IsNullOrWhiteSpace(email) ? null : email.Trim());
+
+        if (errorMessage is not null)
+        {
+            return Conflict(new RegisterPost200Response
+            {
+                Msg = errorMessage
+            });
+        }
+
+        return Ok(new RegisterPost200Response
+        {
+            Msg = "注册成功"
+        });
+    }
+
     [HttpGet]
     [Authorize]
     [Route("user-test")]

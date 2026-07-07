@@ -14,7 +14,7 @@ public class UserTestService(string connString) : IUserTestService
         conn.Open();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"SELECT EMPLOYEE_NO, USER_NAME, CREATED_TIME
+        cmd.CommandText = @"SELECT USER_ID, USER_NAME, CREATED_TIME
                             FROM SYS_USER
                             ORDER BY USER_ID DESC
                             FETCH FIRST 20 ROWS ONLY";

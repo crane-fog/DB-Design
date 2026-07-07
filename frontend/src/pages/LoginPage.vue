@@ -138,7 +138,7 @@ async function submitLogin() {
         </button>
       </form>
 
-      <a class="login-register" href="/register">注册</a>
+      <a class="login-register" href="/register.html">注册</a>
     </section>
   </main>
 </template>

@@ -53,6 +53,39 @@ public class AuthService(string connString, string jwtSecret)
         return new AuthenticatedUser(userId, storedEmployeeNo, userName);
     }
 
+    public string? Register(
+        string employeeNo,
+        string passwordHash,
+        string userName,
+        string phone,
+        string? email)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"INSERT INTO SYS_USER
+                            (EMPLOYEE_NO, PASSWORD_HASH, USER_NAME, PHONE, EMAIL, STATUS, PWD_UPDATE_TIME)
+                            VALUES
+                            (:employeeNo, :passwordHash, :userName, :phone, :email, 'valid', SYSTIMESTAMP)";
+        cmd.Parameters.Add(new OracleParameter("employeeNo", employeeNo));
+        cmd.Parameters.Add(new OracleParameter("passwordHash", passwordHash));
+        cmd.Parameters.Add(new OracleParameter("userName", userName));
+        cmd.Parameters.Add(new OracleParameter("phone", phone));
+        var emailValue = string.IsNullOrWhiteSpace(email) ? (object)DBNull.Value : email;
+        cmd.Parameters.Add(new OracleParameter("email", emailValue));
+
+        try
+        {
+            cmd.ExecuteNonQuery();
+            return null;
+        }
+        catch (OracleException ex) when (ex.Number == 1)
+        {
+            return "账号已存在";
+        }
+    }
+
     public string CreateToken(string employeeNo, DateTimeOffset expiresAt)
     {
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));

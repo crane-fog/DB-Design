@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         app: fileURLToPath(new URL('./index.html', import.meta.url)),
         login: fileURLToPath(new URL('./login.html', import.meta.url)),
+        register: fileURLToPath(new URL('./register.html', import.meta.url)),
       },
     },
   },
