@@ -28,11 +28,6 @@ export interface LoginPost200Response {
     'accessToken'?: string;
     'expires'?: number;
 }
-export interface LoginResponse {
-    'msg': string;
-    'accessToken'?: string;
-    'expires'?: number;
-}
 export interface RegisterPost200Response {
     'msg': string;
 }
@@ -65,6 +60,10 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
             localVarHeaderParameter['Accept'] = 'application/json';
 
