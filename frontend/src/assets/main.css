@@ -46,6 +46,29 @@
   flex-direction: column;
 }
 
+.sidebar-footer {
+  margin-top: auto;
+  padding: 14px 16px 18px;
+}
+
+.logout-button {
+  width: 6em;
+  min-height: 38px;
+  border: 1px solid #c6ced8;
+  border-radius: 4px;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  padding: 0 12px;
+}
+
+.logout-button:hover {
+  background: #d8e9f7;
+  color: #111827;
+}
+
 .nav-group {
   display: flex;
   flex-direction: column;
@@ -216,7 +239,7 @@
   border: 1px solid #c6ced8;
   border-radius: 4px;
   color: #1f2937;
-  font: inherit;
+  font-weight: 400;
   padding: 0 12px;
 }
 

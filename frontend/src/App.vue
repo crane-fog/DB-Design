@@ -34,6 +34,12 @@ function togglePage(key: ModuleKey) {
   expandedPageKeys.value = [...expandedPageKeys.value, key]
 }
 
+function logout() {
+  localStorage.removeItem('jwt')
+  localStorage.removeItem('expires')
+  globalThis.location.href = '/login.html'
+}
+
 watch(
   activeModuleKey,
   (key) => {
@@ -86,6 +92,10 @@ watch(
           </div>
         </div>
       </nav>
+
+      <div class="sidebar-footer">
+        <button type="button" class="logout-button" @click="logout">退出登录</button>
+      </div>
     </aside>
 
     <main class="content">
