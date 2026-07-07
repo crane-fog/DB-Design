@@ -81,11 +81,13 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
         /**
          * 
          * @summary 登录
-         * @param {LoginData} [login] 
+         * @param {LoginData} login 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost: async (login?: LoginData, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        loginPost: async (login: LoginData, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'login' is not null or undefined
+            assertParamExists('loginPost', 'login', login)
             const localVarPath = `/login`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -97,19 +99,19 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+            const localVarFormParams = new URLSearchParams();
 
 
             if (login !== undefined) { 
-                localVarFormParams.append('login', new Blob([JSON.stringify(login, replaceWithSerializableTypeIfNeeded)], { type: "application/json", }));
+                localVarFormParams.set('login', login as any);
             }
-            localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+            localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
             localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = localVarFormParams;
+            localVarRequestOptions.data = localVarFormParams.toString();
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -140,11 +142,11 @@ export const DefaultApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary 登录
-         * @param {LoginData} [login] 
+         * @param {LoginData} login 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async loginPost(login?: LoginData, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
+        async loginPost(login: LoginData, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(login, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['DefaultApi.loginPost']?.[localVarOperationServerIndex]?.url;
@@ -175,7 +177,7 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
+        loginPost(requestParameters: DefaultApiLoginPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
             return localVarFp.loginPost(requestParameters.login, options).then((request) => request(axios, basePath));
         },
     };
@@ -185,7 +187,7 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
  * Request parameters for loginPost operation in DefaultApi.
  */
 export interface DefaultApiLoginPostRequest {
-    readonly login?: LoginData
+    readonly login: LoginData
 }
 
 /**
@@ -209,7 +211,7 @@ export class DefaultApi extends BaseAPI {
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig) {
+    public loginPost(requestParameters: DefaultApiLoginPostRequest, options?: RawAxiosRequestConfig) {
         return DefaultApiFp(this.configuration).loginPost(requestParameters.login, options).then((request) => request(this.axios, this.basePath));
     }
 }
