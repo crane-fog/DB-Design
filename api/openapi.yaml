@@ -125,20 +125,10 @@ paths:
                     name: 王七
                     createdAt: '2026-03-03T10:15:30.12345'
           headers: {}
-      security: []
+      security:
+        - bearerAuth: []
 components:
   schemas:
-    LoginResponse:
-      type: object
-      properties:
-        msg:
-          type: string
-        accessToken:
-          type: string
-        expires:
-          type: number
-      required:
-        - msg
     UserData:
       type: object
       properties:
@@ -154,6 +144,10 @@ components:
           format: date-time
           example: '2026-03-02T21:44:02.29113'
   responses: {}
-  securitySchemes: {}
-servers: []
-security: []
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+servers:
+  - url: http://localhost:5000
