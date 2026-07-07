@@ -18,11 +18,15 @@ paths:
             schema:
               type: object
               properties:
-                login:
-                  $ref: '#/components/schemas/LoginData'
-              required:
-                - login
-            examples: {}
+                username:
+                  example: ''
+                  type: string
+                password:
+                  example: ''
+                  type: string
+            example:
+              username: ''
+              password: ''
         required: true
       responses:
         '200':
@@ -70,16 +74,6 @@ paths:
       security: []
 components:
   schemas:
-    LoginData:
-      type: object
-      properties:
-        username:
-          type: string
-        password:
-          type: string
-      required:
-        - username
-        - password
     LoginResponse:
       type: object
       properties:
