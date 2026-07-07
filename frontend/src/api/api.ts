@@ -23,9 +23,19 @@ import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerMap } from './base';
 
-export interface GetStatus200Response {
-    'status'?: string;
-    'uptime'?: number;
+export interface LoginData {
+    'username': string;
+    'password': string;
+}
+export interface LoginPost200Response {
+    'msg': string;
+    'accessToken'?: string;
+    'expires'?: number;
+}
+export interface LoginResponse {
+    'msg': string;
+    'accessToken'?: string;
+    'expires'?: number;
 }
 export interface UserData {
     'id'?: number;
@@ -38,36 +48,6 @@ export interface UserData {
  */
 export const DefaultApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
-        /**
-         * 
-         * @summary 获取系统状态
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getStatus: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/get-status`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
         /**
          * 
          * @summary 获取测试用户数据表
@@ -98,6 +78,44 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary 登录
+         * @param {LoginData} [login] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        loginPost: async (login?: LoginData, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/login`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+
+
+            if (login !== undefined) { 
+                localVarFormParams.append('login', new Blob([JSON.stringify(login, replaceWithSerializableTypeIfNeeded)], { type: "application/json", }));
+            }
+            localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = localVarFormParams;
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -109,18 +127,6 @@ export const DefaultApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
-         * @summary 获取系统状态
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async getStatus(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GetStatus200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getStatus(options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.getStatus']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
          * @summary 获取测试用户数据表
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -129,6 +135,19 @@ export const DefaultApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.getUserTest(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['DefaultApi.getUserTest']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary 登录
+         * @param {LoginData} [login] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async loginPost(login?: LoginData, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(login, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['DefaultApi.loginPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
@@ -142,15 +161,6 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
     return {
         /**
          * 
-         * @summary 获取系统状态
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getStatus(options?: RawAxiosRequestConfig): AxiosPromise<GetStatus200Response> {
-            return localVarFp.getStatus(options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary 获取测试用户数据表
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -158,23 +168,30 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
         getUserTest(options?: RawAxiosRequestConfig): AxiosPromise<Array<UserData>> {
             return localVarFp.getUserTest(options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @summary 登录
+         * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
+            return localVarFp.loginPost(requestParameters.login, options).then((request) => request(axios, basePath));
+        },
     };
 };
+
+/**
+ * Request parameters for loginPost operation in DefaultApi.
+ */
+export interface DefaultApiLoginPostRequest {
+    readonly login?: LoginData
+}
 
 /**
  * DefaultApi - object-oriented interface
  */
 export class DefaultApi extends BaseAPI {
-    /**
-     * 
-     * @summary 获取系统状态
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public getStatus(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getStatus(options).then((request) => request(this.axios, this.basePath));
-    }
-
     /**
      * 
      * @summary 获取测试用户数据表
@@ -183,6 +200,17 @@ export class DefaultApi extends BaseAPI {
      */
     public getUserTest(options?: RawAxiosRequestConfig) {
         return DefaultApiFp(this.configuration).getUserTest(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary 登录
+     * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).loginPost(requestParameters.login, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
