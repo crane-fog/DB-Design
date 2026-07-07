@@ -46,6 +46,60 @@ paths:
                   - msg
           headers: {}
       security: []
+  /register:
+    post:
+      summary: 注册系统用户
+      deprecated: false
+      description: ''
+      tags: []
+      parameters: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                userNo:
+                  example: ''
+                  type: string
+                password:
+                  example: ''
+                  type: string
+                userName:
+                  example: ''
+                  type: string
+                phone:
+                  example: ''
+                  type: string
+                email:
+                  example: ''
+                  type: string
+              required:
+                - userNo
+                - password
+                - userName
+                - phone
+            example:
+              userNo: ''
+              password: ''
+              userName: ''
+              phone: ''
+              email: ''
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                required:
+                  - msg
+          headers: {}
+      security: []
   /user-test:
     get:
       summary: 获取测试用户数据表
