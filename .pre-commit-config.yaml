@@ -45,7 +45,7 @@ repos:
 
           - id: backend-analyze
             name: Backend Analyze
-            entry: dotnet build backend/backend.sln -warnaserror --no-incremental
+            entry: dotnet build backend/backend.sln -warnaserror --no-incremental --artifacts-path backend/bin/pre-commit-analyze
             language: system
             files: ^backend/.*\.(cs|csproj|sln|editorconfig)$
             pass_filenames: false
