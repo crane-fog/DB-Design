@@ -1,0 +1,11 @@
+openapi: 3.0.1
+info:
+  title: 物料与 BOM 管理模块 API
+  description: 物料与 BOM 管理模块接口定义。
+  version: 0.1.0
+tags:
+  - name: material_bom
+    description: 物料与 BOM 管理模块
+paths: {}
+components:
+  schemas: {}

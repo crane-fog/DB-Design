@@ -1,0 +1,11 @@
+openapi: 3.0.1
+info:
+  title: 质量追溯模块 API
+  description: 质量追溯模块接口定义。
+  version: 0.1.0
+tags:
+  - name: quality_traceability
+    description: 质量追溯模块
+paths: {}
+components:
+  schemas: {}

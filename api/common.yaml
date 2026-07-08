@@ -1,0 +1,145 @@
+openapi: 3.0.1
+info:
+  title: 公共 API Schema
+  description: 公共响应格式、分页结构、通用参数和 JWT 认证定义。
+  version: 0.1.0
+paths: {}
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          description: 业务状态码，只使用 200、400、401、403、404、409、500。
+          enum:
+            - 200
+            - 400
+            - 401
+            - 403
+            - 404
+            - 409
+            - 500
+          example: 200
+        message:
+          type: string
+          description: 返回结果说明。
+          example: 操作成功
+        data:
+          description: 实际业务数据，无数据时返回 null。
+          nullable: true
+          example: null
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          description: 错误业务状态码，只使用 400、401、403、404、409、500。
+          enum:
+            - 400
+            - 401
+            - 403
+            - 404
+            - 409
+            - 500
+          example: 400
+        message:
+          type: string
+          description: 错误原因说明。
+          example: 请求参数错误
+        data:
+          description: 错误响应无业务数据，固定返回 null。
+          nullable: true
+          example: null
+    PageResult:
+      type: object
+      required:
+        - total
+        - page
+        - page_size
+        - records
+      properties:
+        total:
+          type: integer
+          description: 数据总数。
+          example: 25
+        page:
+          type: integer
+          description: 当前页码。
+          example: 1
+        page_size:
+          type: integer
+          description: 每页数据数量。
+          example: 10
+        records:
+          type: array
+          description: 当前页数据。
+          items: {}
+    PageQuery:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: 当前页码，从 1 开始。
+          default: 1
+          example: 1
+        page_size:
+          type: integer
+          description: 每页数据数量。
+          default: 10
+          example: 10
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 当前页码，从 1 开始。
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+      example: 1
+    PageSize:
+      name: page_size
+      in: query
+      description: 每页数据数量。
+      required: false
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+      example: 10
+  responses:
+    Unauthorized:
+      description: HTTP 状态码固定返回 200，业务 code 为 401。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 401
+            message: 未登录或登录已失效
+            data: null
+    Forbidden:
+      description: HTTP 状态码固定返回 200，业务 code 为 403。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 403
+            message: 没有权限访问该接口
+            data: null
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

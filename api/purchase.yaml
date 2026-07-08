@@ -1,0 +1,11 @@
+openapi: 3.0.1
+info:
+  title: 采购管理模块 API
+  description: 采购管理模块接口定义。
+  version: 0.1.0
+tags:
+  - name: purchase
+    description: 采购管理模块
+paths: {}
+components:
+  schemas: {}
