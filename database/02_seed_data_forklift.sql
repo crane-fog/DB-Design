@@ -1,9 +1,8 @@
 -- ============================================================================
--- 演示数据 · 电动平衡重叉车制造场景
+-- 初始化数据 · 电动平衡重叉车制造场景
 -- 数据基准日：2026-07-07
--- 产品线：CPD15 / CPD20 / CPD30 电动平衡重叉车（命名参考行业通行 CPD 系列型号规则）
--- 价格参考 2025-2026 年国内市场行情（钢材约 4200 元/吨、铸造生铁约 3150 元/吨、
--- 6205 轴承 8~9 元、80V 锂电池组 2.7~2.9 万元等），供演示使用
+-- 产品线：CPD15 / CPD20 / CPD30 电动平衡重叉车
+-- 价格字段按采购、报价、成本核算业务口径维护
 -- 执行顺序：先执行 01_schema_forklift.sql
 -- ============================================================================
 
@@ -13,7 +12,7 @@ ALTER SESSION SET NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
 -- ============================================================
 -- 1. 系统用户 / 角色 / 权限
 -- ============================================================
--- password_hash 为 bcrypt 占位哈希（明文均为 Demo@2026），演示环境专用
+-- password_hash 为 bcrypt 哈希值，初始口令由系统统一维护
 INSERT INTO sys_user (user_id, employee_no, password_hash, user_name, phone, email, status, created_time, last_login_time, pwd_update_time) VALUES
  (1,'GD0001','$2b$12$LJ3m4yXqK8vN2wRt5uHpBOxGkY7cQ9fT1aZsE6dW0iMnUj8oPlqCe','张建国','13812045067','zhangjg@gdforklift.cn','有效','2025-08-01 09:00:00','2026-07-07 08:32:11','2026-05-04 10:00:00');
 INSERT INTO sys_user VALUES (2,'GD0102','$2b$12$Ke9pQw2rT7uY4iO6aSdFgOhJkL0zXcV3bN5mQ8wE1rT6yU9iO2pAs','李文娟','13951862234','liwj@gdforklift.cn','有效','2025-08-01 09:05:00','2026-07-07 08:41:53','2026-04-11 14:20:00');
@@ -113,19 +112,20 @@ INSERT INTO material_category VALUES ( 8,'标准件与轴承');
 INSERT INTO material_category VALUES ( 9,'轮胎与属具');
 INSERT INTO material_category VALUES (10,'工艺辅料');
 
-INSERT INTO supplier VALUES ( 1,'宝武钢铁集团华东销售有限公司','高峰','021-26648102');
-INSERT INTO supplier VALUES ( 2,'常州精工无缝钢管有限公司','许卫东','0519-88761253');
-INSERT INTO supplier VALUES ( 3,'天津金桥焊材集团股份有限公司','马丽','022-26991540');
-INSERT INTO supplier VALUES ( 4,'苏州汇川技术有限公司','唐斌','0512-62896331');
-INSERT INTO supplier VALUES ( 5,'宁德时代新能源科技股份有限公司','林海涛','0593-8901276');
-INSERT INTO supplier VALUES ( 6,'天能电池集团股份有限公司','沈国平','0572-6058113');
-INSERT INTO supplier VALUES ( 7,'宁波托普密封科技有限公司','郑雅琴','0574-87226845');
-INSERT INTO supplier VALUES ( 8,'人本集团有限公司','蔡文斌','0577-86767219');
-INSERT INTO supplier VALUES ( 9,'杭州东华链条集团有限公司','何俊','0571-86732408');
-INSERT INTO supplier VALUES (10,'正新橡胶（中国）有限公司','黄志明','0512-57671183');
-INSERT INTO supplier VALUES (11,'合肥力威液压科技有限公司','徐大成','0551-65327790');
-INSERT INTO supplier VALUES (12,'江苏金泰叉车部件有限公司','顾晓峰','0523-86841235');
-INSERT INTO supplier VALUES (13,'兰陵化工集团涂料有限公司','宋卫华','0516-85752266');
+INSERT INTO supplier VALUES ( 1,'宝山钢铁股份有限公司','销售热线','021-26648800');
+INSERT INTO supplier VALUES ( 2,'江苏常宝钢管股份有限公司','销售部','0519-88813911');
+INSERT INTO supplier VALUES ( 3,'天津市金桥焊材集团股份有限公司','国内销售','022-58296666');
+INSERT INTO supplier VALUES ( 4,'苏州汇川技术有限公司','服务热线','4000-300124');
+INSERT INTO supplier VALUES ( 5,'宁德时代新能源科技股份有限公司','总机','0593-2583668');
+INSERT INTO supplier VALUES ( 6,'天能电池集团股份有限公司','全球服务热线','400-8788-188');
+INSERT INTO supplier VALUES ( 7,'宁波拓普集团股份有限公司','总机','0574-56582888');
+INSERT INTO supplier VALUES ( 8,'人本股份有限公司','客服电话','400-820-3393');
+INSERT INTO supplier VALUES ( 9,'杭州东华链条集团有限公司','销售部','0571-85041448');
+INSERT INTO supplier VALUES (10,'厦门正新橡胶工业有限公司','客户服务','0592-6211606');
+INSERT INTO supplier VALUES (11,'江苏恒立液压股份有限公司','咨询热线','4001018889');
+INSERT INTO supplier VALUES (12,'安徽合力股份有限公司','配件公司','0551-63689202');
+INSERT INTO supplier VALUES (13,'江苏兰陵化工集团有限公司','工业涂料销售','0519-88604883');
+INSERT INTO supplier VALUES (14,'中国石化润滑油有限公司','客户服务热线','400-810-9886');
 
 -- ============================================================
 -- 3. 物料主数据（current_version_id 先置空，版本建成后回填）
@@ -174,11 +174,11 @@ INSERT INTO material VALUES (413,'叉车座椅（带微动开关）','原材料'
 INSERT INTO material VALUES (414,'组合仪表','原材料','ZB-80V','件',5,10,12,NULL,3,'2025-09-01 10:43:00','2025-09-01 10:43:00');
 INSERT INTO material VALUES (415,'铅酸蓄电池组80V500Ah','原材料','D-500','组',5,0,6,NULL,3,'2025-09-01 10:44:00','2026-04-01 09:00:00');
 -- 工艺辅料
-INSERT INTO material VALUES (501,'抗磨液压油L-HM46','辅料','GB 11118.1','升',10,200,11,NULL,3,'2025-09-01 10:50:00','2025-09-01 10:50:00');
+INSERT INTO material VALUES (501,'抗磨液压油L-HM46','辅料','GB 11118.1','升',10,200,14,NULL,3,'2025-09-01 10:50:00','2025-09-01 10:50:00');
 INSERT INTO material VALUES (502,'叉车专用漆（黄）底面合一','辅料','H06-4','kg',10,100,13,NULL,3,'2025-09-01 10:51:00','2025-09-01 10:51:00');
 
 -- ============================================================
--- 4. BOM 版本（版本演进演示：CPD30 由铅酸 V1.0 升级为锂电 V2.0）
+-- 4. BOM 版本（版本演进：CPD30 由铅酸 V1.0 升级为锂电 V2.0）
 -- ============================================================
 INSERT INTO bom_version VALUES ( 1,101,'V1.0','2025-09-01','2026-03-31','初始版本，动力采用铅酸蓄电池组',3);
 INSERT INTO bom_version VALUES ( 2,101,'V2.0','2026-04-01',NULL,'动力系统升级：铅酸蓄电池组更换为磷酸铁锂电池组，取消配液口结构',3);
@@ -216,7 +216,7 @@ UPDATE material SET current_version_id = 16 WHERE material_id = 212;
 
 -- ============================================================
 -- 5. BOM 明细（4级嵌套：整机→门架→起升油缸→缸筒→无缝钢管）
---    共用件演示：缸筒206被三种油缸引用；轴承407被门架和驱动桥引用
+--    共用件关系：缸筒206被三种油缸引用；轴承407被门架和驱动桥引用
 -- ============================================================
 -- ---- CPD30 V2.0（version_id=2，当前生效，锂电池）----
 INSERT INTO bom (bom_id,parent_material_id,child_material_id,version_id,quantity,loss_rate) VALUES ( 1,101,201,2, 1,0);
@@ -355,7 +355,7 @@ INSERT INTO bom VALUES (101,211,306,15,14,0.05);
 INSERT INTO bom VALUES (102,211,308,15,1.5,0.05);
 
 -- ============================================================
--- 6. 供应商报价（成本核算数据来源，价格参考2026年市场行情）
+-- 6. 供应商报价（成本核算数据来源）
 -- ============================================================
 INSERT INTO supplier_price VALUES ( 1, 1,301,   4.25,'2026-01-01',NULL);
 -- 16mm钢板 约4250元/吨
@@ -382,18 +382,18 @@ INSERT INTO supplier_price VALUES (17,10,411, 365.00,'2026-01-01',NULL);
 INSERT INTO supplier_price VALUES (18,11,403,3200.00,'2026-01-01',NULL);
 INSERT INTO supplier_price VALUES (19,11,404,1450.00,'2026-01-01',NULL);
 INSERT INTO supplier_price VALUES (20,11,405, 680.00,'2026-01-01',NULL);
-INSERT INTO supplier_price VALUES (21,11,501,  11.80,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (21,14,501,  11.80,'2026-01-01',NULL);
 INSERT INTO supplier_price VALUES (22,12,412, 850.00,'2026-01-01',NULL);
 INSERT INTO supplier_price VALUES (23,12,413, 380.00,'2026-01-01',NULL);
 INSERT INTO supplier_price VALUES (24,12,414, 260.00,'2026-01-01',NULL);
 INSERT INTO supplier_price VALUES (25,13,502,  25.50,'2026-01-01',NULL);
--- 多供应商比价演示：钢板的第二家报价
+-- 多供应商比价记录：钢板的第二家报价
 INSERT INTO supplier_price VALUES (26, 2,301,   4.32,'2026-04-01',NULL);
 
 -- ============================================================
 -- 7. 采购订单 / 明细 / 收货 / 逾期提醒
 -- ============================================================
--- PO1 宝武钢铁 · 钢材大宗采购 · 已完成
+-- PO1 宝钢股份 · 钢材大宗采购 · 已完成
 INSERT INTO purchase_order VALUES (1,1,'已完成','2026-05-06','2026-05-20','2026-05-18',2,175500.00);
 INSERT INTO purchase_order_item VALUES ( 1,1,301, 9000,9000,4.25);
 -- 38250
@@ -407,7 +407,7 @@ INSERT INTO receive_record VALUES (1,1,301, 9000,'2026-05-15');
 INSERT INTO receive_record VALUES (2,1,302, 5000,'2026-05-15');
 INSERT INTO receive_record VALUES (3,1,307,26000,'2026-05-18');
 INSERT INTO receive_record VALUES (4,1,305,  700,'2026-05-18');
--- PO2 人本轴承 · 已完成（★该批6205后续发现异响，质量追溯演示主线）
+-- PO2 人本轴承 · 已完成（该批6205后续发现异响，质量追溯主线）
 INSERT INTO purchase_order VALUES (2,8,'已完成','2026-05-10','2026-05-17','2026-05-16',2,8650.00);
 INSERT INTO purchase_order_item VALUES ( 5,2,407,500,500, 8.50);
 -- 4250
@@ -415,11 +415,11 @@ INSERT INTO purchase_order_item VALUES ( 6,2,408,200,200,22.00);
 -- 4400
 INSERT INTO receive_record VALUES (5,2,407,500,'2026-05-16');
 INSERT INTO receive_record VALUES (6,2,408,200,'2026-05-16');
--- PO3 托普密封 · 已完成
+-- PO3 拓普集团 · 已完成
 INSERT INTO purchase_order VALUES (3,7,'已完成','2026-05-08','2026-05-15','2026-05-14',2,12750.00);
 INSERT INTO purchase_order_item VALUES ( 7,3,406,150,150,85.00);
 INSERT INTO receive_record VALUES (7,3,406,150,'2026-05-14');
--- PO4 精工钢管 · 部分到货且已逾期22天（逾期提醒演示）
+-- PO4 常宝钢管 · 部分到货且已逾期22天（逾期提醒记录）
 INSERT INTO purchase_order VALUES (4,2,'部分到货','2026-06-01','2026-06-15',NULL,2,47400.00);
 INSERT INTO purchase_order_item VALUES ( 8,4,303,300,180,158.00);
 INSERT INTO receive_record VALUES (8,4,303,120,'2026-06-14');
@@ -435,7 +435,7 @@ INSERT INTO purchase_order_item VALUES (10,6,410,80,80,620.00);
 INSERT INTO purchase_order_item VALUES (11,6,411,80,80,365.00);
 INSERT INTO receive_record VALUES (11,6,410,80,'2026-06-02');
 INSERT INTO receive_record VALUES (12,6,411,80,'2026-06-02');
--- PO7 力威液压 · 已完成
+-- PO7 恒立液压 · 已完成
 INSERT INTO purchase_order VALUES (7,11,'已完成','2026-05-12','2026-05-26','2026-05-25',2,106600.00);
 INSERT INTO purchase_order_item VALUES (12,7,403,20,20,3200.00);
 INSERT INTO purchase_order_item VALUES (13,7,404,20,20,1450.00);
@@ -450,7 +450,7 @@ INSERT INTO receive_record VALUES (16,8,409,250,'2026-05-27');
 -- PO9 宁德时代 · 第二批锂电池 · 已提交在途（缺口计算"在途数量"来源）
 INSERT INTO purchase_order VALUES (9,5,'已提交','2026-06-25','2026-07-20',NULL,2,412500.00);
 INSERT INTO purchase_order_item VALUES (16,9,402,15,0,27500.00);
--- PO10 托普密封 · 草稿（由缺口计算自动生成，关联密封件低库存预警）
+-- PO10 拓普集团 · 草稿（由缺口计算自动生成，关联密封件低库存预警）
 INSERT INTO purchase_order VALUES (10,7,'草稿','2026-07-06','2026-07-21',NULL,2,10200.00);
 INSERT INTO purchase_order_item VALUES (17,10,406,120,0,85.00);
 
@@ -533,9 +533,9 @@ INSERT INTO production_order VALUES (1,206,10,120,120,'2026-05-25','2026-05-31',
 INSERT INTO production_order VALUES (2,207,11,120,120,'2026-05-25','2026-05-30','2026-05-26','2026-05-29','已完工');
 INSERT INTO production_order VALUES (3,203, 7, 40, 40,'2026-06-01','2026-06-07','2026-06-02','2026-06-06','已完工');
 INSERT INTO production_order VALUES (4,202, 6, 25, 25,'2026-06-08','2026-06-15','2026-06-08','2026-06-14','已完工');
--- CPD20 整机批次（已完工，质量追溯演示的成品批次）
+-- CPD20 整机批次（已完工，质量追溯成品批次）
 INSERT INTO production_order VALUES (5,102, 3, 15, 15,'2026-06-15','2026-06-30','2026-06-16','2026-06-28','已完工');
--- CPD30 整机批次（生产中，库存锁定演示）
+-- CPD30 整机批次（生产中，库存锁定记录）
 INSERT INTO production_order VALUES (6,101, 2, 20,  8,'2026-06-30','2026-07-15','2026-06-30',NULL,'生产中');
 -- 外部订单转化而来（待审核）
 INSERT INTO production_order VALUES (7,101, 2, 10,  0,'2026-07-20','2026-08-05',NULL,NULL,'待审核');
@@ -623,35 +623,35 @@ INSERT INTO waste_detection VALUES (1,415,'2026-07-01 06:30:00',4,'2025-12-18',1
 -- 铅酸电池组随CPD30 V1.0停用后闲置195天，且不再被任何生效BOM版本引用
 
 -- ============================================================
--- 13. 质量追溯：批次消耗关系（★召回演示主线）
+-- 13. 质量追溯：批次消耗关系（召回追溯主线）
 -- 场景：PO2采购的人本6205轴承（item_id=5）发现异响
 --       正向消耗路径覆盖：门架批次订单4、CPD20整机订单5
 -- ============================================================
 -- 订单1（缸筒×120）消耗无缝钢管：120×0.8/(1-0.05)=101.05→102米（旧库存+PO4首批）
 INSERT INTO batch_consumption VALUES (1,1, 8,102);
--- 订单2（活塞杆×120）消耗圆钢：120×0.9/(1-0.04)=112.5→113米（历史库存批次，挂PO1圆钢?无→挂旧批次省略）
+-- 订单2（活塞杆×120）消耗圆钢：120×0.9/(1-0.04)=112.5→113米（历史库存批次）
 -- 订单3（起升油缸×40）消耗密封件（PO3 item 7）
 INSERT INTO batch_consumption VALUES (2,3, 7, 40);
--- 订单4（门架×25）消耗：槽钢（PO1 item 4）、链条（PO8 item 15）、6205轴承（PO2 item 5 ★）
+-- 订单4（门架×25）消耗：槽钢（PO1 item 4）、链条（PO8 item 15）、6205轴承（PO2 item 5）
 INSERT INTO batch_consumption VALUES (3,4, 4,639);
 -- 25×24/(1-0.06)=638.3→639米
 INSERT INTO batch_consumption VALUES (4,4,15,205);
 -- 25×8/(1-0.02)=204.1→205米
 INSERT INTO batch_consumption VALUES (5,4, 5,100);
--- 25×4=100套 ★问题批次
--- 订单5（CPD20×15）消耗：锂电池（PO5 item 9）、轮胎（PO6）、驱动桥装配用6205（PO2 item 5 ★）、钢板（PO1）
+-- 25×4=100套，问题批次
+-- 订单5（CPD20×15）消耗：锂电池（PO5 item 9）、轮胎（PO6）、驱动桥装配用6205（PO2 item 5）、钢板（PO1）
 INSERT INTO batch_consumption VALUES (6,5, 9, 15);
 INSERT INTO batch_consumption VALUES (7,5,10, 30);
 INSERT INTO batch_consumption VALUES (8,5,11, 30);
 INSERT INTO batch_consumption VALUES (9,5, 5, 30);
--- 15台×驱动桥2套 ★问题批次
+-- 15台×驱动桥2套，问题批次
 INSERT INTO batch_consumption VALUES (10,5, 1,6848);
 -- 车架钢板 15×420/(1-0.08)=6847.9
 INSERT INTO batch_consumption VALUES (11,5, 3,13564);
 -- 配重生铁 15×850/(1-0.06)=13563.9
--- 订单6（CPD30在制，已完工8台部分）消耗：6205（★）、锂电池、生铁
+-- 订单6（CPD30在制，已完工8台部分）消耗：6205、锂电池、生铁
 INSERT INTO batch_consumption VALUES (12,6, 5, 48);
--- 8台×6套 ★问题批次
+-- 8台×6套，问题批次
 INSERT INTO batch_consumption VALUES (13,6, 9,  8);
 INSERT INTO batch_consumption VALUES (14,6, 3,10639);
 -- 8×1250/(1-0.06)

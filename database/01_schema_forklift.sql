@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 工业制造物料进销存管理系统 · 建表脚本（Oracle 23ai Free / FREEPDB1）
--- 演示领域：电动平衡重叉车制造（CPD15 / CPD20 / CPD30）
+-- 业务领域：电动平衡重叉车制造（CPD15 / CPD20 / CPD30）
 -- 执行用户：DB_Design
 -- 与设计文档差异（已修正项，详见 README）：
 --   1. supplier_price 表字段修正：operator_id→price，补充 valid_from/valid_to
