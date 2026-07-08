@@ -24,25 +24,21 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class LoginData : IEquatable<LoginData>
+    public partial class LoginRequest : IEquatable<LoginRequest>
     {
         /// <summary>
-        /// JWT 访问令牌。
+        /// Gets or Sets UserNo
         /// </summary>
-        /// <value>JWT 访问令牌。</value>
-        /* <example>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</example> */
         [Required]
-        [DataMember(Name="accessToken", EmitDefaultValue=false)]
-        public string AccessToken { get; set; }
+        [DataMember(Name="userNo", EmitDefaultValue=false)]
+        public string UserNo { get; set; }
 
         /// <summary>
-        /// token 过期时间或有效期，具体含义以后端实现为准。
+        /// Gets or Sets Password
         /// </summary>
-        /// <value>token 过期时间或有效期，具体含义以后端实现为准。</value>
-        /* <example>7200</example> */
         [Required]
-        [DataMember(Name="expires", EmitDefaultValue=true)]
-        public decimal Expires { get; set; }
+        [DataMember(Name="password", EmitDefaultValue=false)]
+        public string Password { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -51,9 +47,9 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginData {\n");
-            sb.Append("  AccessToken: ").Append(AccessToken).Append("\n");
-            sb.Append("  Expires: ").Append(Expires).Append("\n");
+            sb.Append("class LoginRequest {\n");
+            sb.Append("  UserNo: ").Append(UserNo).Append("\n");
+            sb.Append("  Password: ").Append(Password).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -76,29 +72,29 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginData)obj);
+            return obj.GetType() == GetType() && Equals((LoginRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginData instances are equal
+        /// Returns true if LoginRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginData to be compared</param>
+        /// <param name="other">Instance of LoginRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginData other)
+        public bool Equals(LoginRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    AccessToken == other.AccessToken ||
-                    AccessToken != null &&
-                    AccessToken.Equals(other.AccessToken)
+                    UserNo == other.UserNo ||
+                    UserNo != null &&
+                    UserNo.Equals(other.UserNo)
                 ) && 
                 (
-                    Expires == other.Expires ||
-                    
-                    Expires.Equals(other.Expires)
+                    Password == other.Password ||
+                    Password != null &&
+                    Password.Equals(other.Password)
                 );
         }
 
@@ -112,10 +108,10 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (AccessToken != null)
-                    hashCode = hashCode * 59 + AccessToken.GetHashCode();
-                    
-                    hashCode = hashCode * 59 + Expires.GetHashCode();
+                    if (UserNo != null)
+                    hashCode = hashCode * 59 + UserNo.GetHashCode();
+                    if (Password != null)
+                    hashCode = hashCode * 59 + Password.GetHashCode();
                 return hashCode;
             }
         }
@@ -123,12 +119,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginData left, LoginData right)
+        public static bool operator ==(LoginRequest left, LoginRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginData left, LoginData right)
+        public static bool operator !=(LoginRequest left, LoginRequest right)
         {
             return !Equals(left, right);
         }

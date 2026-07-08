@@ -1,8 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * 测试
- * 这是一个示例项目
+ * 数据库设计项目 API
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 

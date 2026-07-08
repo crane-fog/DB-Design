@@ -24,22 +24,16 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class LoginResponse : IEquatable<LoginResponse>
+    public partial class ErrorResponse : IEquatable<ErrorResponse>
     {
 
         /// <summary>
-        /// 业务状态码，只使用 200、400、401、403、404、409、500。
+        /// 错误业务状态码，只使用 400、401、403、404、409、500。
         /// </summary>
-        /// <value>业务状态码，只使用 200、400、401、403、404、409、500。</value>
+        /// <value>错误业务状态码，只使用 400、401、403、404、409、500。</value>
         
         public enum CodeEnum
         {
-            
-            /// <summary>
-            /// Enum _200Enum for 200
-            /// </summary>
-            
-            _200Enum = 200,
             
             /// <summary>
             /// Enum _400Enum for 400
@@ -79,29 +73,30 @@ namespace Org.OpenAPITools.Models
         }
 
         /// <summary>
-        /// 业务状态码，只使用 200、400、401、403、404、409、500。
+        /// 错误业务状态码，只使用 400、401、403、404、409、500。
         /// </summary>
-        /// <value>业务状态码，只使用 200、400、401、403、404、409、500。</value>
-        /* <example>200</example> */
+        /// <value>错误业务状态码，只使用 400、401、403、404、409、500。</value>
+        /* <example>400</example> */
         [Required]
         [DataMember(Name="code", EmitDefaultValue=true)]
         public CodeEnum Code { get; set; }
 
         /// <summary>
-        /// 返回结果说明。
+        /// 错误原因说明。
         /// </summary>
-        /// <value>返回结果说明。</value>
-        /* <example>操作成功</example> */
+        /// <value>错误原因说明。</value>
+        /* <example>请求参数错误</example> */
         [Required]
         [DataMember(Name="message", EmitDefaultValue=false)]
         public string Message { get; set; }
 
         /// <summary>
-        /// Gets or Sets Data
+        /// 错误响应无业务数据，固定返回 null。
         /// </summary>
+        /// <value>错误响应无业务数据，固定返回 null。</value>
         [Required]
         [DataMember(Name="data", EmitDefaultValue=true)]
-        public LoginData Data { get; set; }
+        public Object Data { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -110,7 +105,7 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginResponse {\n");
+            sb.Append("class ErrorResponse {\n");
             sb.Append("  Code: ").Append(Code).Append("\n");
             sb.Append("  Message: ").Append(Message).Append("\n");
             sb.Append("  Data: ").Append(Data).Append("\n");
@@ -136,15 +131,15 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginResponse)obj);
+            return obj.GetType() == GetType() && Equals((ErrorResponse)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginResponse instances are equal
+        /// Returns true if ErrorResponse instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginResponse to be compared</param>
+        /// <param name="other">Instance of ErrorResponse to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginResponse other)
+        public bool Equals(ErrorResponse other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -190,12 +185,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginResponse left, LoginResponse right)
+        public static bool operator ==(ErrorResponse left, ErrorResponse right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginResponse left, LoginResponse right)
+        public static bool operator !=(ErrorResponse left, ErrorResponse right)
         {
             return !Equals(left, right);
         }

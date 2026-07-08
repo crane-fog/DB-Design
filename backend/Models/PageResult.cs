@@ -24,25 +24,42 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class LoginData : IEquatable<LoginData>
+    public partial class PageResult : IEquatable<PageResult>
     {
         /// <summary>
-        /// JWT 访问令牌。
+        /// 数据总数。
         /// </summary>
-        /// <value>JWT 访问令牌。</value>
-        /* <example>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</example> */
+        /// <value>数据总数。</value>
+        /* <example>25</example> */
         [Required]
-        [DataMember(Name="accessToken", EmitDefaultValue=false)]
-        public string AccessToken { get; set; }
+        [DataMember(Name="total", EmitDefaultValue=true)]
+        public int Total { get; set; }
 
         /// <summary>
-        /// token 过期时间或有效期，具体含义以后端实现为准。
+        /// 当前页码。
         /// </summary>
-        /// <value>token 过期时间或有效期，具体含义以后端实现为准。</value>
-        /* <example>7200</example> */
+        /// <value>当前页码。</value>
+        /* <example>1</example> */
         [Required]
-        [DataMember(Name="expires", EmitDefaultValue=true)]
-        public decimal Expires { get; set; }
+        [DataMember(Name="page", EmitDefaultValue=true)]
+        public int Page { get; set; }
+
+        /// <summary>
+        /// 每页数据数量。
+        /// </summary>
+        /// <value>每页数据数量。</value>
+        /* <example>10</example> */
+        [Required]
+        [DataMember(Name="page_size", EmitDefaultValue=true)]
+        public int PageSize { get; set; }
+
+        /// <summary>
+        /// 当前页数据。
+        /// </summary>
+        /// <value>当前页数据。</value>
+        [Required]
+        [DataMember(Name="records", EmitDefaultValue=false)]
+        public List<Object> Records { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -51,9 +68,11 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginData {\n");
-            sb.Append("  AccessToken: ").Append(AccessToken).Append("\n");
-            sb.Append("  Expires: ").Append(Expires).Append("\n");
+            sb.Append("class PageResult {\n");
+            sb.Append("  Total: ").Append(Total).Append("\n");
+            sb.Append("  Page: ").Append(Page).Append("\n");
+            sb.Append("  PageSize: ").Append(PageSize).Append("\n");
+            sb.Append("  Records: ").Append(Records).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -76,29 +95,40 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginData)obj);
+            return obj.GetType() == GetType() && Equals((PageResult)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginData instances are equal
+        /// Returns true if PageResult instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginData to be compared</param>
+        /// <param name="other">Instance of PageResult to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginData other)
+        public bool Equals(PageResult other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    AccessToken == other.AccessToken ||
-                    AccessToken != null &&
-                    AccessToken.Equals(other.AccessToken)
+                    Total == other.Total ||
+                    
+                    Total.Equals(other.Total)
                 ) && 
                 (
-                    Expires == other.Expires ||
+                    Page == other.Page ||
                     
-                    Expires.Equals(other.Expires)
+                    Page.Equals(other.Page)
+                ) && 
+                (
+                    PageSize == other.PageSize ||
+                    
+                    PageSize.Equals(other.PageSize)
+                ) && 
+                (
+                    Records == other.Records ||
+                    Records != null &&
+                    other.Records != null &&
+                    Records.SequenceEqual(other.Records)
                 );
         }
 
@@ -112,10 +142,14 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (AccessToken != null)
-                    hashCode = hashCode * 59 + AccessToken.GetHashCode();
                     
-                    hashCode = hashCode * 59 + Expires.GetHashCode();
+                    hashCode = hashCode * 59 + Total.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + Page.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + PageSize.GetHashCode();
+                    if (Records != null)
+                    hashCode = hashCode * 59 + Records.GetHashCode();
                 return hashCode;
             }
         }
@@ -123,12 +157,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginData left, LoginData right)
+        public static bool operator ==(PageResult left, PageResult right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginData left, LoginData right)
+        public static bool operator !=(PageResult left, PageResult right)
         {
             return !Equals(left, right);
         }

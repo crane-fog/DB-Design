@@ -1,8 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * 测试
- * 这是一个示例项目
+ * 数据库设计项目 API
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -23,33 +23,199 @@ import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerMap } from './base';
 
-export interface LoginPost200Response {
-    'msg': string;
-    'accessToken'?: string;
-    'expires'?: number;
+export interface ApiResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ApiResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    /**
+     * 实际业务数据，无数据时返回 null。
+     */
+    'data': any | null;
 }
-export interface RegisterPost200Response {
-    'msg': string;
+
+export const ApiResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ApiResponseCodeEnum = typeof ApiResponseCodeEnum[keyof typeof ApiResponseCodeEnum];
+
+export interface ErrorResponse {
+    /**
+     * 错误业务状态码，只使用 400、401、403、404、409、500。
+     */
+    'code': ErrorResponseCodeEnum;
+    /**
+     * 错误原因说明。
+     */
+    'message': string;
+    /**
+     * 错误响应无业务数据，固定返回 null。
+     */
+    'data': any | null;
 }
+
+export const ErrorResponseCodeEnum = {
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ErrorResponseCodeEnum = typeof ErrorResponseCodeEnum[keyof typeof ErrorResponseCodeEnum];
+
+export interface LoginData {
+    /**
+     * JWT 访问令牌。
+     */
+    'accessToken': string;
+    /**
+     * token 过期时间或有效期，具体含义以后端实现为准。
+     */
+    'expires': number;
+}
+export interface LoginRequest {
+    'userNo': string;
+    'password': string;
+}
+export interface LoginResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': LoginResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': LoginData | null;
+}
+
+export const LoginResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type LoginResponseCodeEnum = typeof LoginResponseCodeEnum[keyof typeof LoginResponseCodeEnum];
+
+export interface PageQuery {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    'page'?: number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size'?: number;
+}
+export interface PageResult {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    /**
+     * 当前页数据。
+     */
+    'records': Array<any>;
+}
+export interface RegisterRequest {
+    'userNo': string;
+    'password': string;
+    'userName': string;
+    'phone': string;
+    'email'?: string;
+}
+export interface RegisterResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': RegisterResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': any | null;
+}
+
+export const RegisterResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type RegisterResponseCodeEnum = typeof RegisterResponseCodeEnum[keyof typeof RegisterResponseCodeEnum];
+
 export interface UserData {
     'id'?: number;
     'name'?: string;
     'createdAt'?: string;
 }
+export interface UserTestResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': UserTestResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<UserData> | null;
+}
+
+export const UserTestResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type UserTestResponseCodeEnum = typeof UserTestResponseCodeEnum[keyof typeof UserTestResponseCodeEnum];
+
 
 /**
- * DefaultApi - axios parameter creator
+ * SystemApi - axios parameter creator
  */
-export const DefaultApiAxiosParamCreator = function (configuration?: Configuration) {
+export const SystemApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 
+         * 需要登录后访问，调用时请求头使用 Authorization: Bearer <token>。
          * @summary 获取测试用户数据表
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
         getUserTest: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/user-test`;
+            const localVarPath = `/api/getUserTest`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -77,15 +243,16 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             };
         },
         /**
-         * 
+         * 登录接口不需要携带 Authorization 请求头。
          * @summary 登录
-         * @param {string} [userNo] 
-         * @param {string} [password] 
+         * @param {LoginRequest} loginRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost: async (userNo?: string, password?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/login`;
+        login: async (loginRequest: LoginRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'loginRequest' is not null or undefined
+            assertParamExists('login', 'loginRequest', loginRequest)
+            const localVarPath = `/api/login`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -96,23 +263,14 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new URLSearchParams();
 
-
-            if (userNo !== undefined) { 
-                localVarFormParams.set('userNo', userNo as any);
-            }
-
-            if (password !== undefined) { 
-                localVarFormParams.set('password', password as any);
-            }
-            localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
+            localVarHeaderParameter['Content-Type'] = 'application/json';
             localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = localVarFormParams.toString();
+            localVarRequestOptions.data = serializeDataIfNeeded(loginRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -120,26 +278,16 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             };
         },
         /**
-         * 
+         * 注册接口不需要携带 Authorization 请求头。
          * @summary 注册系统用户
-         * @param {string} userNo 
-         * @param {string} password 
-         * @param {string} userName 
-         * @param {string} phone 
-         * @param {string} [email] 
+         * @param {RegisterRequest} registerRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        registerPost: async (userNo: string, password: string, userName: string, phone: string, email?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'userNo' is not null or undefined
-            assertParamExists('registerPost', 'userNo', userNo)
-            // verify required parameter 'password' is not null or undefined
-            assertParamExists('registerPost', 'password', password)
-            // verify required parameter 'userName' is not null or undefined
-            assertParamExists('registerPost', 'userName', userName)
-            // verify required parameter 'phone' is not null or undefined
-            assertParamExists('registerPost', 'phone', phone)
-            const localVarPath = `/register`;
+        register: async (registerRequest: RegisterRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'registerRequest' is not null or undefined
+            assertParamExists('register', 'registerRequest', registerRequest)
+            const localVarPath = `/api/register`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -150,35 +298,14 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new URLSearchParams();
 
-
-            if (userNo !== undefined) { 
-                localVarFormParams.set('userNo', userNo as any);
-            }
-
-            if (password !== undefined) { 
-                localVarFormParams.set('password', password as any);
-            }
-
-            if (userName !== undefined) { 
-                localVarFormParams.set('userName', userName as any);
-            }
-
-            if (phone !== undefined) { 
-                localVarFormParams.set('phone', phone as any);
-            }
-
-            if (email !== undefined) { 
-                localVarFormParams.set('email', email as any);
-            }
-            localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
+            localVarHeaderParameter['Content-Type'] = 'application/json';
             localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = localVarFormParams.toString();
+            localVarRequestOptions.data = serializeDataIfNeeded(registerRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -189,153 +316,138 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
 };
 
 /**
- * DefaultApi - functional programming interface
+ * SystemApi - functional programming interface
  */
-export const DefaultApiFp = function(configuration?: Configuration) {
-    const localVarAxiosParamCreator = DefaultApiAxiosParamCreator(configuration)
+export const SystemApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = SystemApiAxiosParamCreator(configuration)
     return {
         /**
-         * 
+         * 需要登录后访问，调用时请求头使用 Authorization: Bearer <token>。
          * @summary 获取测试用户数据表
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getUserTest(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<UserData>>> {
+        async getUserTest(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserTestResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.getUserTest(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.getUserTest']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.getUserTest']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 
+         * 登录接口不需要携带 Authorization 请求头。
          * @summary 登录
-         * @param {string} [userNo] 
-         * @param {string} [password] 
+         * @param {LoginRequest} loginRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async loginPost(userNo?: string, password?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(userNo, password, options);
+        async login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.login(loginRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.loginPost']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.login']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 
+         * 注册接口不需要携带 Authorization 请求头。
          * @summary 注册系统用户
-         * @param {string} userNo 
-         * @param {string} password 
-         * @param {string} userName 
-         * @param {string} phone 
-         * @param {string} [email] 
+         * @param {RegisterRequest} registerRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async registerPost(userNo: string, password: string, userName: string, phone: string, email?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RegisterPost200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.registerPost(userNo, password, userName, phone, email, options);
+        async register(registerRequest: RegisterRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RegisterResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.register(registerRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.registerPost']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.register']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
 };
 
 /**
- * DefaultApi - factory interface
+ * SystemApi - factory interface
  */
-export const DefaultApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
-    const localVarFp = DefaultApiFp(configuration)
+export const SystemApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = SystemApiFp(configuration)
     return {
         /**
-         * 
+         * 需要登录后访问，调用时请求头使用 Authorization: Bearer <token>。
          * @summary 获取测试用户数据表
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getUserTest(options?: RawAxiosRequestConfig): AxiosPromise<Array<UserData>> {
+        getUserTest(options?: RawAxiosRequestConfig): AxiosPromise<UserTestResponse> {
             return localVarFp.getUserTest(options).then((request) => request(axios, basePath));
         },
         /**
-         * 
+         * 登录接口不需要携带 Authorization 请求头。
          * @summary 登录
-         * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+         * @param {SystemApiLoginRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
-            return localVarFp.loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(axios, basePath));
+        login(requestParameters: SystemApiLoginRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponse> {
+            return localVarFp.login(requestParameters.loginRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 
+         * 注册接口不需要携带 Authorization 请求头。
          * @summary 注册系统用户
-         * @param {DefaultApiRegisterPostRequest} requestParameters Request parameters.
+         * @param {SystemApiRegisterRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        registerPost(requestParameters: DefaultApiRegisterPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<RegisterPost200Response> {
-            return localVarFp.registerPost(requestParameters.userNo, requestParameters.password, requestParameters.userName, requestParameters.phone, requestParameters.email, options).then((request) => request(axios, basePath));
+        register(requestParameters: SystemApiRegisterRequest, options?: RawAxiosRequestConfig): AxiosPromise<RegisterResponse> {
+            return localVarFp.register(requestParameters.registerRequest, options).then((request) => request(axios, basePath));
         },
     };
 };
 
 /**
- * Request parameters for loginPost operation in DefaultApi.
+ * Request parameters for login operation in SystemApi.
  */
-export interface DefaultApiLoginPostRequest {
-    readonly userNo?: string
-
-    readonly password?: string
+export interface SystemApiLoginRequest {
+    readonly loginRequest: LoginRequest
 }
 
 /**
- * Request parameters for registerPost operation in DefaultApi.
+ * Request parameters for register operation in SystemApi.
  */
-export interface DefaultApiRegisterPostRequest {
-    readonly userNo: string
-
-    readonly password: string
-
-    readonly userName: string
-
-    readonly phone: string
-
-    readonly email?: string
+export interface SystemApiRegisterRequest {
+    readonly registerRequest: RegisterRequest
 }
 
 /**
- * DefaultApi - object-oriented interface
+ * SystemApi - object-oriented interface
  */
-export class DefaultApi extends BaseAPI {
+export class SystemApi extends BaseAPI {
     /**
-     * 
+     * 需要登录后访问，调用时请求头使用 Authorization: Bearer <token>。
      * @summary 获取测试用户数据表
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public getUserTest(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getUserTest(options).then((request) => request(this.axios, this.basePath));
+        return SystemApiFp(this.configuration).getUserTest(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * 
+     * 登录接口不需要携带 Authorization 请求头。
      * @summary 登录
-     * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+     * @param {SystemApiLoginRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(this.axios, this.basePath));
+    public login(requestParameters: SystemApiLoginRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).login(requestParameters.loginRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * 
+     * 注册接口不需要携带 Authorization 请求头。
      * @summary 注册系统用户
-     * @param {DefaultApiRegisterPostRequest} requestParameters Request parameters.
+     * @param {SystemApiRegisterRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public registerPost(requestParameters: DefaultApiRegisterPostRequest, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).registerPost(requestParameters.userNo, requestParameters.password, requestParameters.userName, requestParameters.phone, requestParameters.email, options).then((request) => request(this.axios, this.basePath));
+    public register(requestParameters: SystemApiRegisterRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).register(requestParameters.registerRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

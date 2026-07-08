@@ -1,7 +1,7 @@
 /*
- * 测试
+ * 数据库设计项目 API
  *
- * 这是一个示例项目
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
