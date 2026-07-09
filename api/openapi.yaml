@@ -19,10 +19,60 @@ tags:
   - name: system
     description: 系统管理模块
 paths:
-  /api/login:
-    $ref: './system.yaml#/paths/~1api~1login'
-  /api/register:
-    $ref: './system.yaml#/paths/~1api~1register'
+  /api/listMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1listMaterialData'
+  /api/getMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1getMaterialData'
+  /api/addMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1addMaterialData'
+  /api/updateMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateMaterialData'
+  /api/deleteMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteMaterialData'
+  /api/listMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1listMaterialCategoryData'
+  /api/addMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1addMaterialCategoryData'
+  /api/updateMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateMaterialCategoryData'
+  /api/deleteMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteMaterialCategoryData'
+  /api/listBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1listBomVersionData'
+  /api/getBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1getBomVersionData'
+  /api/addBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1addBomVersionData'
+  /api/updateBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateBomVersionData'
+  /api/deleteBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteBomVersionData'
+  /api/listBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1listBomData'
+  /api/getBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1getBomData'
+  /api/addBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1addBomData'
+  /api/updateBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateBomData'
+  /api/deleteBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteBomData'
+  /api/checkBomCycleDependency:
+    $ref: './material_bom.yaml#/paths/~1api~1checkBomCycleDependency'
+  /api/getBomTreeData:
+    $ref: './material_bom.yaml#/paths/~1api~1getBomTreeData'
+  /api/getReverseTraceData:
+    $ref: './material_bom.yaml#/paths/~1api~1getReverseTraceData'
+  /api/calculateProductCost:
+    $ref: './material_bom.yaml#/paths/~1api~1calculateProductCost'
+  /api/calculateLossCompensation:
+    $ref: './material_bom.yaml#/paths/~1api~1calculateLossCompensation'
+  /api/getMaterialStockData:
+    $ref: './material_bom.yaml#/paths/~1api~1getMaterialStockData'
+  /api/addRequirementAnalysis:
+    $ref: './material_bom.yaml#/paths/~1api~1addRequirementAnalysis'
+  /api/getRequirementAnalysis:
+    $ref: './material_bom.yaml#/paths/~1api~1getRequirementAnalysis'
   /api/calculateMaterialShortage:
     $ref: './inventory.yaml#/paths/~1api~1calculateMaterialShortage'
   /api/listInventoryAlert:
@@ -139,6 +189,58 @@ paths:
     $ref: './quality_traceability.yaml#/paths/~1api~1traceMaterialBatch'
   /api/analyzeQualityImpact:
     $ref: './quality_traceability.yaml#/paths/~1api~1analyzeQualityImpact'
+  /api/login:
+    $ref: './system.yaml#/paths/~1api~1login'
+  /api/register:
+    $ref: './system.yaml#/paths/~1api~1register'
+  /api/listUserData:
+    $ref: './system.yaml#/paths/~1api~1listUserData'
+  /api/getUserData:
+    $ref: './system.yaml#/paths/~1api~1getUserData'
+  /api/addUserData:
+    $ref: './system.yaml#/paths/~1api~1addUserData'
+  /api/updateUserData:
+    $ref: './system.yaml#/paths/~1api~1updateUserData'
+  /api/deleteUserData:
+    $ref: './system.yaml#/paths/~1api~1deleteUserData'
+  /api/listRoleData:
+    $ref: './system.yaml#/paths/~1api~1listRoleData'
+  /api/getRoleData:
+    $ref: './system.yaml#/paths/~1api~1getRoleData'
+  /api/addRoleData:
+    $ref: './system.yaml#/paths/~1api~1addRoleData'
+  /api/updateRoleData:
+    $ref: './system.yaml#/paths/~1api~1updateRoleData'
+  /api/deleteRoleData:
+    $ref: './system.yaml#/paths/~1api~1deleteRoleData'
+  /api/listPermissionData:
+    $ref: './system.yaml#/paths/~1api~1listPermissionData'
+  /api/getPermissionData:
+    $ref: './system.yaml#/paths/~1api~1getPermissionData'
+  /api/addPermissionData:
+    $ref: './system.yaml#/paths/~1api~1addPermissionData'
+  /api/updatePermissionData:
+    $ref: './system.yaml#/paths/~1api~1updatePermissionData'
+  /api/deletePermissionData:
+    $ref: './system.yaml#/paths/~1api~1deletePermissionData'
+  /api/listUserRoleData:
+    $ref: './system.yaml#/paths/~1api~1listUserRoleData'
+  /api/addUserRole:
+    $ref: './system.yaml#/paths/~1api~1addUserRole'
+  /api/deleteUserRole:
+    $ref: './system.yaml#/paths/~1api~1deleteUserRole'
+  /api/listRolePermissionData:
+    $ref: './system.yaml#/paths/~1api~1listRolePermissionData'
+  /api/addRolePermission:
+    $ref: './system.yaml#/paths/~1api~1addRolePermission'
+  /api/deleteRolePermission:
+    $ref: './system.yaml#/paths/~1api~1deleteRolePermission'
+  /api/listLoginRecordData:
+    $ref: './system.yaml#/paths/~1api~1listLoginRecordData'
+  /api/listOperationLogData:
+    $ref: './system.yaml#/paths/~1api~1listOperationLogData'
+  /api/addOperationLogData:
+    $ref: './system.yaml#/paths/~1api~1addOperationLogData'
 components:
   schemas:
     ApiResponse:
