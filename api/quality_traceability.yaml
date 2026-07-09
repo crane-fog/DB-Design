@@ -108,19 +108,32 @@ paths:
               schema:
                 $ref: './common.yaml#/components/schemas/ApiResponse'
   /api/traceProductBatch:
-    post:
+    get:
       summary: 正向追溯成品批次
       description: 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: traceProductBatch
       tags: [quality_traceability]
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProductBatchTraceRequest'
+      parameters:
+        - name: order_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: batch_no
+          in: query
+          required: false
+          description: 成品批次号，来自完工入库单。order_id 和 batch_no 至少提供一个，由后端校验。
+          schema:
+            type: string
+        - name: include_supplier
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -129,19 +142,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductBatchTraceResponse'
   /api/traceMaterialBatch:
-    post:
+    get:
       summary: 反向追溯原材料批次
       description: 从采购订单明细、原材料编号或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id 或到货日期范围至少提供一种。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: traceMaterialBatch
       tags: [quality_traceability]
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MaterialBatchTraceRequest'
+      parameters:
+        - name: item_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: material_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: receive_date_start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: receive_date_end
+          in: query
+          required: false
+          description: 到货日期结束。item_id、material_id 或完整到货日期范围至少提供一种，由后端校验。
+          schema:
+            type: string
+            format: date
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -198,7 +231,7 @@ components:
         production_order:
           $ref: './production.yaml#/components/schemas/ProductionOrderBrief'
         purchase_item:
-          $ref: './purchase.yaml#/components/schemas/PurchaseOrderItemBrief'
+          $ref: './purchase.yaml#/components/schemas/PurchaseOrderDetailLine'
     BatchConsumptionCreateRequest:
       type: object
       required: [order_id, item_id, consume_qty]
@@ -213,42 +246,6 @@ components:
           type: number
           minimum: 0
           exclusiveMinimum: true
-    ProductBatchTraceRequest:
-      type: object
-      anyOf:
-        - required: [order_id]
-        - required: [batch_no]
-      properties:
-        order_id:
-          type: integer
-          format: int64
-        batch_no:
-          type: string
-          description: 成品批次号，来自完工入库单。
-        include_supplier:
-          type: boolean
-          default: true
-      description: order_id 和 batch_no 至少提供一个。
-    MaterialBatchTraceRequest:
-      type: object
-      anyOf:
-        - required: [item_id]
-        - required: [material_id]
-        - required: [receive_date_start, receive_date_end]
-      properties:
-        item_id:
-          type: integer
-          format: int64
-        material_id:
-          type: integer
-          format: int64
-        receive_date_start:
-          type: string
-          format: date
-        receive_date_end:
-          type: string
-          format: date
-      description: item_id、material_id 或到货日期范围至少提供一种。
     BatchConsumptionUpdateRequest:
       allOf:
         - $ref: '#/components/schemas/BatchConsumptionCreateRequest'
@@ -372,10 +369,6 @@ components:
           type: number
     QualityImpactAnalyzeRequest:
       type: object
-      anyOf:
-        - required: [item_ids]
-        - required: [material_id]
-        - required: [receive_date_start, receive_date_end]
       properties:
         item_ids:
           type: array
