@@ -222,10 +222,8 @@ components:
         order_id:
           type: integer
           format: int64
-          nullable: true
         batch_no:
           type: string
-          nullable: true
           description: 成品批次号，来自完工入库单。
         include_supplier:
           type: boolean
@@ -241,19 +239,15 @@ components:
         item_id:
           type: integer
           format: int64
-          nullable: true
         material_id:
           type: integer
           format: int64
-          nullable: true
         receive_date_start:
           type: string
           format: date
-          nullable: true
         receive_date_end:
           type: string
           format: date
-          nullable: true
       description: item_id、material_id 或到货日期范围至少提供一种。
     BatchConsumptionUpdateRequest:
       allOf:
@@ -393,15 +387,12 @@ components:
         material_id:
           type: integer
           format: int64
-          nullable: true
         receive_date_start:
           type: string
           format: date
-          nullable: true
         receive_date_end:
           type: string
           format: date
-          nullable: true
       description: item_ids、material_id 或到货日期范围至少提供一种过滤条件。
     QualityImpactAnalyzeResult:
       type: object
