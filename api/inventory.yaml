@@ -395,25 +395,50 @@ components:
         gross_requirement:
           type: number
           format: decimal
-          description: 含损耗补偿后的总毛需求。
+          readOnly: true
+          minimum: 0
+          description: >
+            毛需求数量，由后端根据请求中的生产产品、生产数量和 BOM 版本递归展开 bom.quantity，
+            并按 bom.loss_rate 做损耗补偿后汇总得到。单位与物料 material.unit 一致，
+            保留两位小数，取值范围大于等于 0；当 BOM 明细不存在时按 0 处理。
         available_qty:
           type: number
           format: decimal
+          minimum: 0
+          description: 库存可用数量，来源于 material_stock.available_qty，单位与物料 material.unit 一致，取值范围大于等于 0。
         in_transit_qty:
           type: number
           format: decimal
+          readOnly: true
+          minimum: 0
+          description: >
+            在途数量，由后端汇总 purchase_order_item 中同一 material_id 且采购订单状态为 submitted
+            或 partial_received 的未到货数量 sum(quantity - received_qty) 得到。单位与物料
+            material.unit 一致，取值范围大于等于 0；没有匹配采购明细时返回 0。
         safety_stock:
           type: number
           format: decimal
+          minimum: 0
+          description: 安全库存数量，来源于 material.safety_stock，单位与物料 material.unit 一致，取值范围大于等于 0；为空时按 0 处理。
         net_shortage_qty:
           type: number
           format: decimal
+          readOnly: true
           minimum: 0
-          description: max(毛需求 - 可用数量 - 在途数量 + 安全库存, 0)。
+          description: >
+            净缺料数量，由后端根据 gross_requirement、material_stock.available_qty、
+            在途数量和 material.safety_stock 统一计算，公式为
+            max(gross_requirement - available_qty - in_transit_qty + safety_stock, 0)。
+            单位与物料 material.unit 一致，保留两位小数，取值范围大于等于 0。
         suggested_purchase_qty:
           type: number
           format: decimal
+          readOnly: true
           minimum: 0
+          description: >
+            建议采购数量，由后端基于 net_shortage_qty 得到，当前口径为 suggested_purchase_qty = net_shortage_qty。
+            单位与物料 material.unit 一致，保留两位小数，取值范围大于等于 0；后续如引入最小采购批量或包装规格，
+            应在后端统一调整该字段计算逻辑。
     InventoryAlertEvent:
       type: object
       required: [alert_id, material_id, alert_type, available_qty, threshold, alert_time, status]
@@ -561,6 +586,12 @@ components:
               shortage_qty:
                 type: number
                 format: decimal
+                readOnly: true
+                minimum: 0
+                description: >
+                  库存锁定缺口数量，由后端在锁定前根据请求锁定数量 required_qty 与
+                  material_stock.available_qty 计算，公式为 max(required_qty - available_qty, 0)。
+                  单位与物料 material.unit 一致，取值范围大于等于 0。
     ObsoleteMaterialDetectRequest:
       type: object
       required: [idle_days_threshold]
@@ -718,6 +749,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/InventoryAlertEvent'
               nullable: true
@@ -727,6 +759,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/InventoryAlertPageData'
               nullable: true
@@ -745,6 +778,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/MaterialStockLockData'
               nullable: true
@@ -754,6 +788,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/StockLockRecord'
               nullable: true
@@ -763,6 +798,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/StockLockRecordPageData'
               nullable: true
@@ -796,6 +832,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/ObsoleteMaterialDetection'
               nullable: true
@@ -805,6 +842,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/ObsoleteMaterialPageData'
               nullable: true
@@ -823,6 +861,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/CompletionInboundOrder'
               nullable: true
@@ -832,6 +871,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/CompletionInboundPageData'
               nullable: true

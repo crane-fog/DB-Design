@@ -118,7 +118,7 @@ paths:
   /api/createPurchaseOrderDraftFromShortage:
     post:
       summary: 根据缺口生成采购订单草稿
-      description: 读取缺口计算结果中的建议采购量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：suggested_purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+      description: 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
       operationId: createPurchaseOrderDraftFromShortage
       tags: [purchase]
       security:
@@ -367,12 +367,20 @@ components:
         line_amount:
           type: number
           format: decimal
+          readOnly: true
           minimum: 0
+          description: >
+            明细金额，由后端根据 purchase_order_item.quantity 与 purchase_order_item.unit_price
+            计算，公式为 quantity * unit_price。单位为元，保留两位小数，取值范围大于等于 0。
         receive_progress:
           type: number
           format: decimal
+          readOnly: true
           minimum: 0
           maximum: 1
+          description: >
+            明细到货进度，由后端根据 purchase_order_item.received_qty 与 purchase_order_item.quantity
+            计算，公式为 received_qty / quantity。取值范围为 0 到 1；当 quantity 为 0 时返回 0。
     PurchaseOrder:
       type: object
       required: [order_id, status, supplier, order_date, expected_date, buyer_id, total_amount, receive_progress, is_overdue, details]
@@ -400,17 +408,35 @@ components:
         total_amount:
           type: number
           format: decimal
+          readOnly: true
           minimum: 0
+          description: >
+            订单总金额，来源于 purchase_order.total_amount，由后端在新增、收货状态更新或明细变更时
+            统一按所有明细 sum(quantity * unit_price) 计算并保存。单位为元，保留两位小数，
+            取值范围大于等于 0。
         receive_progress:
           type: number
           format: decimal
+          readOnly: true
           minimum: 0
           maximum: 1
+          description: >
+            订单整体到货进度，由后端汇总采购明细计算，公式为
+            sum(purchase_order_item.received_qty) / sum(purchase_order_item.quantity)。
+            取值范围为 0 到 1；当明细总采购数量为 0 时返回 0。
         is_overdue:
           type: boolean
+          readOnly: true
+          description: >
+            是否逾期，由后端根据 purchase_order.expected_date、purchase_order.status 和当前日期判断。
+            当当前日期晚于 expected_date，且 status 不为 completed 或 cancelled 时为 true，否则为 false。
         overdue_days:
           type: integer
+          readOnly: true
           minimum: 0
+          description: >
+            逾期天数，由后端在 is_overdue 为 true 时按当前日期 - purchase_order.expected_date 计算，
+            单位为天，取值范围大于等于 0；当订单未逾期、已完成或已取消时返回 0。
         details:
           type: array
           items:
@@ -462,20 +488,26 @@ components:
           minItems: 1
           items:
             type: object
-            required: [material_id, suggested_purchase_qty]
+            required: [material_id, purchase_qty]
             properties:
               material_id:
                 type: integer
                 format: int64
-              suggested_purchase_qty:
+              purchase_qty:
                 type: number
                 format: decimal
                 minimum: 0
                 exclusiveMinimum: true
+                description: >
+                  用户确认的本次采购数量，通常来自库存缺口计算响应中的 suggested_purchase_qty，
+                  但作为请求字段时表示前端提交的采购数量。单位与物料 material.unit 一致，必须大于 0。
               supplier_id:
                 type: integer
                 format: int64
                 nullable: true
+                description: >
+                  指定供应商编号。为空时后端使用 material.default_supplier_id；仍为空则该物料进入
+                  unassigned_items，不生成采购订单明细。
     PurchaseOrderActionRequest:
       type: object
       required: [order_id, operator_id]
@@ -577,6 +609,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/PurchaseOrder'
               nullable: true
@@ -586,6 +619,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/PurchaseOrderPageData'
               nullable: true
@@ -622,15 +656,19 @@ components:
                       material_id:
                         type: integer
                         format: int64
-                      suggested_purchase_qty:
+                      purchase_qty:
                         type: number
                         format: decimal
+                        minimum: 0
+                        exclusiveMinimum: true
+                        description: 用户确认但因缺少供应商而未生成采购草稿的采购数量，单位与物料 material.unit 一致。
     PurchaseReceiptResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/PurchaseReceipt'
               nullable: true
@@ -640,6 +678,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/PurchaseReceiptPageData'
               nullable: true
@@ -673,6 +712,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/PurchaseOverdueReminder'
               nullable: true
@@ -682,6 +722,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/PurchaseOverdueReminderPageData'
               nullable: true

@@ -31,7 +31,6 @@ components:
           example: 操作成功
         data:
           description: 实际业务数据，无数据时返回 null。
-          nullable: true
           example: null
     ErrorResponse:
       type: object
@@ -56,6 +55,7 @@ components:
           description: 错误原因说明。
           example: 请求参数错误
         data:
+          type: object
           description: 错误响应无业务数据，固定返回 null。
           nullable: true
           example: null

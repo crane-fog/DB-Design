@@ -15,6 +15,7 @@ paths:
       operationId: login
       tags:
         - system
+      security: []
       parameters: []
       requestBody:
         content:
@@ -57,6 +58,7 @@ paths:
       operationId: register
       tags:
         - system
+      security: []
       parameters: []
       requestBody:
         content:
@@ -404,6 +406,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/LoginData'
               nullable: true
@@ -439,6 +442,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               nullable: true
               example: null
     UserData:
