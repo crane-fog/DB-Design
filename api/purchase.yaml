@@ -1,11 +1,666 @@
-openapi: 3.0.1
+﻿openapi: 3.0.1
 info:
   title: 采购管理模块 API
-  description: 采购管理模块接口定义。
+  description: 采购管理模块接口定义，覆盖采购订单检索、基于缺口生成订单草稿、交期逾期提醒和分批收货。
   version: 0.1.0
 tags:
   - name: purchase
     description: 采购管理模块
-paths: {}
+paths:
+  /api/listPurchaseOrder:
+    get:
+      summary: 查询采购订单列表
+      description: 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。
+      operationId: listPurchaseOrder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: supplier_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: material_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/PurchaseOrderStatus'
+        - name: order_start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: order_end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: expected_delivery_start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: expected_delivery_end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: purchaser_user_no
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderPageResponse'
+  /api/getPurchaseOrder:
+    get:
+      summary: 查询采购订单详情
+      description: 根据采购订单编号查询主表、明细、供应商和收货进度。
+      operationId: getPurchaseOrder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: purchase_order_no
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderResponse'
+  /api/addPurchaseOrder:
+    post:
+      summary: 新增采购订单草稿
+      description: 手工新增采购订单草稿及明细，初始状态为 draft。
+      operationId: addPurchaseOrder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderResponse'
+  /api/createPurchaseOrderDraftFromShortage:
+    post:
+      summary: 根据缺口生成采购订单草稿
+      description: 读取缺口计算结果中的建议采购量，关联物料默认供应商，并按供应商生成采购订单草稿。
+      operationId: createPurchaseOrderDraftFromShortage
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseDraftFromShortageRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseDraftFromShortageResponse'
+  /api/submitPurchaseOrder:
+    post:
+      summary: 提交采购订单
+      description: 将采购订单从 draft 状态提交为 submitted 状态。
+      operationId: submitPurchaseOrder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderActionRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderResponse'
+  /api/cancelPurchaseOrder:
+    post:
+      summary: 取消采购订单
+      description: 将可取消的采购订单更新为 cancelled 状态。
+      operationId: cancelPurchaseOrder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderActionRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderResponse'
+  /api/addPurchaseReceipt:
+    post:
+      summary: 新增采购收货记录
+      description: 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。
+      operationId: addPurchaseReceipt
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseReceiptCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseReceiptResponse'
+  /api/listPurchaseReceipt:
+    get:
+      summary: 查询采购收货记录
+      description: 分页查询采购订单分批收货记录。
+      operationId: listPurchaseReceipt
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: purchase_order_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: material_no
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseReceiptPageResponse'
+  /api/generatePurchaseOverdueReminder:
+    post:
+      summary: 生成采购逾期提醒
+      description: 对超过预计交货日期且状态未完成的采购订单生成逾期提醒。
+      operationId: generatePurchaseOverdueReminder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOverdueReminderGenerateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOverdueReminderGenerateResponse'
+  /api/listPurchaseOverdueReminder:
+    get:
+      summary: 查询采购逾期提醒
+      description: 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。
+      operationId: listPurchaseOverdueReminder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: purchase_order_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/PurchaseOverdueReminderStatus'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOverdueReminderPageResponse'
+  /api/handlePurchaseOverdueReminder:
+    post:
+      summary: 处理采购逾期提醒
+      description: 将逾期提醒更新为 urged 或 received，并记录处理备注。
+      operationId: handlePurchaseOverdueReminder
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOverdueReminderHandleRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOverdueReminderResponse'
 components:
-  schemas: {}
+  schemas:
+    PurchaseOrderStatus:
+      type: string
+      description: draft 草稿，submitted 已提交，partial_received 部分到货，completed 已完成，cancelled 已取消。
+      enum: [draft, submitted, partial_received, completed, cancelled]
+    PurchaseOverdueReminderStatus:
+      type: string
+      description: pending_urge 待催交，urged 已催交，received 已到货。
+      enum: [pending_urge, urged, received]
+    SupplierBrief:
+      type: object
+      required: [supplier_no, supplier_name]
+      properties:
+        supplier_no:
+          type: string
+          example: S-1001
+        supplier_name:
+          type: string
+          example: 华东钢材供应商
+        contact_name:
+          type: string
+          nullable: true
+        contact_phone:
+          type: string
+          nullable: true
+    PurchaseOrderBrief:
+      type: object
+      required: [purchase_order_no, status, supplier_no]
+      properties:
+        purchase_order_no:
+          type: string
+        status:
+          $ref: '#/components/schemas/PurchaseOrderStatus'
+        supplier_no:
+          type: string
+    PurchaseOrderDetailLine:
+      type: object
+      required: [detail_no, purchase_order_no, material_no, purchase_quantity, received_quantity, unit_price]
+      properties:
+        detail_no:
+          type: string
+        purchase_order_no:
+          type: string
+        material_no:
+          type: string
+        material_name:
+          type: string
+        purchase_quantity:
+          type: number
+          format: decimal
+        received_quantity:
+          type: number
+          format: decimal
+        unit_price:
+          type: number
+          format: decimal
+          minimum: 0
+        line_amount:
+          type: number
+          format: decimal
+          minimum: 0
+        receive_progress:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 1
+    PurchaseOrder:
+      type: object
+      required: [purchase_order_no, status, supplier, order_date, expected_delivery_date, purchaser_user_no, total_amount, receive_progress, is_overdue, details]
+      properties:
+        purchase_order_no:
+          type: string
+        status:
+          $ref: '#/components/schemas/PurchaseOrderStatus'
+        supplier:
+          $ref: '#/components/schemas/SupplierBrief'
+        order_date:
+          type: string
+          format: date
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_completion_date:
+          type: string
+          format: date
+          nullable: true
+        purchaser_user_no:
+          type: string
+        total_amount:
+          type: number
+          format: decimal
+          minimum: 0
+        receive_progress:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 1
+        is_overdue:
+          type: boolean
+        overdue_days:
+          type: integer
+          minimum: 0
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseOrderDetailLine'
+    PurchaseOrderCreateRequest:
+      type: object
+      required: [supplier_no, expected_delivery_date, purchaser_user_no, details]
+      properties:
+        supplier_no:
+          type: string
+        expected_delivery_date:
+          type: string
+          format: date
+        purchaser_user_no:
+          type: string
+        details:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [material_no, purchase_quantity, unit_price]
+            properties:
+              material_no:
+                type: string
+              purchase_quantity:
+                type: number
+                format: decimal
+                minimum: 0
+                exclusiveMinimum: true
+              unit_price:
+                type: number
+                format: decimal
+                minimum: 0
+    PurchaseDraftFromShortageRequest:
+      type: object
+      required: [expected_delivery_date, purchaser_user_no, items]
+      properties:
+        expected_delivery_date:
+          type: string
+          format: date
+        purchaser_user_no:
+          type: string
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [material_no, suggested_purchase_quantity]
+            properties:
+              material_no:
+                type: string
+              suggested_purchase_quantity:
+                type: number
+                format: decimal
+                minimum: 0
+                exclusiveMinimum: true
+              default_supplier_no:
+                type: string
+                nullable: true
+    PurchaseOrderActionRequest:
+      type: object
+      required: [purchase_order_no, operator_user_no]
+      properties:
+        purchase_order_no:
+          type: string
+        operator_user_no:
+          type: string
+    PurchaseReceipt:
+      type: object
+      required: [receipt_no, purchase_order_no, material_no, received_quantity, receipt_date]
+      properties:
+        receipt_no:
+          type: string
+        purchase_order_no:
+          type: string
+        material_no:
+          type: string
+        material_name:
+          type: string
+        received_quantity:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+        receipt_date:
+          type: string
+          format: date
+    PurchaseReceiptCreateRequest:
+      type: object
+      required: [purchase_order_no, material_no, received_quantity, receipt_date]
+      properties:
+        purchase_order_no:
+          type: string
+        material_no:
+          type: string
+        received_quantity:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+        receipt_date:
+          type: string
+          format: date
+    PurchaseOverdueReminder:
+      type: object
+      required: [reminder_no, purchase_order_no, expected_delivery_date, overdue_days, reminder_time, status]
+      properties:
+        reminder_no:
+          type: string
+        purchase_order_no:
+          type: string
+        expected_delivery_date:
+          type: string
+          format: date
+        overdue_days:
+          type: integer
+          minimum: 1
+        reminder_time:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/PurchaseOverdueReminderStatus'
+        handle_remark:
+          type: string
+          nullable: true
+    PurchaseOverdueReminderGenerateRequest:
+      type: object
+      properties:
+        purchase_order_no:
+          type: string
+          nullable: true
+    PurchaseOverdueReminderHandleRequest:
+      type: object
+      required: [reminder_no, status]
+      properties:
+        reminder_no:
+          type: string
+        status:
+          type: string
+          enum: [urged, received]
+        handle_remark:
+          type: string
+          nullable: true
+    PurchaseOrderResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/PurchaseOrder'
+              nullable: true
+    PurchaseOrderPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/PurchaseOrderPageData'
+              nullable: true
+    PurchaseOrderPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchaseOrder'
+    PurchaseDraftFromShortageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+              properties:
+                created_count:
+                  type: integer
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PurchaseOrder'
+                unassigned_items:
+                  type: array
+                  description: 未找到默认供应商而无法生成草稿的物料。
+                  items:
+                    type: object
+                    properties:
+                      material_no:
+                        type: string
+                      suggested_purchase_quantity:
+                        type: number
+                        format: decimal
+    PurchaseReceiptResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/PurchaseReceipt'
+              nullable: true
+    PurchaseReceiptPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/PurchaseReceiptPageData'
+              nullable: true
+    PurchaseReceiptPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchaseReceipt'
+    PurchaseOverdueReminderGenerateResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+              properties:
+                generated_count:
+                  type: integer
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PurchaseOverdueReminder'
+    PurchaseOverdueReminderResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/PurchaseOverdueReminder'
+              nullable: true
+    PurchaseOverdueReminderPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/PurchaseOverdueReminderPageData'
+              nullable: true
+    PurchaseOverdueReminderPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchaseOverdueReminder'
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'

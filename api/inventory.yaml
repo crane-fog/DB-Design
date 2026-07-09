@@ -1,11 +1,784 @@
-openapi: 3.0.1
+﻿openapi: 3.0.1
 info:
   title: 库存管理模块 API
-  description: 库存管理模块接口定义。
+  description: 库存管理模块接口定义，覆盖物料缺口计算、库存预警、物料锁定、废弃物料检测和完工入库。
   version: 0.1.0
 tags:
   - name: inventory
     description: 库存管理模块
-paths: {}
+paths:
+  /api/calculateMaterialShortage:
+    post:
+      summary: 计算物料缺口
+      description: 根据产品编号、生产数量和 BOM 版本递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。
+      operationId: calculateMaterialShortage
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialShortageCalculateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialShortageCalculateResponse'
+  /api/listInventoryAlert:
+    get:
+      summary: 查询库存预警事件
+      description: 分页查询低库存预警事件，支持按物料、状态和触发时间过滤。
+      operationId: listInventoryAlert
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: material_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/InventoryAlertStatus'
+        - name: start_time
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryAlertPageResponse'
+  /api/generateInventoryAlert:
+    post:
+      summary: 生成库存预警事件
+      description: 比较物料可用数量与安全库存阈值，低于阈值时生成 low_stock 预警；同一物料已有 pending 预警时不重复生成。
+      operationId: generateInventoryAlert
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryAlertGenerateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryAlertGenerateResponse'
+  /api/handleInventoryAlert:
+    post:
+      summary: 处理库存预警事件
+      description: 将库存预警事件更新为 handled 或 ignored，并记录处理人和处理时间。
+      operationId: handleInventoryAlert
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryAlertHandleRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryAlertResponse'
+  /api/lockMaterialStock:
+    post:
+      summary: 锁定物料库存
+      description: 为生产订单锁定物料库存，锁定前校验可用数量；不足时拒绝并返回缺口。
+      operationId: lockMaterialStock
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialStockLockRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialStockLockResponse'
+  /api/releaseMaterialStock:
+    post:
+      summary: 释放物料锁定
+      description: 订单取消时反向释放锁定库存，减少已锁定数量并恢复可用数量。
+      operationId: releaseMaterialStock
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialStockReleaseRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLockRecordResponse'
+  /api/listMaterialStockLock:
+    get:
+      summary: 查询物料锁定记录
+      description: 分页查询物料锁定、取消和消耗记录。
+      operationId: listMaterialStockLock
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: production_order_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: material_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/StockLockStatus'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLockRecordPageResponse'
+  /api/detectObsoleteMaterial:
+    post:
+      summary: 检测废弃物料
+      description: 根据最后出库日期、可用数量和闲置天数阈值检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。
+      operationId: detectObsoleteMaterial
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObsoleteMaterialDetectRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObsoleteMaterialDetectResponse'
+  /api/listObsoleteMaterialDetection:
+    get:
+      summary: 查询废弃物料检测结果
+      description: 分页查询废弃物料检测结果，支持按物料、处理状态和检测时间过滤。
+      operationId: listObsoleteMaterialDetection
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: material_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ObsoleteMaterialStatus'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObsoleteMaterialPageResponse'
+  /api/handleObsoleteMaterialDetection:
+    post:
+      summary: 处理废弃物料检测结果
+      description: 将废弃物料检测结果更新为 handled 或 ignored，并记录处理人。
+      operationId: handleObsoleteMaterialDetection
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObsoleteMaterialHandleRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObsoleteMaterialResponse'
+  /api/addCompletionInbound:
+    post:
+      summary: 登记完工入库
+      description: 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料已锁定数量，增加成品可用数量并记录批次号。
+      operationId: addCompletionInbound
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletionInboundCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionInboundResponse'
+  /api/listCompletionInbound:
+    get:
+      summary: 查询完工入库单
+      description: 分页查询完工入库单，支持按生产订单、产品和入库时间过滤。
+      operationId: listCompletionInbound
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: production_order_no
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: product_no
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionInboundPageResponse'
 components:
-  schemas: {}
+  schemas:
+    InventoryAlertStatus:
+      type: string
+      description: pending 待处理，handled 已处理，ignored 已忽略。
+      enum: [pending, handled, ignored]
+    StockLockStatus:
+      type: string
+      description: locked 已锁定，cancelled 已取消，consumed 已消耗。
+      enum: [locked, cancelled, consumed]
+    ObsoleteMaterialStatus:
+      type: string
+      description: pending 待处理，handled 已处理，ignored 已忽略。
+      enum: [pending, handled, ignored]
+    MaterialShortageCalculateRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [product_no, production_quantity, bom_version]
+            properties:
+              product_no:
+                type: string
+                example: P-1001
+              production_quantity:
+                type: number
+                format: decimal
+                minimum: 0
+                exclusiveMinimum: true
+                example: 100
+              bom_version:
+                type: string
+                example: V1.0
+    MaterialShortageItem:
+      type: object
+      required: [material_no, level, gross_requirement, available_quantity, in_transit_quantity, safety_stock, net_shortage]
+      properties:
+        material_no:
+          type: string
+          example: M-1001
+        material_name:
+          type: string
+          example: 钢板
+        parent_material_no:
+          type: string
+          nullable: true
+        level:
+          type: integer
+          minimum: 0
+          example: 2
+        gross_requirement:
+          type: number
+          format: decimal
+          description: 含损耗补偿后的总毛需求。
+        available_quantity:
+          type: number
+          format: decimal
+        in_transit_quantity:
+          type: number
+          format: decimal
+        safety_stock:
+          type: number
+          format: decimal
+        net_shortage:
+          type: number
+          format: decimal
+          minimum: 0
+          description: max(毛需求 - 可用数量 - 在途数量 + 安全库存, 0)。
+        suggested_purchase_quantity:
+          type: number
+          format: decimal
+          minimum: 0
+    InventoryAlertEvent:
+      type: object
+      required: [alert_no, material_no, alert_type, available_quantity, alert_threshold, alert_time, status]
+      properties:
+        alert_no:
+          type: string
+        material_no:
+          type: string
+        material_name:
+          type: string
+        alert_type:
+          type: string
+          enum: [low_stock]
+        available_quantity:
+          type: number
+          format: decimal
+        alert_threshold:
+          type: number
+          format: decimal
+        alert_time:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/InventoryAlertStatus'
+        handler_user_no:
+          type: string
+          nullable: true
+        handle_time:
+          type: string
+          format: date-time
+          nullable: true
+    InventoryAlertGenerateRequest:
+      type: object
+      properties:
+        material_no:
+          type: string
+          nullable: true
+    InventoryAlertHandleRequest:
+      type: object
+      required: [alert_no, status, handler_user_no]
+      properties:
+        alert_no:
+          type: string
+        status:
+          type: string
+          enum: [handled, ignored]
+        handler_user_no:
+          type: string
+    MaterialStockLockRequest:
+      type: object
+      required: [production_order_no, operator_user_no, items]
+      properties:
+        production_order_no:
+          type: string
+        operator_user_no:
+          type: string
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [material_no, lock_quantity]
+            properties:
+              material_no:
+                type: string
+              lock_quantity:
+                type: number
+                format: decimal
+                minimum: 0
+                exclusiveMinimum: true
+    MaterialStockReleaseRequest:
+      type: object
+      required: [lock_no, operator_user_no]
+      properties:
+        lock_no:
+          type: string
+        operator_user_no:
+          type: string
+    StockLockRecord:
+      type: object
+      required: [lock_no, production_order_no, material_no, lock_quantity, status, lock_time, operator_user_no]
+      properties:
+        lock_no:
+          type: string
+        production_order_no:
+          type: string
+        material_no:
+          type: string
+        material_name:
+          type: string
+        lock_quantity:
+          type: number
+          format: decimal
+        status:
+          $ref: '#/components/schemas/StockLockStatus'
+        lock_time:
+          type: string
+          format: date-time
+        release_time:
+          type: string
+          format: date-time
+          nullable: true
+        operator_user_no:
+          type: string
+    MaterialStockLockData:
+      type: object
+      required: [success, records, shortages]
+      properties:
+        success:
+          type: boolean
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockLockRecord'
+        shortages:
+          type: array
+          items:
+            type: object
+            required: [material_no, required_quantity, available_quantity, shortage_quantity]
+            properties:
+              material_no:
+                type: string
+              required_quantity:
+                type: number
+                format: decimal
+              available_quantity:
+                type: number
+                format: decimal
+              shortage_quantity:
+                type: number
+                format: decimal
+    ObsoleteMaterialDetectRequest:
+      type: object
+      required: [idle_days_threshold]
+      properties:
+        idle_days_threshold:
+          type: integer
+          minimum: 1
+        material_no:
+          type: string
+          nullable: true
+    ObsoleteMaterialDetection:
+      type: object
+      required: [detection_no, detection_time, material_no, available_quantity, idle_days, status]
+      properties:
+        detection_no:
+          type: string
+        detection_time:
+          type: string
+          format: date-time
+        material_no:
+          type: string
+        material_name:
+          type: string
+        available_quantity:
+          type: number
+          format: decimal
+        last_outbound_date:
+          type: string
+          format: date
+          nullable: true
+        idle_days:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ObsoleteMaterialStatus'
+        handler_user_no:
+          type: string
+          nullable: true
+    ObsoleteMaterialHandleRequest:
+      type: object
+      required: [detection_no, status, handler_user_no]
+      properties:
+        detection_no:
+          type: string
+        status:
+          type: string
+          enum: [handled, ignored]
+        handler_user_no:
+          type: string
+    CompletionInboundCreateRequest:
+      type: object
+      required: [production_order_no, product_no, bom_version, completed_quantity, qualified_quantity, product_batch_no, operator_user_no]
+      properties:
+        production_order_no:
+          type: string
+        product_no:
+          type: string
+        bom_version:
+          type: string
+        completed_quantity:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+        qualified_quantity:
+          type: number
+          format: decimal
+          minimum: 0
+        product_batch_no:
+          type: string
+        operator_user_no:
+          type: string
+    CompletionInboundOrder:
+      type: object
+      required: [inbound_no, production_order_no, product_no, bom_version, completed_quantity, qualified_quantity, product_batch_no, inbound_time, operator_user_no]
+      properties:
+        inbound_no:
+          type: string
+        production_order_no:
+          type: string
+        product_no:
+          type: string
+        product_name:
+          type: string
+        bom_version:
+          type: string
+        completed_quantity:
+          type: number
+          format: decimal
+        qualified_quantity:
+          type: number
+          format: decimal
+        product_batch_no:
+          type: string
+        inbound_time:
+          type: string
+          format: date-time
+        operator_user_no:
+          type: string
+        consumed_lock_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockLockRecord'
+    MaterialShortageCalculateResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+              required: [calculation_time, records]
+              properties:
+                calculation_time:
+                  type: string
+                  format: date-time
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/MaterialShortageItem'
+    InventoryAlertGenerateResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+              properties:
+                generated_count:
+                  type: integer
+                skipped_pending_count:
+                  type: integer
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/InventoryAlertEvent'
+    InventoryAlertResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/InventoryAlertEvent'
+              nullable: true
+    InventoryAlertPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/InventoryAlertPageData'
+              nullable: true
+    InventoryAlertPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/InventoryAlertEvent'
+    MaterialStockLockResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/MaterialStockLockData'
+              nullable: true
+    StockLockRecordResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/StockLockRecord'
+              nullable: true
+    StockLockRecordPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/StockLockRecordPageData'
+              nullable: true
+    StockLockRecordPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/StockLockRecord'
+    ObsoleteMaterialDetectResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+              properties:
+                detected_count:
+                  type: integer
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ObsoleteMaterialDetection'
+    ObsoleteMaterialResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/ObsoleteMaterialDetection'
+              nullable: true
+    ObsoleteMaterialPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/ObsoleteMaterialPageData'
+              nullable: true
+    ObsoleteMaterialPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/ObsoleteMaterialDetection'
+    CompletionInboundResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/CompletionInboundOrder'
+              nullable: true
+    CompletionInboundPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: '#/components/schemas/CompletionInboundPageData'
+              nullable: true
+    CompletionInboundPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/CompletionInboundOrder'
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'
