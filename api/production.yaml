@@ -985,7 +985,10 @@ components:
         expected_date:
           type: string
           format: date
-      description: 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。order_id 或 material_id、version_id、plan_qty、expected_date 两组条件至少提供一组，由后端校验。
+      anyOf:
+        - required: [order_id]
+        - required: [material_id, version_id, plan_qty, expected_date]
+      description: 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。
     ProductionCapacityEstimateResult:
       type: object
       required: [can_deliver_on_time, material_ready, capacity_ready, estimated_finish_date]

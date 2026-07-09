@@ -386,6 +386,10 @@ components:
         receive_date_end:
           type: string
           format: date
+      anyOf:
+        - required: [item_ids]
+        - required: [material_id]
+        - required: [receive_date_start, receive_date_end]
       description: item_ids、material_id 或到货日期范围至少提供一种过滤条件。
     QualityImpactAnalyzeResult:
       type: object
