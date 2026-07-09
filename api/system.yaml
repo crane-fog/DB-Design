@@ -22,7 +22,7 @@ paths:
             schema:
               $ref: '#/components/schemas/LoginRequest'
             example:
-              userNo: ''
+              employee_no: ''
               password: ''
         required: true
       responses:
@@ -45,7 +45,7 @@ paths:
                   summary: 用户名或密码错误
                   value:
                     code: 400
-                    message: 用户编号或密码错误
+                    message: 工号或密码错误
                     data: null
           headers: {}
 
@@ -64,9 +64,9 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
             example:
-              userNo: ''
+              employee_no: ''
               password: ''
-              userName: ''
+              user_name: ''
               phone: ''
               email: ''
         required: true
@@ -88,7 +88,7 @@ paths:
                   summary: 用户已存在
                   value:
                     code: 409
-                    message: 用户编号已存在
+                    message: 工号已存在
                     data: null
           headers: {}
 
@@ -214,11 +214,29 @@ paths:
             schema:
               type: object
               properties:
-                userId:
+                user_id:
                   type: integer
       responses:
         '200':
           description: 删除成功
+      security:
+        - bearerAuth: []
+
+  /api/addUserRole:
+    post:
+      summary: 给用户分配角色
+      operationId: addUserRole
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+      responses:
+        '200':
+          description: 成功
       security:
         - bearerAuth: []
 
@@ -302,14 +320,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                roleId:
-                  type: integer
-                permissionIds:
-                  type: array
-                  items:
-                    type: integer
+              $ref: '#/components/schemas/RolePermissionAssignRequest'
       responses:
         '200':
           description: 成功
@@ -357,17 +368,17 @@ paths:
       security:
         - bearerAuth: []
 
-
 components:
   schemas:
     LoginRequest:
       type: object
       required:
-        - userNo
+        - employee_no
         - password
       properties:
-        userNo:
+        employee_no:
           type: string
+          description: 工号，唯一约束，用于登录。
           example: ''
         password:
           type: string
@@ -399,19 +410,20 @@ components:
     RegisterRequest:
       type: object
       required:
-        - userNo
+        - employee_no
         - password
-        - userName
+        - user_name
         - phone
       properties:
-        userNo:
+        employee_no:
           type: string
+          description: 工号，唯一约束。
           example: ''
         password:
           type: string
           format: password
           example: ''
-        userName:
+        user_name:
           type: string
           example: ''
         phone:
@@ -456,11 +468,15 @@ components:
     User:
       type: object
       properties:
-        userId:
+        user_id:
           type: integer
-        userNo:
+        employee_no:
           type: string
-        userName:
+        password_hash:
+          type: string
+          writeOnly: true
+          description: 密码哈希值，仅后端持久化使用，不在普通查询响应中返回。
+        user_name:
           type: string
         phone:
           type: string
@@ -471,26 +487,54 @@ components:
           enum:
             - active
             - disabled
+        created_time:
+          type: string
+          format: date-time
+        last_login_time:
+          type: string
+          format: date-time
+          nullable: true
+        pwd_update_time:
+          type: string
+          format: date-time
+          nullable: true
     UserCreateRequest:
       type: object
+      required:
+        - employee_no
+        - password
+        - user_name
+        - phone
       properties:
-        userNo:
+        employee_no:
           type: string
         password:
           type: string
-        userName:
+          format: password
+        user_name:
           type: string
         phone:
           type: string
         email:
           type: string
+          format: email
+        status:
+          type: string
+          enum:
+            - active
+            - disabled
     UserUpdateRequest:
       type: object
+      required:
+        - user_id
       properties:
-        userId:
+        user_id:
           type: integer
           description: 用户编号
-        userName:
+        employee_no:
+          type: string
+          description: 工号
+        user_name:
           type: string
           description: 用户姓名
         phone:
@@ -507,12 +551,13 @@ components:
     Role:
       type: object
       properties:
-        roleId:
+        role_id:
           type: integer
-        roleName:
+        role_name:
           type: string
         description:
           type: string
+          nullable: true
         status:
           type: string
           enum:
@@ -521,26 +566,89 @@ components:
     Permission:
       type: object
       properties:
-        permissionId:
+        permission_id:
           type: integer
-        resourceName:
+        resource:
           type: string
-        operationType:
+        action:
           type: string
+    UserRole:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        role_id:
+          type: integer
+    UserRoleAssignRequest:
+      type: object
+      required:
+        - user_id
+        - role_ids
+      properties:
+        user_id:
+          type: integer
+        role_ids:
+          type: array
+          items:
+            type: integer
+    RolePermission:
+      type: object
+      properties:
+        role_id:
+          type: integer
+        permission_id:
+          type: integer
+    RolePermissionAssignRequest:
+      type: object
+      required:
+        - role_id
+        - permission_ids
+      properties:
+        role_id:
+          type: integer
+        permission_ids:
+          type: array
+          items:
+            type: integer
+    LoginLog:
+      type: object
+      properties:
+        log_id:
+          type: integer
+        user_id:
+          type: integer
+        login_time:
+          type: string
+          format: date-time
+        ip_address:
+          type: string
+        result:
+          type: string
+        fail_reason:
+          type: string
+          nullable: true
     OperationLog:
       type: object
       properties:
-        logId:
+        log_id:
           type: integer
         module:
           type: string
-        operationType:
+        action:
           type: string
-        operatorId:
+        operator_id:
           type: integer
-        operationTime:
+        operate_time:
           type: string
           format: date-time
+        ip_address:
+          type: string
+        before_data:
+          type: object
+          nullable: true
+        after_data:
+          type: object
+          nullable: true
 
   securitySchemes:
     bearerAuth:

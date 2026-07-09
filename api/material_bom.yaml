@@ -80,7 +80,7 @@ paths:
             schema:
               type: object
               properties:
-                materialId:
+                material_id:
                   type: integer
       responses:
         '200':
@@ -197,7 +197,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RequirementAnalysis'
+              $ref: '#/components/schemas/DemandAnalysis'
       responses:
         '200':
           description: 成功
@@ -216,95 +216,115 @@ paths:
       security:
         - bearerAuth: []
 
-
 components:
   schemas:
     Material:
       type: object
       properties:
-        materialId:
+        material_id:
           type: integer
-        materialName:
+        material_name:
           type: string
-        categoryId:
-          type: integer
-        type:
+        material_type:
           type: string
         model:
           type: string
         unit:
           type: string
-        safeStock:
+        category_id:
+          type: integer
+        safety_stock:
           type: number
-        createTime:
+        default_supplier_id:
+          type: integer
+          nullable: true
+        current_version_id:
+          type: integer
+          nullable: true
+        created_by:
+          type: integer
+        created_time:
           type: string
           format: date-time
-        updateTime:
+        updated_time:
           type: string
           format: date-time
     MaterialCategory:
       type: object
       properties:
-        categoryId:
+        category_id:
           type: integer
-        categoryName:
-          type: string
-        description:
+        category_name:
           type: string
     Bom:
       type: object
       properties:
-        bomId:
+        bom_id:
           type: integer
-        productId:
+        parent_material_id:
           type: integer
-        materialId:
+        child_material_id:
+          type: integer
+        version_id:
           type: integer
         quantity:
           type: number
-        lossRate:
+        loss_rate:
           type: number
     BomVersion:
       type: object
       properties:
-        versionId:
+        version_id:
           type: integer
-        bomId:
+        material_id:
           type: integer
-        versionNo:
+        version_no:
           type: string
-        effectiveDate:
+        effective_date:
           type: string
           format: date
-        expireDate:
+        expire_date:
           type: string
           format: date
-        changeReason:
+          nullable: true
+        change_reason:
           type: string
-    MaterialInventory:
+        created_by:
+          type: integer
+    MaterialStock:
       type: object
       properties:
-        materialId:
+        material_id:
           type: integer
-        availableQuantity:
+        available_qty:
           type: number
-        lockedQuantity:
+        locked_qty:
           type: number
-        lastInboundTime:
+        last_in_date:
           type: string
           format: date-time
-        lastOutboundTime:
+          nullable: true
+        last_out_date:
+          type: string
+          format: date-time
+          nullable: true
+    DemandAnalysis:
+      type: object
+      properties:
+        analysis_id:
+          type: integer
+        material_id:
+          type: integer
+        version_id:
+          type: integer
+        production_qty:
+          type: number
+        demand_detail:
+          type: object
+        analysis_time:
           type: string
           format: date-time
     RequirementAnalysis:
-      type: object
-      properties:
-        analysisId:
-          type: integer
-        productionQuantity:
-          type: number
-        analysisTime:
-          type: string
-          format: date-time
-        requirementJson:
-          type: object
+      deprecated: true
+      allOf:
+        - $ref: '#/components/schemas/DemandAnalysis'
