@@ -1,11 +1,451 @@
 openapi: 3.0.1
 info:
   title: 质量追溯模块 API
-  description: 质量追溯模块接口定义。
+  description: 质量追溯模块接口定义，覆盖批次消耗关系维护、成品批次正向追溯、原材料批次反向追溯和受影响生产订单分析。
   version: 0.1.0
 tags:
   - name: quality_traceability
     description: 质量追溯模块
-paths: {}
+paths:
+  /api/listBatchConsumption:
+    get:
+      summary: 查询批次消耗关系
+      description: 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: listBatchConsumption
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: order_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: item_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: material_id
+          in: query
+          required: false
+          description: 采购明细对应的原材料编号。
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchConsumptionPageResponse'
+  /api/addBatchConsumption:
+    post:
+      summary: 新增批次消耗关系
+      description: 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+      operationId: addBatchConsumption
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchConsumptionCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchConsumptionResponse'
+  /api/updateBatchConsumption:
+    post:
+      summary: 修改批次消耗关系
+      description: 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+      operationId: updateBatchConsumption
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchConsumptionUpdateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchConsumptionResponse'
+  /api/deleteBatchConsumption:
+    post:
+      summary: 删除批次消耗关系
+      description: 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+      operationId: deleteBatchConsumption
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchConsumptionDeleteRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+  /api/traceProductBatch:
+    get:
+      summary: 正向追溯成品批次
+      description: 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: traceProductBatch
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: order_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: batch_no
+          in: query
+          required: false
+          description: 成品批次号，来自完工入库单。order_id 和 batch_no 至少传一个。
+          schema:
+            type: string
+        - name: include_supplier
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductBatchTraceResponse'
+  /api/traceMaterialBatch:
+    get:
+      summary: 反向追溯原材料批次
+      description: 从采购订单明细或原材料编号出发，查询问题批次流入的所有生产订单和成品批次。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: traceMaterialBatch
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: item_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: material_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: receive_date_start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: receive_date_end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialBatchTraceResponse'
+  /api/analyzeQualityImpact:
+    post:
+      summary: 分析问题批次影响范围
+      description: 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: analyzeQualityImpact
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QualityImpactAnalyzeRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityImpactAnalyzeResponse'
 components:
-  schemas: {}
+  schemas:
+    BatchConsumption:
+      type: object
+      required: [consumption_id, order_id, item_id, consume_qty]
+      properties:
+        consumption_id:
+          type: integer
+          format: int64
+          example: 7001
+        order_id:
+          type: integer
+          format: int64
+          description: 生产订单编号。
+          example: 3001
+        item_id:
+          type: integer
+          format: int64
+          description: 采购订单明细编号，作为原材料批次来源。
+          example: 5001
+        consume_qty:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+          example: 12.5
+        production_order:
+          $ref: './production.yaml#/components/schemas/ProductionOrderBrief'
+        purchase_item:
+          $ref: './purchase.yaml#/components/schemas/PurchaseOrderItemBrief'
+    BatchConsumptionCreateRequest:
+      type: object
+      required: [order_id, item_id, consume_qty]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        item_id:
+          type: integer
+          format: int64
+        consume_qty:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+    BatchConsumptionUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/BatchConsumptionCreateRequest'
+        - type: object
+          required: [consumption_id]
+          properties:
+            consumption_id:
+              type: integer
+              format: int64
+    BatchConsumptionDeleteRequest:
+      type: object
+      required: [consumption_id]
+      properties:
+        consumption_id:
+          type: integer
+          format: int64
+    ProductBatchTraceResult:
+      type: object
+      required: [order_id, material_id, consumed_batches]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        batch_no:
+          type: string
+          nullable: true
+          description: 成品批次号，来自完工入库单。
+        material_id:
+          type: integer
+          format: int64
+          description: 成品物料编号。
+        material_name:
+          type: string
+          nullable: true
+        consumed_batches:
+          type: array
+          description: 该成品批次消耗的原材料批次列表。
+          items:
+            $ref: '#/components/schemas/ConsumedMaterialBatch'
+    ConsumedMaterialBatch:
+      type: object
+      required: [item_id, material_id, consume_qty]
+      properties:
+        item_id:
+          type: integer
+          format: int64
+          description: 采购订单明细编号。
+        material_id:
+          type: integer
+          format: int64
+        material_name:
+          type: string
+          nullable: true
+        supplier_id:
+          type: integer
+          format: int64
+          nullable: true
+        supplier_name:
+          type: string
+          nullable: true
+        purchase_order_id:
+          type: integer
+          format: int64
+          nullable: true
+        receive_date:
+          type: string
+          format: date
+          nullable: true
+        consume_qty:
+          type: number
+          format: decimal
+    MaterialBatchTraceResult:
+      type: object
+      required: [item_id, material_id, affected_products]
+      properties:
+        item_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
+        material_name:
+          type: string
+          nullable: true
+        supplier_id:
+          type: integer
+          format: int64
+          nullable: true
+        supplier_name:
+          type: string
+          nullable: true
+        affected_products:
+          type: array
+          description: 使用该原材料批次的生产订单和成品批次。
+          items:
+            $ref: '#/components/schemas/AffectedProductBatch'
+    AffectedProductBatch:
+      type: object
+      required: [order_id, product_material_id, consume_qty]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        batch_no:
+          type: string
+          nullable: true
+        product_material_id:
+          type: integer
+          format: int64
+        product_material_name:
+          type: string
+          nullable: true
+        production_status:
+          $ref: './production.yaml#/components/schemas/ProductionOrderStatus'
+        consume_qty:
+          type: number
+          format: decimal
+    QualityImpactAnalyzeRequest:
+      type: object
+      properties:
+        item_ids:
+          type: array
+          description: 问题采购明细编号列表。
+          items:
+            type: integer
+            format: int64
+        material_id:
+          type: integer
+          format: int64
+          nullable: true
+        receive_date_start:
+          type: string
+          format: date
+          nullable: true
+        receive_date_end:
+          type: string
+          format: date
+          nullable: true
+      description: item_ids、material_id 或到货日期范围至少提供一种过滤条件。
+    QualityImpactAnalyzeResult:
+      type: object
+      required: [affected_order_count, affected_batch_count, affected_products]
+      properties:
+        affected_order_count:
+          type: integer
+          example: 3
+        affected_batch_count:
+          type: integer
+          example: 5
+        affected_products:
+          type: array
+          items:
+            $ref: '#/components/schemas/AffectedProductBatch'
+        suggested_action:
+          type: string
+          description: 建议处理动作。
+          enum: [freeze, recall, observe]
+          example: freeze
+    BatchConsumptionResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/BatchConsumption'
+    BatchConsumptionPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/BatchConsumption'
+    ProductBatchTraceResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductBatchTraceResult'
+    MaterialBatchTraceResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/MaterialBatchTraceResult'
+    QualityImpactAnalyzeResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/QualityImpactAnalyzeResult'
