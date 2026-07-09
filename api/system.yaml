@@ -10,7 +10,7 @@ paths:
   /api/login:
     post:
       summary: 登录
-      description: 登录接口不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+      description: 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
       operationId: login
       tags:
         - system
@@ -50,7 +50,7 @@ paths:
   /api/register:
     post:
       summary: 注册系统用户
-      description: 注册接口不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+      description: 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
       operationId: register
       tags:
         - system
@@ -97,7 +97,7 @@ paths:
   /api/listUserData:
     get:
       summary: 查询用户列表
-      description: 分页查询系统用户。需登录，未登录或无权限时 HTTP 仍返回 200，响应体 code 返回 401 或 403。
+      description: 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: listUserData
       tags:
         - system
@@ -140,6 +140,7 @@ paths:
   /api/getUserData:
     get:
       summary: 查询用户详情
+      description: 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: getUserData
       tags:
         - system
@@ -163,6 +164,7 @@ paths:
   /api/addUserData:
     post:
       summary: 新增用户
+      description: 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: addUserData
       tags:
         - system
@@ -185,6 +187,7 @@ paths:
   /api/updateUserData:
     post:
       summary: 修改用户
+      description: 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: updateUserData
       tags:
         - system
@@ -207,6 +210,7 @@ paths:
   /api/deleteUserData:
     post:
       summary: 删除用户
+      description: 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: deleteUserData
       tags:
         - system
@@ -229,7 +233,7 @@ paths:
   /api/listRoleData:
     get:
       summary: 查询角色列表
-      description: 分页查询系统角色。
+      description: 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: listRoleData
       tags:
         - system
@@ -267,6 +271,7 @@ paths:
   /api/getRoleData:
     get:
       summary: 查询角色详情
+      description: 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: getRoleData
       tags:
         - system
@@ -290,6 +295,7 @@ paths:
   /api/addRoleData:
     post:
       summary: 新增角色
+      description: 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: addRoleData
       tags:
         - system
@@ -312,6 +318,7 @@ paths:
   /api/updateRoleData:
     post:
       summary: 修改角色
+      description: 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: updateRoleData
       tags:
         - system
@@ -334,6 +341,7 @@ paths:
   /api/deleteRoleData:
     post:
       summary: 删除角色
+      description: 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: deleteRoleData
       tags:
         - system
@@ -356,7 +364,7 @@ paths:
   /api/listPermissionData:
     get:
       summary: 查询权限列表
-      description: 分页查询系统权限。
+      description: 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: listPermissionData
       tags:
         - system
@@ -391,6 +399,7 @@ paths:
   /api/getPermissionData:
     get:
       summary: 查询权限详情
+      description: 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: getPermissionData
       tags:
         - system
@@ -414,6 +423,7 @@ paths:
   /api/addPermissionData:
     post:
       summary: 新增权限
+      description: 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: addPermissionData
       tags:
         - system
@@ -436,6 +446,7 @@ paths:
   /api/updatePermissionData:
     post:
       summary: 修改权限
+      description: 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: updatePermissionData
       tags:
         - system
@@ -458,6 +469,7 @@ paths:
   /api/deletePermissionData:
     post:
       summary: 删除权限
+      description: 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: deletePermissionData
       tags:
         - system
@@ -480,7 +492,7 @@ paths:
   /api/listUserRoleData:
     get:
       summary: 查询用户角色关系列表
-      description: 分页查询用户与角色的多对多关系。
+      description: 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: listUserRoleData
       tags:
         - system
@@ -510,6 +522,7 @@ paths:
   /api/addUserRole:
     post:
       summary: 给用户分配角色
+      description: 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: addUserRole
       tags:
         - system
@@ -532,6 +545,7 @@ paths:
   /api/deleteUserRole:
     post:
       summary: 移除用户角色
+      description: 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: deleteUserRole
       tags:
         - system
@@ -554,7 +568,7 @@ paths:
   /api/listRolePermissionData:
     get:
       summary: 查询角色权限关系列表
-      description: 分页查询角色与权限的多对多关系。
+      description: 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: listRolePermissionData
       tags:
         - system
@@ -584,6 +598,7 @@ paths:
   /api/addRolePermission:
     post:
       summary: 给角色分配权限
+      description: 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: addRolePermission
       tags:
         - system
@@ -606,6 +621,7 @@ paths:
   /api/deleteRolePermission:
     post:
       summary: 移除角色权限
+      description: 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: deleteRolePermission
       tags:
         - system
@@ -628,7 +644,7 @@ paths:
   /api/listLoginRecordData:
     get:
       summary: 查询登录日志
-      description: 分页查询用户登录日志。
+      description: 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: listLoginRecordData
       tags:
         - system
@@ -673,7 +689,7 @@ paths:
   /api/listOperationLogData:
     get:
       summary: 查询操作日志
-      description: 分页查询系统操作日志。日志为追踪写入，正式业务不提供修改或删除接口。
+      description: 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
       operationId: listOperationLogData
       tags:
         - system
@@ -720,7 +736,7 @@ paths:
   /api/addOperationLogData:
     post:
       summary: 新增操作日志
-      description: 追踪写入操作日志，日志数据不提供修改或删除接口。
+      description: 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
       operationId: addOperationLogData
       tags:
         - system
@@ -779,6 +795,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/LoginData'
               nullable: true
@@ -818,6 +835,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/UserBrief'
               nullable: true
@@ -838,6 +856,7 @@ components:
           nullable: true
         status:
           type: string
+          description: 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 active 与 disabled 之间切换。
           enum:
             - active
             - disabled
@@ -886,6 +905,7 @@ components:
           nullable: true
         status:
           type: string
+          description: 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。新增时默认为 active，允许后续通过 updateUserData 修改为 disabled 或从 disabled 恢复为 active。
           enum:
             - active
             - disabled
@@ -919,7 +939,7 @@ components:
           description: 邮箱。
         status:
           type: string
-          description: 账号状态。active：启用；disabled：停用。
+          description: 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：active -> disabled、disabled -> active。
           enum:
             - active
             - disabled
@@ -941,6 +961,7 @@ components:
           type: string
         status:
           type: string
+          description: 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 active 与 disabled 之间切换。
           enum:
             - active
             - disabled
@@ -966,6 +987,7 @@ components:
           nullable: true
         status:
           type: string
+          description: 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。
           enum:
             - active
             - disabled
@@ -1175,6 +1197,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/User'
               nullable: true
@@ -1185,6 +1208,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: './common.yaml#/components/schemas/PageResult'
                 - type: object
@@ -1201,6 +1225,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/Role'
               nullable: true
@@ -1211,6 +1236,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: './common.yaml#/components/schemas/PageResult'
                 - type: object
@@ -1227,6 +1253,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/Permission'
               nullable: true
@@ -1237,6 +1264,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: './common.yaml#/components/schemas/PageResult'
                 - type: object
@@ -1253,6 +1281,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: './common.yaml#/components/schemas/PageResult'
                 - type: object
@@ -1280,6 +1309,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: './common.yaml#/components/schemas/PageResult'
                 - type: object
@@ -1307,6 +1337,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: './common.yaml#/components/schemas/PageResult'
                 - type: object
@@ -1323,6 +1354,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: '#/components/schemas/OperationLog'
               nullable: true
@@ -1333,6 +1365,7 @@ components:
         - type: object
           properties:
             data:
+              type: object
               allOf:
                 - $ref: './common.yaml#/components/schemas/PageResult'
                 - type: object
