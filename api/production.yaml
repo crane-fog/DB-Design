@@ -1,11 +1,1528 @@
 openapi: 3.0.1
 info:
   title: 生产管理模块 API
-  description: 生产管理模块接口定义。
+  description: 生产管理模块接口定义，覆盖生产订单检索、生产线类型、生产线、生产日历、产能配置、产能估计、外部订单、产能检测与平衡、生产线故障反馈和生产线状态记录。
   version: 0.1.0
 tags:
   - name: production
     description: 生产管理模块
-paths: {}
+paths:
+  /api/listProductionOrder:
+    get:
+      summary: 查询生产订单列表
+      description: 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+      operationId: listProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: material_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProductionOrderStatus'
+        - name: plan_end_start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: plan_end_end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderPageResponse'
+  /api/getProductionOrder:
+    get:
+      summary: 查询生产订单详情
+      description: 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: getProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: order_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/addProductionOrder:
+    post:
+      summary: 新增生产订单
+      description: 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+      operationId: addProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/updateProductionOrder:
+    post:
+      summary: 修改生产订单计划
+      description: 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+      operationId: updateProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderUpdateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/approveProductionOrder:
+    post:
+      summary: 审核生产订单
+      description: 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      operationId: approveProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderApproveRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/startProductionOrder:
+    post:
+      summary: 开始生产订单
+      description: 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      operationId: startProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderActionRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/finishProductionOrder:
+    post:
+      summary: 完成生产订单
+      description: 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      operationId: finishProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderFinishRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/cancelProductionOrder:
+    post:
+      summary: 取消生产订单
+      description: 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+      operationId: cancelProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderActionRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/listProductionLine:
+    get:
+      summary: 查询生产线列表
+      description: 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: listProductionLine
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: type_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProductionLineRunStatus'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionLinePageResponse'
+  /api/listProductionLineType:
+    get:
+      summary: 查询生产线类型
+      description: 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: listProductionLineType
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: type_name
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineTypePageResponse'
+  /api/saveProductionLineType:
+    post:
+      summary: 保存生产线类型
+      description: 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+      operationId: saveProductionLineType
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LineTypeSaveRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineTypeResponse'
+  /api/addProductionLine:
+    post:
+      summary: 新增生产线
+      description: 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: addProductionLine
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionLineCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionLineResponse'
+  /api/updateProductionLine:
+    post:
+      summary: 修改生产线
+      description: 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+      operationId: updateProductionLine
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionLineUpdateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionLineResponse'
+  /api/listCapacityConfig:
+    get:
+      summary: 查询产品产能配置
+      description: 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: listCapacityConfig
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: material_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: type_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapacityConfigPageResponse'
+  /api/saveCapacityConfig:
+    post:
+      summary: 保存产品产能配置
+      description: 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+      operationId: saveCapacityConfig
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapacityConfigSaveRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapacityConfigResponse'
+  /api/listProductionCalendar:
+    get:
+      summary: 查询生产日历
+      description: 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: listProductionCalendar
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: line_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: calendar_date_start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: calendar_date_end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: config_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionCalendarPageResponse'
+  /api/saveProductionCalendar:
+    post:
+      summary: 保存生产日历
+      description: 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+      operationId: saveProductionCalendar
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionCalendarSaveRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionCalendarResponse'
+  /api/deleteProductionCalendar:
+    post:
+      summary: 删除生产日历
+      description: 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+      operationId: deleteProductionCalendar
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionCalendarDeleteRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+  /api/estimateProductionCapacity:
+    post:
+      summary: 估计生产订单交付能力
+      description: 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: estimateProductionCapacity
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionCapacityEstimateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionCapacityEstimateResponse'
+  /api/listExternalOrder:
+    get:
+      summary: 查询外部订单列表
+      description: 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+      operationId: listExternalOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: customer_id
+          in: query
+          required: false
+          description: 外部客户角色只能传自身 user_id。
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ExternalOrderStatus'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderPageResponse'
+  /api/addExternalOrder:
+    post:
+      summary: 外部客户提交订单
+      description: 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+      operationId: addExternalOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalOrderCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderResponse'
+  /api/reviewExternalOrder:
+    post:
+      summary: 审核外部订单
+      description: 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      operationId: reviewExternalOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalOrderReviewRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderResponse'
+  /api/convertExternalOrderToProductionOrder:
+    post:
+      summary: 外部订单转生产订单
+      description: 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      operationId: convertExternalOrderToProductionOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalOrderConvertRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderConvertResponse'
+  /api/runCapacityDetection:
+    post:
+      summary: 执行产能检测
+      description: 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: runCapacityDetection
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapacityDetectionRunRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapacityDetectionResponse'
+  /api/saveCapacityBalance:
+    post:
+      summary: 保存产能平衡调整
+      description: 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: saveCapacityBalance
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapacityBalanceSaveRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapacityBalanceResponse'
+  /api/reportProductionLineFault:
+    post:
+      summary: 上报生产线故障
+      description: 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      operationId: reportProductionLineFault
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaultRecordCreateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaultRecordResponse'
+  /api/updateProductionLineFault:
+    post:
+      summary: 更新生产线故障状态
+      description: 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+      operationId: updateProductionLineFault
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaultRecordUpdateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaultRecordResponse'
+  /api/updateProductionLineStatus:
+    post:
+      summary: 更新生产线状态
+      description: 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      operationId: updateProductionLineStatus
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionLineStatusUpdateRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionLineStatusResponse'
 components:
-  schemas: {}
+  schemas:
+    ProductionOrderStatus:
+      type: string
+      description: 生产订单状态。pending_review 待审核，可审核或取消；pending_schedule 待排产，可修改、开始或取消；in_progress 生产中，可完工或取消；completed 已完工，流程结束；cancelled 已取消，流程结束。
+      enum: [pending_review, pending_schedule, in_progress, completed, cancelled]
+    ExternalOrderStatus:
+      type: string
+      description: 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；rejected 已拒绝，流程结束。
+      enum: [pending_review, accepted, rejected]
+    ProductionLineRunStatus:
+      type: string
+      description: 生产线状态。idle 空闲；running 运行中；fault 故障。
+      enum: [idle, running, fault]
+    FaultStatus:
+      type: string
+      description: 故障状态。pending_repair 待维修；repairing 维修中；recovered 已恢复。
+      enum: [pending_repair, repairing, recovered]
+    ProductionOrderBrief:
+      type: object
+      required: [order_id, material_id, plan_qty, status]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+          example: 3001
+        material_id:
+          type: integer
+          format: int64
+          example: 1001
+        material_name:
+          type: string
+          example: 工业叉车
+        plan_qty:
+          type: number
+          example: 50
+        finished_qty:
+          type: number
+          example: 10
+        status:
+          $ref: '#/components/schemas/ProductionOrderStatus'
+    ProductionOrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductionOrderBrief'
+        - type: object
+          required: [version_id, plan_start, plan_end]
+          properties:
+            version_id:
+              type: integer
+              format: int64
+              example: 1
+            version_no:
+              type: string
+              example: V1.0
+            plan_start:
+              type: string
+              format: date
+              example: '2026-07-10'
+            plan_end:
+              type: string
+              format: date
+              example: '2026-07-20'
+            actual_start:
+              type: string
+              format: date
+              nullable: true
+            actual_end:
+              type: string
+              format: date
+              nullable: true
+            review_comment:
+              type: string
+              nullable: true
+              example: 产能满足要求
+    ProductionOrderCreateRequest:
+      type: object
+      required: [material_id, version_id, plan_qty, plan_start, plan_end]
+      properties:
+        material_id:
+          type: integer
+          format: int64
+        version_id:
+          type: integer
+          format: int64
+        plan_qty:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        plan_start:
+          type: string
+          format: date
+        plan_end:
+          type: string
+          format: date
+    ProductionOrderUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/ProductionOrderCreateRequest'
+        - type: object
+          required: [order_id]
+          properties:
+            order_id:
+              type: integer
+              format: int64
+    ProductionOrderApproveRequest:
+      type: object
+      required: [order_id, approved]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        approved:
+          type: boolean
+          description: true 表示审核通过，false 表示审核拒绝。
+        review_comment:
+          type: string
+          nullable: true
+      description: 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+    ProductionOrderActionRequest:
+      type: object
+      required: [order_id]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        remark:
+          type: string
+          nullable: true
+      description: 操作人从当前登录用户推导，客户端不得传 operator_id。
+    ProductionOrderFinishRequest:
+      allOf:
+        - $ref: '#/components/schemas/ProductionOrderActionRequest'
+        - type: object
+          required: [finished_qty]
+          properties:
+            finished_qty:
+              type: number
+              minimum: 0
+              exclusiveMinimum: true
+    LineType:
+      type: object
+      required: [type_id, type_name]
+      properties:
+        type_id:
+          type: integer
+          format: int64
+        type_name:
+          type: string
+          example: 总装线
+    LineTypeSaveRequest:
+      type: object
+      required: [type_name]
+      properties:
+        type_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: 为空表示新增，非空表示更新。
+        type_name:
+          type: string
+          minLength: 1
+    ProductionLine:
+      type: object
+      required: [line_id, type_id, start_date, manager_id]
+      properties:
+        line_id:
+          type: integer
+          format: int64
+        type_id:
+          type: integer
+          format: int64
+        type_name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        manager_id:
+          type: integer
+          format: int64
+        manager_name:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/ProductionLineRunStatus'
+    ProductionLineCreateRequest:
+      type: object
+      required: [type_id, start_date, manager_id]
+      properties:
+        type_id:
+          type: integer
+          format: int64
+        start_date:
+          type: string
+          format: date
+        manager_id:
+          type: integer
+          format: int64
+    ProductionLineUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/ProductionLineCreateRequest'
+        - type: object
+          required: [line_id]
+          properties:
+            line_id:
+              type: integer
+              format: int64
+    CapacityConfig:
+      type: object
+      required: [config_id, material_id, type_id, unit_time]
+      properties:
+        config_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
+        material_name:
+          type: string
+          nullable: true
+        type_id:
+          type: integer
+          format: int64
+        type_name:
+          type: string
+          nullable: true
+        unit_time:
+          type: number
+          description: 单件生产时间，单位为分钟。
+          example: 12.5
+    CapacityConfigSaveRequest:
+      type: object
+      required: [material_id, type_id, unit_time]
+      properties:
+        config_id:
+          type: integer
+          format: int64
+          nullable: true
+        material_id:
+          type: integer
+          format: int64
+        type_id:
+          type: integer
+          format: int64
+        unit_time:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+    ProductionCalendar:
+      type: object
+      required: [calendar_date, line_id, config_id]
+      properties:
+        calendar_date:
+          type: string
+          format: date
+          description: 排产日期，与 line_id 共同构成生产日历主键。
+        line_id:
+          type: integer
+          format: int64
+        line_name:
+          type: string
+          nullable: true
+        config_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
+          nullable: true
+        material_name:
+          type: string
+          nullable: true
+        type_id:
+          type: integer
+          format: int64
+          nullable: true
+        type_name:
+          type: string
+          nullable: true
+    ProductionCalendarSaveRequest:
+      type: object
+      required: [calendar_date, line_id, config_id]
+      properties:
+        calendar_date:
+          type: string
+          format: date
+        line_id:
+          type: integer
+          format: int64
+        config_id:
+          type: integer
+          format: int64
+    ProductionCalendarDeleteRequest:
+      type: object
+      required: [calendar_date, line_id]
+      properties:
+        calendar_date:
+          type: string
+          format: date
+        line_id:
+          type: integer
+          format: int64
+    ProductionCapacityEstimateRequest:
+      type: object
+      properties:
+        order_id:
+          type: integer
+          format: int64
+          description: 已存在的生产订单编号。审核生产订单时优先传 order_id。
+        material_id:
+          type: integer
+          format: int64
+        version_id:
+          type: integer
+          format: int64
+        plan_qty:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        expected_date:
+          type: string
+          format: date
+      anyOf:
+        - required: [order_id]
+        - required: [material_id, version_id, plan_qty, expected_date]
+      description: 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。
+    ProductionCapacityEstimateResult:
+      type: object
+      required: [can_deliver_on_time, material_ready, capacity_ready, estimated_finish_date]
+      properties:
+        can_deliver_on_time:
+          type: boolean
+        material_ready:
+          type: boolean
+          description: 物料是否齐套。
+        capacity_ready:
+          type: boolean
+          description: 产能是否满足计划。
+        latest_material_ready_date:
+          type: string
+          format: date
+          nullable: true
+        estimated_finish_date:
+          type: string
+          format: date
+        required_work_minutes:
+          type: number
+        available_work_minutes:
+          type: number
+        risk_reason:
+          type: string
+          nullable: true
+    ExternalOrder:
+      type: object
+      required: [ext_order_id, customer_id, material_id, quantity, expected_date, contact_person, contact_phone, status, submit_time]
+      properties:
+        ext_order_id:
+          type: integer
+          format: int64
+        customer_id:
+          type: integer
+          format: int64
+        customer_name:
+          type: string
+          nullable: true
+        material_id:
+          type: integer
+          format: int64
+        material_name:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+        expected_date:
+          type: string
+          format: date
+        contact_person:
+          type: string
+        contact_phone:
+          type: string
+        status:
+          $ref: '#/components/schemas/ExternalOrderStatus'
+        submit_time:
+          type: string
+          format: date-time
+        review_comment:
+          type: string
+          nullable: true
+    ExternalOrderCreateRequest:
+      type: object
+      required: [material_id, quantity, expected_date, contact_person, contact_phone]
+      properties:
+        customer_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: 外部客户自提交时不得传，由当前登录用户推导；仅生产管理员或系统管理员代录时可传，后端必须按登录角色校验。
+        material_id:
+          type: integer
+          format: int64
+        quantity:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        expected_date:
+          type: string
+          format: date
+        contact_person:
+          type: string
+        contact_phone:
+          type: string
+      description: 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时可传 customer_id。
+    ExternalOrderReviewRequest:
+      type: object
+      required: [ext_order_id, accepted]
+      properties:
+        ext_order_id:
+          type: integer
+          format: int64
+        accepted:
+          type: boolean
+        review_comment:
+          type: string
+          nullable: true
+      description: 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+    ExternalOrderConvertRequest:
+      type: object
+      required: [ext_order_id, production_orders]
+      properties:
+        ext_order_id:
+          type: integer
+          format: int64
+        production_orders:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ProductionOrderCreateRequest'
+    ExternalOrderConvertResult:
+      type: object
+      required: [ext_order_id, production_orders, associations]
+      properties:
+        ext_order_id:
+          type: integer
+          format: int64
+        production_orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductionOrderBrief'
+        associations:
+          type: array
+          description: 外部订单与生产订单关联表 external_order_production 的写入结果。
+          items:
+            $ref: '#/components/schemas/ExternalOrderProductionAssociation'
+    ExternalOrderProductionAssociation:
+      type: object
+      required: [ext_order_id, order_id]
+      properties:
+        ext_order_id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+    CapacityDetection:
+      type: object
+      required: [detection_id, line_id, period_start, period_end, plan_capacity, actual_capacity, actual_work_hours, downtime_minutes, efficiency, diff_qty, diff_rate, reason_type]
+      properties:
+        detection_id:
+          type: integer
+          format: int64
+        line_id:
+          type: integer
+          format: int64
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+        plan_capacity:
+          type: number
+        actual_capacity:
+          type: number
+        actual_work_hours:
+          type: number
+          minimum: 0
+          description: 统计周期内实际生产工时，单位为小时。
+        downtime_minutes:
+          type: number
+          minimum: 0
+          description: 统计周期内停机时间，单位为分钟。
+        efficiency:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 生产效率，0 到 1。
+        diff_qty:
+          type: number
+        diff_rate:
+          type: number
+        reason_type:
+          type: string
+          example: equipment_fault
+    CapacityDetectionRunRequest:
+      type: object
+      required: [line_id, period_start, period_end]
+      properties:
+        line_id:
+          type: integer
+          format: int64
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+    CapacityBalance:
+      type: object
+      required: [balance_id, before_plan, after_plan, operator_id, adjust_time, affected_orders]
+      properties:
+        balance_id:
+          type: integer
+          format: int64
+        before_plan:
+          type: object
+          description: 调整前排产方案 JSON。
+          additionalProperties: true
+        after_plan:
+          type: object
+          description: 调整后排产方案 JSON。
+          additionalProperties: true
+        operator_id:
+          type: integer
+          format: int64
+        adjust_time:
+          type: string
+          format: date-time
+        affected_orders:
+          type: array
+          items:
+            type: integer
+            format: int64
+    CapacityBalanceSaveRequest:
+      type: object
+      required: [before_plan, after_plan, affected_orders]
+      properties:
+        before_plan:
+          type: object
+          additionalProperties: true
+        after_plan:
+          type: object
+          additionalProperties: true
+        affected_orders:
+          type: array
+          items:
+            type: integer
+            format: int64
+      description: 调整人从当前登录用户推导，客户端不得传 operator_id。
+    FaultRecord:
+      type: object
+      required: [fault_id, line_id, fault_type, description, occur_time, status, reporter_id]
+      properties:
+        fault_id:
+          type: integer
+          format: int64
+        line_id:
+          type: integer
+          format: int64
+        fault_type:
+          type: string
+          example: mechanical_fault
+        description:
+          type: string
+        occur_time:
+          type: string
+          format: date-time
+        recover_time:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          $ref: '#/components/schemas/FaultStatus'
+        reporter_id:
+          type: integer
+          format: int64
+        repairer_id:
+          type: integer
+          format: int64
+          nullable: true
+    FaultRecordCreateRequest:
+      type: object
+      required: [line_id, fault_type, description]
+      properties:
+        line_id:
+          type: integer
+          format: int64
+        fault_type:
+          type: string
+        description:
+          type: string
+      description: 上报人从当前登录用户推导，客户端不得传 reporter_id。
+    FaultRecordUpdateRequest:
+      type: object
+      required: [fault_id, status]
+      properties:
+        fault_id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/FaultStatus'
+        repairer_id:
+          type: integer
+          format: int64
+          nullable: true
+        recover_time:
+          type: string
+          format: date-time
+          nullable: true
+      description: 操作人从当前登录用户推导，客户端不得传 operator_id。
+    ProductionLineStatus:
+      type: object
+      required: [line_id, status, finished_qty, efficiency, updated_time]
+      properties:
+        line_id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ProductionLineRunStatus'
+        current_order_id:
+          type: integer
+          format: int64
+          nullable: true
+        current_material_id:
+          type: integer
+          format: int64
+          nullable: true
+        finished_qty:
+          type: number
+        efficiency:
+          type: number
+          description: 当前效率，0 到 1。
+          minimum: 0
+          maximum: 1
+        updated_time:
+          type: string
+          format: date-time
+    ProductionLineStatusUpdateRequest:
+      type: object
+      required: [line_id, status]
+      properties:
+        line_id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ProductionLineRunStatus'
+        current_order_id:
+          type: integer
+          format: int64
+          nullable: true
+        current_material_id:
+          type: integer
+          format: int64
+          nullable: true
+        finished_qty:
+          type: number
+          nullable: true
+        efficiency:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+      description: 操作人从当前登录用户推导，客户端不得传 operator_id。
+    ProductionOrderResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionOrderDetail'
+    ProductionOrderPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ProductionOrderDetail'
+    LineTypeResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/LineType'
+    LineTypePageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/LineType'
+    ProductionLineResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionLine'
+    ProductionLinePageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ProductionLine'
+    CapacityConfigResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/CapacityConfig'
+    CapacityConfigPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/CapacityConfig'
+    ProductionCalendarResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionCalendar'
+    ProductionCalendarPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ProductionCalendar'
+    ProductionCapacityEstimateResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionCapacityEstimateResult'
+    ExternalOrderResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ExternalOrder'
+    ExternalOrderPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ExternalOrder'
+    ExternalOrderConvertResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ExternalOrderConvertResult'
+    CapacityDetectionResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/CapacityDetection'
+    CapacityBalanceResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/CapacityBalance'
+    FaultRecordResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/FaultRecord'
+    ProductionLineStatusResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionLineStatus'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

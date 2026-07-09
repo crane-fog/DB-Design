@@ -23,8 +23,6 @@ paths:
     $ref: './system.yaml#/paths/~1api~1login'
   /api/register:
     $ref: './system.yaml#/paths/~1api~1register'
-  /api/getUserTest:
-    $ref: './system.yaml#/paths/~1api~1getUserTest'
   /api/calculateMaterialShortage:
     $ref: './inventory.yaml#/paths/~1api~1calculateMaterialShortage'
   /api/listInventoryAlert:
@@ -71,6 +69,76 @@ paths:
     $ref: './purchase.yaml#/paths/~1api~1listPurchaseOverdueReminder'
   /api/handlePurchaseOverdueReminder:
     $ref: './purchase.yaml#/paths/~1api~1handlePurchaseOverdueReminder'
+  /api/listProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1listProductionOrder'
+  /api/getProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1getProductionOrder'
+  /api/addProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1addProductionOrder'
+  /api/updateProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1updateProductionOrder'
+  /api/approveProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1approveProductionOrder'
+  /api/startProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1startProductionOrder'
+  /api/finishProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1finishProductionOrder'
+  /api/cancelProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1cancelProductionOrder'
+  /api/listProductionLine:
+    $ref: './production.yaml#/paths/~1api~1listProductionLine'
+  /api/listProductionLineType:
+    $ref: './production.yaml#/paths/~1api~1listProductionLineType'
+  /api/saveProductionLineType:
+    $ref: './production.yaml#/paths/~1api~1saveProductionLineType'
+  /api/addProductionLine:
+    $ref: './production.yaml#/paths/~1api~1addProductionLine'
+  /api/updateProductionLine:
+    $ref: './production.yaml#/paths/~1api~1updateProductionLine'
+  /api/listCapacityConfig:
+    $ref: './production.yaml#/paths/~1api~1listCapacityConfig'
+  /api/saveCapacityConfig:
+    $ref: './production.yaml#/paths/~1api~1saveCapacityConfig'
+  /api/listProductionCalendar:
+    $ref: './production.yaml#/paths/~1api~1listProductionCalendar'
+  /api/saveProductionCalendar:
+    $ref: './production.yaml#/paths/~1api~1saveProductionCalendar'
+  /api/deleteProductionCalendar:
+    $ref: './production.yaml#/paths/~1api~1deleteProductionCalendar'
+  /api/estimateProductionCapacity:
+    $ref: './production.yaml#/paths/~1api~1estimateProductionCapacity'
+  /api/listExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1listExternalOrder'
+  /api/addExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1addExternalOrder'
+  /api/reviewExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1reviewExternalOrder'
+  /api/convertExternalOrderToProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1convertExternalOrderToProductionOrder'
+  /api/runCapacityDetection:
+    $ref: './production.yaml#/paths/~1api~1runCapacityDetection'
+  /api/saveCapacityBalance:
+    $ref: './production.yaml#/paths/~1api~1saveCapacityBalance'
+  /api/reportProductionLineFault:
+    $ref: './production.yaml#/paths/~1api~1reportProductionLineFault'
+  /api/updateProductionLineFault:
+    $ref: './production.yaml#/paths/~1api~1updateProductionLineFault'
+  /api/updateProductionLineStatus:
+    $ref: './production.yaml#/paths/~1api~1updateProductionLineStatus'
+  /api/listBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1listBatchConsumption'
+  /api/addBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1addBatchConsumption'
+  /api/updateBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1updateBatchConsumption'
+  /api/deleteBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1deleteBatchConsumption'
+  /api/traceProductBatch:
+    $ref: './quality_traceability.yaml#/paths/~1api~1traceProductBatch'
+  /api/traceMaterialBatch:
+    $ref: './quality_traceability.yaml#/paths/~1api~1traceMaterialBatch'
+  /api/analyzeQualityImpact:
+    $ref: './quality_traceability.yaml#/paths/~1api~1analyzeQualityImpact'
 components:
   schemas:
     ApiResponse:

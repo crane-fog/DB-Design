@@ -24,48 +24,65 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class RegisterRequest : IEquatable<RegisterRequest>
+    public partial class UserBrief : IEquatable<UserBrief>
     {
         /// <summary>
-        /// 工号，唯一约束。
+        /// Gets or Sets UserId
         /// </summary>
-        /// <value>工号，唯一约束。</value>
-        /* <example>EMP001</example> */
-        [Required]
+        [DataMember(Name="user_id", EmitDefaultValue=true)]
+        public int UserId { get; set; }
+
+        /// <summary>
+        /// Gets or Sets EmployeeNo
+        /// </summary>
         [DataMember(Name="employee_no", EmitDefaultValue=false)]
         public string EmployeeNo { get; set; }
 
         /// <summary>
-        /// 登录密码或前端传入的密码哈希值，以后端实现为准。
-        /// </summary>
-        /// <value>登录密码或前端传入的密码哈希值，以后端实现为准。</value>
-        /* <example>5f4dcc3b5aa765d61d8327deb882cf99</example> */
-        [Required]
-        [DataMember(Name="password", EmitDefaultValue=false)]
-        public string Password { get; set; }
-
-        /// <summary>
         /// Gets or Sets UserName
         /// </summary>
-        /* <example>张三</example> */
-        [Required]
         [DataMember(Name="user_name", EmitDefaultValue=false)]
         public string UserName { get; set; }
 
         /// <summary>
         /// Gets or Sets Phone
         /// </summary>
-        /* <example>13800000000</example> */
-        [Required]
         [DataMember(Name="phone", EmitDefaultValue=false)]
         public string Phone { get; set; }
 
         /// <summary>
         /// Gets or Sets Email
         /// </summary>
-        /* <example>zhangsan@example.com</example> */
         [DataMember(Name="email", EmitDefaultValue=true)]
         public string Email { get; set; }
+
+
+        /// <summary>
+        /// Gets or Sets Status
+        /// </summary>
+        [TypeConverter(typeof(CustomEnumConverter<StatusEnum>))]
+        [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public enum StatusEnum
+        {
+            
+            /// <summary>
+            /// Enum ActiveEnum for active
+            /// </summary>
+            [EnumMember(Value = "active")]
+            ActiveEnum = 1,
+            
+            /// <summary>
+            /// Enum DisabledEnum for disabled
+            /// </summary>
+            [EnumMember(Value = "disabled")]
+            DisabledEnum = 2
+        }
+
+        /// <summary>
+        /// Gets or Sets Status
+        /// </summary>
+        [DataMember(Name="status", EmitDefaultValue=true)]
+        public StatusEnum Status { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -74,12 +91,13 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class RegisterRequest {\n");
+            sb.Append("class UserBrief {\n");
+            sb.Append("  UserId: ").Append(UserId).Append("\n");
             sb.Append("  EmployeeNo: ").Append(EmployeeNo).Append("\n");
-            sb.Append("  Password: ").Append(Password).Append("\n");
             sb.Append("  UserName: ").Append(UserName).Append("\n");
             sb.Append("  Phone: ").Append(Phone).Append("\n");
             sb.Append("  Email: ").Append(Email).Append("\n");
+            sb.Append("  Status: ").Append(Status).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -102,29 +120,29 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((RegisterRequest)obj);
+            return obj.GetType() == GetType() && Equals((UserBrief)obj);
         }
 
         /// <summary>
-        /// Returns true if RegisterRequest instances are equal
+        /// Returns true if UserBrief instances are equal
         /// </summary>
-        /// <param name="other">Instance of RegisterRequest to be compared</param>
+        /// <param name="other">Instance of UserBrief to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(RegisterRequest other)
+        public bool Equals(UserBrief other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
+                    UserId == other.UserId ||
+                    
+                    UserId.Equals(other.UserId)
+                ) && 
+                (
                     EmployeeNo == other.EmployeeNo ||
                     EmployeeNo != null &&
                     EmployeeNo.Equals(other.EmployeeNo)
-                ) && 
-                (
-                    Password == other.Password ||
-                    Password != null &&
-                    Password.Equals(other.Password)
                 ) && 
                 (
                     UserName == other.UserName ||
@@ -140,6 +158,11 @@ namespace Org.OpenAPITools.Models
                     Email == other.Email ||
                     Email != null &&
                     Email.Equals(other.Email)
+                ) && 
+                (
+                    Status == other.Status ||
+                    
+                    Status.Equals(other.Status)
                 );
         }
 
@@ -153,16 +176,18 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
+                    
+                    hashCode = hashCode * 59 + UserId.GetHashCode();
                     if (EmployeeNo != null)
                     hashCode = hashCode * 59 + EmployeeNo.GetHashCode();
-                    if (Password != null)
-                    hashCode = hashCode * 59 + Password.GetHashCode();
                     if (UserName != null)
                     hashCode = hashCode * 59 + UserName.GetHashCode();
                     if (Phone != null)
                     hashCode = hashCode * 59 + Phone.GetHashCode();
                     if (Email != null)
                     hashCode = hashCode * 59 + Email.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + Status.GetHashCode();
                 return hashCode;
             }
         }
@@ -170,12 +195,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(RegisterRequest left, RegisterRequest right)
+        public static bool operator ==(UserBrief left, UserBrief right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(RegisterRequest left, RegisterRequest right)
+        public static bool operator !=(UserBrief left, UserBrief right)
         {
             return !Equals(left, right);
         }

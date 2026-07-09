@@ -24,25 +24,35 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class LoginData : IEquatable<LoginData>
+    public partial class BatchConsumptionUpdateRequest : IEquatable<BatchConsumptionUpdateRequest>
     {
         /// <summary>
-        /// JWT 访问令牌。
+        /// Gets or Sets OrderId
         /// </summary>
-        /// <value>JWT 访问令牌。</value>
-        /* <example>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</example> */
         [Required]
-        [DataMember(Name="access_token", EmitDefaultValue=false)]
-        public string AccessToken { get; set; }
+        [DataMember(Name="order_id", EmitDefaultValue=true)]
+        public long OrderId { get; set; }
 
         /// <summary>
-        /// token 有效期，单位秒。
+        /// Gets or Sets ItemId
         /// </summary>
-        /// <value>token 有效期，单位秒。</value>
-        /* <example>7200</example> */
         [Required]
-        [DataMember(Name="expires", EmitDefaultValue=true)]
-        public int Expires { get; set; }
+        [DataMember(Name="item_id", EmitDefaultValue=true)]
+        public long ItemId { get; set; }
+
+        /// <summary>
+        /// Gets or Sets ConsumeQty
+        /// </summary>
+        [Required]
+        [DataMember(Name="consume_qty", EmitDefaultValue=true)]
+        public decimal ConsumeQty { get; set; }
+
+        /// <summary>
+        /// Gets or Sets ConsumptionId
+        /// </summary>
+        [Required]
+        [DataMember(Name="consumption_id", EmitDefaultValue=true)]
+        public long ConsumptionId { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -51,9 +61,11 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginData {\n");
-            sb.Append("  AccessToken: ").Append(AccessToken).Append("\n");
-            sb.Append("  Expires: ").Append(Expires).Append("\n");
+            sb.Append("class BatchConsumptionUpdateRequest {\n");
+            sb.Append("  OrderId: ").Append(OrderId).Append("\n");
+            sb.Append("  ItemId: ").Append(ItemId).Append("\n");
+            sb.Append("  ConsumeQty: ").Append(ConsumeQty).Append("\n");
+            sb.Append("  ConsumptionId: ").Append(ConsumptionId).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -76,29 +88,39 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginData)obj);
+            return obj.GetType() == GetType() && Equals((BatchConsumptionUpdateRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginData instances are equal
+        /// Returns true if BatchConsumptionUpdateRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginData to be compared</param>
+        /// <param name="other">Instance of BatchConsumptionUpdateRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginData other)
+        public bool Equals(BatchConsumptionUpdateRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    AccessToken == other.AccessToken ||
-                    AccessToken != null &&
-                    AccessToken.Equals(other.AccessToken)
+                    OrderId == other.OrderId ||
+                    
+                    OrderId.Equals(other.OrderId)
                 ) && 
                 (
-                    Expires == other.Expires ||
+                    ItemId == other.ItemId ||
                     
-                    Expires.Equals(other.Expires)
+                    ItemId.Equals(other.ItemId)
+                ) && 
+                (
+                    ConsumeQty == other.ConsumeQty ||
+                    
+                    ConsumeQty.Equals(other.ConsumeQty)
+                ) && 
+                (
+                    ConsumptionId == other.ConsumptionId ||
+                    
+                    ConsumptionId.Equals(other.ConsumptionId)
                 );
         }
 
@@ -112,10 +134,14 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (AccessToken != null)
-                    hashCode = hashCode * 59 + AccessToken.GetHashCode();
                     
-                    hashCode = hashCode * 59 + Expires.GetHashCode();
+                    hashCode = hashCode * 59 + OrderId.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + ItemId.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + ConsumeQty.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + ConsumptionId.GetHashCode();
                 return hashCode;
             }
         }
@@ -123,12 +149,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginData left, LoginData right)
+        public static bool operator ==(BatchConsumptionUpdateRequest left, BatchConsumptionUpdateRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginData left, LoginData right)
+        public static bool operator !=(BatchConsumptionUpdateRequest left, BatchConsumptionUpdateRequest right)
         {
             return !Equals(left, right);
         }
