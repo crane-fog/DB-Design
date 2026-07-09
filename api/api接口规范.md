@@ -461,6 +461,89 @@ openapi/
 - 同一字段在不同接口中不应出现多种命名方式。
 - 与业务状态相关的字段，应遵守本文档第 4 节的状态值设计规范。
 
+### 8.1 派生字段设计规范
+
+派生字段是指数据库表中没有直接存储，而是由后端根据其他字段或业务数据计算得到的字段，例如库存差额、订单总金额、完成进度和预警状态等。
+
+派生字段应遵守以下规则：
+
+* 派生字段必须在 OpenAPI Schema 中标记为 `readOnly: true`。
+* `description` 中必须说明字段的数据来源、计算规则、单位、精度以及可能的取值范围。
+* 派生字段原则上只允许出现在查询响应模型中，不得出现在新增请求模型和修改请求模型中。
+* 前端不得提交或自行修改派生字段，后端也不得直接使用前端传入的派生字段值。
+* 涉及金额、库存、数量、进度、预警状态等关键业务数据时，必须由后端统一计算，禁止不同接口或前端分别采用不同计算口径。
+* 同一个派生字段在不同接口中出现时，其字段名称、数据类型、计算公式、精度和取值范围必须保持一致。
+* 如果派生字段计算所需的数据不完整，应在 `description` 中说明空值或默认值的处理规则。
+
+OpenAPI 示例：
+
+```yaml
+total_amount:
+  type: number
+  format: double
+  readOnly: true
+  minimum: 0
+  description: >
+    订单总金额，由后端根据订单明细中的 quantity × unit_price
+    汇总计算得到，单位为元，保留两位小数，取值范围大于等于 0。
+  example: 12500.50
+
+available_stock:
+  type: integer
+  readOnly: true
+  minimum: 0
+  description: >
+    可用库存，由后端按照 current_stock - locked_stock 计算得到，
+    单位与物料库存单位一致，取值范围大于等于 0。
+  example: 80
+
+progress:
+  type: number
+  format: double
+  readOnly: true
+  minimum: 0
+  maximum: 100
+  description: >
+    生产完成进度，由后端按照 completed_quantity / planned_quantity × 100
+    计算得到，单位为百分比，取值范围为 0～100。
+    当 planned_quantity 为 0 时，progress 返回 0。
+  example: 75.5
+```
+
+请求模型中不得包含上述字段：
+
+```yaml
+OrderCreateRequest:
+  type: object
+  properties:
+    supplier_id:
+      type: integer
+    order_items:
+      type: array
+      items:
+        $ref: '#/components/schemas/OrderItemCreateRequest'
+```
+
+响应模型中可以包含派生字段：
+
+```yaml
+OrderDetail:
+  type: object
+  properties:
+    order_id:
+      type: integer
+    supplier_id:
+      type: integer
+    total_amount:
+      type: number
+      format: double
+      readOnly: true
+      minimum: 0
+      description: >
+        订单总金额，由后端汇总所有订单明细的 quantity × unit_price 得到，
+        单位为元，保留两位小数。
+```
+
 ## 9. 接口路径和请求方法规范
 
 接口统一只使用 `GET` 和 `POST` 两种请求方法。
