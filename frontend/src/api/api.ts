@@ -1392,7 +1392,7 @@ export interface ProductionCalendarSaveRequest {
     'config_id': number;
 }
 /**
- * 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。order_id 或 material_id、version_id、plan_qty、expected_date 两组条件至少提供一组，由后端校验。
+ * 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。
  */
 export interface ProductionCapacityEstimateRequest {
     /**
@@ -3800,11 +3800,11 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
         /**
          * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
          * @summary 估计生产订单交付能力
-         * @param {ProductionCapacityEstimateRequest} productionCapacityEstimateRequest 
+         * @param {ProductionCapacityEstimateRequest | null} productionCapacityEstimateRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        estimateProductionCapacity: async (productionCapacityEstimateRequest: ProductionCapacityEstimateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        estimateProductionCapacity: async (productionCapacityEstimateRequest: ProductionCapacityEstimateRequest | null, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'productionCapacityEstimateRequest' is not null or undefined
             assertParamExists('estimateProductionCapacity', 'productionCapacityEstimateRequest', productionCapacityEstimateRequest)
             const localVarPath = `/api/estimateProductionCapacity`;
@@ -4834,11 +4834,11 @@ export const ProductionApiFp = function(configuration?: Configuration) {
         /**
          * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
          * @summary 估计生产订单交付能力
-         * @param {ProductionCapacityEstimateRequest} productionCapacityEstimateRequest 
+         * @param {ProductionCapacityEstimateRequest | null} productionCapacityEstimateRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async estimateProductionCapacity(productionCapacityEstimateRequest: ProductionCapacityEstimateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionCapacityEstimateResponse>> {
+        async estimateProductionCapacity(productionCapacityEstimateRequest: ProductionCapacityEstimateRequest | null, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionCapacityEstimateResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.estimateProductionCapacity(productionCapacityEstimateRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ProductionApi.estimateProductionCapacity']?.[localVarOperationServerIndex]?.url;
@@ -5470,7 +5470,7 @@ export interface ProductionApiDeleteProductionCalendarRequest {
  * Request parameters for estimateProductionCapacity operation in ProductionApi.
  */
 export interface ProductionApiEstimateProductionCapacityRequest {
-    readonly productionCapacityEstimateRequest: ProductionCapacityEstimateRequest
+    readonly productionCapacityEstimateRequest: ProductionCapacityEstimateRequest | null
 }
 
 /**
@@ -7115,11 +7115,11 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
         /**
          * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
          * @summary 分析问题批次影响范围
-         * @param {QualityImpactAnalyzeRequest} qualityImpactAnalyzeRequest 
+         * @param {QualityImpactAnalyzeRequest | null} qualityImpactAnalyzeRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        analyzeQualityImpact: async (qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        analyzeQualityImpact: async (qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest | null, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'qualityImpactAnalyzeRequest' is not null or undefined
             assertParamExists('analyzeQualityImpact', 'qualityImpactAnalyzeRequest', qualityImpactAnalyzeRequest)
             const localVarPath = `/api/analyzeQualityImpact`;
@@ -7420,11 +7420,11 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
         /**
          * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
          * @summary 分析问题批次影响范围
-         * @param {QualityImpactAnalyzeRequest} qualityImpactAnalyzeRequest 
+         * @param {QualityImpactAnalyzeRequest | null} qualityImpactAnalyzeRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async analyzeQualityImpact(qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<QualityImpactAnalyzeResponse>> {
+        async analyzeQualityImpact(qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest | null, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<QualityImpactAnalyzeResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.analyzeQualityImpact(qualityImpactAnalyzeRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.analyzeQualityImpact']?.[localVarOperationServerIndex]?.url;
@@ -7597,7 +7597,7 @@ export interface QualityTraceabilityApiAddBatchConsumptionRequest {
  * Request parameters for analyzeQualityImpact operation in QualityTraceabilityApi.
  */
 export interface QualityTraceabilityApiAnalyzeQualityImpactRequest {
-    readonly qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest
+    readonly qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest | null
 }
 
 /**

@@ -21,7 +21,7 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。order_id 或 material_id、version_id、plan_qty、expected_date 两组条件至少提供一组，由后端校验。
+    /// 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。
     /// </summary>
     [DataContract]
     public partial class ProductionCapacityEstimateRequest : IEquatable<ProductionCapacityEstimateRequest>
