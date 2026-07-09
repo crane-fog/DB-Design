@@ -10,7 +10,7 @@ paths:
   /api/listPurchaseOrder:
     get:
       summary: 查询采购订单列表
-      description: 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。
+      description: 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
       operationId: listPurchaseOrder
       tags: [purchase]
       security:
@@ -18,50 +18,53 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: supplier_no
+        - name: supplier_id
           in: query
           required: false
           schema:
-            type: string
-        - name: material_no
+            type: integer
+            format: int64
+        - name: material_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
         - name: status
           in: query
           required: false
           schema:
             $ref: '#/components/schemas/PurchaseOrderStatus'
-        - name: order_start_date
+        - name: order_date_start
           in: query
           required: false
           schema:
             type: string
             format: date
-        - name: order_end_date
+        - name: order_date_end
           in: query
           required: false
           schema:
             type: string
             format: date
-        - name: expected_delivery_start_date
+        - name: expected_date_start
           in: query
           required: false
           schema:
             type: string
             format: date
-        - name: expected_delivery_end_date
+        - name: expected_date_end
           in: query
           required: false
           schema:
             type: string
             format: date
-        - name: purchaser_user_no
+        - name: buyer_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -72,17 +75,18 @@ paths:
   /api/getPurchaseOrder:
     get:
       summary: 查询采购订单详情
-      description: 根据采购订单编号查询主表、明细、供应商和收货进度。
+      description: 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
       operationId: getPurchaseOrder
       tags: [purchase]
       security:
         - bearerAuth: []
       parameters:
-        - name: purchase_order_no
+        - name: order_id
           in: query
           required: true
           schema:
-            type: string
+            type: integer
+            format: int64
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -93,7 +97,7 @@ paths:
   /api/addPurchaseOrder:
     post:
       summary: 新增采购订单草稿
-      description: 手工新增采购订单草稿及明细，初始状态为 draft。
+      description: 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
       operationId: addPurchaseOrder
       tags: [purchase]
       security:
@@ -114,7 +118,7 @@ paths:
   /api/createPurchaseOrderDraftFromShortage:
     post:
       summary: 根据缺口生成采购订单草稿
-      description: 读取缺口计算结果中的建议采购量，关联物料默认供应商，并按供应商生成采购订单草稿。
+      description: 读取缺口计算结果中的建议采购量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：suggested_purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
       operationId: createPurchaseOrderDraftFromShortage
       tags: [purchase]
       security:
@@ -135,7 +139,7 @@ paths:
   /api/submitPurchaseOrder:
     post:
       summary: 提交采购订单
-      description: 将采购订单从 draft 状态提交为 submitted 状态。
+      description: 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
       operationId: submitPurchaseOrder
       tags: [purchase]
       security:
@@ -156,7 +160,7 @@ paths:
   /api/cancelPurchaseOrder:
     post:
       summary: 取消采购订单
-      description: 将可取消的采购订单更新为 cancelled 状态。
+      description: 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
       operationId: cancelPurchaseOrder
       tags: [purchase]
       security:
@@ -177,7 +181,7 @@ paths:
   /api/addPurchaseReceipt:
     post:
       summary: 新增采购收货记录
-      description: 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。
+      description: 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
       operationId: addPurchaseReceipt
       tags: [purchase]
       security:
@@ -198,7 +202,7 @@ paths:
   /api/listPurchaseReceipt:
     get:
       summary: 查询采购收货记录
-      description: 分页查询采购订单分批收货记录。
+      description: 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
       operationId: listPurchaseReceipt
       tags: [purchase]
       security:
@@ -206,16 +210,18 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: purchase_order_no
+        - name: order_id
           in: query
           required: false
           schema:
-            type: string
-        - name: material_no
+            type: integer
+            format: int64
+        - name: material_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -226,7 +232,7 @@ paths:
   /api/generatePurchaseOverdueReminder:
     post:
       summary: 生成采购逾期提醒
-      description: 对超过预计交货日期且状态未完成的采购订单生成逾期提醒。
+      description: 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
       operationId: generatePurchaseOverdueReminder
       tags: [purchase]
       security:
@@ -247,7 +253,7 @@ paths:
   /api/listPurchaseOverdueReminder:
     get:
       summary: 查询采购逾期提醒
-      description: 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。
+      description: 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
       operationId: listPurchaseOverdueReminder
       tags: [purchase]
       security:
@@ -255,11 +261,12 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: purchase_order_no
+        - name: order_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
         - name: status
           in: query
           required: false
@@ -275,7 +282,7 @@ paths:
   /api/handlePurchaseOverdueReminder:
     post:
       summary: 处理采购逾期提醒
-      description: 将逾期提醒更新为 urged 或 received，并记录处理备注。
+      description: 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
       operationId: handlePurchaseOverdueReminder
       tags: [purchase]
       security:
@@ -297,23 +304,24 @@ components:
   schemas:
     PurchaseOrderStatus:
       type: string
-      description: draft 草稿，submitted 已提交，partial_received 部分到货，completed 已完成，cancelled 已取消。
+      description: 采购订单状态。draft 草稿，可编辑、提交、取消；submitted 已提交，可收货、取消；partial_received 部分到货，可继续收货；completed 已完成，不可修改；cancelled 已取消，不可继续操作。允许流转：draft -> submitted/cancelled，submitted -> partial_received/completed/cancelled，partial_received -> completed。
       enum: [draft, submitted, partial_received, completed, cancelled]
     PurchaseOverdueReminderStatus:
       type: string
-      description: pending_urge 待催交，urged 已催交，received 已到货。
+      description: 采购逾期提醒状态。pending_urge 待催交，可催交或标记到货；urged 已催交，可继续备注或标记到货；received 已到货，流程结束。允许流转：pending_urge -> urged/received，urged -> received。
       enum: [pending_urge, urged, received]
     SupplierBrief:
       type: object
-      required: [supplier_no, supplier_name]
+      required: [supplier_id, supplier_name]
       properties:
-        supplier_no:
-          type: string
-          example: S-1001
+        supplier_id:
+          type: integer
+          format: int64
+          example: 1001
         supplier_name:
           type: string
           example: 华东钢材供应商
-        contact_name:
+        contact_person:
           type: string
           nullable: true
         contact_phone:
@@ -321,30 +329,35 @@ components:
           nullable: true
     PurchaseOrderBrief:
       type: object
-      required: [purchase_order_no, status, supplier_no]
+      required: [order_id, status, supplier_id]
       properties:
-        purchase_order_no:
-          type: string
+        order_id:
+          type: integer
+          format: int64
         status:
           $ref: '#/components/schemas/PurchaseOrderStatus'
-        supplier_no:
-          type: string
+        supplier_id:
+          type: integer
+          format: int64
     PurchaseOrderDetailLine:
       type: object
-      required: [detail_no, purchase_order_no, material_no, purchase_quantity, received_quantity, unit_price]
+      required: [item_id, order_id, material_id, quantity, received_qty, unit_price]
       properties:
-        detail_no:
-          type: string
-        purchase_order_no:
-          type: string
-        material_no:
-          type: string
+        item_id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
         material_name:
           type: string
-        purchase_quantity:
+        quantity:
           type: number
           format: decimal
-        received_quantity:
+        received_qty:
           type: number
           format: decimal
         unit_price:
@@ -362,10 +375,11 @@ components:
           maximum: 1
     PurchaseOrder:
       type: object
-      required: [purchase_order_no, status, supplier, order_date, expected_delivery_date, purchaser_user_no, total_amount, receive_progress, is_overdue, details]
+      required: [order_id, status, supplier, order_date, expected_date, buyer_id, total_amount, receive_progress, is_overdue, details]
       properties:
-        purchase_order_no:
-          type: string
+        order_id:
+          type: integer
+          format: int64
         status:
           $ref: '#/components/schemas/PurchaseOrderStatus'
         supplier:
@@ -373,15 +387,16 @@ components:
         order_date:
           type: string
           format: date
-        expected_delivery_date:
+        expected_date:
           type: string
           format: date
-        actual_completion_date:
+        actual_date:
           type: string
           format: date
           nullable: true
-        purchaser_user_no:
-          type: string
+        buyer_id:
+          type: integer
+          format: int64
         total_amount:
           type: number
           format: decimal
@@ -402,25 +417,28 @@ components:
             $ref: '#/components/schemas/PurchaseOrderDetailLine'
     PurchaseOrderCreateRequest:
       type: object
-      required: [supplier_no, expected_delivery_date, purchaser_user_no, details]
+      required: [supplier_id, expected_date, buyer_id, details]
       properties:
-        supplier_no:
-          type: string
-        expected_delivery_date:
+        supplier_id:
+          type: integer
+          format: int64
+        expected_date:
           type: string
           format: date
-        purchaser_user_no:
-          type: string
+        buyer_id:
+          type: integer
+          format: int64
         details:
           type: array
           minItems: 1
           items:
             type: object
-            required: [material_no, purchase_quantity, unit_price]
+            required: [material_id, quantity, unit_price]
             properties:
-              material_no:
-                type: string
-              purchase_quantity:
+              material_id:
+                type: integer
+                format: int64
+              quantity:
                 type: number
                 format: decimal
                 minimum: 0
@@ -431,112 +449,126 @@ components:
                 minimum: 0
     PurchaseDraftFromShortageRequest:
       type: object
-      required: [expected_delivery_date, purchaser_user_no, items]
+      required: [expected_date, buyer_id, items]
       properties:
-        expected_delivery_date:
+        expected_date:
           type: string
           format: date
-        purchaser_user_no:
-          type: string
+        buyer_id:
+          type: integer
+          format: int64
         items:
           type: array
           minItems: 1
           items:
             type: object
-            required: [material_no, suggested_purchase_quantity]
+            required: [material_id, suggested_purchase_qty]
             properties:
-              material_no:
-                type: string
-              suggested_purchase_quantity:
+              material_id:
+                type: integer
+                format: int64
+              suggested_purchase_qty:
                 type: number
                 format: decimal
                 minimum: 0
                 exclusiveMinimum: true
-              default_supplier_no:
-                type: string
+              supplier_id:
+                type: integer
+                format: int64
                 nullable: true
     PurchaseOrderActionRequest:
       type: object
-      required: [purchase_order_no, operator_user_no]
+      required: [order_id, operator_id]
       properties:
-        purchase_order_no:
-          type: string
-        operator_user_no:
-          type: string
+        order_id:
+          type: integer
+          format: int64
+        operator_id:
+          type: integer
+          format: int64
     PurchaseReceipt:
       type: object
-      required: [receipt_no, purchase_order_no, material_no, received_quantity, receipt_date]
+      required: [receive_id, order_id, material_id, quantity, receive_date]
       properties:
-        receipt_no:
-          type: string
-        purchase_order_no:
-          type: string
-        material_no:
-          type: string
+        receive_id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
         material_name:
           type: string
-        received_quantity:
+        quantity:
           type: number
           format: decimal
           minimum: 0
           exclusiveMinimum: true
-        receipt_date:
+        receive_date:
           type: string
           format: date
     PurchaseReceiptCreateRequest:
       type: object
-      required: [purchase_order_no, material_no, received_quantity, receipt_date]
+      required: [order_id, material_id, quantity, receive_date]
       properties:
-        purchase_order_no:
-          type: string
-        material_no:
-          type: string
-        received_quantity:
+        order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
+        quantity:
           type: number
           format: decimal
           minimum: 0
           exclusiveMinimum: true
-        receipt_date:
+        receive_date:
           type: string
           format: date
     PurchaseOverdueReminder:
       type: object
-      required: [reminder_no, purchase_order_no, expected_delivery_date, overdue_days, reminder_time, status]
+      required: [reminder_id, order_id, expected_date, overdue_days, remind_time, status]
       properties:
-        reminder_no:
-          type: string
-        purchase_order_no:
-          type: string
-        expected_delivery_date:
+        reminder_id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        expected_date:
           type: string
           format: date
         overdue_days:
           type: integer
           minimum: 1
-        reminder_time:
+        remind_time:
           type: string
           format: date-time
         status:
           $ref: '#/components/schemas/PurchaseOverdueReminderStatus'
-        handle_remark:
+        remark:
           type: string
           nullable: true
     PurchaseOverdueReminderGenerateRequest:
       type: object
       properties:
-        purchase_order_no:
-          type: string
+        order_id:
+          type: integer
+          format: int64
           nullable: true
     PurchaseOverdueReminderHandleRequest:
       type: object
-      required: [reminder_no, status]
+      required: [reminder_id, status]
       properties:
-        reminder_no:
-          type: string
+        reminder_id:
+          type: integer
+          format: int64
         status:
           type: string
           enum: [urged, received]
-        handle_remark:
+        remark:
           type: string
           nullable: true
     PurchaseOrderResponse:
@@ -587,9 +619,10 @@ components:
                   items:
                     type: object
                     properties:
-                      material_no:
-                        type: string
-                      suggested_purchase_quantity:
+                      material_id:
+                        type: integer
+                        format: int64
+                      suggested_purchase_qty:
                         type: number
                         format: decimal
     PurchaseReceiptResponse:

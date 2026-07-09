@@ -10,7 +10,7 @@ paths:
   /api/calculateMaterialShortage:
     post:
       summary: 计算物料缺口
-      description: 根据产品编号、生产数量和 BOM 版本递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。
+      description: 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: calculateMaterialShortage
       tags: [inventory]
       security:
@@ -31,7 +31,7 @@ paths:
   /api/listInventoryAlert:
     get:
       summary: 查询库存预警事件
-      description: 分页查询低库存预警事件，支持按物料、状态和触发时间过滤。
+      description: 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: listInventoryAlert
       tags: [inventory]
       security:
@@ -39,11 +39,12 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: material_no
+        - name: material_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
         - name: status
           in: query
           required: false
@@ -71,7 +72,7 @@ paths:
   /api/generateInventoryAlert:
     post:
       summary: 生成库存预警事件
-      description: 比较物料可用数量与安全库存阈值，低于阈值时生成 low_stock 预警；同一物料已有 pending 预警时不重复生成。
+      description: 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: generateInventoryAlert
       tags: [inventory]
       security:
@@ -92,7 +93,7 @@ paths:
   /api/handleInventoryAlert:
     post:
       summary: 处理库存预警事件
-      description: 将库存预警事件更新为 handled 或 ignored，并记录处理人和处理时间。
+      description: 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
       operationId: handleInventoryAlert
       tags: [inventory]
       security:
@@ -113,7 +114,7 @@ paths:
   /api/lockMaterialStock:
     post:
       summary: 锁定物料库存
-      description: 为生产订单锁定物料库存，锁定前校验可用数量；不足时拒绝并返回缺口。
+      description: 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
       operationId: lockMaterialStock
       tags: [inventory]
       security:
@@ -134,7 +135,7 @@ paths:
   /api/releaseMaterialStock:
     post:
       summary: 释放物料锁定
-      description: 订单取消时反向释放锁定库存，减少已锁定数量并恢复可用数量。
+      description: 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
       operationId: releaseMaterialStock
       tags: [inventory]
       security:
@@ -155,7 +156,7 @@ paths:
   /api/listMaterialStockLock:
     get:
       summary: 查询物料锁定记录
-      description: 分页查询物料锁定、取消和消耗记录。
+      description: 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: listMaterialStockLock
       tags: [inventory]
       security:
@@ -163,16 +164,18 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: production_order_no
+        - name: order_id
           in: query
           required: false
           schema:
-            type: string
-        - name: material_no
+            type: integer
+            format: int64
+        - name: material_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
         - name: status
           in: query
           required: false
@@ -188,7 +191,7 @@ paths:
   /api/detectObsoleteMaterial:
     post:
       summary: 检测废弃物料
-      description: 根据最后出库日期、可用数量和闲置天数阈值检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。
+      description: 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: detectObsoleteMaterial
       tags: [inventory]
       security:
@@ -209,7 +212,7 @@ paths:
   /api/listObsoleteMaterialDetection:
     get:
       summary: 查询废弃物料检测结果
-      description: 分页查询废弃物料检测结果，支持按物料、处理状态和检测时间过滤。
+      description: 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: listObsoleteMaterialDetection
       tags: [inventory]
       security:
@@ -217,11 +220,12 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: material_no
+        - name: material_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
         - name: status
           in: query
           required: false
@@ -237,7 +241,7 @@ paths:
   /api/handleObsoleteMaterialDetection:
     post:
       summary: 处理废弃物料检测结果
-      description: 将废弃物料检测结果更新为 handled 或 ignored，并记录处理人。
+      description: 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
       operationId: handleObsoleteMaterialDetection
       tags: [inventory]
       security:
@@ -258,7 +262,7 @@ paths:
   /api/addCompletionInbound:
     post:
       summary: 登记完工入库
-      description: 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料已锁定数量，增加成品可用数量并记录批次号。
+      description: 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
       operationId: addCompletionInbound
       tags: [inventory]
       security:
@@ -279,7 +283,7 @@ paths:
   /api/listCompletionInbound:
     get:
       summary: 查询完工入库单
-      description: 分页查询完工入库单，支持按生产订单、产品和入库时间过滤。
+      description: 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: listCompletionInbound
       tags: [inventory]
       security:
@@ -287,16 +291,18 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: production_order_no
+        - name: order_id
           in: query
           required: false
           schema:
-            type: string
-        - name: product_no
+            type: integer
+            format: int64
+        - name: material_id
           in: query
           required: false
           schema:
-            type: string
+            type: integer
+            format: int64
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -308,15 +314,15 @@ components:
   schemas:
     InventoryAlertStatus:
       type: string
-      description: pending 待处理，handled 已处理，ignored 已忽略。
+      description: 库存预警状态。pending 待处理，可处理或忽略；handled 已处理，流程结束；ignored 已忽略，流程结束。允许流转：pending -> handled/ignored。
       enum: [pending, handled, ignored]
     StockLockStatus:
       type: string
-      description: locked 已锁定，cancelled 已取消，consumed 已消耗。
+      description: 库存锁定状态。locked 已锁定，可释放或消耗；cancelled 已取消，释放完成；consumed 已消耗，完工入库后不可释放。允许流转：locked -> cancelled/consumed。
       enum: [locked, cancelled, consumed]
     ObsoleteMaterialStatus:
       type: string
-      description: pending 待处理，handled 已处理，ignored 已忽略。
+      description: 废弃物料检测状态。pending 待处理，可处理或忽略；handled 已处理，流程结束；ignored 已忽略，流程结束。允许流转：pending -> handled/ignored。
       enum: [pending, handled, ignored]
     MaterialShortageCalculateRequest:
       type: object
@@ -327,32 +333,36 @@ components:
           minItems: 1
           items:
             type: object
-            required: [product_no, production_quantity, bom_version]
+            required: [material_id, production_qty, version_id]
             properties:
-              product_no:
-                type: string
-                example: P-1001
-              production_quantity:
+              material_id:
+                type: integer
+                format: int64
+                example: 1001
+              production_qty:
                 type: number
                 format: decimal
                 minimum: 0
                 exclusiveMinimum: true
                 example: 100
-              bom_version:
-                type: string
-                example: V1.0
+              version_id:
+                type: integer
+                format: int64
+                example: 1
     MaterialShortageItem:
       type: object
-      required: [material_no, level, gross_requirement, available_quantity, in_transit_quantity, safety_stock, net_shortage]
+      required: [material_id, level, gross_requirement, available_qty, in_transit_qty, safety_stock, net_shortage_qty]
       properties:
-        material_no:
-          type: string
-          example: M-1001
+        material_id:
+          type: integer
+          format: int64
+          example: 1001
         material_name:
           type: string
           example: 钢板
-        parent_material_no:
-          type: string
+        parent_material_id:
+          type: integer
+          format: int64
           nullable: true
         level:
           type: integer
@@ -362,41 +372,43 @@ components:
           type: number
           format: decimal
           description: 含损耗补偿后的总毛需求。
-        available_quantity:
+        available_qty:
           type: number
           format: decimal
-        in_transit_quantity:
+        in_transit_qty:
           type: number
           format: decimal
         safety_stock:
           type: number
           format: decimal
-        net_shortage:
+        net_shortage_qty:
           type: number
           format: decimal
           minimum: 0
           description: max(毛需求 - 可用数量 - 在途数量 + 安全库存, 0)。
-        suggested_purchase_quantity:
+        suggested_purchase_qty:
           type: number
           format: decimal
           minimum: 0
     InventoryAlertEvent:
       type: object
-      required: [alert_no, material_no, alert_type, available_quantity, alert_threshold, alert_time, status]
+      required: [alert_id, material_id, alert_type, available_qty, threshold, alert_time, status]
       properties:
-        alert_no:
-          type: string
-        material_no:
-          type: string
+        alert_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
         material_name:
           type: string
         alert_type:
           type: string
           enum: [low_stock]
-        available_quantity:
+        available_qty:
           type: number
           format: decimal
-        alert_threshold:
+        threshold:
           type: number
           format: decimal
         alert_time:
@@ -404,8 +416,9 @@ components:
           format: date-time
         status:
           $ref: '#/components/schemas/InventoryAlertStatus'
-        handler_user_no:
-          type: string
+        handler_id:
+          type: integer
+          format: int64
           nullable: true
         handle_time:
           type: string
@@ -414,63 +427,74 @@ components:
     InventoryAlertGenerateRequest:
       type: object
       properties:
-        material_no:
-          type: string
+        material_id:
+          type: integer
+          format: int64
           nullable: true
     InventoryAlertHandleRequest:
       type: object
-      required: [alert_no, status, handler_user_no]
+      required: [alert_id, status, handler_id]
       properties:
-        alert_no:
-          type: string
+        alert_id:
+          type: integer
+          format: int64
         status:
           type: string
           enum: [handled, ignored]
-        handler_user_no:
-          type: string
+        handler_id:
+          type: integer
+          format: int64
     MaterialStockLockRequest:
       type: object
-      required: [production_order_no, operator_user_no, items]
+      required: [order_id, operator_id, items]
       properties:
-        production_order_no:
-          type: string
-        operator_user_no:
-          type: string
+        order_id:
+          type: integer
+          format: int64
+        operator_id:
+          type: integer
+          format: int64
         items:
           type: array
           minItems: 1
           items:
             type: object
-            required: [material_no, lock_quantity]
+            required: [material_id, lock_qty]
             properties:
-              material_no:
-                type: string
-              lock_quantity:
+              material_id:
+                type: integer
+                format: int64
+              lock_qty:
                 type: number
                 format: decimal
                 minimum: 0
                 exclusiveMinimum: true
     MaterialStockReleaseRequest:
       type: object
-      required: [lock_no, operator_user_no]
+      required: [lock_id, operator_id]
       properties:
-        lock_no:
-          type: string
-        operator_user_no:
-          type: string
+        lock_id:
+          type: integer
+          format: int64
+        operator_id:
+          type: integer
+          format: int64
     StockLockRecord:
       type: object
-      required: [lock_no, production_order_no, material_no, lock_quantity, status, lock_time, operator_user_no]
+      required: [lock_id, order_id, material_id, lock_qty, status, lock_time, operator_id]
       properties:
-        lock_no:
-          type: string
-        production_order_no:
-          type: string
-        material_no:
-          type: string
+        lock_id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
         material_name:
           type: string
-        lock_quantity:
+        lock_qty:
           type: number
           format: decimal
         status:
@@ -482,8 +506,9 @@ components:
           type: string
           format: date-time
           nullable: true
-        operator_user_no:
-          type: string
+        operator_id:
+          type: integer
+          format: int64
     MaterialStockLockData:
       type: object
       required: [success, records, shortages]
@@ -498,17 +523,18 @@ components:
           type: array
           items:
             type: object
-            required: [material_no, required_quantity, available_quantity, shortage_quantity]
+            required: [material_id, required_qty, available_qty, shortage_qty]
             properties:
-              material_no:
-                type: string
-              required_quantity:
+              material_id:
+                type: integer
+                format: int64
+              required_qty:
                 type: number
                 format: decimal
-              available_quantity:
+              available_qty:
                 type: number
                 format: decimal
-              shortage_quantity:
+              shortage_qty:
                 type: number
                 format: decimal
     ObsoleteMaterialDetectRequest:
@@ -518,26 +544,29 @@ components:
         idle_days_threshold:
           type: integer
           minimum: 1
-        material_no:
-          type: string
+        material_id:
+          type: integer
+          format: int64
           nullable: true
     ObsoleteMaterialDetection:
       type: object
-      required: [detection_no, detection_time, material_no, available_quantity, idle_days, status]
+      required: [detection_id, detect_time, material_id, available_qty, idle_days, status]
       properties:
-        detection_no:
-          type: string
-        detection_time:
+        detection_id:
+          type: integer
+          format: int64
+        detect_time:
           type: string
           format: date-time
-        material_no:
-          type: string
+        material_id:
+          type: integer
+          format: int64
         material_name:
           type: string
-        available_quantity:
+        available_qty:
           type: number
           format: decimal
-        last_outbound_date:
+        last_out_date:
           type: string
           format: date
           nullable: true
@@ -545,70 +574,82 @@ components:
           type: integer
         status:
           $ref: '#/components/schemas/ObsoleteMaterialStatus'
-        handler_user_no:
-          type: string
+        handler_id:
+          type: integer
+          format: int64
           nullable: true
     ObsoleteMaterialHandleRequest:
       type: object
-      required: [detection_no, status, handler_user_no]
+      required: [detection_id, status, handler_id]
       properties:
-        detection_no:
-          type: string
+        detection_id:
+          type: integer
+          format: int64
         status:
           type: string
           enum: [handled, ignored]
-        handler_user_no:
-          type: string
+        handler_id:
+          type: integer
+          format: int64
     CompletionInboundCreateRequest:
       type: object
-      required: [production_order_no, product_no, bom_version, completed_quantity, qualified_quantity, product_batch_no, operator_user_no]
+      required: [order_id, material_id, version_id, finish_qty, qualified_qty, batch_no, operator_id]
       properties:
-        production_order_no:
-          type: string
-        product_no:
-          type: string
-        bom_version:
-          type: string
-        completed_quantity:
+        order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
+        version_id:
+          type: integer
+          format: int64
+        finish_qty:
           type: number
           format: decimal
           minimum: 0
           exclusiveMinimum: true
-        qualified_quantity:
+        qualified_qty:
           type: number
           format: decimal
           minimum: 0
-        product_batch_no:
+        batch_no:
           type: string
-        operator_user_no:
-          type: string
+        operator_id:
+          type: integer
+          format: int64
     CompletionInboundOrder:
       type: object
-      required: [inbound_no, production_order_no, product_no, bom_version, completed_quantity, qualified_quantity, product_batch_no, inbound_time, operator_user_no]
+      required: [inbound_id, order_id, material_id, version_id, finish_qty, qualified_qty, batch_no, inbound_time, operator_id]
       properties:
-        inbound_no:
-          type: string
-        production_order_no:
-          type: string
-        product_no:
-          type: string
+        inbound_id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
         product_name:
           type: string
-        bom_version:
-          type: string
-        completed_quantity:
+        version_id:
+          type: integer
+          format: int64
+        finish_qty:
           type: number
           format: decimal
-        qualified_quantity:
+        qualified_qty:
           type: number
           format: decimal
-        product_batch_no:
+        batch_no:
           type: string
         inbound_time:
           type: string
           format: date-time
-        operator_user_no:
-          type: string
+        operator_id:
+          type: integer
+          format: int64
         consumed_lock_records:
           type: array
           items:
