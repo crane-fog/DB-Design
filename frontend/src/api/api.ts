@@ -87,7 +87,10 @@ export interface LoginData {
     'expires': number;
 }
 export interface LoginRequest {
-    'userNo': string;
+    /**
+     * 工号，唯一约束，用于登录。
+     */
+    'employee_no': string;
     'password': string;
 }
 export interface LoginResponse {
@@ -143,9 +146,12 @@ export interface PageResult {
     'records': Array<any>;
 }
 export interface RegisterRequest {
-    'userNo': string;
+    /**
+     * 工号，唯一约束。
+     */
+    'employee_no': string;
     'password': string;
-    'userName': string;
+    'user_name': string;
     'phone': string;
     'email'?: string;
 }

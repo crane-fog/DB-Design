@@ -27,11 +27,12 @@ namespace Org.OpenAPITools.Models
     public partial class LoginRequest : IEquatable<LoginRequest>
     {
         /// <summary>
-        /// Gets or Sets UserNo
+        /// 工号，唯一约束，用于登录。
         /// </summary>
+        /// <value>工号，唯一约束，用于登录。</value>
         [Required]
-        [DataMember(Name="userNo", EmitDefaultValue=false)]
-        public string UserNo { get; set; }
+        [DataMember(Name="employee_no", EmitDefaultValue=false)]
+        public string EmployeeNo { get; set; }
 
         /// <summary>
         /// Gets or Sets Password
@@ -48,7 +49,7 @@ namespace Org.OpenAPITools.Models
         {
             var sb = new StringBuilder();
             sb.Append("class LoginRequest {\n");
-            sb.Append("  UserNo: ").Append(UserNo).Append("\n");
+            sb.Append("  EmployeeNo: ").Append(EmployeeNo).Append("\n");
             sb.Append("  Password: ").Append(Password).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
@@ -87,9 +88,9 @@ namespace Org.OpenAPITools.Models
 
             return 
                 (
-                    UserNo == other.UserNo ||
-                    UserNo != null &&
-                    UserNo.Equals(other.UserNo)
+                    EmployeeNo == other.EmployeeNo ||
+                    EmployeeNo != null &&
+                    EmployeeNo.Equals(other.EmployeeNo)
                 ) && 
                 (
                     Password == other.Password ||
@@ -108,8 +109,8 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (UserNo != null)
-                    hashCode = hashCode * 59 + UserNo.GetHashCode();
+                    if (EmployeeNo != null)
+                    hashCode = hashCode * 59 + EmployeeNo.GetHashCode();
                     if (Password != null)
                     hashCode = hashCode * 59 + Password.GetHashCode();
                 return hashCode;
