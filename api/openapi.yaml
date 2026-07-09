@@ -23,8 +23,6 @@ paths:
     $ref: './system.yaml#/paths/~1api~1login'
   /api/register:
     $ref: './system.yaml#/paths/~1api~1register'
-  /api/getUserTest:
-    $ref: './system.yaml#/paths/~1api~1getUserTest'
   /api/calculateMaterialShortage:
     $ref: './inventory.yaml#/paths/~1api~1calculateMaterialShortage'
   /api/listInventoryAlert:
