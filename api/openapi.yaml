@@ -25,6 +25,52 @@ paths:
     $ref: './system.yaml#/paths/~1api~1register'
   /api/getUserTest:
     $ref: './system.yaml#/paths/~1api~1getUserTest'
+  /api/calculateMaterialShortage:
+    $ref: './inventory.yaml#/paths/~1api~1calculateMaterialShortage'
+  /api/listInventoryAlert:
+    $ref: './inventory.yaml#/paths/~1api~1listInventoryAlert'
+  /api/generateInventoryAlert:
+    $ref: './inventory.yaml#/paths/~1api~1generateInventoryAlert'
+  /api/handleInventoryAlert:
+    $ref: './inventory.yaml#/paths/~1api~1handleInventoryAlert'
+  /api/lockMaterialStock:
+    $ref: './inventory.yaml#/paths/~1api~1lockMaterialStock'
+  /api/releaseMaterialStock:
+    $ref: './inventory.yaml#/paths/~1api~1releaseMaterialStock'
+  /api/listMaterialStockLock:
+    $ref: './inventory.yaml#/paths/~1api~1listMaterialStockLock'
+  /api/detectObsoleteMaterial:
+    $ref: './inventory.yaml#/paths/~1api~1detectObsoleteMaterial'
+  /api/listObsoleteMaterialDetection:
+    $ref: './inventory.yaml#/paths/~1api~1listObsoleteMaterialDetection'
+  /api/handleObsoleteMaterialDetection:
+    $ref: './inventory.yaml#/paths/~1api~1handleObsoleteMaterialDetection'
+  /api/addCompletionInbound:
+    $ref: './inventory.yaml#/paths/~1api~1addCompletionInbound'
+  /api/listCompletionInbound:
+    $ref: './inventory.yaml#/paths/~1api~1listCompletionInbound'
+  /api/listPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1listPurchaseOrder'
+  /api/getPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1getPurchaseOrder'
+  /api/addPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1addPurchaseOrder'
+  /api/createPurchaseOrderDraftFromShortage:
+    $ref: './purchase.yaml#/paths/~1api~1createPurchaseOrderDraftFromShortage'
+  /api/submitPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1submitPurchaseOrder'
+  /api/cancelPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1cancelPurchaseOrder'
+  /api/addPurchaseReceipt:
+    $ref: './purchase.yaml#/paths/~1api~1addPurchaseReceipt'
+  /api/listPurchaseReceipt:
+    $ref: './purchase.yaml#/paths/~1api~1listPurchaseReceipt'
+  /api/generatePurchaseOverdueReminder:
+    $ref: './purchase.yaml#/paths/~1api~1generatePurchaseOverdueReminder'
+  /api/listPurchaseOverdueReminder:
+    $ref: './purchase.yaml#/paths/~1api~1listPurchaseOverdueReminder'
+  /api/handlePurchaseOverdueReminder:
+    $ref: './purchase.yaml#/paths/~1api~1handlePurchaseOverdueReminder'
 components:
   schemas:
     ApiResponse:

@@ -231,6 +231,18 @@ paths:
           required: false
           schema:
             $ref: '#/components/schemas/ObsoleteMaterialStatus'
+        - name: detect_time_start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: detect_time_end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -303,6 +315,18 @@ paths:
           schema:
             type: integer
             format: int64
+        - name: inbound_time_start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: inbound_time_end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
