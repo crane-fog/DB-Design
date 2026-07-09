@@ -35,7 +35,7 @@ export interface ApiResponse {
     /**
      * 实际业务数据，无数据时返回 null。
      */
-    'data': any | null;
+    'data': any;
 }
 
 export const ApiResponseCodeEnum = {
@@ -50,6 +50,91 @@ export const ApiResponseCodeEnum = {
 
 export type ApiResponseCodeEnum = typeof ApiResponseCodeEnum[keyof typeof ApiResponseCodeEnum];
 
+export interface CompletionInboundCreateRequest {
+    'order_id': number;
+    'material_id': number;
+    'version_id': number;
+    'finish_qty': number;
+    'qualified_qty': number;
+    'batch_no': string;
+    'operator_id': number;
+}
+export interface CompletionInboundOrder {
+    'inbound_id': number;
+    'order_id': number;
+    'material_id': number;
+    'product_name'?: string;
+    'version_id': number;
+    'finish_qty': number;
+    'qualified_qty': number;
+    'batch_no': string;
+    'inbound_time': string;
+    'operator_id': number;
+    'consumed_lock_records'?: Array<StockLockRecord>;
+}
+export interface CompletionInboundPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<CompletionInboundOrder>;
+}
+export interface CompletionInboundPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CompletionInboundPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const CompletionInboundPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CompletionInboundPageResponseCodeEnum = typeof CompletionInboundPageResponseCodeEnum[keyof typeof CompletionInboundPageResponseCodeEnum];
+
+export interface CompletionInboundResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CompletionInboundResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const CompletionInboundResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CompletionInboundResponseCodeEnum = typeof CompletionInboundResponseCodeEnum[keyof typeof CompletionInboundResponseCodeEnum];
+
 export interface ErrorResponse {
     /**
      * 错误业务状态码，只使用 400、401、403、404、409、500。
@@ -62,7 +147,7 @@ export interface ErrorResponse {
     /**
      * 错误响应无业务数据，固定返回 null。
      */
-    'data': any | null;
+    'data': object | null;
 }
 
 export const ErrorResponseCodeEnum = {
@@ -75,6 +160,146 @@ export const ErrorResponseCodeEnum = {
 } as const;
 
 export type ErrorResponseCodeEnum = typeof ErrorResponseCodeEnum[keyof typeof ErrorResponseCodeEnum];
+
+export interface InventoryAlertEvent {
+    'alert_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'alert_type': InventoryAlertEventAlertTypeEnum;
+    'available_qty': number;
+    'threshold': number;
+    'alert_time': string;
+    'status': InventoryAlertStatus;
+    'handler_id'?: number | null;
+    'handle_time'?: string | null;
+}
+
+export const InventoryAlertEventAlertTypeEnum = {
+    LowStock: 'low_stock',
+} as const;
+
+export type InventoryAlertEventAlertTypeEnum = typeof InventoryAlertEventAlertTypeEnum[keyof typeof InventoryAlertEventAlertTypeEnum];
+
+export interface InventoryAlertGenerateRequest {
+    'material_id'?: number | null;
+}
+export interface InventoryAlertGenerateResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': InventoryAlertGenerateResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': InventoryAlertGenerateResponseAllOfData | null;
+}
+
+export const InventoryAlertGenerateResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type InventoryAlertGenerateResponseCodeEnum = typeof InventoryAlertGenerateResponseCodeEnum[keyof typeof InventoryAlertGenerateResponseCodeEnum];
+
+export interface InventoryAlertGenerateResponseAllOfData {
+    'generated_count'?: number;
+    'skipped_pending_count'?: number;
+    'records'?: Array<InventoryAlertEvent>;
+}
+export interface InventoryAlertHandleRequest {
+    'alert_id': number;
+    'status': InventoryAlertHandleRequestStatusEnum;
+    'handler_id': number;
+}
+
+export const InventoryAlertHandleRequestStatusEnum = {
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type InventoryAlertHandleRequestStatusEnum = typeof InventoryAlertHandleRequestStatusEnum[keyof typeof InventoryAlertHandleRequestStatusEnum];
+
+export interface InventoryAlertPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<InventoryAlertEvent>;
+}
+export interface InventoryAlertPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': InventoryAlertPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const InventoryAlertPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type InventoryAlertPageResponseCodeEnum = typeof InventoryAlertPageResponseCodeEnum[keyof typeof InventoryAlertPageResponseCodeEnum];
+
+export interface InventoryAlertResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': InventoryAlertResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const InventoryAlertResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type InventoryAlertResponseCodeEnum = typeof InventoryAlertResponseCodeEnum[keyof typeof InventoryAlertResponseCodeEnum];
+
+/**
+ * 库存预警状态。pending 待处理，可处理或忽略；handled 已处理，流程结束；ignored 已忽略，流程结束。允许流转：pending -> handled/ignored。
+ */
+
+export const InventoryAlertStatus = {
+    Pending: 'pending',
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type InventoryAlertStatus = typeof InventoryAlertStatus[keyof typeof InventoryAlertStatus];
+
 
 export interface LoginData {
     /**
@@ -102,7 +327,7 @@ export interface LoginResponse {
      * 返回结果说明。
      */
     'message': string;
-    'data': LoginData | null;
+    'data': object | null;
 }
 
 export const LoginResponseCodeEnum = {
@@ -116,6 +341,257 @@ export const LoginResponseCodeEnum = {
 } as const;
 
 export type LoginResponseCodeEnum = typeof LoginResponseCodeEnum[keyof typeof LoginResponseCodeEnum];
+
+export interface MaterialShortageCalculateRequest {
+    'items': Array<MaterialShortageCalculateRequestItemsInner>;
+}
+export interface MaterialShortageCalculateRequestItemsInner {
+    'material_id': number;
+    'production_qty': number;
+    'version_id': number;
+}
+export interface MaterialShortageCalculateResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialShortageCalculateResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': MaterialShortageCalculateResponseAllOfData | null;
+}
+
+export const MaterialShortageCalculateResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialShortageCalculateResponseCodeEnum = typeof MaterialShortageCalculateResponseCodeEnum[keyof typeof MaterialShortageCalculateResponseCodeEnum];
+
+export interface MaterialShortageCalculateResponseAllOfData {
+    'calculation_time': string;
+    'records': Array<MaterialShortageItem>;
+}
+export interface MaterialShortageItem {
+    'material_id': number;
+    'material_name'?: string;
+    'parent_material_id'?: number | null;
+    'level': number;
+    /**
+     * 毛需求数量，由后端根据请求中的生产产品、生产数量和 BOM 版本递归展开 bom.quantity， 并按 bom.loss_rate 做损耗补偿后汇总得到。单位与物料 material.unit 一致， 保留两位小数，取值范围大于等于 0；当 BOM 明细不存在时按 0 处理。 
+     */
+    'gross_requirement': number;
+    /**
+     * 库存可用数量，来源于 material_stock.available_qty，单位与物料 material.unit 一致，取值范围大于等于 0。
+     */
+    'available_qty': number;
+    /**
+     * 在途数量，由后端汇总 purchase_order_item 中同一 material_id 且采购订单状态为 submitted 或 partial_received 的未到货数量 sum(quantity - received_qty) 得到。单位与物料 material.unit 一致，取值范围大于等于 0；没有匹配采购明细时返回 0。 
+     */
+    'in_transit_qty': number;
+    /**
+     * 安全库存数量，来源于 material.safety_stock，单位与物料 material.unit 一致，取值范围大于等于 0；为空时按 0 处理。
+     */
+    'safety_stock': number;
+    /**
+     * 净缺料数量，由后端根据 gross_requirement、material_stock.available_qty、 在途数量和 material.safety_stock 统一计算，公式为 max(gross_requirement - available_qty - in_transit_qty + safety_stock, 0)。 单位与物料 material.unit 一致，保留两位小数，取值范围大于等于 0。 
+     */
+    'net_shortage_qty': number;
+    /**
+     * 建议采购数量，由后端基于 net_shortage_qty 得到，当前口径为 suggested_purchase_qty = net_shortage_qty。 单位与物料 material.unit 一致，保留两位小数，取值范围大于等于 0；后续如引入最小采购批量或包装规格， 应在后端统一调整该字段计算逻辑。 
+     */
+    'suggested_purchase_qty'?: number;
+}
+export interface MaterialStockLockData {
+    'success': boolean;
+    'records': Array<StockLockRecord>;
+    'shortages': Array<MaterialStockLockDataShortagesInner>;
+}
+export interface MaterialStockLockDataShortagesInner {
+    'material_id': number;
+    'required_qty': number;
+    'available_qty': number;
+    /**
+     * 库存锁定缺口数量，由后端在锁定前根据请求锁定数量 required_qty 与 material_stock.available_qty 计算，公式为 max(required_qty - available_qty, 0)。 单位与物料 material.unit 一致，取值范围大于等于 0。 
+     */
+    'shortage_qty': number;
+}
+export interface MaterialStockLockRequest {
+    'order_id': number;
+    'operator_id': number;
+    'items': Array<MaterialStockLockRequestItemsInner>;
+}
+export interface MaterialStockLockRequestItemsInner {
+    'material_id': number;
+    'lock_qty': number;
+}
+export interface MaterialStockLockResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialStockLockResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const MaterialStockLockResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialStockLockResponseCodeEnum = typeof MaterialStockLockResponseCodeEnum[keyof typeof MaterialStockLockResponseCodeEnum];
+
+export interface MaterialStockReleaseRequest {
+    'lock_id': number;
+    'operator_id': number;
+}
+export interface ObsoleteMaterialDetectRequest {
+    'idle_days_threshold': number;
+    'material_id'?: number | null;
+}
+export interface ObsoleteMaterialDetectResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ObsoleteMaterialDetectResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ObsoleteMaterialDetectResponseAllOfData | null;
+}
+
+export const ObsoleteMaterialDetectResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ObsoleteMaterialDetectResponseCodeEnum = typeof ObsoleteMaterialDetectResponseCodeEnum[keyof typeof ObsoleteMaterialDetectResponseCodeEnum];
+
+export interface ObsoleteMaterialDetectResponseAllOfData {
+    'detected_count'?: number;
+    'records'?: Array<ObsoleteMaterialDetection>;
+}
+export interface ObsoleteMaterialDetection {
+    'detection_id': number;
+    'detect_time': string;
+    'material_id': number;
+    'material_name'?: string;
+    'available_qty': number;
+    'last_out_date'?: string | null;
+    'idle_days': number;
+    'status': ObsoleteMaterialStatus;
+    'handler_id'?: number | null;
+}
+
+
+export interface ObsoleteMaterialHandleRequest {
+    'detection_id': number;
+    'status': ObsoleteMaterialHandleRequestStatusEnum;
+    'handler_id': number;
+}
+
+export const ObsoleteMaterialHandleRequestStatusEnum = {
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type ObsoleteMaterialHandleRequestStatusEnum = typeof ObsoleteMaterialHandleRequestStatusEnum[keyof typeof ObsoleteMaterialHandleRequestStatusEnum];
+
+export interface ObsoleteMaterialPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<ObsoleteMaterialDetection>;
+}
+export interface ObsoleteMaterialPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ObsoleteMaterialPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const ObsoleteMaterialPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ObsoleteMaterialPageResponseCodeEnum = typeof ObsoleteMaterialPageResponseCodeEnum[keyof typeof ObsoleteMaterialPageResponseCodeEnum];
+
+export interface ObsoleteMaterialResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ObsoleteMaterialResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const ObsoleteMaterialResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ObsoleteMaterialResponseCodeEnum = typeof ObsoleteMaterialResponseCodeEnum[keyof typeof ObsoleteMaterialResponseCodeEnum];
+
+/**
+ * 废弃物料检测状态。pending 待处理，可处理或忽略；handled 已处理，流程结束；ignored 已忽略，流程结束。允许流转：pending -> handled/ignored。
+ */
+
+export const ObsoleteMaterialStatus = {
+    Pending: 'pending',
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type ObsoleteMaterialStatus = typeof ObsoleteMaterialStatus[keyof typeof ObsoleteMaterialStatus];
+
 
 export interface PageQuery {
     /**
@@ -145,6 +621,407 @@ export interface PageResult {
      */
     'records': Array<any>;
 }
+export interface PurchaseDraftFromShortageRequest {
+    'expected_date': string;
+    'buyer_id': number;
+    'items': Array<PurchaseDraftFromShortageRequestItemsInner>;
+}
+export interface PurchaseDraftFromShortageRequestItemsInner {
+    'material_id': number;
+    /**
+     * 用户确认的本次采购数量，通常来自库存缺口计算响应中的 suggested_purchase_qty， 但作为请求字段时表示前端提交的采购数量。单位与物料 material.unit 一致，必须大于 0。 
+     */
+    'purchase_qty': number;
+    /**
+     * 指定供应商编号。为空时后端使用 material.default_supplier_id；仍为空则该物料进入 unassigned_items，不生成采购订单明细。 
+     */
+    'supplier_id'?: number | null;
+}
+export interface PurchaseDraftFromShortageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseDraftFromShortageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': PurchaseDraftFromShortageResponseAllOfData | null;
+}
+
+export const PurchaseDraftFromShortageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseDraftFromShortageResponseCodeEnum = typeof PurchaseDraftFromShortageResponseCodeEnum[keyof typeof PurchaseDraftFromShortageResponseCodeEnum];
+
+export interface PurchaseDraftFromShortageResponseAllOfData {
+    'created_count'?: number;
+    'records'?: Array<PurchaseOrder>;
+    /**
+     * 未找到默认供应商而无法生成草稿的物料。
+     */
+    'unassigned_items'?: Array<PurchaseDraftFromShortageResponseAllOfDataUnassignedItems>;
+}
+export interface PurchaseDraftFromShortageResponseAllOfDataUnassignedItems {
+    'material_id'?: number;
+    /**
+     * 用户确认但因缺少供应商而未生成采购草稿的采购数量，单位与物料 material.unit 一致。
+     */
+    'purchase_qty'?: number;
+}
+export interface PurchaseOrder {
+    'order_id': number;
+    'status': PurchaseOrderStatus;
+    'supplier': SupplierBrief;
+    'order_date': string;
+    'expected_date': string;
+    'actual_date'?: string | null;
+    'buyer_id': number;
+    /**
+     * 订单总金额，来源于 purchase_order.total_amount，由后端在新增、收货状态更新或明细变更时 统一按所有明细 sum(quantity * unit_price) 计算并保存。单位为元，保留两位小数， 取值范围大于等于 0。 
+     */
+    'total_amount': number;
+    /**
+     * 订单整体到货进度，由后端汇总采购明细计算，公式为 sum(purchase_order_item.received_qty) / sum(purchase_order_item.quantity)。 取值范围为 0 到 1；当明细总采购数量为 0 时返回 0。 
+     */
+    'receive_progress': number;
+    /**
+     * 是否逾期，由后端根据 purchase_order.expected_date、purchase_order.status 和当前日期判断。 当当前日期晚于 expected_date，且 status 不为 completed 或 cancelled 时为 true，否则为 false。 
+     */
+    'is_overdue': boolean;
+    /**
+     * 逾期天数，由后端在 is_overdue 为 true 时按当前日期 - purchase_order.expected_date 计算， 单位为天，取值范围大于等于 0；当订单未逾期、已完成或已取消时返回 0。 
+     */
+    'overdue_days'?: number;
+    'details': Array<PurchaseOrderDetailLine>;
+}
+
+
+export interface PurchaseOrderActionRequest {
+    'order_id': number;
+    'operator_id': number;
+}
+export interface PurchaseOrderCreateRequest {
+    'supplier_id': number;
+    'expected_date': string;
+    'buyer_id': number;
+    'details': Array<PurchaseOrderCreateRequestDetailsInner>;
+}
+export interface PurchaseOrderCreateRequestDetailsInner {
+    'material_id': number;
+    'quantity': number;
+    'unit_price': number;
+}
+export interface PurchaseOrderDetailLine {
+    'item_id': number;
+    'order_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'quantity': number;
+    'received_qty': number;
+    'unit_price': number;
+    /**
+     * 明细金额，由后端根据 purchase_order_item.quantity 与 purchase_order_item.unit_price 计算，公式为 quantity * unit_price。单位为元，保留两位小数，取值范围大于等于 0。 
+     */
+    'line_amount'?: number;
+    /**
+     * 明细到货进度，由后端根据 purchase_order_item.received_qty 与 purchase_order_item.quantity 计算，公式为 received_qty / quantity。取值范围为 0 到 1；当 quantity 为 0 时返回 0。 
+     */
+    'receive_progress'?: number;
+}
+export interface PurchaseOrderPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<PurchaseOrder>;
+}
+export interface PurchaseOrderPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOrderPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOrderPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOrderPageResponseCodeEnum = typeof PurchaseOrderPageResponseCodeEnum[keyof typeof PurchaseOrderPageResponseCodeEnum];
+
+export interface PurchaseOrderResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOrderResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOrderResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOrderResponseCodeEnum = typeof PurchaseOrderResponseCodeEnum[keyof typeof PurchaseOrderResponseCodeEnum];
+
+/**
+ * 采购订单状态。draft 草稿，可编辑、提交、取消；submitted 已提交，可收货、取消；partial_received 部分到货，可继续收货；completed 已完成，不可修改；cancelled 已取消，不可继续操作。允许流转：draft -> submitted/cancelled，submitted -> partial_received/completed/cancelled，partial_received -> completed。
+ */
+
+export const PurchaseOrderStatus = {
+    Draft: 'draft',
+    Submitted: 'submitted',
+    PartialReceived: 'partial_received',
+    Completed: 'completed',
+    Cancelled: 'cancelled',
+} as const;
+
+export type PurchaseOrderStatus = typeof PurchaseOrderStatus[keyof typeof PurchaseOrderStatus];
+
+
+export interface PurchaseOverdueReminder {
+    'reminder_id': number;
+    'order_id': number;
+    'expected_date': string;
+    'overdue_days': number;
+    'remind_time': string;
+    'status': PurchaseOverdueReminderStatus;
+    'remark'?: string | null;
+}
+
+
+export interface PurchaseOverdueReminderGenerateRequest {
+    'order_id'?: number | null;
+}
+export interface PurchaseOverdueReminderGenerateResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOverdueReminderGenerateResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': PurchaseOverdueReminderGenerateResponseAllOfData | null;
+}
+
+export const PurchaseOverdueReminderGenerateResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOverdueReminderGenerateResponseCodeEnum = typeof PurchaseOverdueReminderGenerateResponseCodeEnum[keyof typeof PurchaseOverdueReminderGenerateResponseCodeEnum];
+
+export interface PurchaseOverdueReminderGenerateResponseAllOfData {
+    'generated_count'?: number;
+    'records'?: Array<PurchaseOverdueReminder>;
+}
+export interface PurchaseOverdueReminderHandleRequest {
+    'reminder_id': number;
+    'status': PurchaseOverdueReminderHandleRequestStatusEnum;
+    'remark'?: string | null;
+}
+
+export const PurchaseOverdueReminderHandleRequestStatusEnum = {
+    Urged: 'urged',
+    Received: 'received',
+} as const;
+
+export type PurchaseOverdueReminderHandleRequestStatusEnum = typeof PurchaseOverdueReminderHandleRequestStatusEnum[keyof typeof PurchaseOverdueReminderHandleRequestStatusEnum];
+
+export interface PurchaseOverdueReminderPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<PurchaseOverdueReminder>;
+}
+export interface PurchaseOverdueReminderPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOverdueReminderPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOverdueReminderPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOverdueReminderPageResponseCodeEnum = typeof PurchaseOverdueReminderPageResponseCodeEnum[keyof typeof PurchaseOverdueReminderPageResponseCodeEnum];
+
+export interface PurchaseOverdueReminderResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOverdueReminderResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOverdueReminderResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOverdueReminderResponseCodeEnum = typeof PurchaseOverdueReminderResponseCodeEnum[keyof typeof PurchaseOverdueReminderResponseCodeEnum];
+
+/**
+ * 采购逾期提醒状态。pending_urge 待催交，可催交或标记到货；urged 已催交，可继续备注或标记到货；received 已到货，流程结束。允许流转：pending_urge -> urged/received，urged -> received。
+ */
+
+export const PurchaseOverdueReminderStatus = {
+    PendingUrge: 'pending_urge',
+    Urged: 'urged',
+    Received: 'received',
+} as const;
+
+export type PurchaseOverdueReminderStatus = typeof PurchaseOverdueReminderStatus[keyof typeof PurchaseOverdueReminderStatus];
+
+
+export interface PurchaseReceipt {
+    'receive_id': number;
+    'order_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'quantity': number;
+    'receive_date': string;
+}
+export interface PurchaseReceiptCreateRequest {
+    'order_id': number;
+    'material_id': number;
+    'quantity': number;
+    'receive_date': string;
+}
+export interface PurchaseReceiptPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<PurchaseReceipt>;
+}
+export interface PurchaseReceiptPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseReceiptPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseReceiptPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseReceiptPageResponseCodeEnum = typeof PurchaseReceiptPageResponseCodeEnum[keyof typeof PurchaseReceiptPageResponseCodeEnum];
+
+export interface PurchaseReceiptResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseReceiptResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseReceiptResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseReceiptResponseCodeEnum = typeof PurchaseReceiptResponseCodeEnum[keyof typeof PurchaseReceiptResponseCodeEnum];
+
 export interface RegisterRequest {
     /**
      * 工号，唯一约束。
@@ -164,7 +1041,7 @@ export interface RegisterResponse {
      * 返回结果说明。
      */
     'message': string;
-    'data': any | null;
+    'data': object | null;
 }
 
 export const RegisterResponseCodeEnum = {
@@ -179,6 +1056,101 @@ export const RegisterResponseCodeEnum = {
 
 export type RegisterResponseCodeEnum = typeof RegisterResponseCodeEnum[keyof typeof RegisterResponseCodeEnum];
 
+export interface StockLockRecord {
+    'lock_id': number;
+    'order_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'lock_qty': number;
+    'status': StockLockStatus;
+    'lock_time': string;
+    'release_time'?: string | null;
+    'operator_id': number;
+}
+
+
+export interface StockLockRecordPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<StockLockRecord>;
+}
+export interface StockLockRecordPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': StockLockRecordPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const StockLockRecordPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type StockLockRecordPageResponseCodeEnum = typeof StockLockRecordPageResponseCodeEnum[keyof typeof StockLockRecordPageResponseCodeEnum];
+
+export interface StockLockRecordResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': StockLockRecordResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const StockLockRecordResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type StockLockRecordResponseCodeEnum = typeof StockLockRecordResponseCodeEnum[keyof typeof StockLockRecordResponseCodeEnum];
+
+/**
+ * 库存锁定状态。locked 已锁定，可释放或消耗；cancelled 已取消，释放完成；consumed 已消耗，完工入库后不可释放。允许流转：locked -> cancelled/consumed。
+ */
+
+export const StockLockStatus = {
+    Locked: 'locked',
+    Cancelled: 'cancelled',
+    Consumed: 'consumed',
+} as const;
+
+export type StockLockStatus = typeof StockLockStatus[keyof typeof StockLockStatus];
+
+
+export interface SupplierBrief {
+    'supplier_id': number;
+    'supplier_name': string;
+    'contact_person'?: string | null;
+    'contact_phone'?: string | null;
+}
 export interface UserData {
     'id'?: number;
     'name'?: string;
@@ -207,6 +1179,2244 @@ export const UserTestResponseCodeEnum = {
 } as const;
 
 export type UserTestResponseCodeEnum = typeof UserTestResponseCodeEnum[keyof typeof UserTestResponseCodeEnum];
+
+
+/**
+ * InventoryApi - axios parameter creator
+ */
+export const InventoryApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * @summary 登记完工入库
+         * @param {CompletionInboundCreateRequest} completionInboundCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addCompletionInbound: async (completionInboundCreateRequest: CompletionInboundCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'completionInboundCreateRequest' is not null or undefined
+            assertParamExists('addCompletionInbound', 'completionInboundCreateRequest', completionInboundCreateRequest)
+            const localVarPath = `/api/addCompletionInbound`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(completionInboundCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 计算物料缺口
+         * @param {MaterialShortageCalculateRequest} materialShortageCalculateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        calculateMaterialShortage: async (materialShortageCalculateRequest: MaterialShortageCalculateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialShortageCalculateRequest' is not null or undefined
+            assertParamExists('calculateMaterialShortage', 'materialShortageCalculateRequest', materialShortageCalculateRequest)
+            const localVarPath = `/api/calculateMaterialShortage`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialShortageCalculateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 检测废弃物料
+         * @param {ObsoleteMaterialDetectRequest} obsoleteMaterialDetectRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        detectObsoleteMaterial: async (obsoleteMaterialDetectRequest: ObsoleteMaterialDetectRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'obsoleteMaterialDetectRequest' is not null or undefined
+            assertParamExists('detectObsoleteMaterial', 'obsoleteMaterialDetectRequest', obsoleteMaterialDetectRequest)
+            const localVarPath = `/api/detectObsoleteMaterial`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(obsoleteMaterialDetectRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 生成库存预警事件
+         * @param {InventoryAlertGenerateRequest} [inventoryAlertGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generateInventoryAlert: async (inventoryAlertGenerateRequest?: InventoryAlertGenerateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/generateInventoryAlert`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(inventoryAlertGenerateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理库存预警事件
+         * @param {InventoryAlertHandleRequest} inventoryAlertHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleInventoryAlert: async (inventoryAlertHandleRequest: InventoryAlertHandleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'inventoryAlertHandleRequest' is not null or undefined
+            assertParamExists('handleInventoryAlert', 'inventoryAlertHandleRequest', inventoryAlertHandleRequest)
+            const localVarPath = `/api/handleInventoryAlert`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(inventoryAlertHandleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理废弃物料检测结果
+         * @param {ObsoleteMaterialHandleRequest} obsoleteMaterialHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleObsoleteMaterialDetection: async (obsoleteMaterialHandleRequest: ObsoleteMaterialHandleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'obsoleteMaterialHandleRequest' is not null or undefined
+            assertParamExists('handleObsoleteMaterialDetection', 'obsoleteMaterialHandleRequest', obsoleteMaterialHandleRequest)
+            const localVarPath = `/api/handleObsoleteMaterialDetection`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(obsoleteMaterialHandleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询完工入库单
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {string} [inboundTimeStart] 
+         * @param {string} [inboundTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listCompletionInbound: async (page?: number, pageSize?: number, orderId?: number, materialId?: number, inboundTimeStart?: string, inboundTimeEnd?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listCompletionInbound`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (inboundTimeStart !== undefined) {
+                localVarQueryParameter['inbound_time_start'] = (inboundTimeStart as any instanceof Date) ?
+                    (inboundTimeStart as any).toISOString() :
+                    inboundTimeStart;
+            }
+
+            if (inboundTimeEnd !== undefined) {
+                localVarQueryParameter['inbound_time_end'] = (inboundTimeEnd as any instanceof Date) ?
+                    (inboundTimeEnd as any).toISOString() :
+                    inboundTimeEnd;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询库存预警事件
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {InventoryAlertStatus} [status] 
+         * @param {string} [startTime] 
+         * @param {string} [endTime] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listInventoryAlert: async (page?: number, pageSize?: number, materialId?: number, status?: InventoryAlertStatus, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listInventoryAlert`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (startTime !== undefined) {
+                localVarQueryParameter['start_time'] = (startTime as any instanceof Date) ?
+                    (startTime as any).toISOString() :
+                    startTime;
+            }
+
+            if (endTime !== undefined) {
+                localVarQueryParameter['end_time'] = (endTime as any instanceof Date) ?
+                    (endTime as any).toISOString() :
+                    endTime;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询物料锁定记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {StockLockStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialStockLock: async (page?: number, pageSize?: number, orderId?: number, materialId?: number, status?: StockLockStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listMaterialStockLock`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询废弃物料检测结果
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {ObsoleteMaterialStatus} [status] 
+         * @param {string} [detectTimeStart] 
+         * @param {string} [detectTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listObsoleteMaterialDetection: async (page?: number, pageSize?: number, materialId?: number, status?: ObsoleteMaterialStatus, detectTimeStart?: string, detectTimeEnd?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listObsoleteMaterialDetection`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (detectTimeStart !== undefined) {
+                localVarQueryParameter['detect_time_start'] = (detectTimeStart as any instanceof Date) ?
+                    (detectTimeStart as any).toISOString() :
+                    detectTimeStart;
+            }
+
+            if (detectTimeEnd !== undefined) {
+                localVarQueryParameter['detect_time_end'] = (detectTimeEnd as any instanceof Date) ?
+                    (detectTimeEnd as any).toISOString() :
+                    detectTimeEnd;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * @summary 锁定物料库存
+         * @param {MaterialStockLockRequest} materialStockLockRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        lockMaterialStock: async (materialStockLockRequest: MaterialStockLockRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialStockLockRequest' is not null or undefined
+            assertParamExists('lockMaterialStock', 'materialStockLockRequest', materialStockLockRequest)
+            const localVarPath = `/api/lockMaterialStock`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialStockLockRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * @summary 释放物料锁定
+         * @param {MaterialStockReleaseRequest} materialStockReleaseRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        releaseMaterialStock: async (materialStockReleaseRequest: MaterialStockReleaseRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialStockReleaseRequest' is not null or undefined
+            assertParamExists('releaseMaterialStock', 'materialStockReleaseRequest', materialStockReleaseRequest)
+            const localVarPath = `/api/releaseMaterialStock`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialStockReleaseRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * InventoryApi - functional programming interface
+ */
+export const InventoryApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = InventoryApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * @summary 登记完工入库
+         * @param {CompletionInboundCreateRequest} completionInboundCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addCompletionInbound(completionInboundCreateRequest: CompletionInboundCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CompletionInboundResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addCompletionInbound(completionInboundCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.addCompletionInbound']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 计算物料缺口
+         * @param {MaterialShortageCalculateRequest} materialShortageCalculateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async calculateMaterialShortage(materialShortageCalculateRequest: MaterialShortageCalculateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialShortageCalculateResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.calculateMaterialShortage(materialShortageCalculateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.calculateMaterialShortage']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 检测废弃物料
+         * @param {ObsoleteMaterialDetectRequest} obsoleteMaterialDetectRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async detectObsoleteMaterial(obsoleteMaterialDetectRequest: ObsoleteMaterialDetectRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ObsoleteMaterialDetectResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.detectObsoleteMaterial(obsoleteMaterialDetectRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.detectObsoleteMaterial']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 生成库存预警事件
+         * @param {InventoryAlertGenerateRequest} [inventoryAlertGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async generateInventoryAlert(inventoryAlertGenerateRequest?: InventoryAlertGenerateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InventoryAlertGenerateResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.generateInventoryAlert(inventoryAlertGenerateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.generateInventoryAlert']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理库存预警事件
+         * @param {InventoryAlertHandleRequest} inventoryAlertHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async handleInventoryAlert(inventoryAlertHandleRequest: InventoryAlertHandleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InventoryAlertResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.handleInventoryAlert(inventoryAlertHandleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.handleInventoryAlert']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理废弃物料检测结果
+         * @param {ObsoleteMaterialHandleRequest} obsoleteMaterialHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async handleObsoleteMaterialDetection(obsoleteMaterialHandleRequest: ObsoleteMaterialHandleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ObsoleteMaterialResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.handleObsoleteMaterialDetection(obsoleteMaterialHandleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.handleObsoleteMaterialDetection']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询完工入库单
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {string} [inboundTimeStart] 
+         * @param {string} [inboundTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listCompletionInbound(page?: number, pageSize?: number, orderId?: number, materialId?: number, inboundTimeStart?: string, inboundTimeEnd?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CompletionInboundPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listCompletionInbound(page, pageSize, orderId, materialId, inboundTimeStart, inboundTimeEnd, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listCompletionInbound']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询库存预警事件
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {InventoryAlertStatus} [status] 
+         * @param {string} [startTime] 
+         * @param {string} [endTime] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listInventoryAlert(page?: number, pageSize?: number, materialId?: number, status?: InventoryAlertStatus, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InventoryAlertPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listInventoryAlert(page, pageSize, materialId, status, startTime, endTime, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listInventoryAlert']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询物料锁定记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {StockLockStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listMaterialStockLock(page?: number, pageSize?: number, orderId?: number, materialId?: number, status?: StockLockStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StockLockRecordPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listMaterialStockLock(page, pageSize, orderId, materialId, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listMaterialStockLock']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询废弃物料检测结果
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {ObsoleteMaterialStatus} [status] 
+         * @param {string} [detectTimeStart] 
+         * @param {string} [detectTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listObsoleteMaterialDetection(page?: number, pageSize?: number, materialId?: number, status?: ObsoleteMaterialStatus, detectTimeStart?: string, detectTimeEnd?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ObsoleteMaterialPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listObsoleteMaterialDetection(page, pageSize, materialId, status, detectTimeStart, detectTimeEnd, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listObsoleteMaterialDetection']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * @summary 锁定物料库存
+         * @param {MaterialStockLockRequest} materialStockLockRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async lockMaterialStock(materialStockLockRequest: MaterialStockLockRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialStockLockResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.lockMaterialStock(materialStockLockRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.lockMaterialStock']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * @summary 释放物料锁定
+         * @param {MaterialStockReleaseRequest} materialStockReleaseRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async releaseMaterialStock(materialStockReleaseRequest: MaterialStockReleaseRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StockLockRecordResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.releaseMaterialStock(materialStockReleaseRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.releaseMaterialStock']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * InventoryApi - factory interface
+ */
+export const InventoryApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = InventoryApiFp(configuration)
+    return {
+        /**
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * @summary 登记完工入库
+         * @param {InventoryApiAddCompletionInboundRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addCompletionInbound(requestParameters: InventoryApiAddCompletionInboundRequest, options?: RawAxiosRequestConfig): AxiosPromise<CompletionInboundResponse> {
+            return localVarFp.addCompletionInbound(requestParameters.completionInboundCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 计算物料缺口
+         * @param {InventoryApiCalculateMaterialShortageRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        calculateMaterialShortage(requestParameters: InventoryApiCalculateMaterialShortageRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialShortageCalculateResponse> {
+            return localVarFp.calculateMaterialShortage(requestParameters.materialShortageCalculateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 检测废弃物料
+         * @param {InventoryApiDetectObsoleteMaterialRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        detectObsoleteMaterial(requestParameters: InventoryApiDetectObsoleteMaterialRequest, options?: RawAxiosRequestConfig): AxiosPromise<ObsoleteMaterialDetectResponse> {
+            return localVarFp.detectObsoleteMaterial(requestParameters.obsoleteMaterialDetectRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 生成库存预警事件
+         * @param {InventoryApiGenerateInventoryAlertRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generateInventoryAlert(requestParameters: InventoryApiGenerateInventoryAlertRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<InventoryAlertGenerateResponse> {
+            return localVarFp.generateInventoryAlert(requestParameters.inventoryAlertGenerateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理库存预警事件
+         * @param {InventoryApiHandleInventoryAlertRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleInventoryAlert(requestParameters: InventoryApiHandleInventoryAlertRequest, options?: RawAxiosRequestConfig): AxiosPromise<InventoryAlertResponse> {
+            return localVarFp.handleInventoryAlert(requestParameters.inventoryAlertHandleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理废弃物料检测结果
+         * @param {InventoryApiHandleObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleObsoleteMaterialDetection(requestParameters: InventoryApiHandleObsoleteMaterialDetectionRequest, options?: RawAxiosRequestConfig): AxiosPromise<ObsoleteMaterialResponse> {
+            return localVarFp.handleObsoleteMaterialDetection(requestParameters.obsoleteMaterialHandleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询完工入库单
+         * @param {InventoryApiListCompletionInboundRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listCompletionInbound(requestParameters: InventoryApiListCompletionInboundRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<CompletionInboundPageResponse> {
+            return localVarFp.listCompletionInbound(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.inboundTimeStart, requestParameters.inboundTimeEnd, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询库存预警事件
+         * @param {InventoryApiListInventoryAlertRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listInventoryAlert(requestParameters: InventoryApiListInventoryAlertRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<InventoryAlertPageResponse> {
+            return localVarFp.listInventoryAlert(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询物料锁定记录
+         * @param {InventoryApiListMaterialStockLockRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialStockLock(requestParameters: InventoryApiListMaterialStockLockRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<StockLockRecordPageResponse> {
+            return localVarFp.listMaterialStockLock(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询废弃物料检测结果
+         * @param {InventoryApiListObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listObsoleteMaterialDetection(requestParameters: InventoryApiListObsoleteMaterialDetectionRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ObsoleteMaterialPageResponse> {
+            return localVarFp.listObsoleteMaterialDetection(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.detectTimeStart, requestParameters.detectTimeEnd, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * @summary 锁定物料库存
+         * @param {InventoryApiLockMaterialStockRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        lockMaterialStock(requestParameters: InventoryApiLockMaterialStockRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialStockLockResponse> {
+            return localVarFp.lockMaterialStock(requestParameters.materialStockLockRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * @summary 释放物料锁定
+         * @param {InventoryApiReleaseMaterialStockRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        releaseMaterialStock(requestParameters: InventoryApiReleaseMaterialStockRequest, options?: RawAxiosRequestConfig): AxiosPromise<StockLockRecordResponse> {
+            return localVarFp.releaseMaterialStock(requestParameters.materialStockReleaseRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addCompletionInbound operation in InventoryApi.
+ */
+export interface InventoryApiAddCompletionInboundRequest {
+    readonly completionInboundCreateRequest: CompletionInboundCreateRequest
+}
+
+/**
+ * Request parameters for calculateMaterialShortage operation in InventoryApi.
+ */
+export interface InventoryApiCalculateMaterialShortageRequest {
+    readonly materialShortageCalculateRequest: MaterialShortageCalculateRequest
+}
+
+/**
+ * Request parameters for detectObsoleteMaterial operation in InventoryApi.
+ */
+export interface InventoryApiDetectObsoleteMaterialRequest {
+    readonly obsoleteMaterialDetectRequest: ObsoleteMaterialDetectRequest
+}
+
+/**
+ * Request parameters for generateInventoryAlert operation in InventoryApi.
+ */
+export interface InventoryApiGenerateInventoryAlertRequest {
+    readonly inventoryAlertGenerateRequest?: InventoryAlertGenerateRequest
+}
+
+/**
+ * Request parameters for handleInventoryAlert operation in InventoryApi.
+ */
+export interface InventoryApiHandleInventoryAlertRequest {
+    readonly inventoryAlertHandleRequest: InventoryAlertHandleRequest
+}
+
+/**
+ * Request parameters for handleObsoleteMaterialDetection operation in InventoryApi.
+ */
+export interface InventoryApiHandleObsoleteMaterialDetectionRequest {
+    readonly obsoleteMaterialHandleRequest: ObsoleteMaterialHandleRequest
+}
+
+/**
+ * Request parameters for listCompletionInbound operation in InventoryApi.
+ */
+export interface InventoryApiListCompletionInboundRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly materialId?: number
+
+    readonly inboundTimeStart?: string
+
+    readonly inboundTimeEnd?: string
+}
+
+/**
+ * Request parameters for listInventoryAlert operation in InventoryApi.
+ */
+export interface InventoryApiListInventoryAlertRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly materialId?: number
+
+    readonly status?: InventoryAlertStatus
+
+    readonly startTime?: string
+
+    readonly endTime?: string
+}
+
+/**
+ * Request parameters for listMaterialStockLock operation in InventoryApi.
+ */
+export interface InventoryApiListMaterialStockLockRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly materialId?: number
+
+    readonly status?: StockLockStatus
+}
+
+/**
+ * Request parameters for listObsoleteMaterialDetection operation in InventoryApi.
+ */
+export interface InventoryApiListObsoleteMaterialDetectionRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly materialId?: number
+
+    readonly status?: ObsoleteMaterialStatus
+
+    readonly detectTimeStart?: string
+
+    readonly detectTimeEnd?: string
+}
+
+/**
+ * Request parameters for lockMaterialStock operation in InventoryApi.
+ */
+export interface InventoryApiLockMaterialStockRequest {
+    readonly materialStockLockRequest: MaterialStockLockRequest
+}
+
+/**
+ * Request parameters for releaseMaterialStock operation in InventoryApi.
+ */
+export interface InventoryApiReleaseMaterialStockRequest {
+    readonly materialStockReleaseRequest: MaterialStockReleaseRequest
+}
+
+/**
+ * InventoryApi - object-oriented interface
+ */
+export class InventoryApi extends BaseAPI {
+    /**
+     * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+     * @summary 登记完工入库
+     * @param {InventoryApiAddCompletionInboundRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addCompletionInbound(requestParameters: InventoryApiAddCompletionInboundRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).addCompletionInbound(requestParameters.completionInboundCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 计算物料缺口
+     * @param {InventoryApiCalculateMaterialShortageRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public calculateMaterialShortage(requestParameters: InventoryApiCalculateMaterialShortageRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).calculateMaterialShortage(requestParameters.materialShortageCalculateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 检测废弃物料
+     * @param {InventoryApiDetectObsoleteMaterialRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public detectObsoleteMaterial(requestParameters: InventoryApiDetectObsoleteMaterialRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).detectObsoleteMaterial(requestParameters.obsoleteMaterialDetectRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 生成库存预警事件
+     * @param {InventoryApiGenerateInventoryAlertRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public generateInventoryAlert(requestParameters: InventoryApiGenerateInventoryAlertRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).generateInventoryAlert(requestParameters.inventoryAlertGenerateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+     * @summary 处理库存预警事件
+     * @param {InventoryApiHandleInventoryAlertRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public handleInventoryAlert(requestParameters: InventoryApiHandleInventoryAlertRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).handleInventoryAlert(requestParameters.inventoryAlertHandleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+     * @summary 处理废弃物料检测结果
+     * @param {InventoryApiHandleObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public handleObsoleteMaterialDetection(requestParameters: InventoryApiHandleObsoleteMaterialDetectionRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).handleObsoleteMaterialDetection(requestParameters.obsoleteMaterialHandleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询完工入库单
+     * @param {InventoryApiListCompletionInboundRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listCompletionInbound(requestParameters: InventoryApiListCompletionInboundRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listCompletionInbound(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.inboundTimeStart, requestParameters.inboundTimeEnd, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询库存预警事件
+     * @param {InventoryApiListInventoryAlertRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listInventoryAlert(requestParameters: InventoryApiListInventoryAlertRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listInventoryAlert(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询物料锁定记录
+     * @param {InventoryApiListMaterialStockLockRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listMaterialStockLock(requestParameters: InventoryApiListMaterialStockLockRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listMaterialStockLock(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询废弃物料检测结果
+     * @param {InventoryApiListObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listObsoleteMaterialDetection(requestParameters: InventoryApiListObsoleteMaterialDetectionRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listObsoleteMaterialDetection(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.detectTimeStart, requestParameters.detectTimeEnd, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+     * @summary 锁定物料库存
+     * @param {InventoryApiLockMaterialStockRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public lockMaterialStock(requestParameters: InventoryApiLockMaterialStockRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).lockMaterialStock(requestParameters.materialStockLockRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+     * @summary 释放物料锁定
+     * @param {InventoryApiReleaseMaterialStockRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public releaseMaterialStock(requestParameters: InventoryApiReleaseMaterialStockRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).releaseMaterialStock(requestParameters.materialStockReleaseRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * PurchaseApi - axios parameter creator
+ */
+export const PurchaseApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * @summary 新增采购订单草稿
+         * @param {PurchaseOrderCreateRequest} purchaseOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseOrder: async (purchaseOrderCreateRequest: PurchaseOrderCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOrderCreateRequest' is not null or undefined
+            assertParamExists('addPurchaseOrder', 'purchaseOrderCreateRequest', purchaseOrderCreateRequest)
+            const localVarPath = `/api/addPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOrderCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * @summary 新增采购收货记录
+         * @param {PurchaseReceiptCreateRequest} purchaseReceiptCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseReceipt: async (purchaseReceiptCreateRequest: PurchaseReceiptCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseReceiptCreateRequest' is not null or undefined
+            assertParamExists('addPurchaseReceipt', 'purchaseReceiptCreateRequest', purchaseReceiptCreateRequest)
+            const localVarPath = `/api/addPurchaseReceipt`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseReceiptCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * @summary 取消采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancelPurchaseOrder: async (purchaseOrderActionRequest: PurchaseOrderActionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOrderActionRequest' is not null or undefined
+            assertParamExists('cancelPurchaseOrder', 'purchaseOrderActionRequest', purchaseOrderActionRequest)
+            const localVarPath = `/api/cancelPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOrderActionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * @summary 根据缺口生成采购订单草稿
+         * @param {PurchaseDraftFromShortageRequest} purchaseDraftFromShortageRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createPurchaseOrderDraftFromShortage: async (purchaseDraftFromShortageRequest: PurchaseDraftFromShortageRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseDraftFromShortageRequest' is not null or undefined
+            assertParamExists('createPurchaseOrderDraftFromShortage', 'purchaseDraftFromShortageRequest', purchaseDraftFromShortageRequest)
+            const localVarPath = `/api/createPurchaseOrderDraftFromShortage`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseDraftFromShortageRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * @summary 生成采购逾期提醒
+         * @param {PurchaseOverdueReminderGenerateRequest} [purchaseOverdueReminderGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generatePurchaseOverdueReminder: async (purchaseOverdueReminderGenerateRequest?: PurchaseOverdueReminderGenerateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/generatePurchaseOverdueReminder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOverdueReminderGenerateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单详情
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPurchaseOrder: async (orderId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'orderId' is not null or undefined
+            assertParamExists('getPurchaseOrder', 'orderId', orderId)
+            const localVarPath = `/api/getPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * @summary 处理采购逾期提醒
+         * @param {PurchaseOverdueReminderHandleRequest} purchaseOverdueReminderHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handlePurchaseOverdueReminder: async (purchaseOverdueReminderHandleRequest: PurchaseOverdueReminderHandleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOverdueReminderHandleRequest' is not null or undefined
+            assertParamExists('handlePurchaseOverdueReminder', 'purchaseOverdueReminderHandleRequest', purchaseOverdueReminderHandleRequest)
+            const localVarPath = `/api/handlePurchaseOverdueReminder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOverdueReminderHandleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [supplierId] 
+         * @param {number} [materialId] 
+         * @param {PurchaseOrderStatus} [status] 
+         * @param {string} [orderDateStart] 
+         * @param {string} [orderDateEnd] 
+         * @param {string} [expectedDateStart] 
+         * @param {string} [expectedDateEnd] 
+         * @param {number} [buyerId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOrder: async (page?: number, pageSize?: number, supplierId?: number, materialId?: number, status?: PurchaseOrderStatus, orderDateStart?: string, orderDateEnd?: string, expectedDateStart?: string, expectedDateEnd?: string, buyerId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (supplierId !== undefined) {
+                localVarQueryParameter['supplier_id'] = supplierId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (orderDateStart !== undefined) {
+                localVarQueryParameter['order_date_start'] = (orderDateStart as any instanceof Date) ?
+                    (orderDateStart as any).toISOString().substring(0,10) :
+                    orderDateStart;
+            }
+
+            if (orderDateEnd !== undefined) {
+                localVarQueryParameter['order_date_end'] = (orderDateEnd as any instanceof Date) ?
+                    (orderDateEnd as any).toISOString().substring(0,10) :
+                    orderDateEnd;
+            }
+
+            if (expectedDateStart !== undefined) {
+                localVarQueryParameter['expected_date_start'] = (expectedDateStart as any instanceof Date) ?
+                    (expectedDateStart as any).toISOString().substring(0,10) :
+                    expectedDateStart;
+            }
+
+            if (expectedDateEnd !== undefined) {
+                localVarQueryParameter['expected_date_end'] = (expectedDateEnd as any instanceof Date) ?
+                    (expectedDateEnd as any).toISOString().substring(0,10) :
+                    expectedDateEnd;
+            }
+
+            if (buyerId !== undefined) {
+                localVarQueryParameter['buyer_id'] = buyerId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购逾期提醒
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {PurchaseOverdueReminderStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOverdueReminder: async (page?: number, pageSize?: number, orderId?: number, status?: PurchaseOverdueReminderStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listPurchaseOverdueReminder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购收货记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseReceipt: async (page?: number, pageSize?: number, orderId?: number, materialId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listPurchaseReceipt`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * @summary 提交采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        submitPurchaseOrder: async (purchaseOrderActionRequest: PurchaseOrderActionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOrderActionRequest' is not null or undefined
+            assertParamExists('submitPurchaseOrder', 'purchaseOrderActionRequest', purchaseOrderActionRequest)
+            const localVarPath = `/api/submitPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOrderActionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * PurchaseApi - functional programming interface
+ */
+export const PurchaseApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = PurchaseApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * @summary 新增采购订单草稿
+         * @param {PurchaseOrderCreateRequest} purchaseOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addPurchaseOrder(purchaseOrderCreateRequest: PurchaseOrderCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addPurchaseOrder(purchaseOrderCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.addPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * @summary 新增采购收货记录
+         * @param {PurchaseReceiptCreateRequest} purchaseReceiptCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addPurchaseReceipt(purchaseReceiptCreateRequest: PurchaseReceiptCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseReceiptResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addPurchaseReceipt(purchaseReceiptCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.addPurchaseReceipt']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * @summary 取消采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async cancelPurchaseOrder(purchaseOrderActionRequest: PurchaseOrderActionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.cancelPurchaseOrder(purchaseOrderActionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.cancelPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * @summary 根据缺口生成采购订单草稿
+         * @param {PurchaseDraftFromShortageRequest} purchaseDraftFromShortageRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createPurchaseOrderDraftFromShortage(purchaseDraftFromShortageRequest: PurchaseDraftFromShortageRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseDraftFromShortageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createPurchaseOrderDraftFromShortage(purchaseDraftFromShortageRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.createPurchaseOrderDraftFromShortage']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * @summary 生成采购逾期提醒
+         * @param {PurchaseOverdueReminderGenerateRequest} [purchaseOverdueReminderGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async generatePurchaseOverdueReminder(purchaseOverdueReminderGenerateRequest?: PurchaseOverdueReminderGenerateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOverdueReminderGenerateResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.generatePurchaseOverdueReminder(purchaseOverdueReminderGenerateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.generatePurchaseOverdueReminder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单详情
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getPurchaseOrder(orderId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getPurchaseOrder(orderId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.getPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * @summary 处理采购逾期提醒
+         * @param {PurchaseOverdueReminderHandleRequest} purchaseOverdueReminderHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async handlePurchaseOverdueReminder(purchaseOverdueReminderHandleRequest: PurchaseOverdueReminderHandleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOverdueReminderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.handlePurchaseOverdueReminder(purchaseOverdueReminderHandleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.handlePurchaseOverdueReminder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [supplierId] 
+         * @param {number} [materialId] 
+         * @param {PurchaseOrderStatus} [status] 
+         * @param {string} [orderDateStart] 
+         * @param {string} [orderDateEnd] 
+         * @param {string} [expectedDateStart] 
+         * @param {string} [expectedDateEnd] 
+         * @param {number} [buyerId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listPurchaseOrder(page?: number, pageSize?: number, supplierId?: number, materialId?: number, status?: PurchaseOrderStatus, orderDateStart?: string, orderDateEnd?: string, expectedDateStart?: string, expectedDateEnd?: string, buyerId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPurchaseOrder(page, pageSize, supplierId, materialId, status, orderDateStart, orderDateEnd, expectedDateStart, expectedDateEnd, buyerId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.listPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购逾期提醒
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {PurchaseOverdueReminderStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listPurchaseOverdueReminder(page?: number, pageSize?: number, orderId?: number, status?: PurchaseOverdueReminderStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOverdueReminderPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPurchaseOverdueReminder(page, pageSize, orderId, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.listPurchaseOverdueReminder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购收货记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listPurchaseReceipt(page?: number, pageSize?: number, orderId?: number, materialId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseReceiptPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPurchaseReceipt(page, pageSize, orderId, materialId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.listPurchaseReceipt']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * @summary 提交采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async submitPurchaseOrder(purchaseOrderActionRequest: PurchaseOrderActionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.submitPurchaseOrder(purchaseOrderActionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.submitPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * PurchaseApi - factory interface
+ */
+export const PurchaseApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = PurchaseApiFp(configuration)
+    return {
+        /**
+         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * @summary 新增采购订单草稿
+         * @param {PurchaseApiAddPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseOrder(requestParameters: PurchaseApiAddPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.addPurchaseOrder(requestParameters.purchaseOrderCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * @summary 新增采购收货记录
+         * @param {PurchaseApiAddPurchaseReceiptRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseReceipt(requestParameters: PurchaseApiAddPurchaseReceiptRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseReceiptResponse> {
+            return localVarFp.addPurchaseReceipt(requestParameters.purchaseReceiptCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * @summary 取消采购订单
+         * @param {PurchaseApiCancelPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancelPurchaseOrder(requestParameters: PurchaseApiCancelPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.cancelPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * @summary 根据缺口生成采购订单草稿
+         * @param {PurchaseApiCreatePurchaseOrderDraftFromShortageRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createPurchaseOrderDraftFromShortage(requestParameters: PurchaseApiCreatePurchaseOrderDraftFromShortageRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseDraftFromShortageResponse> {
+            return localVarFp.createPurchaseOrderDraftFromShortage(requestParameters.purchaseDraftFromShortageRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * @summary 生成采购逾期提醒
+         * @param {PurchaseApiGeneratePurchaseOverdueReminderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generatePurchaseOverdueReminder(requestParameters: PurchaseApiGeneratePurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOverdueReminderGenerateResponse> {
+            return localVarFp.generatePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderGenerateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单详情
+         * @param {PurchaseApiGetPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPurchaseOrder(requestParameters: PurchaseApiGetPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.getPurchaseOrder(requestParameters.orderId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * @summary 处理采购逾期提醒
+         * @param {PurchaseApiHandlePurchaseOverdueReminderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handlePurchaseOverdueReminder(requestParameters: PurchaseApiHandlePurchaseOverdueReminderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOverdueReminderResponse> {
+            return localVarFp.handlePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderHandleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单列表
+         * @param {PurchaseApiListPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOrder(requestParameters: PurchaseApiListPurchaseOrderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderPageResponse> {
+            return localVarFp.listPurchaseOrder(requestParameters.page, requestParameters.pageSize, requestParameters.supplierId, requestParameters.materialId, requestParameters.status, requestParameters.orderDateStart, requestParameters.orderDateEnd, requestParameters.expectedDateStart, requestParameters.expectedDateEnd, requestParameters.buyerId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购逾期提醒
+         * @param {PurchaseApiListPurchaseOverdueReminderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOverdueReminder(requestParameters: PurchaseApiListPurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOverdueReminderPageResponse> {
+            return localVarFp.listPurchaseOverdueReminder(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购收货记录
+         * @param {PurchaseApiListPurchaseReceiptRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseReceipt(requestParameters: PurchaseApiListPurchaseReceiptRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseReceiptPageResponse> {
+            return localVarFp.listPurchaseReceipt(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * @summary 提交采购订单
+         * @param {PurchaseApiSubmitPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        submitPurchaseOrder(requestParameters: PurchaseApiSubmitPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.submitPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiAddPurchaseOrderRequest {
+    readonly purchaseOrderCreateRequest: PurchaseOrderCreateRequest
+}
+
+/**
+ * Request parameters for addPurchaseReceipt operation in PurchaseApi.
+ */
+export interface PurchaseApiAddPurchaseReceiptRequest {
+    readonly purchaseReceiptCreateRequest: PurchaseReceiptCreateRequest
+}
+
+/**
+ * Request parameters for cancelPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiCancelPurchaseOrderRequest {
+    readonly purchaseOrderActionRequest: PurchaseOrderActionRequest
+}
+
+/**
+ * Request parameters for createPurchaseOrderDraftFromShortage operation in PurchaseApi.
+ */
+export interface PurchaseApiCreatePurchaseOrderDraftFromShortageRequest {
+    readonly purchaseDraftFromShortageRequest: PurchaseDraftFromShortageRequest
+}
+
+/**
+ * Request parameters for generatePurchaseOverdueReminder operation in PurchaseApi.
+ */
+export interface PurchaseApiGeneratePurchaseOverdueReminderRequest {
+    readonly purchaseOverdueReminderGenerateRequest?: PurchaseOverdueReminderGenerateRequest
+}
+
+/**
+ * Request parameters for getPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiGetPurchaseOrderRequest {
+    readonly orderId: number
+}
+
+/**
+ * Request parameters for handlePurchaseOverdueReminder operation in PurchaseApi.
+ */
+export interface PurchaseApiHandlePurchaseOverdueReminderRequest {
+    readonly purchaseOverdueReminderHandleRequest: PurchaseOverdueReminderHandleRequest
+}
+
+/**
+ * Request parameters for listPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiListPurchaseOrderRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly supplierId?: number
+
+    readonly materialId?: number
+
+    readonly status?: PurchaseOrderStatus
+
+    readonly orderDateStart?: string
+
+    readonly orderDateEnd?: string
+
+    readonly expectedDateStart?: string
+
+    readonly expectedDateEnd?: string
+
+    readonly buyerId?: number
+}
+
+/**
+ * Request parameters for listPurchaseOverdueReminder operation in PurchaseApi.
+ */
+export interface PurchaseApiListPurchaseOverdueReminderRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly status?: PurchaseOverdueReminderStatus
+}
+
+/**
+ * Request parameters for listPurchaseReceipt operation in PurchaseApi.
+ */
+export interface PurchaseApiListPurchaseReceiptRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly materialId?: number
+}
+
+/**
+ * Request parameters for submitPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiSubmitPurchaseOrderRequest {
+    readonly purchaseOrderActionRequest: PurchaseOrderActionRequest
+}
+
+/**
+ * PurchaseApi - object-oriented interface
+ */
+export class PurchaseApi extends BaseAPI {
+    /**
+     * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+     * @summary 新增采购订单草稿
+     * @param {PurchaseApiAddPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addPurchaseOrder(requestParameters: PurchaseApiAddPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).addPurchaseOrder(requestParameters.purchaseOrderCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+     * @summary 新增采购收货记录
+     * @param {PurchaseApiAddPurchaseReceiptRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addPurchaseReceipt(requestParameters: PurchaseApiAddPurchaseReceiptRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).addPurchaseReceipt(requestParameters.purchaseReceiptCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+     * @summary 取消采购订单
+     * @param {PurchaseApiCancelPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public cancelPurchaseOrder(requestParameters: PurchaseApiCancelPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).cancelPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+     * @summary 根据缺口生成采购订单草稿
+     * @param {PurchaseApiCreatePurchaseOrderDraftFromShortageRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public createPurchaseOrderDraftFromShortage(requestParameters: PurchaseApiCreatePurchaseOrderDraftFromShortageRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).createPurchaseOrderDraftFromShortage(requestParameters.purchaseDraftFromShortageRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+     * @summary 生成采购逾期提醒
+     * @param {PurchaseApiGeneratePurchaseOverdueReminderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public generatePurchaseOverdueReminder(requestParameters: PurchaseApiGeneratePurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).generatePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderGenerateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购订单详情
+     * @param {PurchaseApiGetPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getPurchaseOrder(requestParameters: PurchaseApiGetPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).getPurchaseOrder(requestParameters.orderId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+     * @summary 处理采购逾期提醒
+     * @param {PurchaseApiHandlePurchaseOverdueReminderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public handlePurchaseOverdueReminder(requestParameters: PurchaseApiHandlePurchaseOverdueReminderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).handlePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderHandleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购订单列表
+     * @param {PurchaseApiListPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listPurchaseOrder(requestParameters: PurchaseApiListPurchaseOrderRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).listPurchaseOrder(requestParameters.page, requestParameters.pageSize, requestParameters.supplierId, requestParameters.materialId, requestParameters.status, requestParameters.orderDateStart, requestParameters.orderDateEnd, requestParameters.expectedDateStart, requestParameters.expectedDateEnd, requestParameters.buyerId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购逾期提醒
+     * @param {PurchaseApiListPurchaseOverdueReminderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listPurchaseOverdueReminder(requestParameters: PurchaseApiListPurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).listPurchaseOverdueReminder(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购收货记录
+     * @param {PurchaseApiListPurchaseReceiptRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listPurchaseReceipt(requestParameters: PurchaseApiListPurchaseReceiptRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).listPurchaseReceipt(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+     * @summary 提交采购订单
+     * @param {PurchaseApiSubmitPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public submitPurchaseOrder(requestParameters: PurchaseApiSubmitPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).submitPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
 
 
 /**
