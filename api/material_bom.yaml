@@ -6,6 +6,305 @@ info:
 tags:
   - name: material_bom
     description: 物料与 BOM 管理模块
-paths: {}
+paths:
+  /api/listMaterialData:
+    get:
+      summary: 查询物料列表
+      operationId: listMaterialData
+      tags:
+        - material_bom
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addMaterialData:
+    post:
+      summary: 新增物料
+      operationId: addMaterialData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Material'
+      responses:
+        '200':
+          description: 新增成功
+      security:
+        - bearerAuth: []
+  /api/updateMaterialData:
+    post:
+      summary: 修改物料
+      operationId: updateMaterialData
+      tags:
+        - material_bom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Material'
+      responses:
+        '200':
+          description: 修改成功
+      security:
+        - bearerAuth: []
+
+  /api/deleteMaterialData:
+    post:
+      summary: 删除物料
+      operationId: deleteMaterialData
+      tags:
+        - material_bom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                materialId:
+                  type: integer
+      responses:
+        '200':
+          description: 删除成功
+      security:
+        - bearerAuth: []
+
+  /api/listMaterialCategoryData:
+    get:
+      summary: 查询物料分类
+      operationId: listMaterialCategoryData
+      tags:
+        - material_bom
+      responses:
+        '200':
+          description: 查询成功
+      security:
+        - bearerAuth: []
+
+  /api/addMaterialCategoryData:
+    post:
+      summary: 新增物料分类
+      operationId: addMaterialCategoryData
+      tags:
+        - material_bom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialCategory'
+      responses:
+        '200':
+          description: 成功
+      security:
+        - bearerAuth: []
+
+  /api/getBomData:
+    get:
+      summary: 查询 BOM
+      operationId: getBomData
+      tags:
+        - material_bom
+      responses:
+        '200':
+          description: 查询成功
+      security:
+        - bearerAuth: []
+
+  /api/addBomData:
+    post:
+      summary: 新增 BOM
+      operationId: addBomData
+      tags:
+        - material_bom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Bom'
+      responses:
+        '200':
+          description: 成功
+      security:
+        - bearerAuth: []
+
+  /api/listBomVersionData:
+    get:
+      summary: 查询 BOM 版本
+      operationId: listBomVersionData
+      tags:
+        - material_bom
+      responses:
+        '200':
+          description: 成功
+      security:
+        - bearerAuth: []
+
+  /api/addBomVersionData:
+    post:
+      summary: 新增 BOM 版本
+      operationId: addBomVersionData
+      tags:
+        - material_bom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomVersion'
+      responses:
+        '200':
+          description: 成功
+      security:
+        - bearerAuth: []
+
+  /api/getMaterialInventoryData:
+    get:
+      summary: 查询物料库存
+      operationId: getMaterialInventoryData
+      tags:
+        - material_bom
+      responses:
+        '200':
+          description: 成功
+      security:
+        - bearerAuth: []
+
+  /api/addRequirementAnalysis:
+    post:
+      summary: 新增需求分析
+      operationId: addRequirementAnalysis
+      tags:
+        - material_bom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequirementAnalysis'
+      responses:
+        '200':
+          description: 成功
+      security:
+        - bearerAuth: []
+
+  /api/getRequirementAnalysis:
+    get:
+      summary: 查询需求分析结果
+      operationId: getRequirementAnalysis
+      tags:
+        - material_bom
+      responses:
+        '200':
+          description: 成功
+      security:
+        - bearerAuth: []
+
+
 components:
-  schemas: {}
+  schemas:
+    Material:
+      type: object
+      properties:
+        materialId:
+          type: integer
+        materialName:
+          type: string
+        categoryId:
+          type: integer
+        type:
+          type: string
+        model:
+          type: string
+        unit:
+          type: string
+        safeStock:
+          type: number
+        createTime:
+          type: string
+          format: date-time
+        updateTime:
+          type: string
+          format: date-time
+    MaterialCategory:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        description:
+          type: string
+    Bom:
+      type: object
+      properties:
+        bomId:
+          type: integer
+        productId:
+          type: integer
+        materialId:
+          type: integer
+        quantity:
+          type: number
+        lossRate:
+          type: number
+    BomVersion:
+      type: object
+      properties:
+        versionId:
+          type: integer
+        bomId:
+          type: integer
+        versionNo:
+          type: string
+        effectiveDate:
+          type: string
+          format: date
+        expireDate:
+          type: string
+          format: date
+        changeReason:
+          type: string
+    MaterialInventory:
+      type: object
+      properties:
+        materialId:
+          type: integer
+        availableQuantity:
+          type: number
+        lockedQuantity:
+          type: number
+        lastInboundTime:
+          type: string
+          format: date-time
+        lastOutboundTime:
+          type: string
+          format: date-time
+    RequirementAnalysis:
+      type: object
+      properties:
+        analysisId:
+          type: integer
+        productionQuantity:
+          type: number
+        analysisTime:
+          type: string
+          format: date-time
+        requirementJson:
+          type: object
