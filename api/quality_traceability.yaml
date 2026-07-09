@@ -108,32 +108,19 @@ paths:
               schema:
                 $ref: './common.yaml#/components/schemas/ApiResponse'
   /api/traceProductBatch:
-    get:
+    post:
       summary: 正向追溯成品批次
-      description: 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: traceProductBatch
       tags: [quality_traceability]
       security:
         - bearerAuth: []
-      parameters:
-        - name: order_id
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-        - name: batch_no
-          in: query
-          required: false
-          description: 成品批次号，来自完工入库单。order_id 和 batch_no 至少传一个。
-          schema:
-            type: string
-        - name: include_supplier
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductBatchTraceRequest'
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -142,38 +129,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductBatchTraceResponse'
   /api/traceMaterialBatch:
-    get:
+    post:
       summary: 反向追溯原材料批次
-      description: 从采购订单明细或原材料编号出发，查询问题批次流入的所有生产订单和成品批次。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 从采购订单明细、原材料编号或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id 或到货日期范围至少提供一种。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: traceMaterialBatch
       tags: [quality_traceability]
       security:
         - bearerAuth: []
-      parameters:
-        - name: item_id
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-        - name: material_id
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-        - name: receive_date_start
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date
-        - name: receive_date_end
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialBatchTraceRequest'
       responses:
         '200':
           description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
@@ -224,7 +192,6 @@ components:
           example: 5001
         consume_qty:
           type: number
-          format: decimal
           minimum: 0
           exclusiveMinimum: true
           example: 12.5
@@ -244,9 +211,50 @@ components:
           format: int64
         consume_qty:
           type: number
-          format: decimal
           minimum: 0
           exclusiveMinimum: true
+    ProductBatchTraceRequest:
+      type: object
+      anyOf:
+        - required: [order_id]
+        - required: [batch_no]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+          nullable: true
+        batch_no:
+          type: string
+          nullable: true
+          description: 成品批次号，来自完工入库单。
+        include_supplier:
+          type: boolean
+          default: true
+      description: order_id 和 batch_no 至少提供一个。
+    MaterialBatchTraceRequest:
+      type: object
+      anyOf:
+        - required: [item_id]
+        - required: [material_id]
+        - required: [receive_date_start, receive_date_end]
+      properties:
+        item_id:
+          type: integer
+          format: int64
+          nullable: true
+        material_id:
+          type: integer
+          format: int64
+          nullable: true
+        receive_date_start:
+          type: string
+          format: date
+          nullable: true
+        receive_date_end:
+          type: string
+          format: date
+          nullable: true
+      description: item_id、material_id 或到货日期范围至少提供一种。
     BatchConsumptionUpdateRequest:
       allOf:
         - $ref: '#/components/schemas/BatchConsumptionCreateRequest'
@@ -281,6 +289,7 @@ components:
         material_name:
           type: string
           nullable: true
+          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
         consumed_batches:
           type: array
           description: 该成品批次消耗的原材料批次列表。
@@ -300,6 +309,7 @@ components:
         material_name:
           type: string
           nullable: true
+          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
         supplier_id:
           type: integer
           format: int64
@@ -307,6 +317,7 @@ components:
         supplier_name:
           type: string
           nullable: true
+          description: 冗余展示字段，权威供应商实体由采购模块维护。
         purchase_order_id:
           type: integer
           format: int64
@@ -317,7 +328,6 @@ components:
           nullable: true
         consume_qty:
           type: number
-          format: decimal
     MaterialBatchTraceResult:
       type: object
       required: [item_id, material_id, affected_products]
@@ -331,6 +341,7 @@ components:
         material_name:
           type: string
           nullable: true
+          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
         supplier_id:
           type: integer
           format: int64
@@ -338,6 +349,7 @@ components:
         supplier_name:
           type: string
           nullable: true
+          description: 冗余展示字段，权威供应商实体由采购模块维护。
         affected_products:
           type: array
           description: 使用该原材料批次的生产订单和成品批次。
@@ -359,17 +371,22 @@ components:
         product_material_name:
           type: string
           nullable: true
+          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
         production_status:
           $ref: './production.yaml#/components/schemas/ProductionOrderStatus'
         consume_qty:
           type: number
-          format: decimal
     QualityImpactAnalyzeRequest:
       type: object
+      anyOf:
+        - required: [item_ids]
+        - required: [material_id]
+        - required: [receive_date_start, receive_date_end]
       properties:
         item_ids:
           type: array
           description: 问题采购明细编号列表。
+          minItems: 1
           items:
             type: integer
             format: int64
@@ -409,6 +426,7 @@ components:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object
+          required: [data]
           properties:
             data:
               $ref: '#/components/schemas/BatchConsumption'
@@ -416,6 +434,7 @@ components:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object
+          required: [data]
           properties:
             data:
               allOf:
@@ -430,6 +449,7 @@ components:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object
+          required: [data]
           properties:
             data:
               $ref: '#/components/schemas/ProductBatchTraceResult'
@@ -437,6 +457,7 @@ components:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object
+          required: [data]
           properties:
             data:
               type: array
@@ -446,6 +467,12 @@ components:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object
+          required: [data]
           properties:
             data:
               $ref: '#/components/schemas/QualityImpactAnalyzeResult'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
