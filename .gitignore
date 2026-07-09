@@ -4,6 +4,12 @@ obj
 .vs
 .env
 
+# local tooling
+tools/
+.npm-cache/
+.pnpm-store/
+.venv/
+
 
 # frontend
 # Logs
