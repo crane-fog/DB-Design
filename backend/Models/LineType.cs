@@ -24,25 +24,22 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class LoginRequest : IEquatable<LoginRequest>
+    public partial class LineType : IEquatable<LineType>
     {
         /// <summary>
-        /// 工号，唯一约束，用于登录。
+        /// Gets or Sets TypeId
         /// </summary>
-        /// <value>工号，唯一约束，用于登录。</value>
-        /* <example>EMP001</example> */
         [Required]
-        [DataMember(Name="employee_no", EmitDefaultValue=false)]
-        public string EmployeeNo { get; set; }
+        [DataMember(Name="type_id", EmitDefaultValue=true)]
+        public long TypeId { get; set; }
 
         /// <summary>
-        /// 登录密码或前端传入的密码哈希值，以后端实现为准。
+        /// Gets or Sets TypeName
         /// </summary>
-        /// <value>登录密码或前端传入的密码哈希值，以后端实现为准。</value>
-        /* <example>5f4dcc3b5aa765d61d8327deb882cf99</example> */
+        /* <example>总装线</example> */
         [Required]
-        [DataMember(Name="password", EmitDefaultValue=false)]
-        public string Password { get; set; }
+        [DataMember(Name="type_name", EmitDefaultValue=false)]
+        public string TypeName { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -51,9 +48,9 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginRequest {\n");
-            sb.Append("  EmployeeNo: ").Append(EmployeeNo).Append("\n");
-            sb.Append("  Password: ").Append(Password).Append("\n");
+            sb.Append("class LineType {\n");
+            sb.Append("  TypeId: ").Append(TypeId).Append("\n");
+            sb.Append("  TypeName: ").Append(TypeName).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -76,29 +73,29 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginRequest)obj);
+            return obj.GetType() == GetType() && Equals((LineType)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginRequest instances are equal
+        /// Returns true if LineType instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginRequest to be compared</param>
+        /// <param name="other">Instance of LineType to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginRequest other)
+        public bool Equals(LineType other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    EmployeeNo == other.EmployeeNo ||
-                    EmployeeNo != null &&
-                    EmployeeNo.Equals(other.EmployeeNo)
+                    TypeId == other.TypeId ||
+                    
+                    TypeId.Equals(other.TypeId)
                 ) && 
                 (
-                    Password == other.Password ||
-                    Password != null &&
-                    Password.Equals(other.Password)
+                    TypeName == other.TypeName ||
+                    TypeName != null &&
+                    TypeName.Equals(other.TypeName)
                 );
         }
 
@@ -112,10 +109,10 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (EmployeeNo != null)
-                    hashCode = hashCode * 59 + EmployeeNo.GetHashCode();
-                    if (Password != null)
-                    hashCode = hashCode * 59 + Password.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + TypeId.GetHashCode();
+                    if (TypeName != null)
+                    hashCode = hashCode * 59 + TypeName.GetHashCode();
                 return hashCode;
             }
         }
@@ -123,12 +120,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginRequest left, LoginRequest right)
+        public static bool operator ==(LineType left, LineType right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginRequest left, LoginRequest right)
+        public static bool operator !=(LineType left, LineType right)
         {
             return !Equals(left, right);
         }

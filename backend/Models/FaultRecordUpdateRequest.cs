@@ -21,28 +21,36 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// 操作人从当前登录用户推导，客户端不得传 operator_id。
     /// </summary>
     [DataContract]
-    public partial class LoginData : IEquatable<LoginData>
+    public partial class FaultRecordUpdateRequest : IEquatable<FaultRecordUpdateRequest>
     {
         /// <summary>
-        /// JWT 访问令牌。
+        /// Gets or Sets FaultId
         /// </summary>
-        /// <value>JWT 访问令牌。</value>
-        /* <example>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</example> */
         [Required]
-        [DataMember(Name="access_token", EmitDefaultValue=false)]
-        public string AccessToken { get; set; }
+        [DataMember(Name="fault_id", EmitDefaultValue=true)]
+        public long FaultId { get; set; }
 
         /// <summary>
-        /// token 有效期，单位秒。
+        /// Gets or Sets Status
         /// </summary>
-        /// <value>token 有效期，单位秒。</value>
-        /* <example>7200</example> */
         [Required]
-        [DataMember(Name="expires", EmitDefaultValue=true)]
-        public int Expires { get; set; }
+        [DataMember(Name="status", EmitDefaultValue=true)]
+        public FaultStatus Status { get; set; }
+
+        /// <summary>
+        /// Gets or Sets RepairerId
+        /// </summary>
+        [DataMember(Name="repairer_id", EmitDefaultValue=true)]
+        public long? RepairerId { get; set; }
+
+        /// <summary>
+        /// Gets or Sets RecoverTime
+        /// </summary>
+        [DataMember(Name="recover_time", EmitDefaultValue=true)]
+        public DateTime? RecoverTime { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -51,9 +59,11 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginData {\n");
-            sb.Append("  AccessToken: ").Append(AccessToken).Append("\n");
-            sb.Append("  Expires: ").Append(Expires).Append("\n");
+            sb.Append("class FaultRecordUpdateRequest {\n");
+            sb.Append("  FaultId: ").Append(FaultId).Append("\n");
+            sb.Append("  Status: ").Append(Status).Append("\n");
+            sb.Append("  RepairerId: ").Append(RepairerId).Append("\n");
+            sb.Append("  RecoverTime: ").Append(RecoverTime).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -76,29 +86,39 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginData)obj);
+            return obj.GetType() == GetType() && Equals((FaultRecordUpdateRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginData instances are equal
+        /// Returns true if FaultRecordUpdateRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginData to be compared</param>
+        /// <param name="other">Instance of FaultRecordUpdateRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginData other)
+        public bool Equals(FaultRecordUpdateRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    AccessToken == other.AccessToken ||
-                    AccessToken != null &&
-                    AccessToken.Equals(other.AccessToken)
+                    FaultId == other.FaultId ||
+                    
+                    FaultId.Equals(other.FaultId)
                 ) && 
                 (
-                    Expires == other.Expires ||
+                    Status == other.Status ||
                     
-                    Expires.Equals(other.Expires)
+                    Status.Equals(other.Status)
+                ) && 
+                (
+                    RepairerId == other.RepairerId ||
+                    RepairerId != null &&
+                    RepairerId.Equals(other.RepairerId)
+                ) && 
+                (
+                    RecoverTime == other.RecoverTime ||
+                    RecoverTime != null &&
+                    RecoverTime.Equals(other.RecoverTime)
                 );
         }
 
@@ -112,10 +132,14 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (AccessToken != null)
-                    hashCode = hashCode * 59 + AccessToken.GetHashCode();
                     
-                    hashCode = hashCode * 59 + Expires.GetHashCode();
+                    hashCode = hashCode * 59 + FaultId.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + Status.GetHashCode();
+                    if (RepairerId != null)
+                    hashCode = hashCode * 59 + RepairerId.GetHashCode();
+                    if (RecoverTime != null)
+                    hashCode = hashCode * 59 + RecoverTime.GetHashCode();
                 return hashCode;
             }
         }
@@ -123,12 +147,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginData left, LoginData right)
+        public static bool operator ==(FaultRecordUpdateRequest left, FaultRecordUpdateRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginData left, LoginData right)
+        public static bool operator !=(FaultRecordUpdateRequest left, FaultRecordUpdateRequest right)
         {
             return !Equals(left, right);
         }

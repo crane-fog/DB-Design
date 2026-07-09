@@ -101,7 +101,7 @@ namespace Org.OpenAPITools.Models
         /// </summary>
         [Required]
         [DataMember(Name="data", EmitDefaultValue=true)]
-        public Object Data { get; set; }
+        public UserBrief Data { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object

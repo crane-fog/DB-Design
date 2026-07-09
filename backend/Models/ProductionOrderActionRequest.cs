@@ -21,28 +21,23 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// 操作人从当前登录用户推导，客户端不得传 operator_id。
     /// </summary>
     [DataContract]
-    public partial class LoginRequest : IEquatable<LoginRequest>
+    public partial class ProductionOrderActionRequest : IEquatable<ProductionOrderActionRequest>
     {
         /// <summary>
-        /// 工号，唯一约束，用于登录。
+        /// Gets or Sets OrderId
         /// </summary>
-        /// <value>工号，唯一约束，用于登录。</value>
-        /* <example>EMP001</example> */
         [Required]
-        [DataMember(Name="employee_no", EmitDefaultValue=false)]
-        public string EmployeeNo { get; set; }
+        [DataMember(Name="order_id", EmitDefaultValue=true)]
+        public long OrderId { get; set; }
 
         /// <summary>
-        /// 登录密码或前端传入的密码哈希值，以后端实现为准。
+        /// Gets or Sets Remark
         /// </summary>
-        /// <value>登录密码或前端传入的密码哈希值，以后端实现为准。</value>
-        /* <example>5f4dcc3b5aa765d61d8327deb882cf99</example> */
-        [Required]
-        [DataMember(Name="password", EmitDefaultValue=false)]
-        public string Password { get; set; }
+        [DataMember(Name="remark", EmitDefaultValue=true)]
+        public string Remark { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -51,9 +46,9 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginRequest {\n");
-            sb.Append("  EmployeeNo: ").Append(EmployeeNo).Append("\n");
-            sb.Append("  Password: ").Append(Password).Append("\n");
+            sb.Append("class ProductionOrderActionRequest {\n");
+            sb.Append("  OrderId: ").Append(OrderId).Append("\n");
+            sb.Append("  Remark: ").Append(Remark).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -76,29 +71,29 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginRequest)obj);
+            return obj.GetType() == GetType() && Equals((ProductionOrderActionRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginRequest instances are equal
+        /// Returns true if ProductionOrderActionRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginRequest to be compared</param>
+        /// <param name="other">Instance of ProductionOrderActionRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginRequest other)
+        public bool Equals(ProductionOrderActionRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    EmployeeNo == other.EmployeeNo ||
-                    EmployeeNo != null &&
-                    EmployeeNo.Equals(other.EmployeeNo)
+                    OrderId == other.OrderId ||
+                    
+                    OrderId.Equals(other.OrderId)
                 ) && 
                 (
-                    Password == other.Password ||
-                    Password != null &&
-                    Password.Equals(other.Password)
+                    Remark == other.Remark ||
+                    Remark != null &&
+                    Remark.Equals(other.Remark)
                 );
         }
 
@@ -112,10 +107,10 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (EmployeeNo != null)
-                    hashCode = hashCode * 59 + EmployeeNo.GetHashCode();
-                    if (Password != null)
-                    hashCode = hashCode * 59 + Password.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + OrderId.GetHashCode();
+                    if (Remark != null)
+                    hashCode = hashCode * 59 + Remark.GetHashCode();
                 return hashCode;
             }
         }
@@ -123,12 +118,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginRequest left, LoginRequest right)
+        public static bool operator ==(ProductionOrderActionRequest left, ProductionOrderActionRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginRequest left, LoginRequest right)
+        public static bool operator !=(ProductionOrderActionRequest left, ProductionOrderActionRequest right)
         {
             return !Equals(left, right);
         }

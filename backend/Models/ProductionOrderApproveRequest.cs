@@ -21,28 +21,31 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// 审核人从当前登录用户推导，客户端不得传 reviewer_id。
     /// </summary>
     [DataContract]
-    public partial class LoginRequest : IEquatable<LoginRequest>
+    public partial class ProductionOrderApproveRequest : IEquatable<ProductionOrderApproveRequest>
     {
         /// <summary>
-        /// 工号，唯一约束，用于登录。
+        /// Gets or Sets OrderId
         /// </summary>
-        /// <value>工号，唯一约束，用于登录。</value>
-        /* <example>EMP001</example> */
         [Required]
-        [DataMember(Name="employee_no", EmitDefaultValue=false)]
-        public string EmployeeNo { get; set; }
+        [DataMember(Name="order_id", EmitDefaultValue=true)]
+        public long OrderId { get; set; }
 
         /// <summary>
-        /// 登录密码或前端传入的密码哈希值，以后端实现为准。
+        /// true 表示审核通过，false 表示审核拒绝。
         /// </summary>
-        /// <value>登录密码或前端传入的密码哈希值，以后端实现为准。</value>
-        /* <example>5f4dcc3b5aa765d61d8327deb882cf99</example> */
+        /// <value>true 表示审核通过，false 表示审核拒绝。</value>
         [Required]
-        [DataMember(Name="password", EmitDefaultValue=false)]
-        public string Password { get; set; }
+        [DataMember(Name="approved", EmitDefaultValue=true)]
+        public bool Approved { get; set; }
+
+        /// <summary>
+        /// Gets or Sets ReviewComment
+        /// </summary>
+        [DataMember(Name="review_comment", EmitDefaultValue=true)]
+        public string ReviewComment { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -51,9 +54,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginRequest {\n");
-            sb.Append("  EmployeeNo: ").Append(EmployeeNo).Append("\n");
-            sb.Append("  Password: ").Append(Password).Append("\n");
+            sb.Append("class ProductionOrderApproveRequest {\n");
+            sb.Append("  OrderId: ").Append(OrderId).Append("\n");
+            sb.Append("  Approved: ").Append(Approved).Append("\n");
+            sb.Append("  ReviewComment: ").Append(ReviewComment).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -76,29 +80,34 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginRequest)obj);
+            return obj.GetType() == GetType() && Equals((ProductionOrderApproveRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginRequest instances are equal
+        /// Returns true if ProductionOrderApproveRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginRequest to be compared</param>
+        /// <param name="other">Instance of ProductionOrderApproveRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginRequest other)
+        public bool Equals(ProductionOrderApproveRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    EmployeeNo == other.EmployeeNo ||
-                    EmployeeNo != null &&
-                    EmployeeNo.Equals(other.EmployeeNo)
+                    OrderId == other.OrderId ||
+                    
+                    OrderId.Equals(other.OrderId)
                 ) && 
                 (
-                    Password == other.Password ||
-                    Password != null &&
-                    Password.Equals(other.Password)
+                    Approved == other.Approved ||
+                    
+                    Approved.Equals(other.Approved)
+                ) && 
+                (
+                    ReviewComment == other.ReviewComment ||
+                    ReviewComment != null &&
+                    ReviewComment.Equals(other.ReviewComment)
                 );
         }
 
@@ -112,10 +121,12 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (EmployeeNo != null)
-                    hashCode = hashCode * 59 + EmployeeNo.GetHashCode();
-                    if (Password != null)
-                    hashCode = hashCode * 59 + Password.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + OrderId.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + Approved.GetHashCode();
+                    if (ReviewComment != null)
+                    hashCode = hashCode * 59 + ReviewComment.GetHashCode();
                 return hashCode;
             }
         }
@@ -123,12 +134,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginRequest left, LoginRequest right)
+        public static bool operator ==(ProductionOrderApproveRequest left, ProductionOrderApproveRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginRequest left, LoginRequest right)
+        public static bool operator !=(ProductionOrderApproveRequest left, ProductionOrderApproveRequest right)
         {
             return !Equals(left, right);
         }

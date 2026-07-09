@@ -24,7 +24,7 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class LoginResponse : IEquatable<LoginResponse>
+    public partial class CapacityConfigResponse : IEquatable<CapacityConfigResponse>
     {
 
         /// <summary>
@@ -100,8 +100,8 @@ namespace Org.OpenAPITools.Models
         /// Gets or Sets Data
         /// </summary>
         [Required]
-        [DataMember(Name="data", EmitDefaultValue=true)]
-        public LoginData Data { get; set; }
+        [DataMember(Name="data", EmitDefaultValue=false)]
+        public CapacityConfig Data { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -110,7 +110,7 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginResponse {\n");
+            sb.Append("class CapacityConfigResponse {\n");
             sb.Append("  Code: ").Append(Code).Append("\n");
             sb.Append("  Message: ").Append(Message).Append("\n");
             sb.Append("  Data: ").Append(Data).Append("\n");
@@ -136,15 +136,15 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginResponse)obj);
+            return obj.GetType() == GetType() && Equals((CapacityConfigResponse)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginResponse instances are equal
+        /// Returns true if CapacityConfigResponse instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginResponse to be compared</param>
+        /// <param name="other">Instance of CapacityConfigResponse to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginResponse other)
+        public bool Equals(CapacityConfigResponse other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -190,12 +190,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginResponse left, LoginResponse right)
+        public static bool operator ==(CapacityConfigResponse left, CapacityConfigResponse right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginResponse left, LoginResponse right)
+        public static bool operator !=(CapacityConfigResponse left, CapacityConfigResponse right)
         {
             return !Equals(left, right);
         }
