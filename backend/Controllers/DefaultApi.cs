@@ -8,83 +8,108 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 [ApiController]
-[Route("/")]
+[Route("/api")]
 public class DefaultApiController(
     IUserTestService userTestService,
     AuthService authService) : ControllerBase
 {
+    private const int TokenExpiresSeconds = 7200;
+
     [HttpPost]
-    [Consumes("application/x-www-form-urlencoded")]
+    [Consumes("application/json")]
+    [Produces("application/json")]
     [Route("login")]
-    public IActionResult Login([FromForm] string? userNo, [FromForm(Name = "password")] string? passwordHash)
+    public IActionResult Login([FromBody] LoginRequest? request)
     {
-        if (string.IsNullOrWhiteSpace(userNo) || string.IsNullOrWhiteSpace(passwordHash))
+        if (request is null
+            || string.IsNullOrWhiteSpace(request.EmployeeNo)
+            || string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new LoginPost200Response
+            return Ok(new LoginResponse
             {
-                Msg = "请输入账号和密码"
+                Code = LoginResponse.CodeEnum._400Enum,
+                Message = "请输入账号和密码",
+                Data = null!
             });
         }
 
-        var user = authService.Authenticate(userNo, passwordHash);
+        var user = authService.Authenticate(request.EmployeeNo.Trim(), request.Password);
         if (user is null)
         {
-            return Unauthorized(new LoginPost200Response
+            return Ok(new LoginResponse
             {
-                Msg = "账号或密码错误"
+                Code = LoginResponse.CodeEnum._400Enum,
+                Message = "工号或密码错误",
+                Data = null!
             });
         }
 
-        var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
-        var response = new LoginPost200Response
+        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(TokenExpiresSeconds);
+        var response = new LoginResponse
         {
-            Msg = "登录成功",
-            AccessToken = authService.CreateToken(user.EmployeeNo, expiresAt),
-            Expires = expiresAt.ToUnixTimeSeconds()
+            Code = LoginResponse.CodeEnum._200Enum,
+            Message = "登录成功",
+            Data = new LoginData
+            {
+                AccessToken = authService.CreateToken(user.EmployeeNo, expiresAt),
+                Expires = TokenExpiresSeconds
+            }
         };
 
         return Ok(response);
     }
 
     [HttpPost]
-    [Consumes("application/x-www-form-urlencoded")]
+    [Consumes("application/json")]
+    [Produces("application/json")]
     [Route("register")]
-    public IActionResult Register(
-        [FromForm] string? userNo,
-        [FromForm(Name = "password")] string? passwordHash,
-        [FromForm] string? userName,
-        [FromForm] string? phone,
-        [FromForm] string? email)
+    public IActionResult Register([FromBody] RegisterRequest? request)
     {
-        if (string.IsNullOrWhiteSpace(userNo)
-            || string.IsNullOrWhiteSpace(passwordHash)
-            || string.IsNullOrWhiteSpace(userName)
-            || string.IsNullOrWhiteSpace(phone))
+        if (request is null
+            || string.IsNullOrWhiteSpace(request.EmployeeNo)
+            || string.IsNullOrWhiteSpace(request.Password)
+            || string.IsNullOrWhiteSpace(request.UserName)
+            || string.IsNullOrWhiteSpace(request.Phone))
         {
-            return BadRequest(new RegisterPost200Response
+            return Ok(new RegisterResponse
             {
-                Msg = "请填写必填项"
+                Code = RegisterResponse.CodeEnum._400Enum,
+                Message = "请填写必填项",
+                Data = null!
             });
         }
 
-        var errorMessage = authService.Register(
-            userNo.Trim(),
-            passwordHash,
-            userName.Trim(),
-            phone.Trim(),
-            string.IsNullOrWhiteSpace(email) ? null : email.Trim());
+        var result = authService.Register(
+            request.EmployeeNo.Trim(),
+            request.Password,
+            request.UserName.Trim(),
+            request.Phone.Trim(),
+            string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim());
 
-        if (errorMessage is not null)
+        if (result.ErrorMessage is not null)
         {
-            return Conflict(new RegisterPost200Response
+            return Ok(new RegisterResponse
             {
-                Msg = errorMessage
+                Code = RegisterResponse.CodeEnum._409Enum,
+                Message = result.ErrorMessage,
+                Data = null!
             });
         }
 
-        return Ok(new RegisterPost200Response
+        var registeredUser = result.User!;
+        return Ok(new RegisterResponse
         {
-            Msg = "注册成功"
+            Code = RegisterResponse.CodeEnum._200Enum,
+            Message = "注册成功",
+            Data = new UserBrief
+            {
+                UserId = Convert.ToInt32(registeredUser.UserId),
+                EmployeeNo = registeredUser.EmployeeNo,
+                UserName = registeredUser.UserName,
+                Phone = registeredUser.Phone,
+                Email = registeredUser.Email,
+                Status = UserBrief.StatusEnum.ValidEnum
+            }
         });
     }
 

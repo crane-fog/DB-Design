@@ -1,153 +1,266 @@
 openapi: 3.0.1
 info:
-  title: 测试
-  description: 这是一个示例项目
+  title: 数据库设计项目 API
+  description: 项目 OpenAPI 总入口，按业务模块汇总接口定义。
   version: 0.1.0
-tags: []
-paths:
-  /login:
-    post:
-      summary: 登录
-      deprecated: false
-      description: ''
-      tags: []
-      parameters: []
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                userNo:
-                  example: ''
-                  type: string
-                password:
-                  example: ''
-                  type: string
-            example:
-              userNo: ''
-              password: ''
-        required: true
-      responses:
-        '200':
-          description: ''
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  msg:
-                    type: string
-                  accessToken:
-                    type: string
-                  expires:
-                    type: number
-                required:
-                  - msg
-          headers: {}
-      security: []
-  /register:
-    post:
-      summary: 注册系统用户
-      deprecated: false
-      description: ''
-      tags: []
-      parameters: []
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                userNo:
-                  example: ''
-                  type: string
-                password:
-                  example: ''
-                  type: string
-                userName:
-                  example: ''
-                  type: string
-                phone:
-                  example: ''
-                  type: string
-                email:
-                  example: ''
-                  type: string
-              required:
-                - userNo
-                - password
-                - userName
-                - phone
-            example:
-              userNo: ''
-              password: ''
-              userName: ''
-              phone: ''
-              email: ''
-        required: true
-      responses:
-        '200':
-          description: ''
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  msg:
-                    type: string
-                required:
-                  - msg
-          headers: {}
-      security: []
-  /user-test:
-    get:
-      summary: 获取测试用户数据表
-      deprecated: false
-      description: ''
-      operationId: getUserTest
-      tags: []
-      parameters: []
-      responses:
-        '200':
-          description: 成功返回用户列表
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/UserData'
-                example:
-                  - id: 113
-                    name: 李四
-                    createdAt: '2026-03-02T21:44:02.29113'
-                  - id: 114
-                    name: 王七
-                    createdAt: '2026-03-03T10:15:30.12345'
-          headers: {}
-      security:
-        - bearerAuth: []
-components:
-  schemas:
-    UserData:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-          example: 113
-        name:
-          type: string
-          example: 李四
-        createdAt:
-          type: string
-          format: date-time
-          example: '2026-03-02T21:44:02.29113'
-  responses: {}
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
 servers:
   - url: http://localhost:5000
+tags:
+  - name: material_bom
+    description: 物料与 BOM 管理模块
+  - name: inventory
+    description: 库存管理模块
+  - name: purchase
+    description: 采购管理模块
+  - name: production
+    description: 生产管理模块
+  - name: quality_traceability
+    description: 质量追溯模块
+  - name: system
+    description: 系统管理模块
+paths:
+  /api/listMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1listMaterialData'
+  /api/getMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1getMaterialData'
+  /api/addMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1addMaterialData'
+  /api/updateMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateMaterialData'
+  /api/deleteMaterialData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteMaterialData'
+  /api/listMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1listMaterialCategoryData'
+  /api/addMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1addMaterialCategoryData'
+  /api/updateMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateMaterialCategoryData'
+  /api/deleteMaterialCategoryData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteMaterialCategoryData'
+  /api/listBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1listBomVersionData'
+  /api/getBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1getBomVersionData'
+  /api/addBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1addBomVersionData'
+  /api/updateBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateBomVersionData'
+  /api/deleteBomVersionData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteBomVersionData'
+  /api/listBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1listBomData'
+  /api/getBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1getBomData'
+  /api/addBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1addBomData'
+  /api/updateBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1updateBomData'
+  /api/deleteBomData:
+    $ref: './material_bom.yaml#/paths/~1api~1deleteBomData'
+  /api/checkBomCycleDependency:
+    $ref: './material_bom.yaml#/paths/~1api~1checkBomCycleDependency'
+  /api/getBomTreeData:
+    $ref: './material_bom.yaml#/paths/~1api~1getBomTreeData'
+  /api/getReverseTraceData:
+    $ref: './material_bom.yaml#/paths/~1api~1getReverseTraceData'
+  /api/calculateProductCost:
+    $ref: './material_bom.yaml#/paths/~1api~1calculateProductCost'
+  /api/calculateLossCompensation:
+    $ref: './material_bom.yaml#/paths/~1api~1calculateLossCompensation'
+  /api/getMaterialStockData:
+    $ref: './material_bom.yaml#/paths/~1api~1getMaterialStockData'
+  /api/addRequirementAnalysis:
+    $ref: './material_bom.yaml#/paths/~1api~1addRequirementAnalysis'
+  /api/getRequirementAnalysis:
+    $ref: './material_bom.yaml#/paths/~1api~1getRequirementAnalysis'
+  /api/calculateMaterialShortage:
+    $ref: './inventory.yaml#/paths/~1api~1calculateMaterialShortage'
+  /api/listInventoryAlert:
+    $ref: './inventory.yaml#/paths/~1api~1listInventoryAlert'
+  /api/generateInventoryAlert:
+    $ref: './inventory.yaml#/paths/~1api~1generateInventoryAlert'
+  /api/handleInventoryAlert:
+    $ref: './inventory.yaml#/paths/~1api~1handleInventoryAlert'
+  /api/lockMaterialStock:
+    $ref: './inventory.yaml#/paths/~1api~1lockMaterialStock'
+  /api/releaseMaterialStock:
+    $ref: './inventory.yaml#/paths/~1api~1releaseMaterialStock'
+  /api/listMaterialStockLock:
+    $ref: './inventory.yaml#/paths/~1api~1listMaterialStockLock'
+  /api/detectObsoleteMaterial:
+    $ref: './inventory.yaml#/paths/~1api~1detectObsoleteMaterial'
+  /api/listObsoleteMaterialDetection:
+    $ref: './inventory.yaml#/paths/~1api~1listObsoleteMaterialDetection'
+  /api/handleObsoleteMaterialDetection:
+    $ref: './inventory.yaml#/paths/~1api~1handleObsoleteMaterialDetection'
+  /api/addCompletionInbound:
+    $ref: './inventory.yaml#/paths/~1api~1addCompletionInbound'
+  /api/listCompletionInbound:
+    $ref: './inventory.yaml#/paths/~1api~1listCompletionInbound'
+  /api/listPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1listPurchaseOrder'
+  /api/getPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1getPurchaseOrder'
+  /api/addPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1addPurchaseOrder'
+  /api/createPurchaseOrderDraftFromShortage:
+    $ref: './purchase.yaml#/paths/~1api~1createPurchaseOrderDraftFromShortage'
+  /api/submitPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1submitPurchaseOrder'
+  /api/cancelPurchaseOrder:
+    $ref: './purchase.yaml#/paths/~1api~1cancelPurchaseOrder'
+  /api/addPurchaseReceipt:
+    $ref: './purchase.yaml#/paths/~1api~1addPurchaseReceipt'
+  /api/listPurchaseReceipt:
+    $ref: './purchase.yaml#/paths/~1api~1listPurchaseReceipt'
+  /api/generatePurchaseOverdueReminder:
+    $ref: './purchase.yaml#/paths/~1api~1generatePurchaseOverdueReminder'
+  /api/listPurchaseOverdueReminder:
+    $ref: './purchase.yaml#/paths/~1api~1listPurchaseOverdueReminder'
+  /api/handlePurchaseOverdueReminder:
+    $ref: './purchase.yaml#/paths/~1api~1handlePurchaseOverdueReminder'
+  /api/listProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1listProductionOrder'
+  /api/getProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1getProductionOrder'
+  /api/addProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1addProductionOrder'
+  /api/updateProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1updateProductionOrder'
+  /api/approveProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1approveProductionOrder'
+  /api/startProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1startProductionOrder'
+  /api/finishProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1finishProductionOrder'
+  /api/cancelProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1cancelProductionOrder'
+  /api/listProductionLine:
+    $ref: './production.yaml#/paths/~1api~1listProductionLine'
+  /api/listProductionLineType:
+    $ref: './production.yaml#/paths/~1api~1listProductionLineType'
+  /api/saveProductionLineType:
+    $ref: './production.yaml#/paths/~1api~1saveProductionLineType'
+  /api/addProductionLine:
+    $ref: './production.yaml#/paths/~1api~1addProductionLine'
+  /api/updateProductionLine:
+    $ref: './production.yaml#/paths/~1api~1updateProductionLine'
+  /api/listCapacityConfig:
+    $ref: './production.yaml#/paths/~1api~1listCapacityConfig'
+  /api/saveCapacityConfig:
+    $ref: './production.yaml#/paths/~1api~1saveCapacityConfig'
+  /api/listProductionCalendar:
+    $ref: './production.yaml#/paths/~1api~1listProductionCalendar'
+  /api/saveProductionCalendar:
+    $ref: './production.yaml#/paths/~1api~1saveProductionCalendar'
+  /api/deleteProductionCalendar:
+    $ref: './production.yaml#/paths/~1api~1deleteProductionCalendar'
+  /api/estimateProductionCapacity:
+    $ref: './production.yaml#/paths/~1api~1estimateProductionCapacity'
+  /api/listExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1listExternalOrder'
+  /api/addExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1addExternalOrder'
+  /api/reviewExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1reviewExternalOrder'
+  /api/convertExternalOrderToProductionOrder:
+    $ref: './production.yaml#/paths/~1api~1convertExternalOrderToProductionOrder'
+  /api/runCapacityDetection:
+    $ref: './production.yaml#/paths/~1api~1runCapacityDetection'
+  /api/saveCapacityBalance:
+    $ref: './production.yaml#/paths/~1api~1saveCapacityBalance'
+  /api/reportProductionLineFault:
+    $ref: './production.yaml#/paths/~1api~1reportProductionLineFault'
+  /api/updateProductionLineFault:
+    $ref: './production.yaml#/paths/~1api~1updateProductionLineFault'
+  /api/updateProductionLineStatus:
+    $ref: './production.yaml#/paths/~1api~1updateProductionLineStatus'
+  /api/listBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1listBatchConsumption'
+  /api/addBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1addBatchConsumption'
+  /api/updateBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1updateBatchConsumption'
+  /api/deleteBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1deleteBatchConsumption'
+  /api/traceProductBatch:
+    $ref: './quality_traceability.yaml#/paths/~1api~1traceProductBatch'
+  /api/traceMaterialBatch:
+    $ref: './quality_traceability.yaml#/paths/~1api~1traceMaterialBatch'
+  /api/analyzeQualityImpact:
+    $ref: './quality_traceability.yaml#/paths/~1api~1analyzeQualityImpact'
+  /api/login:
+    $ref: './system.yaml#/paths/~1api~1login'
+  /api/register:
+    $ref: './system.yaml#/paths/~1api~1register'
+  /api/listUserData:
+    $ref: './system.yaml#/paths/~1api~1listUserData'
+  /api/getUserData:
+    $ref: './system.yaml#/paths/~1api~1getUserData'
+  /api/addUserData:
+    $ref: './system.yaml#/paths/~1api~1addUserData'
+  /api/updateUserData:
+    $ref: './system.yaml#/paths/~1api~1updateUserData'
+  /api/deleteUserData:
+    $ref: './system.yaml#/paths/~1api~1deleteUserData'
+  /api/listRoleData:
+    $ref: './system.yaml#/paths/~1api~1listRoleData'
+  /api/getRoleData:
+    $ref: './system.yaml#/paths/~1api~1getRoleData'
+  /api/addRoleData:
+    $ref: './system.yaml#/paths/~1api~1addRoleData'
+  /api/updateRoleData:
+    $ref: './system.yaml#/paths/~1api~1updateRoleData'
+  /api/deleteRoleData:
+    $ref: './system.yaml#/paths/~1api~1deleteRoleData'
+  /api/listPermissionData:
+    $ref: './system.yaml#/paths/~1api~1listPermissionData'
+  /api/getPermissionData:
+    $ref: './system.yaml#/paths/~1api~1getPermissionData'
+  /api/addPermissionData:
+    $ref: './system.yaml#/paths/~1api~1addPermissionData'
+  /api/updatePermissionData:
+    $ref: './system.yaml#/paths/~1api~1updatePermissionData'
+  /api/deletePermissionData:
+    $ref: './system.yaml#/paths/~1api~1deletePermissionData'
+  /api/listUserRoleData:
+    $ref: './system.yaml#/paths/~1api~1listUserRoleData'
+  /api/addUserRole:
+    $ref: './system.yaml#/paths/~1api~1addUserRole'
+  /api/deleteUserRole:
+    $ref: './system.yaml#/paths/~1api~1deleteUserRole'
+  /api/listRolePermissionData:
+    $ref: './system.yaml#/paths/~1api~1listRolePermissionData'
+  /api/addRolePermission:
+    $ref: './system.yaml#/paths/~1api~1addRolePermission'
+  /api/deleteRolePermission:
+    $ref: './system.yaml#/paths/~1api~1deleteRolePermission'
+  /api/listLoginRecordData:
+    $ref: './system.yaml#/paths/~1api~1listLoginRecordData'
+  /api/listOperationLogData:
+    $ref: './system.yaml#/paths/~1api~1listOperationLogData'
+  /api/addOperationLogData:
+    $ref: './system.yaml#/paths/~1api~1addOperationLogData'
+components:
+  schemas:
+    ApiResponse:
+      $ref: './common.yaml#/components/schemas/ApiResponse'
+    ErrorResponse:
+      $ref: './common.yaml#/components/schemas/ErrorResponse'
+    PageResult:
+      $ref: './common.yaml#/components/schemas/PageResult'
+    PageQuery:
+      $ref: './common.yaml#/components/schemas/PageQuery'
+  parameters:
+    Page:
+      $ref: './common.yaml#/components/parameters/Page'
+    PageSize:
+      $ref: './common.yaml#/components/parameters/PageSize'
+  responses:
+    Unauthorized:
+      $ref: './common.yaml#/components/responses/Unauthorized'
+    Forbidden:
+      $ref: './common.yaml#/components/responses/Forbidden'
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'

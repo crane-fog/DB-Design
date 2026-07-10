@@ -1,7 +1,7 @@
 /*
- * 测试
+ * 数据库设计项目 API
  *
- * 这是一个示例项目
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -24,26 +24,27 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class LoginPost200Response : IEquatable<LoginPost200Response>
+    public partial class ProductionOrderFinishRequest : IEquatable<ProductionOrderFinishRequest>
     {
         /// <summary>
-        /// Gets or Sets Msg
+        /// Gets or Sets OrderId
         /// </summary>
         [Required]
-        [DataMember(Name="msg", EmitDefaultValue=false)]
-        public string Msg { get; set; }
+        [DataMember(Name="order_id", EmitDefaultValue=true)]
+        public long OrderId { get; set; }
 
         /// <summary>
-        /// Gets or Sets AccessToken
+        /// Gets or Sets Remark
         /// </summary>
-        [DataMember(Name="accessToken", EmitDefaultValue=false)]
-        public string AccessToken { get; set; }
+        [DataMember(Name="remark", EmitDefaultValue=true)]
+        public string Remark { get; set; }
 
         /// <summary>
-        /// Gets or Sets Expires
+        /// Gets or Sets FinishedQty
         /// </summary>
-        [DataMember(Name="expires", EmitDefaultValue=true)]
-        public decimal Expires { get; set; }
+        [Required]
+        [DataMember(Name="finished_qty", EmitDefaultValue=true)]
+        public decimal FinishedQty { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -52,10 +53,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class LoginPost200Response {\n");
-            sb.Append("  Msg: ").Append(Msg).Append("\n");
-            sb.Append("  AccessToken: ").Append(AccessToken).Append("\n");
-            sb.Append("  Expires: ").Append(Expires).Append("\n");
+            sb.Append("class ProductionOrderFinishRequest {\n");
+            sb.Append("  OrderId: ").Append(OrderId).Append("\n");
+            sb.Append("  Remark: ").Append(Remark).Append("\n");
+            sb.Append("  FinishedQty: ").Append(FinishedQty).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -78,34 +79,34 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((LoginPost200Response)obj);
+            return obj.GetType() == GetType() && Equals((ProductionOrderFinishRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if LoginPost200Response instances are equal
+        /// Returns true if ProductionOrderFinishRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of LoginPost200Response to be compared</param>
+        /// <param name="other">Instance of ProductionOrderFinishRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(LoginPost200Response other)
+        public bool Equals(ProductionOrderFinishRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    Msg == other.Msg ||
-                    Msg != null &&
-                    Msg.Equals(other.Msg)
-                ) && 
-                (
-                    AccessToken == other.AccessToken ||
-                    AccessToken != null &&
-                    AccessToken.Equals(other.AccessToken)
-                ) && 
-                (
-                    Expires == other.Expires ||
+                    OrderId == other.OrderId ||
                     
-                    Expires.Equals(other.Expires)
+                    OrderId.Equals(other.OrderId)
+                ) && 
+                (
+                    Remark == other.Remark ||
+                    Remark != null &&
+                    Remark.Equals(other.Remark)
+                ) && 
+                (
+                    FinishedQty == other.FinishedQty ||
+                    
+                    FinishedQty.Equals(other.FinishedQty)
                 );
         }
 
@@ -119,12 +120,12 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (Msg != null)
-                    hashCode = hashCode * 59 + Msg.GetHashCode();
-                    if (AccessToken != null)
-                    hashCode = hashCode * 59 + AccessToken.GetHashCode();
                     
-                    hashCode = hashCode * 59 + Expires.GetHashCode();
+                    hashCode = hashCode * 59 + OrderId.GetHashCode();
+                    if (Remark != null)
+                    hashCode = hashCode * 59 + Remark.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + FinishedQty.GetHashCode();
                 return hashCode;
             }
         }
@@ -132,12 +133,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(LoginPost200Response left, LoginPost200Response right)
+        public static bool operator ==(ProductionOrderFinishRequest left, ProductionOrderFinishRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(LoginPost200Response left, LoginPost200Response right)
+        public static bool operator !=(ProductionOrderFinishRequest left, ProductionOrderFinishRequest right)
         {
             return !Equals(left, right);
         }

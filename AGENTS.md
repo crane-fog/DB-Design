@@ -13,7 +13,7 @@
 
 以下文件在 CI/CD 流水线中由 OpenAPI Generator 生成，不得直接修改：
 
-- 前端：`frontend/src/api/*`，主要内容为对接后端的 API 调用。
+- 前端：`frontend/src/api/*`，主要内容为对接后端的 API 调用。(除了 `frontend/src/api/client.ts`，该文件允许修改)
 - 后端：`backend/Converters/*`、`backend/Models/*`，主要内容为根据 API 契约生成的数据模型，需要手动适配业务逻辑。
 
 由开发者编写，可以直接修改的文件主要位于：

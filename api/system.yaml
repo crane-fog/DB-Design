@@ -1,0 +1,1381 @@
+openapi: 3.0.1
+info:
+  title: 系统管理模块 API
+  description: 系统管理模块接口定义。
+  version: 0.1.0
+tags:
+  - name: system
+    description: 系统管理模块
+paths:
+  /api/login:
+    post:
+      summary: 登录
+      description: 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+      operationId: login
+      tags:
+        - system
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              employee_no: EMP001
+              password: 5f4dcc3b5aa765d61d8327deb882cf99
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为登录令牌。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              examples:
+                success:
+                  summary: 登录成功
+                  value:
+                    code: 200
+                    message: 登录成功
+                    data:
+                      access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+                      expires: 7200
+                invalidPassword:
+                  summary: 工号或密码错误
+                  value:
+                    code: 400
+                    message: 工号或密码错误
+                    data: null
+
+  /api/register:
+    post:
+      summary: 注册系统用户
+      description: 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+      operationId: register
+      tags:
+        - system
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              employee_no: EMP001
+              password: 5f4dcc3b5aa765d61d8327deb882cf99
+              user_name: 张三
+              phone: '13800000000'
+              email: zhangsan@example.com
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为注册后的用户信息。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+              examples:
+                success:
+                  summary: 注册成功
+                  value:
+                    code: 200
+                    message: 注册成功
+                    data:
+                      user_id: 1
+                      employee_no: EMP001
+                      user_name: 张三
+                      phone: '13800000000'
+                      email: zhangsan@example.com
+                      status: valid
+                userExists:
+                  summary: 工号已存在
+                  value:
+                    code: 409
+                    message: 工号已存在
+                    data: null
+
+  /api/listUserData:
+    get:
+      summary: 查询用户列表
+      description: 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listUserData
+      tags:
+        - system
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: user_id
+          in: query
+          description: 用户编号。
+          schema:
+            type: integer
+        - name: employee_no
+          in: query
+          description: 工号，支持精确或模糊匹配。
+          schema:
+            type: string
+        - name: user_name
+          in: query
+          description: 用户姓名，支持模糊匹配。
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: 账号状态。
+          schema:
+            type: string
+            enum:
+              - valid
+              - disabled
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页用户列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getUserData:
+    get:
+      summary: 查询用户详情
+      description: 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getUserData
+      tags:
+        - system
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          description: 用户编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为用户详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addUserData:
+    post:
+      summary: 新增用户
+      description: 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addUserData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的用户。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+      security:
+        - bearerAuth: []
+
+  /api/updateUserData:
+    post:
+      summary: 修改用户
+      description: 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: updateUserData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为修改后的用户。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteUserData:
+    post:
+      summary: 删除用户
+      description: 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteUserData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listRoleData:
+    get:
+      summary: 查询角色列表
+      description: 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listRoleData
+      tags:
+        - system
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: role_id
+          in: query
+          description: 角色编号。
+          schema:
+            type: integer
+        - name: role_name
+          in: query
+          description: 角色名称，支持模糊匹配。
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: 角色状态。
+          schema:
+            type: string
+            enum:
+              - valid
+              - disabled
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页角色列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolePageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getRoleData:
+    get:
+      summary: 查询角色详情
+      description: 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getRoleData
+      tags:
+        - system
+      parameters:
+        - name: role_id
+          in: query
+          required: true
+          description: 角色编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为角色详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addRoleData:
+    post:
+      summary: 新增角色
+      description: 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addRoleData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的角色。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+      security:
+        - bearerAuth: []
+
+  /api/updateRoleData:
+    post:
+      summary: 修改角色
+      description: 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: updateRoleData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为修改后的角色。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteRoleData:
+    post:
+      summary: 删除角色
+      description: 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteRoleData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listPermissionData:
+    get:
+      summary: 查询权限列表
+      description: 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listPermissionData
+      tags:
+        - system
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: permission_id
+          in: query
+          description: 权限编号。
+          schema:
+            type: integer
+        - name: resource
+          in: query
+          description: 资源名称，支持模糊匹配。
+          schema:
+            type: string
+        - name: action
+          in: query
+          description: 操作类型，支持模糊匹配。
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页权限列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getPermissionData:
+    get:
+      summary: 查询权限详情
+      description: 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getPermissionData
+      tags:
+        - system
+      parameters:
+        - name: permission_id
+          in: query
+          required: true
+          description: 权限编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为权限详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addPermissionData:
+    post:
+      summary: 新增权限
+      description: 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addPermissionData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的权限。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResponse'
+      security:
+        - bearerAuth: []
+
+  /api/updatePermissionData:
+    post:
+      summary: 修改权限
+      description: 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: updatePermissionData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionUpdateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为修改后的权限。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deletePermissionData:
+    post:
+      summary: 删除权限
+      description: 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deletePermissionData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listUserRoleData:
+    get:
+      summary: 查询用户角色关系列表
+      description: 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listUserRoleData
+      tags:
+        - system
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: user_id
+          in: query
+          description: 用户编号。
+          schema:
+            type: integer
+        - name: role_id
+          in: query
+          description: 角色编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页用户角色关系列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRolePageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addUserRole:
+    post:
+      summary: 给用户分配角色
+      description: 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addUserRole
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分配后的用户角色关系。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRoleAssignResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteUserRole:
+    post:
+      summary: 移除用户角色
+      description: 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteUserRole
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listRolePermissionData:
+    get:
+      summary: 查询角色权限关系列表
+      description: 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listRolePermissionData
+      tags:
+        - system
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: role_id
+          in: query
+          description: 角色编号。
+          schema:
+            type: integer
+        - name: permission_id
+          in: query
+          description: 权限编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页角色权限关系列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolePermissionPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addRolePermission:
+    post:
+      summary: 给角色分配权限
+      description: 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addRolePermission
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RolePermissionAssignRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分配后的角色权限关系。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolePermissionAssignResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteRolePermission:
+    post:
+      summary: 移除角色权限
+      description: 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteRolePermission
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RolePermissionDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listLoginRecordData:
+    get:
+      summary: 查询登录日志
+      description: 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listLoginRecordData
+      tags:
+        - system
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: user_id
+          in: query
+          description: 用户编号。
+          schema:
+            type: integer
+        - name: result
+          in: query
+          description: 登录结果。
+          schema:
+            type: string
+            enum:
+              - success
+              - failure
+        - name: start_time
+          in: query
+          description: 登录开始时间。
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          description: 登录结束时间。
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页登录日志。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginLogPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listOperationLogData:
+    get:
+      summary: 查询操作日志
+      description: 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+      operationId: listOperationLogData
+      tags:
+        - system
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: module
+          in: query
+          description: 操作模块，支持模糊匹配。
+          schema:
+            type: string
+        - name: action
+          in: query
+          description: 操作类型，支持模糊匹配。
+          schema:
+            type: string
+        - name: operator_id
+          in: query
+          description: 操作人编号。
+          schema:
+            type: integer
+        - name: start_time
+          in: query
+          description: 操作开始时间。
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          description: 操作结束时间。
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页操作日志。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationLogPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addOperationLogData:
+    post:
+      summary: 新增操作日志
+      description: 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+      operationId: addOperationLogData
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationLogCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的操作日志。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationLogResponse'
+      security:
+        - bearerAuth: []
+
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - employee_no
+        - password
+      properties:
+        employee_no:
+          type: string
+          description: 工号，唯一约束，用于登录。
+          example: EMP001
+        password:
+          type: string
+          format: password
+          description: 前端传入的密码哈希值，sha256。
+          example: 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
+
+    LoginData:
+      type: object
+      required:
+        - access_token
+        - expires
+      properties:
+        access_token:
+          type: string
+          description: JWT 访问令牌。
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbXBsb3llZV9ubyI6IjI0NTAzMTMiLCJuYmYiOjE3ODM2OTg1ODAsImV4cCI6MTc4MzcwMjE4MH0.tFFAtFV5PaosfjMEVkQ0g97eK0RVAYHYvyxq7P3JKKw
+        expires:
+          type: integer
+          description: token 有效期，单位秒。
+          example: 7200
+
+    LoginResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/LoginData'
+              nullable: true
+
+    RegisterRequest:
+      type: object
+      required:
+        - employee_no
+        - password
+        - user_name
+        - phone
+      properties:
+        employee_no:
+          type: string
+          description: 工号，唯一约束。
+          example: EMP001
+        password:
+          type: string
+          format: password
+          description: 登录密码或前端传入的密码哈希值，sha256。
+          example: 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
+        user_name:
+          type: string
+          example: 张三
+        phone:
+          type: string
+          example: '13800000000'
+        email:
+          type: string
+          format: email
+          nullable: true
+          example: zhangsan@example.com
+
+    RegisterResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/UserBrief'
+              nullable: true
+
+    UserBrief:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        employee_no:
+          type: string
+        user_name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          nullable: true
+        status:
+          type: string
+          description: 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 valid 与 disabled 之间切换。
+          enum:
+            - valid
+            - disabled
+
+    User:
+      allOf:
+        - $ref: '#/components/schemas/UserBrief'
+        - type: object
+          properties:
+            password_hash:
+              type: string
+              writeOnly: true
+              description: 密码哈希值，仅后端持久化使用，不在普通查询响应中返回。
+            created_time:
+              type: string
+              format: date-time
+            last_login_time:
+              type: string
+              format: date-time
+              nullable: true
+            pwd_update_time:
+              type: string
+              format: date-time
+              nullable: true
+
+    UserCreateRequest:
+      type: object
+      required:
+        - employee_no
+        - password
+        - user_name
+        - phone
+      properties:
+        employee_no:
+          type: string
+        password:
+          type: string
+          format: password
+        user_name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        status:
+          type: string
+          description: 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。新增时默认为 valid，允许后续通过 updateUserData 修改为 disabled 或从 disabled 恢复为 valid。
+          enum:
+            - valid
+            - disabled
+          default: valid
+
+    UserUpdateRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+          description: 用户编号。
+        employee_no:
+          type: string
+          description: 工号。
+        password:
+          type: string
+          format: password
+          description: 需要重置密码时传入。
+        user_name:
+          type: string
+          description: 用户姓名。
+        phone:
+          type: string
+          description: 联系电话。
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: 邮箱。
+        status:
+          type: string
+          description: 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -> disabled、disabled -> valid。
+          enum:
+            - valid
+            - disabled
+
+    UserDeleteRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+
+    RoleBrief:
+      type: object
+      properties:
+        role_id:
+          type: integer
+        role_name:
+          type: string
+        status:
+          type: string
+          description: 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
+          enum:
+            - valid
+            - disabled
+
+    Role:
+      allOf:
+        - $ref: '#/components/schemas/RoleBrief'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+
+    RoleCreateRequest:
+      type: object
+      required:
+        - role_name
+      properties:
+        role_name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          description: 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
+          enum:
+            - valid
+            - disabled
+          default: valid
+
+    RoleUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/RoleCreateRequest'
+        - type: object
+          required:
+            - role_id
+          properties:
+            role_id:
+              type: integer
+
+    RoleDeleteRequest:
+      type: object
+      required:
+        - role_id
+      properties:
+        role_id:
+          type: integer
+
+    PermissionBrief:
+      type: object
+      properties:
+        permission_id:
+          type: integer
+        resource:
+          type: string
+        action:
+          type: string
+
+    Permission:
+      allOf:
+        - $ref: '#/components/schemas/PermissionBrief'
+
+    PermissionCreateRequest:
+      type: object
+      required:
+        - resource
+        - action
+      properties:
+        resource:
+          type: string
+        action:
+          type: string
+
+    PermissionUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PermissionCreateRequest'
+        - type: object
+          required:
+            - permission_id
+          properties:
+            permission_id:
+              type: integer
+
+    PermissionDeleteRequest:
+      type: object
+      required:
+        - permission_id
+      properties:
+        permission_id:
+          type: integer
+
+    UserRole:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        role_id:
+          type: integer
+
+    UserRoleAssignRequest:
+      type: object
+      required:
+        - user_id
+        - role_ids
+      properties:
+        user_id:
+          type: integer
+        role_ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+
+    UserRoleDeleteRequest:
+      type: object
+      required:
+        - user_id
+        - role_id
+      properties:
+        user_id:
+          type: integer
+        role_id:
+          type: integer
+
+    RolePermission:
+      type: object
+      properties:
+        role_id:
+          type: integer
+        permission_id:
+          type: integer
+
+    RolePermissionAssignRequest:
+      type: object
+      required:
+        - role_id
+        - permission_ids
+      properties:
+        role_id:
+          type: integer
+        permission_ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+
+    RolePermissionDeleteRequest:
+      type: object
+      required:
+        - role_id
+        - permission_id
+      properties:
+        role_id:
+          type: integer
+        permission_id:
+          type: integer
+
+    LoginLog:
+      type: object
+      properties:
+        log_id:
+          type: integer
+        user_id:
+          type: integer
+        login_time:
+          type: string
+          format: date-time
+        ip_address:
+          type: string
+        result:
+          type: string
+          enum:
+            - success
+            - failure
+        fail_reason:
+          type: string
+          nullable: true
+
+    OperationLog:
+      type: object
+      properties:
+        log_id:
+          type: integer
+        module:
+          type: string
+        action:
+          type: string
+        operator_id:
+          type: integer
+        operate_time:
+          type: string
+          format: date-time
+        ip_address:
+          type: string
+        before_data:
+          type: object
+          nullable: true
+          additionalProperties: true
+        after_data:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    OperationLogCreateRequest:
+      type: object
+      required:
+        - module
+        - action
+        - operator_id
+        - ip_address
+      properties:
+        module:
+          type: string
+        action:
+          type: string
+        operator_id:
+          type: integer
+        ip_address:
+          type: string
+        before_data:
+          type: object
+          nullable: true
+          additionalProperties: true
+        after_data:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    UserResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/User'
+              nullable: true
+
+    UserPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/User'
+              nullable: true
+
+    RoleResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/Role'
+              nullable: true
+
+    RolePageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Role'
+              nullable: true
+
+    PermissionResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/Permission'
+              nullable: true
+
+    PermissionPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Permission'
+              nullable: true
+
+    UserRolePageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/UserRole'
+              nullable: true
+
+    UserRoleAssignResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              nullable: true
+              items:
+                $ref: '#/components/schemas/UserRole'
+
+    RolePermissionPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/RolePermission'
+              nullable: true
+
+    RolePermissionAssignResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              nullable: true
+              items:
+                $ref: '#/components/schemas/RolePermission'
+
+    LoginLogPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/LoginLog'
+              nullable: true
+
+    OperationLogResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/OperationLog'
+              nullable: true
+
+    OperationLogPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/OperationLog'
+              nullable: true
+
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'

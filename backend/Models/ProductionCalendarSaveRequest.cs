@@ -1,7 +1,7 @@
 /*
- * 测试
+ * 数据库设计项目 API
  *
- * 这是一个示例项目
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -24,27 +24,28 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class UserData : IEquatable<UserData>
+    public partial class ProductionCalendarSaveRequest : IEquatable<ProductionCalendarSaveRequest>
     {
         /// <summary>
-        /// Gets or Sets Id
+        /// Gets or Sets CalendarDate
         /// </summary>
-        /* <example>113</example> */
-        [DataMember(Name="id", EmitDefaultValue=true)]
-        public long Id { get; set; }
+        [Required]
+        [DataMember(Name="calendar_date", EmitDefaultValue=true)]
+        public DateOnly CalendarDate { get; set; }
 
         /// <summary>
-        /// Gets or Sets Name
+        /// Gets or Sets LineId
         /// </summary>
-        /* <example>李四</example> */
-        [DataMember(Name="name", EmitDefaultValue=false)]
-        public string Name { get; set; }
+        [Required]
+        [DataMember(Name="line_id", EmitDefaultValue=true)]
+        public long LineId { get; set; }
 
         /// <summary>
-        /// Gets or Sets CreatedAt
+        /// Gets or Sets ConfigId
         /// </summary>
-        [DataMember(Name="createdAt", EmitDefaultValue=true)]
-        public DateTime CreatedAt { get; set; }
+        [Required]
+        [DataMember(Name="config_id", EmitDefaultValue=true)]
+        public long ConfigId { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -53,10 +54,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class UserData {\n");
-            sb.Append("  Id: ").Append(Id).Append("\n");
-            sb.Append("  Name: ").Append(Name).Append("\n");
-            sb.Append("  CreatedAt: ").Append(CreatedAt).Append("\n");
+            sb.Append("class ProductionCalendarSaveRequest {\n");
+            sb.Append("  CalendarDate: ").Append(CalendarDate).Append("\n");
+            sb.Append("  LineId: ").Append(LineId).Append("\n");
+            sb.Append("  ConfigId: ").Append(ConfigId).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -79,34 +80,34 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((UserData)obj);
+            return obj.GetType() == GetType() && Equals((ProductionCalendarSaveRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if UserData instances are equal
+        /// Returns true if ProductionCalendarSaveRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of UserData to be compared</param>
+        /// <param name="other">Instance of ProductionCalendarSaveRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(UserData other)
+        public bool Equals(ProductionCalendarSaveRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    Id == other.Id ||
+                    CalendarDate == other.CalendarDate ||
                     
-                    Id.Equals(other.Id)
+                    CalendarDate.Equals(other.CalendarDate)
                 ) && 
                 (
-                    Name == other.Name ||
-                    Name != null &&
-                    Name.Equals(other.Name)
+                    LineId == other.LineId ||
+                    
+                    LineId.Equals(other.LineId)
                 ) && 
                 (
-                    CreatedAt == other.CreatedAt ||
+                    ConfigId == other.ConfigId ||
                     
-                    CreatedAt.Equals(other.CreatedAt)
+                    ConfigId.Equals(other.ConfigId)
                 );
         }
 
@@ -121,11 +122,11 @@ namespace Org.OpenAPITools.Models
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
                     
-                    hashCode = hashCode * 59 + Id.GetHashCode();
-                    if (Name != null)
-                    hashCode = hashCode * 59 + Name.GetHashCode();
+                    hashCode = hashCode * 59 + CalendarDate.GetHashCode();
                     
-                    hashCode = hashCode * 59 + CreatedAt.GetHashCode();
+                    hashCode = hashCode * 59 + LineId.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + ConfigId.GetHashCode();
                 return hashCode;
             }
         }
@@ -133,12 +134,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(UserData left, UserData right)
+        public static bool operator ==(ProductionCalendarSaveRequest left, ProductionCalendarSaveRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(UserData left, UserData right)
+        public static bool operator !=(ProductionCalendarSaveRequest left, ProductionCalendarSaveRequest right)
         {
             return !Equals(left, right);
         }

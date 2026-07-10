@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Api } from '@/api/client'
-import type { DefaultApiLoginPostRequest } from '@/api'
+import type { LoginData, LoginRequest } from '@/api'
 import { ref } from 'vue'
+import { systemApi } from '@/api/client'
 
 const userNo = ref('')
 const password = ref('')
@@ -46,21 +46,32 @@ async function hashPassword(value: string) {
   return [...new Uint8Array(hashBuffer)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-async function buildLoginData(employeeNo: string): Promise<DefaultApiLoginPostRequest> {
+async function buildLoginData(employeeNo: string): Promise<LoginRequest> {
   return {
+    employee_no: employeeNo,
     password: await hashPassword(password.value),
-    userNo: employeeNo,
   }
 }
 
-function handleLoginSuccess(accessToken?: string, expires?: number) {
-  if (!accessToken || expires === undefined) {
+function isLoginData(data: unknown): data is LoginData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'access_token' in data &&
+    'expires' in data &&
+    typeof data.access_token === 'string' &&
+    typeof data.expires === 'number'
+  )
+}
+
+function handleLoginSuccess(accessToken?: string, expiresInSeconds?: number) {
+  if (!accessToken || expiresInSeconds === undefined || expiresInSeconds <= 0) {
     errorMessage.value = '登录响应缺少令牌信息'
     return
   }
 
   localStorage.setItem('jwt', accessToken)
-  localStorage.setItem('expires', String(expires))
+  localStorage.setItem('expires', String(Math.floor(Date.now() / 1000) + expiresInSeconds))
   globalThis.location.href = getRedirectTarget()
 }
 
@@ -81,15 +92,20 @@ async function submitLogin() {
 
   try {
     const loginData = await buildLoginData(employeeNo)
-    const response = await Api.loginPost(loginData)
+    const response = await systemApi.login({ loginRequest: loginData })
     const result = response.data
 
-    if (result.msg !== '登录成功') {
-      errorMessage.value = result.msg || '登录失败'
+    if (result.code !== 200) {
+      errorMessage.value = result.message || '登录失败'
       return
     }
 
-    handleLoginSuccess(result.accessToken, result.expires)
+    if (!isLoginData(result.data)) {
+      errorMessage.value = '登录响应缺少令牌信息'
+      return
+    }
+
+    handleLoginSuccess(result.data.access_token, result.data.expires)
   } catch (error) {
     errorMessage.value = getLoginErrorMessage(error)
   } finally {

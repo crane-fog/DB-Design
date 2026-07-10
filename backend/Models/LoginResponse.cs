@@ -1,7 +1,7 @@
 /*
- * 测试
+ * 数据库设计项目 API
  *
- * 这是一个示例项目
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -26,24 +26,82 @@ namespace Org.OpenAPITools.Models
     [DataContract]
     public partial class LoginResponse : IEquatable<LoginResponse>
     {
+
         /// <summary>
-        /// Gets or Sets Msg
+        /// 业务状态码，只使用 200、400、401、403、404、409、500。
+        /// </summary>
+        /// <value>业务状态码，只使用 200、400、401、403、404、409、500。</value>
+        
+        public enum CodeEnum
+        {
+            
+            /// <summary>
+            /// Enum _200Enum for 200
+            /// </summary>
+            
+            _200Enum = 200,
+            
+            /// <summary>
+            /// Enum _400Enum for 400
+            /// </summary>
+            
+            _400Enum = 400,
+            
+            /// <summary>
+            /// Enum _401Enum for 401
+            /// </summary>
+            
+            _401Enum = 401,
+            
+            /// <summary>
+            /// Enum _403Enum for 403
+            /// </summary>
+            
+            _403Enum = 403,
+            
+            /// <summary>
+            /// Enum _404Enum for 404
+            /// </summary>
+            
+            _404Enum = 404,
+            
+            /// <summary>
+            /// Enum _409Enum for 409
+            /// </summary>
+            
+            _409Enum = 409,
+            
+            /// <summary>
+            /// Enum _500Enum for 500
+            /// </summary>
+            
+            _500Enum = 500
+        }
+
+        /// <summary>
+        /// 业务状态码，只使用 200、400、401、403、404、409、500。
+        /// </summary>
+        /// <value>业务状态码，只使用 200、400、401、403、404、409、500。</value>
+        /* <example>200</example> */
+        [Required]
+        [DataMember(Name="code", EmitDefaultValue=true)]
+        public CodeEnum Code { get; set; }
+
+        /// <summary>
+        /// 返回结果说明。
+        /// </summary>
+        /// <value>返回结果说明。</value>
+        /* <example>操作成功</example> */
+        [Required]
+        [DataMember(Name="message", EmitDefaultValue=false)]
+        public string Message { get; set; }
+
+        /// <summary>
+        /// Gets or Sets Data
         /// </summary>
         [Required]
-        [DataMember(Name="msg", EmitDefaultValue=false)]
-        public string Msg { get; set; }
-
-        /// <summary>
-        /// Gets or Sets AccessToken
-        /// </summary>
-        [DataMember(Name="accessToken", EmitDefaultValue=false)]
-        public string AccessToken { get; set; }
-
-        /// <summary>
-        /// Gets or Sets Expires
-        /// </summary>
-        [DataMember(Name="expires", EmitDefaultValue=true)]
-        public decimal Expires { get; set; }
+        [DataMember(Name="data", EmitDefaultValue=true)]
+        public Object Data { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -53,9 +111,9 @@ namespace Org.OpenAPITools.Models
         {
             var sb = new StringBuilder();
             sb.Append("class LoginResponse {\n");
-            sb.Append("  Msg: ").Append(Msg).Append("\n");
-            sb.Append("  AccessToken: ").Append(AccessToken).Append("\n");
-            sb.Append("  Expires: ").Append(Expires).Append("\n");
+            sb.Append("  Code: ").Append(Code).Append("\n");
+            sb.Append("  Message: ").Append(Message).Append("\n");
+            sb.Append("  Data: ").Append(Data).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -93,19 +151,19 @@ namespace Org.OpenAPITools.Models
 
             return 
                 (
-                    Msg == other.Msg ||
-                    Msg != null &&
-                    Msg.Equals(other.Msg)
-                ) && 
-                (
-                    AccessToken == other.AccessToken ||
-                    AccessToken != null &&
-                    AccessToken.Equals(other.AccessToken)
-                ) && 
-                (
-                    Expires == other.Expires ||
+                    Code == other.Code ||
                     
-                    Expires.Equals(other.Expires)
+                    Code.Equals(other.Code)
+                ) && 
+                (
+                    Message == other.Message ||
+                    Message != null &&
+                    Message.Equals(other.Message)
+                ) && 
+                (
+                    Data == other.Data ||
+                    Data != null &&
+                    Data.Equals(other.Data)
                 );
         }
 
@@ -119,12 +177,12 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (Msg != null)
-                    hashCode = hashCode * 59 + Msg.GetHashCode();
-                    if (AccessToken != null)
-                    hashCode = hashCode * 59 + AccessToken.GetHashCode();
                     
-                    hashCode = hashCode * 59 + Expires.GetHashCode();
+                    hashCode = hashCode * 59 + Code.GetHashCode();
+                    if (Message != null)
+                    hashCode = hashCode * 59 + Message.GetHashCode();
+                    if (Data != null)
+                    hashCode = hashCode * 59 + Data.GetHashCode();
                 return hashCode;
             }
         }

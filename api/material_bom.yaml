@@ -1,0 +1,1546 @@
+openapi: 3.0.1
+info:
+  title: 物料与 BOM 管理模块 API
+  description: 物料与 BOM 管理模块接口定义。
+  version: 0.1.0
+tags:
+  - name: material_bom
+    description: 物料与 BOM 管理模块
+paths:
+  /api/listMaterialData:
+    get:
+      summary: 查询物料列表
+      description: 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listMaterialData
+      tags:
+        - material_bom
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: material_id
+          in: query
+          description: 物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+        - name: material_name
+          in: query
+          description: 物料名称，支持模糊匹配。
+          schema:
+            type: string
+        - name: material_type
+          in: query
+          description: 物料类型。
+          schema:
+            type: string
+        - name: category_id
+          in: query
+          description: 物料分类编号。
+          schema:
+            type: integer
+        - name: default_supplier_id
+          in: query
+          description: 默认供应商编号。
+          schema:
+            type: integer
+        - name: min_safety_stock
+          in: query
+          description: 安全库存下限。
+          schema:
+            type: number
+            format: double
+        - name: max_safety_stock
+          in: query
+          description: 安全库存上限。
+          schema:
+            type: number
+            format: double
+        - name: created_start_time
+          in: query
+          description: 创建开始时间。
+          schema:
+            type: string
+            format: date-time
+        - name: created_end_time
+          in: query
+          description: 创建结束时间。
+          schema:
+            type: string
+            format: date-time
+        - name: updated_start_time
+          in: query
+          description: 更新开始时间。
+          schema:
+            type: string
+            format: date-time
+        - name: updated_end_time
+          in: query
+          description: 更新结束时间。
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页物料列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getMaterialData:
+    get:
+      summary: 查询物料详情
+      description: 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getMaterialData
+      tags:
+        - material_bom
+      parameters:
+        - name: material_id
+          in: query
+          required: true
+          description: 物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为物料详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addMaterialData:
+    post:
+      summary: 新增物料
+      description: 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addMaterialData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的物料。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialResponse'
+      security:
+        - bearerAuth: []
+
+  /api/updateMaterialData:
+    post:
+      summary: 修改物料
+      description: 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: updateMaterialData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialUpdateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为修改后的物料。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteMaterialData:
+    post:
+      summary: 删除物料
+      description: 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteMaterialData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listMaterialCategoryData:
+    get:
+      summary: 查询物料分类列表
+      description: 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listMaterialCategoryData
+      tags:
+        - material_bom
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: category_name
+          in: query
+          description: 分类名称，支持模糊匹配。
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页分类列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialCategoryPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addMaterialCategoryData:
+    post:
+      summary: 新增物料分类
+      description: 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addMaterialCategoryData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialCategoryCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的分类。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialCategoryResponse'
+      security:
+        - bearerAuth: []
+
+  /api/updateMaterialCategoryData:
+    post:
+      summary: 修改物料分类
+      description: 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: updateMaterialCategoryData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialCategoryUpdateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为修改后的分类。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialCategoryResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteMaterialCategoryData:
+    post:
+      summary: 删除物料分类
+      description: 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteMaterialCategoryData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialCategoryDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listBomVersionData:
+    get:
+      summary: 查询 BOM 版本列表
+      description: 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listBomVersionData
+      tags:
+        - material_bom
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: material_id
+          in: query
+          description: 所属物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+        - name: version_no
+          in: query
+          description: 版本号。
+          schema:
+            type: string
+        - name: effective_only
+          in: query
+          description: 是否仅查询当前有效版本。
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页 BOM 版本列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomVersionPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getBomVersionData:
+    get:
+      summary: 查询 BOM 版本详情
+      description: 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getBomVersionData
+      tags:
+        - material_bom
+      parameters:
+        - name: version_id
+          in: query
+          required: true
+          description: 版本编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 BOM 版本详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomVersionResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addBomVersionData:
+    post:
+      summary: 新增 BOM 版本
+      description: 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addBomVersionData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomVersionCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的 BOM 版本。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomVersionResponse'
+      security:
+        - bearerAuth: []
+
+  /api/updateBomVersionData:
+    post:
+      summary: 修改 BOM 版本
+      description: 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: updateBomVersionData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomVersionUpdateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为修改后的 BOM 版本。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomVersionResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteBomVersionData:
+    post:
+      summary: 删除 BOM 版本
+      description: 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteBomVersionData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomVersionDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/listBomData:
+    get:
+      summary: 查询 BOM 明细列表
+      description: 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: listBomData
+      tags:
+        - material_bom
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: version_id
+          in: query
+          required: true
+          description: 所属 BOM 版本编号。
+          schema:
+            type: integer
+        - name: parent_material_id
+          in: query
+          description: 父物料编号。
+          schema:
+            type: integer
+        - name: child_material_id
+          in: query
+          description: 子物料编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为分页 BOM 明细列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomPageResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getBomData:
+    get:
+      summary: 查询 BOM 明细详情
+      description: 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getBomData
+      tags:
+        - material_bom
+      parameters:
+        - name: bom_id
+          in: query
+          required: true
+          description: BOM 明细编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 BOM 明细详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addBomData:
+    post:
+      summary: 新增 BOM 明细
+      description: 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addBomData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为新增后的 BOM 明细。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomResponse'
+      security:
+        - bearerAuth: []
+
+  /api/updateBomData:
+    post:
+      summary: 修改 BOM 明细
+      description: 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: updateBomData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomUpdateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为修改后的 BOM 明细。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomResponse'
+      security:
+        - bearerAuth: []
+
+  /api/deleteBomData:
+    post:
+      summary: 删除 BOM 明细
+      description: 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: deleteBomData
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomDeleteRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/ApiResponse'
+      security:
+        - bearerAuth: []
+
+  /api/checkBomCycleDependency:
+    post:
+      summary: 检查 BOM 循环依赖
+      description: 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: checkBomCycleDependency
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BomCycleCheckRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为循环依赖检查结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomCycleCheckResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getBomTreeData:
+    get:
+      summary: 查询 BOM 层级树
+      description: 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getBomTreeData
+      tags:
+        - material_bom
+      parameters:
+        - name: material_id
+          in: query
+          required: true
+          description: 根产品物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+        - name: version_id
+          in: query
+          required: true
+          description: 使用的 BOM 版本编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为 BOM 树节点数组。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BomTreeResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getReverseTraceData:
+    get:
+      summary: 反向产品追溯
+      description: 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getReverseTraceData
+      tags:
+        - material_bom
+      parameters:
+        - name: material_id
+          in: query
+          required: true
+          description: 需要追溯的子项物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+        - name: include_history
+          in: query
+          description: 是否包含历史版本依赖关系。
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为反向追溯结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReverseTraceResponse'
+      security:
+        - bearerAuth: []
+
+  /api/calculateProductCost:
+    post:
+      summary: 产品成本核算
+      description: 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: calculateProductCost
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCostCalculateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为成本核算结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCostResponse'
+      security:
+        - bearerAuth: []
+
+  /api/calculateLossCompensation:
+    post:
+      summary: 生产损耗补偿计算
+      description: 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: calculateLossCompensation
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LossCompensationCalculateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为损耗补偿计算结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LossCompensationResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getMaterialStockData:
+    get:
+      summary: 查询物料库存
+      description: 查询指定物料库存。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getMaterialStockData
+      tags:
+        - material_bom
+      parameters:
+        - name: material_id
+          in: query
+          required: true
+          description: 物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为物料库存。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialStockResponse'
+      security:
+        - bearerAuth: []
+
+  /api/addRequirementAnalysis:
+    post:
+      summary: 新增需求分析
+      description: 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: addRequirementAnalysis
+      tags:
+        - material_bom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DemandAnalysisCreateRequest'
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为需求分析结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemandAnalysisResponse'
+      security:
+        - bearerAuth: []
+
+  /api/getRequirementAnalysis:
+    get:
+      summary: 查询需求分析结果
+      description: 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      operationId: getRequirementAnalysis
+      tags:
+        - material_bom
+      parameters:
+        - name: analysis_id
+          in: query
+          description: 分析编号；传入时按单条记录查询。
+          schema:
+            type: integer
+        - name: material_id
+          in: query
+          description: 分析产品物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+        - name: version_id
+          in: query
+          description: 使用的 BOM 版本编号。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为需求分析结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemandAnalysisResponse'
+      security:
+        - bearerAuth: []
+
+components:
+  schemas:
+    MaterialBrief:
+      type: object
+      properties:
+        material_id:
+          type: integer
+        material_name:
+          type: string
+        material_type:
+          type: string
+        model:
+          type: string
+        unit:
+          type: string
+
+    BomVersionBrief:
+      type: object
+      properties:
+        version_id:
+          type: integer
+        material_id:
+          type: integer
+        version_no:
+          type: string
+
+    Material:
+      type: object
+      properties:
+        material_id:
+          type: integer
+        material_name:
+          type: string
+        material_type:
+          type: string
+          enum:
+            - raw_material
+            - semi_finished
+            - finished
+            - auxiliary
+        model:
+          type: string
+        unit:
+          type: string
+        category_id:
+          type: integer
+        safety_stock:
+          type: number
+          format: double
+        default_supplier_id:
+          type: integer
+          nullable: true
+        current_version_id:
+          type: integer
+          nullable: true
+        created_by:
+          type: integer
+        created_time:
+          type: string
+          format: date-time
+        updated_time:
+          type: string
+          format: date-time
+
+    MaterialDetail:
+      allOf:
+        - $ref: '#/components/schemas/Material'
+        - type: object
+          description: 物料查询响应模型，包含数据库字段以及按设计文档要求展示的关联/派生字段。
+          properties:
+            category_name:
+              type: string
+              readOnly: true
+              description: 物料分类名称，来源于 material_category.category_name。
+            supplier_name:
+              type: string
+              nullable: true
+              readOnly: true
+              description: 默认供应商名称，来源于 supplier.supplier_name；无默认供应商时返回 null。
+            available_qty:
+              type: number
+              format: double
+              readOnly: true
+              description: 可用库存，来源于 material_stock.available_qty，单位与物料计量单位一致。
+            locked_qty:
+              type: number
+              format: double
+              readOnly: true
+              description: 锁定库存，来源于 material_stock.locked_qty，单位与物料计量单位一致。
+            last_in_date:
+              type: string
+              format: date-time
+              nullable: true
+              readOnly: true
+              description: 最近入库日期，来源于 material_stock.last_in_date。
+            last_out_date:
+              type: string
+              format: date-time
+              nullable: true
+              readOnly: true
+              description: 最近出库日期，来源于 material_stock.last_out_date。
+            current_version_no:
+              type: string
+              nullable: true
+              readOnly: true
+              description: 当前有效 BOM 版本号，来源于 bom_version.version_no；无当前版本时返回 null。
+
+    MaterialCreateRequest:
+      type: object
+      required:
+        - material_name
+        - material_type
+        - unit
+        - category_id
+      properties:
+        material_name:
+          type: string
+        material_type:
+          type: string
+          enum:
+            - raw_material
+            - semi_finished
+            - finished
+            - auxiliary
+        model:
+          type: string
+        unit:
+          type: string
+        category_id:
+          type: integer
+        safety_stock:
+          type: number
+          format: double
+          default: 0
+        default_supplier_id:
+          type: integer
+          nullable: true
+        current_version_id:
+          type: integer
+          nullable: true
+
+    MaterialUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/MaterialCreateRequest'
+        - type: object
+          required:
+            - material_id
+          properties:
+            material_id:
+              type: integer
+
+    MaterialDeleteRequest:
+      type: object
+      required:
+        - material_id
+      properties:
+        material_id:
+          type: integer
+
+    MaterialCategory:
+      type: object
+      properties:
+        category_id:
+          type: integer
+        category_name:
+          type: string
+
+    MaterialCategoryCreateRequest:
+      type: object
+      required:
+        - category_name
+      properties:
+        category_name:
+          type: string
+
+    MaterialCategoryUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/MaterialCategoryCreateRequest'
+        - type: object
+          required:
+            - category_id
+          properties:
+            category_id:
+              type: integer
+
+    MaterialCategoryDeleteRequest:
+      type: object
+      required:
+        - category_id
+      properties:
+        category_id:
+          type: integer
+
+    MaterialStock:
+      type: object
+      properties:
+        material_id:
+          type: integer
+        available_qty:
+          type: number
+          format: double
+        locked_qty:
+          type: number
+          format: double
+        last_in_date:
+          type: string
+          format: date-time
+          nullable: true
+        last_out_date:
+          type: string
+          format: date-time
+          nullable: true
+
+    BomVersion:
+      type: object
+      properties:
+        version_id:
+          type: integer
+        material_id:
+          type: integer
+        version_no:
+          type: string
+        effective_date:
+          type: string
+          format: date
+        expire_date:
+          type: string
+          format: date
+          nullable: true
+        change_reason:
+          type: string
+        created_by:
+          type: integer
+
+    BomVersionCreateRequest:
+      type: object
+      required:
+        - material_id
+        - version_no
+        - effective_date
+      properties:
+        material_id:
+          type: integer
+        version_no:
+          type: string
+        effective_date:
+          type: string
+          format: date
+        expire_date:
+          type: string
+          format: date
+          nullable: true
+        change_reason:
+          type: string
+
+    BomVersionUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/BomVersionCreateRequest'
+        - type: object
+          required:
+            - version_id
+          properties:
+            version_id:
+              type: integer
+
+    BomVersionDeleteRequest:
+      type: object
+      required:
+        - version_id
+      properties:
+        version_id:
+          type: integer
+
+    Bom:
+      type: object
+      properties:
+        bom_id:
+          type: integer
+        parent_material_id:
+          type: integer
+        child_material_id:
+          type: integer
+        version_id:
+          type: integer
+        quantity:
+          type: number
+          format: double
+        loss_rate:
+          type: number
+          format: double
+
+    BomCreateRequest:
+      type: object
+      required:
+        - parent_material_id
+        - child_material_id
+        - version_id
+        - quantity
+        - loss_rate
+      properties:
+        parent_material_id:
+          type: integer
+        child_material_id:
+          type: integer
+        version_id:
+          type: integer
+        quantity:
+          type: number
+          format: double
+        loss_rate:
+          type: number
+          format: double
+
+    BomUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/BomCreateRequest'
+        - type: object
+          required:
+            - bom_id
+          properties:
+            bom_id:
+              type: integer
+
+    BomDeleteRequest:
+      type: object
+      required:
+        - bom_id
+      properties:
+        bom_id:
+          type: integer
+
+    BomCycleCheckRequest:
+      type: object
+      required:
+        - parent_material_id
+        - child_material_id
+        - version_id
+      properties:
+        parent_material_id:
+          type: integer
+        child_material_id:
+          type: integer
+        version_id:
+          type: integer
+
+    BomCycleCheckResult:
+      type: object
+      description: BOM 循环依赖检查结果，由后端根据指定版本内的父子物料关系递归计算得到。
+      properties:
+        has_cycle:
+          type: boolean
+          readOnly: true
+          description: 是否存在循环依赖，由后端递归检查 BOM 父子关系得到。
+        cycle_path:
+          type: array
+          readOnly: true
+          description: 形成循环依赖时的物料编号路径；无循环依赖时返回空数组。
+          items:
+            type: integer
+
+    BomTreeNode:
+      type: object
+      description: BOM 层级树节点，由后端按照指定产品和 BOM 版本递归展开计算得到。
+      properties:
+        material_id:
+          type: integer
+          readOnly: true
+          description: 物料编号，来源于 material.material_id。
+        material_name:
+          type: string
+          readOnly: true
+          description: 物料名称，来源于 material.material_name。
+        model:
+          type: string
+          readOnly: true
+          description: 型号规格，来源于 material.model。
+        material_type:
+          type: string
+          readOnly: true
+          description: 物料类型，来源于 material.material_type。
+        unit:
+          type: string
+          readOnly: true
+          description: 计量单位，来源于 material.unit。
+        quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 相对父节点的单位用量，来源于 bom.quantity。
+        accumulated_quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 相对根产品的累计用量，由后端按路径上各层 quantity 乘积计算得到。
+        depth:
+          type: integer
+          readOnly: true
+          description: 节点层级，由后端递归展开时计算，根节点为 0。
+        parent_material_id:
+          type: integer
+          nullable: true
+          readOnly: true
+          description: 父物料编号，根节点返回 null。
+        path:
+          type: string
+          readOnly: true
+          description: 从根节点到当前节点的物料编号路径，由后端递归拼接得到。
+        is_leaf:
+          type: boolean
+          readOnly: true
+          description: 是否叶子节点，由后端根据当前物料是否还有子项 BOM 判断。
+
+    ReverseTraceItem:
+      type: object
+      description: 反向追溯结果项，由后端以指定子物料为起点向上递归查找父项和最终产品得到。
+      properties:
+        product_material_id:
+          type: integer
+          readOnly: true
+          description: 受影响的产品物料编号，来源于递归追溯到的父级物料。
+        product_material_name:
+          type: string
+          readOnly: true
+          description: 受影响的产品物料名称，来源于 material.material_name。
+        version_id:
+          type: integer
+          readOnly: true
+          description: BOM 版本编号，来源于 bom_version.version_id。
+        version_no:
+          type: string
+          readOnly: true
+          description: BOM 版本号，来源于 bom_version.version_no。
+        version_status:
+          type: string
+          readOnly: true
+          description: 版本状态，由后端根据有效期判断；effective 表示当前有效，history 表示历史版本。
+          enum:
+            - effective
+            - history
+        path:
+          type: string
+          readOnly: true
+          description: 从指定子物料向上追溯到产品的物料编号路径。
+        depth:
+          type: integer
+          readOnly: true
+          description: 追溯层级，由后端递归计算。
+        quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 当前父子关系的单位用量，来源于 bom.quantity。
+        accumulated_quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 累计影响用量，由后端按追溯路径上的 quantity 乘积计算得到。
+
+    ProductCostCalculateRequest:
+      type: object
+      required:
+        - material_id
+        - version_id
+      properties:
+        material_id:
+          type: integer
+        version_id:
+          type: integer
+        production_qty:
+          type: number
+          format: double
+          default: 1
+
+    ProductCostItem:
+      type: object
+      description: 产品成本核算明细，由后端读取 BOM、损耗率和采购价格后计算得到。
+      properties:
+        material_id:
+          type: integer
+          readOnly: true
+          description: 物料编号，来源于 BOM 展开结果。
+        material_name:
+          type: string
+          readOnly: true
+          description: 物料名称，来源于 material.material_name。
+        net_quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 净需求量，由后端按 BOM 层级和生产数量计算得到。
+        gross_quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 毛需求量，由后端按净需求量和 loss_rate 计算，公式为 net_quantity / (1 - loss_rate)。
+        unit_price:
+          type: number
+          format: double
+          readOnly: true
+          description: 单价，来源于采购价格、历史成交价或标准成本，单位为元。
+        amount:
+          type: number
+          format: double
+          readOnly: true
+          description: 明细金额，由后端按 gross_quantity × unit_price 计算，单位为元。
+
+    ProductCostResult:
+      type: object
+      description: 产品成本核算结果，由后端汇总各物料成本明细得到。
+      properties:
+        material_id:
+          type: integer
+          readOnly: true
+          description: 核算产品物料编号。
+        version_id:
+          type: integer
+          readOnly: true
+          description: 使用的 BOM 版本编号。
+        total_cost:
+          type: number
+          format: double
+          readOnly: true
+          description: 产品总成本，由后端汇总所有明细 amount 得到，单位为元。
+        items:
+          type: array
+          readOnly: true
+          description: 成本核算明细列表。
+          items:
+            $ref: '#/components/schemas/ProductCostItem'
+
+    LossCompensationCalculateRequest:
+      type: object
+      required:
+        - material_id
+        - version_id
+        - net_quantity
+      properties:
+        material_id:
+          type: integer
+        version_id:
+          type: integer
+        net_quantity:
+          type: number
+          format: double
+
+    LossCompensationItem:
+      type: object
+      description: 生产损耗补偿计算明细，由后端按 BOM 损耗率计算得到。
+      properties:
+        material_id:
+          type: integer
+          readOnly: true
+          description: 物料编号，来源于 BOM 展开结果。
+        material_name:
+          type: string
+          readOnly: true
+          description: 物料名称，来源于 material.material_name。
+        net_quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 净需求量，来源于生产需求或 BOM 展开结果。
+        loss_rate:
+          type: number
+          format: double
+          readOnly: true
+          description: 损耗率，来源于 bom.loss_rate。
+        gross_quantity:
+          type: number
+          format: double
+          readOnly: true
+          description: 实际需求量，由后端按 net_quantity / (1 - loss_rate) 计算并按业务规则取整。
+
+    DemandAnalysis:
+      type: object
+      properties:
+        analysis_id:
+          type: integer
+          readOnly: true
+        material_id:
+          type: integer
+        version_id:
+          type: integer
+        production_qty:
+          type: number
+          format: double
+        demand_detail:
+          type: object
+          readOnly: true
+          description: 物料及净需求量 JSON，由后端递归展开 BOM 并扣减库存、在途量、安全库存后计算得到。
+          additionalProperties: true
+        analysis_time:
+          type: string
+          format: date-time
+          readOnly: true
+
+    DemandAnalysisCreateRequest:
+      type: object
+      required:
+        - material_id
+        - version_id
+        - production_qty
+      properties:
+        material_id:
+          type: integer
+        version_id:
+          type: integer
+        production_qty:
+          type: number
+          format: double
+
+    MaterialResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/MaterialDetail'
+              nullable: true
+
+    MaterialPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/MaterialDetail'
+              nullable: true
+
+    MaterialCategoryResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/MaterialCategory'
+              nullable: true
+
+    MaterialCategoryPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/MaterialCategory'
+              nullable: true
+
+    BomVersionResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/BomVersion'
+              nullable: true
+
+    BomVersionPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/BomVersion'
+              nullable: true
+
+    BomResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/Bom'
+              nullable: true
+
+    BomPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Bom'
+              nullable: true
+
+    BomCycleCheckResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/BomCycleCheckResult'
+              nullable: true
+
+    BomTreeResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              nullable: true
+              items:
+                $ref: '#/components/schemas/BomTreeNode'
+
+    ReverseTraceResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              nullable: true
+              items:
+                $ref: '#/components/schemas/ReverseTraceItem'
+
+    ProductCostResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/ProductCostResult'
+              nullable: true
+
+    LossCompensationResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              nullable: true
+              items:
+                $ref: '#/components/schemas/LossCompensationItem'
+
+    MaterialStockResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/MaterialStock'
+              nullable: true
+
+    DemandAnalysisResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/DemandAnalysis'
+              nullable: true
+
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'

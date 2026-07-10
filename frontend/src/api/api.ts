@@ -1,8 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * 测试
- * 这是一个示例项目
+ * 数据库设计项目 API
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -23,33 +23,4004 @@ import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerMap } from './base';
 
-export interface LoginPost200Response {
-    'msg': string;
-    'accessToken'?: string;
-    'expires'?: number;
-}
-export interface RegisterPost200Response {
-    'msg': string;
-}
-export interface UserData {
-    'id'?: number;
-    'name'?: string;
-    'createdAt'?: string;
+export interface AffectedProductBatch {
+    'order_id': number;
+    'batch_no'?: string | null;
+    'product_material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
+     */
+    'product_material_name'?: string | null;
+    /**
+     * 跨表展示字段，来源于生产订单表 production_order.status，通过 batch_consumption.order_id = production_order.order_id 关联查询得到。
+     */
+    'production_status'?: ProductionOrderStatus;
+    'consume_qty': number;
 }
 
+
+export interface ApiResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ApiResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    /**
+     * 实际业务数据，无数据时返回 null。
+     */
+    'data': any;
+}
+
+export const ApiResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ApiResponseCodeEnum = typeof ApiResponseCodeEnum[keyof typeof ApiResponseCodeEnum];
+
+export interface BatchConsumption {
+    'consumption_id': number;
+    /**
+     * 生产订单编号。
+     */
+    'order_id': number;
+    /**
+     * 采购订单明细编号，作为原材料批次来源。
+     */
+    'item_id': number;
+    'consume_qty': number;
+    /**
+     * 跨模块展示对象，来源于生产订单表 production_order，通过 batch_consumption.order_id = production_order.order_id 关联查询得到。
+     */
+    'production_order'?: ProductionOrderBrief;
+    /**
+     * 跨模块展示对象，来源于采购订单明细表 purchase_order_item，通过 batch_consumption.item_id = purchase_order_item.item_id 关联查询得到。
+     */
+    'purchase_item'?: PurchaseOrderDetailLine;
+}
+export interface BatchConsumptionCreateRequest {
+    'order_id': number;
+    'item_id': number;
+    'consume_qty': number;
+}
+export interface BatchConsumptionDeleteRequest {
+    'consumption_id': number;
+}
+export interface BatchConsumptionPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BatchConsumptionPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': BatchConsumptionPageResponseAllOfData;
+}
+
+export const BatchConsumptionPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BatchConsumptionPageResponseCodeEnum = typeof BatchConsumptionPageResponseCodeEnum[keyof typeof BatchConsumptionPageResponseCodeEnum];
+
+export interface BatchConsumptionPageResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<BatchConsumption>;
+}
+export interface BatchConsumptionResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BatchConsumptionResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': BatchConsumption;
+}
+
+export const BatchConsumptionResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BatchConsumptionResponseCodeEnum = typeof BatchConsumptionResponseCodeEnum[keyof typeof BatchConsumptionResponseCodeEnum];
+
+export interface BatchConsumptionUpdateRequest {
+    'order_id': number;
+    'item_id': number;
+    'consume_qty': number;
+    'consumption_id': number;
+}
+export interface Bom {
+    'bom_id'?: number;
+    'parent_material_id'?: number;
+    'child_material_id'?: number;
+    'version_id'?: number;
+    'quantity'?: number;
+    'loss_rate'?: number;
+}
+export interface BomCreateRequest {
+    'parent_material_id': number;
+    'child_material_id': number;
+    'version_id': number;
+    'quantity': number;
+    'loss_rate': number;
+}
+export interface BomCycleCheckRequest {
+    'parent_material_id': number;
+    'child_material_id': number;
+    'version_id': number;
+}
+export interface BomCycleCheckResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BomCycleCheckResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const BomCycleCheckResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BomCycleCheckResponseCodeEnum = typeof BomCycleCheckResponseCodeEnum[keyof typeof BomCycleCheckResponseCodeEnum];
+
 /**
- * DefaultApi - axios parameter creator
+ * BOM 循环依赖检查结果，由后端根据指定版本内的父子物料关系递归计算得到。
  */
-export const DefaultApiAxiosParamCreator = function (configuration?: Configuration) {
+export interface BomCycleCheckResult {
+    /**
+     * 是否存在循环依赖，由后端递归检查 BOM 父子关系得到。
+     */
+    'has_cycle'?: boolean;
+    /**
+     * 形成循环依赖时的物料编号路径；无循环依赖时返回空数组。
+     */
+    'cycle_path'?: Array<number>;
+}
+export interface BomDeleteRequest {
+    'bom_id': number;
+}
+export interface BomPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BomPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const BomPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BomPageResponseCodeEnum = typeof BomPageResponseCodeEnum[keyof typeof BomPageResponseCodeEnum];
+
+export interface BomResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BomResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const BomResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BomResponseCodeEnum = typeof BomResponseCodeEnum[keyof typeof BomResponseCodeEnum];
+
+/**
+ * BOM 层级树节点，由后端按照指定产品和 BOM 版本递归展开计算得到。
+ */
+export interface BomTreeNode {
+    /**
+     * 物料编号，来源于 material.material_id。
+     */
+    'material_id'?: number;
+    /**
+     * 物料名称，来源于 material.material_name。
+     */
+    'material_name'?: string;
+    /**
+     * 型号规格，来源于 material.model。
+     */
+    'model'?: string;
+    /**
+     * 物料类型，来源于 material.material_type。
+     */
+    'material_type'?: string;
+    /**
+     * 计量单位，来源于 material.unit。
+     */
+    'unit'?: string;
+    /**
+     * 相对父节点的单位用量，来源于 bom.quantity。
+     */
+    'quantity'?: number;
+    /**
+     * 相对根产品的累计用量，由后端按路径上各层 quantity 乘积计算得到。
+     */
+    'accumulated_quantity'?: number;
+    /**
+     * 节点层级，由后端递归展开时计算，根节点为 0。
+     */
+    'depth'?: number;
+    /**
+     * 父物料编号，根节点返回 null。
+     */
+    'parent_material_id'?: number | null;
+    /**
+     * 从根节点到当前节点的物料编号路径，由后端递归拼接得到。
+     */
+    'path'?: string;
+    /**
+     * 是否叶子节点，由后端根据当前物料是否还有子项 BOM 判断。
+     */
+    'is_leaf'?: boolean;
+}
+export interface BomTreeResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BomTreeResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<BomTreeNode> | null;
+}
+
+export const BomTreeResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BomTreeResponseCodeEnum = typeof BomTreeResponseCodeEnum[keyof typeof BomTreeResponseCodeEnum];
+
+export interface BomUpdateRequest {
+    'parent_material_id': number;
+    'child_material_id': number;
+    'version_id': number;
+    'quantity': number;
+    'loss_rate': number;
+    'bom_id': number;
+}
+export interface BomVersion {
+    'version_id'?: number;
+    'material_id'?: number;
+    'version_no'?: string;
+    'effective_date'?: string;
+    'expire_date'?: string | null;
+    'change_reason'?: string;
+    'created_by'?: number;
+}
+export interface BomVersionCreateRequest {
+    'material_id': number;
+    'version_no': string;
+    'effective_date': string;
+    'expire_date'?: string | null;
+    'change_reason'?: string;
+}
+export interface BomVersionDeleteRequest {
+    'version_id': number;
+}
+export interface BomVersionPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BomVersionPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const BomVersionPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BomVersionPageResponseCodeEnum = typeof BomVersionPageResponseCodeEnum[keyof typeof BomVersionPageResponseCodeEnum];
+
+export interface BomVersionResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': BomVersionResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const BomVersionResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type BomVersionResponseCodeEnum = typeof BomVersionResponseCodeEnum[keyof typeof BomVersionResponseCodeEnum];
+
+export interface BomVersionUpdateRequest {
+    'material_id': number;
+    'version_no': string;
+    'effective_date': string;
+    'expire_date'?: string | null;
+    'change_reason'?: string;
+    'version_id': number;
+}
+export interface CapacityBalance {
+    'balance_id': number;
+    /**
+     * 调整前排产方案 JSON。
+     */
+    'before_plan': { [key: string]: any; };
+    /**
+     * 调整后排产方案 JSON。
+     */
+    'after_plan': { [key: string]: any; };
+    'operator_id': number;
+    'adjust_time': string;
+    'affected_orders': Array<number>;
+}
+export interface CapacityBalanceResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CapacityBalanceResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': CapacityBalance;
+}
+
+export const CapacityBalanceResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CapacityBalanceResponseCodeEnum = typeof CapacityBalanceResponseCodeEnum[keyof typeof CapacityBalanceResponseCodeEnum];
+
+/**
+ * 调整人从当前登录用户推导，客户端不得传 operator_id。
+ */
+export interface CapacityBalanceSaveRequest {
+    'before_plan': { [key: string]: any; };
+    'after_plan': { [key: string]: any; };
+    'affected_orders': Array<number>;
+}
+export interface CapacityConfig {
+    'config_id': number;
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 capacity_config.material_id = material.material_id 关联查询得到。
+     */
+    'material_name'?: string | null;
+    'type_id': number;
+    /**
+     * 跨表展示字段，来源于产线类型表 line_type.type_name，通过 capacity_config.type_id = line_type.type_id 关联查询得到。
+     */
+    'type_name'?: string | null;
+    /**
+     * 单件生产时间，单位为分钟。
+     */
+    'unit_time': number;
+}
+export interface CapacityConfigPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CapacityConfigPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': CapacityConfigPageResponseAllOfData;
+}
+
+export const CapacityConfigPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CapacityConfigPageResponseCodeEnum = typeof CapacityConfigPageResponseCodeEnum[keyof typeof CapacityConfigPageResponseCodeEnum];
+
+export interface CapacityConfigPageResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<CapacityConfig>;
+}
+export interface CapacityConfigResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CapacityConfigResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': CapacityConfig;
+}
+
+export const CapacityConfigResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CapacityConfigResponseCodeEnum = typeof CapacityConfigResponseCodeEnum[keyof typeof CapacityConfigResponseCodeEnum];
+
+export interface CapacityConfigSaveRequest {
+    'config_id'?: number | null;
+    'material_id': number;
+    'type_id': number;
+    'unit_time': number;
+}
+export interface CapacityDetection {
+    'detection_id': number;
+    'line_id': number;
+    'period_start': string;
+    'period_end': string;
+    'plan_capacity': number;
+    'actual_capacity': number;
+    /**
+     * 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内生产线实际运行和生产执行记录汇总，单位为小时。基础数据不足时可返回 null 或不返回。
+     */
+    'actual_work_hours'?: number | null;
+    /**
+     * 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内故障记录、停机记录或生产线状态记录汇总，单位为分钟。基础数据不足时可返回 null 或不返回。
+     */
+    'downtime_minutes'?: number | null;
+    /**
+     * 后端计算字段，数据库 capacity_detection 表不持久化该字段；由后端根据实际工时、停机时长和产能数据统一计算，取值范围 0 到 1。现有数据库设计文档未给出更细的固定公式，基础数据不足时可返回 null 或不返回。*猜测：表示统计周期内的产能达成效率。计算公式为 efficiency = actual_capacity / plan_capacity。
+     */
+    'efficiency'?: number | null;
+    'diff_qty': number;
+    'diff_rate': number;
+    'reason_type': string;
+}
+export interface CapacityDetectionResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CapacityDetectionResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': CapacityDetection;
+}
+
+export const CapacityDetectionResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CapacityDetectionResponseCodeEnum = typeof CapacityDetectionResponseCodeEnum[keyof typeof CapacityDetectionResponseCodeEnum];
+
+export interface CapacityDetectionRunRequest {
+    'line_id': number;
+    'period_start': string;
+    'period_end': string;
+}
+export interface CompletionInboundCreateRequest {
+    'order_id': number;
+    'material_id': number;
+    'version_id': number;
+    'finish_qty': number;
+    'qualified_qty': number;
+    'batch_no': string;
+    'operator_id': number;
+}
+export interface CompletionInboundOrder {
+    'inbound_id': number;
+    'order_id': number;
+    'material_id': number;
+    'product_name'?: string;
+    'version_id': number;
+    'finish_qty': number;
+    'qualified_qty': number;
+    'batch_no': string;
+    'inbound_time': string;
+    'operator_id': number;
+    'consumed_lock_records'?: Array<StockLockRecord>;
+}
+export interface CompletionInboundPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<CompletionInboundOrder>;
+}
+export interface CompletionInboundPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CompletionInboundPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const CompletionInboundPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CompletionInboundPageResponseCodeEnum = typeof CompletionInboundPageResponseCodeEnum[keyof typeof CompletionInboundPageResponseCodeEnum];
+
+export interface CompletionInboundResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CompletionInboundResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const CompletionInboundResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CompletionInboundResponseCodeEnum = typeof CompletionInboundResponseCodeEnum[keyof typeof CompletionInboundResponseCodeEnum];
+
+export interface ConsumedMaterialBatch {
+    /**
+     * 采购订单明细编号。
+     */
+    'item_id': number;
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
+     */
+    'material_name'?: string | null;
+    /**
+     * 跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id = purchase_order.order_id 关联查询得到。
+     */
+    'supplier_id'?: number | null;
+    /**
+     * 跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。
+     */
+    'supplier_name'?: string | null;
+    /**
+     * 采购订单表 purchase_order.order_id，来源于 purchase_order_item.order_id，用于标识该原材料批次所属采购订单。
+     */
+    'order_id'?: number | null;
+    /**
+     * 跨表展示字段，来源于到货记录表 receive_record.receive_date，通过 purchase_order_item.order_id 和 material_id 关联查询该批次到货日期。
+     */
+    'receive_date'?: string | null;
+    'consume_qty': number;
+}
+export interface DemandAnalysis {
+    'analysis_id'?: number;
+    'material_id'?: number;
+    'version_id'?: number;
+    'production_qty'?: number;
+    /**
+     * 物料及净需求量 JSON，由后端递归展开 BOM 并扣减库存、在途量、安全库存后计算得到。
+     */
+    'demand_detail'?: { [key: string]: any; };
+    'analysis_time'?: string;
+}
+export interface DemandAnalysisCreateRequest {
+    'material_id': number;
+    'version_id': number;
+    'production_qty': number;
+}
+export interface DemandAnalysisResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': DemandAnalysisResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const DemandAnalysisResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type DemandAnalysisResponseCodeEnum = typeof DemandAnalysisResponseCodeEnum[keyof typeof DemandAnalysisResponseCodeEnum];
+
+export interface ErrorResponse {
+    /**
+     * 错误业务状态码，只使用 400、401、403、404、409、500。
+     */
+    'code': ErrorResponseCodeEnum;
+    /**
+     * 错误原因说明。
+     */
+    'message': string;
+    /**
+     * 错误响应无业务数据，固定返回 null。
+     */
+    'data': object | null;
+}
+
+export const ErrorResponseCodeEnum = {
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ErrorResponseCodeEnum = typeof ErrorResponseCodeEnum[keyof typeof ErrorResponseCodeEnum];
+
+export interface ExternalOrder {
+    'ext_order_id': number;
+    'customer_id': number;
+    /**
+     * 跨表展示字段，根据 external_order.customer_id 关联 sys_user.user_id，取 sys_user.user_name。
+     */
+    'customer_name'?: string | null;
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 external_order.material_id = material.material_id 关联查询得到。
+     */
+    'material_name'?: string | null;
+    'quantity': number;
+    'expected_date': string;
+    'contact_person': string;
+    'contact_phone': string;
+    'status': ExternalOrderStatus;
+    'submit_time': string;
+    'review_comment'?: string | null;
+}
+
+
+export interface ExternalOrderConvertRequest {
+    'ext_order_id': number;
+    'production_orders': Array<ProductionOrderCreateRequest>;
+}
+export interface ExternalOrderConvertResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ExternalOrderConvertResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ExternalOrderConvertResult;
+}
+
+export const ExternalOrderConvertResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ExternalOrderConvertResponseCodeEnum = typeof ExternalOrderConvertResponseCodeEnum[keyof typeof ExternalOrderConvertResponseCodeEnum];
+
+export interface ExternalOrderConvertResult {
+    'ext_order_id': number;
+    'production_orders': Array<ProductionOrderBrief>;
+    /**
+     * 外部订单与生产订单关联表 external_order_production 的写入结果。
+     */
+    'associations': Array<ExternalOrderProductionAssociation>;
+}
+/**
+ * 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时可传 customer_id。
+ */
+export interface ExternalOrderCreateRequest {
+    /**
+     * 外部客户自提交时不得传，由当前登录用户推导；仅生产管理员或系统管理员代录时可传，后端必须按登录角色校验。
+     */
+    'customer_id'?: number | null;
+    'material_id': number;
+    'quantity': number;
+    'expected_date': string;
+    'contact_person': string;
+    'contact_phone': string;
+}
+export interface ExternalOrderPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ExternalOrderPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ExternalOrderPageResponseAllOfData;
+}
+
+export const ExternalOrderPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ExternalOrderPageResponseCodeEnum = typeof ExternalOrderPageResponseCodeEnum[keyof typeof ExternalOrderPageResponseCodeEnum];
+
+export interface ExternalOrderPageResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<ExternalOrder>;
+}
+export interface ExternalOrderProductionAssociation {
+    'ext_order_id': number;
+    'order_id': number;
+}
+export interface ExternalOrderResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ExternalOrderResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ExternalOrder;
+}
+
+export const ExternalOrderResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ExternalOrderResponseCodeEnum = typeof ExternalOrderResponseCodeEnum[keyof typeof ExternalOrderResponseCodeEnum];
+
+/**
+ * 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+ */
+export interface ExternalOrderReviewRequest {
+    'ext_order_id': number;
+    'accepted': boolean;
+    'review_comment'?: string | null;
+}
+/**
+ * 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；rejected 已拒绝，流程结束。
+ */
+
+export const ExternalOrderStatus = {
+    PendingReview: 'pending_review',
+    Accepted: 'accepted',
+    Rejected: 'rejected',
+} as const;
+
+export type ExternalOrderStatus = typeof ExternalOrderStatus[keyof typeof ExternalOrderStatus];
+
+
+export interface FaultRecord {
+    'fault_id': number;
+    'line_id': number;
+    'fault_type': string;
+    'description': string;
+    'occur_time': string;
+    'recover_time'?: string | null;
+    'status': FaultStatus;
+    'reporter_id': number;
+    'repairer_id'?: number | null;
+}
+
+
+/**
+ * 上报人从当前登录用户推导，客户端不得传 reporter_id。
+ */
+export interface FaultRecordCreateRequest {
+    'line_id': number;
+    'fault_type': string;
+    'description': string;
+}
+export interface FaultRecordResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': FaultRecordResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': FaultRecord;
+}
+
+export const FaultRecordResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type FaultRecordResponseCodeEnum = typeof FaultRecordResponseCodeEnum[keyof typeof FaultRecordResponseCodeEnum];
+
+/**
+ * 操作人从当前登录用户推导，客户端不得传 operator_id。
+ */
+export interface FaultRecordUpdateRequest {
+    'fault_id': number;
+    'status': FaultStatus;
+    'repairer_id'?: number | null;
+    'recover_time'?: string | null;
+}
+
+
+/**
+ * 故障状态。pending_repair 待维修；repairing 维修中；recovered 已恢复。
+ */
+
+export const FaultStatus = {
+    PendingRepair: 'pending_repair',
+    Repairing: 'repairing',
+    Recovered: 'recovered',
+} as const;
+
+export type FaultStatus = typeof FaultStatus[keyof typeof FaultStatus];
+
+
+export interface InventoryAlertEvent {
+    'alert_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'alert_type': InventoryAlertEventAlertTypeEnum;
+    'available_qty': number;
+    'threshold': number;
+    'alert_time': string;
+    'status': InventoryAlertStatus;
+    'handler_id'?: number | null;
+    'handle_time'?: string | null;
+}
+
+export const InventoryAlertEventAlertTypeEnum = {
+    LowStock: 'low_stock',
+} as const;
+
+export type InventoryAlertEventAlertTypeEnum = typeof InventoryAlertEventAlertTypeEnum[keyof typeof InventoryAlertEventAlertTypeEnum];
+
+export interface InventoryAlertGenerateRequest {
+    'material_id'?: number | null;
+}
+export interface InventoryAlertGenerateResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': InventoryAlertGenerateResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': InventoryAlertGenerateResponseAllOfData | null;
+}
+
+export const InventoryAlertGenerateResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type InventoryAlertGenerateResponseCodeEnum = typeof InventoryAlertGenerateResponseCodeEnum[keyof typeof InventoryAlertGenerateResponseCodeEnum];
+
+export interface InventoryAlertGenerateResponseAllOfData {
+    'generated_count'?: number;
+    'skipped_pending_count'?: number;
+    'records'?: Array<InventoryAlertEvent>;
+}
+export interface InventoryAlertHandleRequest {
+    'alert_id': number;
+    'status': InventoryAlertHandleRequestStatusEnum;
+    'handler_id': number;
+}
+
+export const InventoryAlertHandleRequestStatusEnum = {
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type InventoryAlertHandleRequestStatusEnum = typeof InventoryAlertHandleRequestStatusEnum[keyof typeof InventoryAlertHandleRequestStatusEnum];
+
+export interface InventoryAlertPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<InventoryAlertEvent>;
+}
+export interface InventoryAlertPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': InventoryAlertPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const InventoryAlertPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type InventoryAlertPageResponseCodeEnum = typeof InventoryAlertPageResponseCodeEnum[keyof typeof InventoryAlertPageResponseCodeEnum];
+
+export interface InventoryAlertResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': InventoryAlertResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const InventoryAlertResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type InventoryAlertResponseCodeEnum = typeof InventoryAlertResponseCodeEnum[keyof typeof InventoryAlertResponseCodeEnum];
+
+/**
+ * 库存预警状态。pending 待处理，可处理或忽略；handled 已处理，流程结束；ignored 已忽略，流程结束。允许流转：pending -> handled/ignored。
+ */
+
+export const InventoryAlertStatus = {
+    Pending: 'pending',
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type InventoryAlertStatus = typeof InventoryAlertStatus[keyof typeof InventoryAlertStatus];
+
+
+export interface LineType {
+    'type_id': number;
+    'type_name': string;
+}
+export interface LineTypePageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': LineTypePageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': LineTypePageResponseAllOfData;
+}
+
+export const LineTypePageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type LineTypePageResponseCodeEnum = typeof LineTypePageResponseCodeEnum[keyof typeof LineTypePageResponseCodeEnum];
+
+export interface LineTypePageResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<LineType>;
+}
+export interface LineTypeResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': LineTypeResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': LineType;
+}
+
+export const LineTypeResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type LineTypeResponseCodeEnum = typeof LineTypeResponseCodeEnum[keyof typeof LineTypeResponseCodeEnum];
+
+export interface LineTypeSaveRequest {
+    /**
+     * 为空表示新增，非空表示更新。
+     */
+    'type_id'?: number | null;
+    'type_name': string;
+}
+export interface LoginData {
+    /**
+     * JWT 访问令牌。
+     */
+    'access_token': string;
+    /**
+     * token 有效期，单位秒。
+     */
+    'expires': number;
+}
+export interface LoginLog {
+    'log_id'?: number;
+    'user_id'?: number;
+    'login_time'?: string;
+    'ip_address'?: string;
+    'result'?: LoginLogResultEnum;
+    'fail_reason'?: string | null;
+}
+
+export const LoginLogResultEnum = {
+    Success: 'success',
+    Failure: 'failure',
+} as const;
+
+export type LoginLogResultEnum = typeof LoginLogResultEnum[keyof typeof LoginLogResultEnum];
+
+export interface LoginLogPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': LoginLogPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const LoginLogPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type LoginLogPageResponseCodeEnum = typeof LoginLogPageResponseCodeEnum[keyof typeof LoginLogPageResponseCodeEnum];
+
+export interface LoginRequest {
+    /**
+     * 工号，唯一约束，用于登录。
+     */
+    'employee_no': string;
+    /**
+     * 前端传入的密码哈希值，sha256。
+     */
+    'password': string;
+}
+export interface LoginResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': LoginResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const LoginResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type LoginResponseCodeEnum = typeof LoginResponseCodeEnum[keyof typeof LoginResponseCodeEnum];
+
+export interface LossCompensationCalculateRequest {
+    'material_id': number;
+    'version_id': number;
+    'net_quantity': number;
+}
+/**
+ * 生产损耗补偿计算明细，由后端按 BOM 损耗率计算得到。
+ */
+export interface LossCompensationItem {
+    /**
+     * 物料编号，来源于 BOM 展开结果。
+     */
+    'material_id'?: number;
+    /**
+     * 物料名称，来源于 material.material_name。
+     */
+    'material_name'?: string;
+    /**
+     * 净需求量，来源于生产需求或 BOM 展开结果。
+     */
+    'net_quantity'?: number;
+    /**
+     * 损耗率，来源于 bom.loss_rate。
+     */
+    'loss_rate'?: number;
+    /**
+     * 实际需求量，由后端按 net_quantity / (1 - loss_rate) 计算并按业务规则取整。
+     */
+    'gross_quantity'?: number;
+}
+export interface LossCompensationResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': LossCompensationResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<LossCompensationItem> | null;
+}
+
+export const LossCompensationResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type LossCompensationResponseCodeEnum = typeof LossCompensationResponseCodeEnum[keyof typeof LossCompensationResponseCodeEnum];
+
+export interface Material {
+    'material_id'?: number;
+    'material_name'?: string;
+    'material_type'?: MaterialMaterialTypeEnum;
+    'model'?: string;
+    'unit'?: string;
+    'category_id'?: number;
+    'safety_stock'?: number;
+    'default_supplier_id'?: number | null;
+    'current_version_id'?: number | null;
+    'created_by'?: number;
+    'created_time'?: string;
+    'updated_time'?: string;
+}
+
+export const MaterialMaterialTypeEnum = {
+    RawMaterial: 'raw_material',
+    SemiFinished: 'semi_finished',
+    Finished: 'finished',
+    Auxiliary: 'auxiliary',
+} as const;
+
+export type MaterialMaterialTypeEnum = typeof MaterialMaterialTypeEnum[keyof typeof MaterialMaterialTypeEnum];
+
+export interface MaterialBatchTraceResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialBatchTraceResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<MaterialBatchTraceResult>;
+}
+
+export const MaterialBatchTraceResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialBatchTraceResponseCodeEnum = typeof MaterialBatchTraceResponseCodeEnum[keyof typeof MaterialBatchTraceResponseCodeEnum];
+
+export interface MaterialBatchTraceResult {
+    'item_id': number;
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
+     */
+    'material_name'?: string | null;
+    /**
+     * 跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id = purchase_order.order_id 关联查询得到。
+     */
+    'supplier_id'?: number | null;
+    /**
+     * 跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。
+     */
+    'supplier_name'?: string | null;
+    /**
+     * 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，通过 batch_consumption.item_id = purchase_order_item.item_id 反查使用该原材料批次的生产订单和成品批次。
+     */
+    'affected_products'?: Array<AffectedProductBatch>;
+}
+export interface MaterialCategory {
+    'category_id'?: number;
+    'category_name'?: string;
+}
+export interface MaterialCategoryCreateRequest {
+    'category_name': string;
+}
+export interface MaterialCategoryDeleteRequest {
+    'category_id': number;
+}
+export interface MaterialCategoryPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialCategoryPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const MaterialCategoryPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialCategoryPageResponseCodeEnum = typeof MaterialCategoryPageResponseCodeEnum[keyof typeof MaterialCategoryPageResponseCodeEnum];
+
+export interface MaterialCategoryResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialCategoryResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const MaterialCategoryResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialCategoryResponseCodeEnum = typeof MaterialCategoryResponseCodeEnum[keyof typeof MaterialCategoryResponseCodeEnum];
+
+export interface MaterialCategoryUpdateRequest {
+    'category_name': string;
+    'category_id': number;
+}
+export interface MaterialCreateRequest {
+    'material_name': string;
+    'material_type': MaterialCreateRequestMaterialTypeEnum;
+    'model'?: string;
+    'unit': string;
+    'category_id': number;
+    'safety_stock'?: number;
+    'default_supplier_id'?: number | null;
+    'current_version_id'?: number | null;
+}
+
+export const MaterialCreateRequestMaterialTypeEnum = {
+    RawMaterial: 'raw_material',
+    SemiFinished: 'semi_finished',
+    Finished: 'finished',
+    Auxiliary: 'auxiliary',
+} as const;
+
+export type MaterialCreateRequestMaterialTypeEnum = typeof MaterialCreateRequestMaterialTypeEnum[keyof typeof MaterialCreateRequestMaterialTypeEnum];
+
+export interface MaterialDeleteRequest {
+    'material_id': number;
+}
+export interface MaterialDetail {
+    'material_id'?: number;
+    'material_name'?: string;
+    'material_type'?: MaterialDetailMaterialTypeEnum;
+    'model'?: string;
+    'unit'?: string;
+    'category_id'?: number;
+    'safety_stock'?: number;
+    'default_supplier_id'?: number | null;
+    'current_version_id'?: number | null;
+    'created_by'?: number;
+    'created_time'?: string;
+    'updated_time'?: string;
+    /**
+     * 物料分类名称，来源于 material_category.category_name。
+     */
+    'category_name'?: string;
+    /**
+     * 默认供应商名称，来源于 supplier.supplier_name；无默认供应商时返回 null。
+     */
+    'supplier_name'?: string | null;
+    /**
+     * 可用库存，来源于 material_stock.available_qty，单位与物料计量单位一致。
+     */
+    'available_qty'?: number;
+    /**
+     * 锁定库存，来源于 material_stock.locked_qty，单位与物料计量单位一致。
+     */
+    'locked_qty'?: number;
+    /**
+     * 最近入库日期，来源于 material_stock.last_in_date。
+     */
+    'last_in_date'?: string | null;
+    /**
+     * 最近出库日期，来源于 material_stock.last_out_date。
+     */
+    'last_out_date'?: string | null;
+    /**
+     * 当前有效 BOM 版本号，来源于 bom_version.version_no；无当前版本时返回 null。
+     */
+    'current_version_no'?: string | null;
+}
+
+export const MaterialDetailMaterialTypeEnum = {
+    RawMaterial: 'raw_material',
+    SemiFinished: 'semi_finished',
+    Finished: 'finished',
+    Auxiliary: 'auxiliary',
+} as const;
+
+export type MaterialDetailMaterialTypeEnum = typeof MaterialDetailMaterialTypeEnum[keyof typeof MaterialDetailMaterialTypeEnum];
+
+export interface MaterialPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const MaterialPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialPageResponseCodeEnum = typeof MaterialPageResponseCodeEnum[keyof typeof MaterialPageResponseCodeEnum];
+
+export interface MaterialResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const MaterialResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialResponseCodeEnum = typeof MaterialResponseCodeEnum[keyof typeof MaterialResponseCodeEnum];
+
+export interface MaterialShortageCalculateRequest {
+    'items': Array<MaterialShortageCalculateRequestItemsInner>;
+}
+export interface MaterialShortageCalculateRequestItemsInner {
+    'material_id': number;
+    'production_qty': number;
+    'version_id': number;
+}
+export interface MaterialShortageCalculateResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialShortageCalculateResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': MaterialShortageCalculateResponseAllOfData | null;
+}
+
+export const MaterialShortageCalculateResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialShortageCalculateResponseCodeEnum = typeof MaterialShortageCalculateResponseCodeEnum[keyof typeof MaterialShortageCalculateResponseCodeEnum];
+
+export interface MaterialShortageCalculateResponseAllOfData {
+    'calculation_time': string;
+    'records': Array<MaterialShortageItem>;
+}
+export interface MaterialShortageItem {
+    'material_id': number;
+    'material_name'?: string;
+    'parent_material_id'?: number | null;
+    'level': number;
+    /**
+     * 毛需求数量，由后端根据请求中的生产产品、生产数量和 BOM 版本递归展开 bom.quantity， 并按 bom.loss_rate 做损耗补偿后汇总得到。单位与物料 material.unit 一致， 保留两位小数，取值范围大于等于 0；当 BOM 明细不存在时按 0 处理。 
+     */
+    'gross_requirement': number;
+    /**
+     * 库存可用数量，来源于 material_stock.available_qty，单位与物料 material.unit 一致，取值范围大于等于 0。
+     */
+    'available_qty': number;
+    /**
+     * 在途数量，由后端汇总 purchase_order_item 中同一 material_id 且采购订单状态为 submitted 或 partial_received 的未到货数量 sum(quantity - received_qty) 得到。单位与物料 material.unit 一致，取值范围大于等于 0；没有匹配采购明细时返回 0。 
+     */
+    'in_transit_qty': number;
+    /**
+     * 安全库存数量，来源于 material.safety_stock，单位与物料 material.unit 一致，取值范围大于等于 0；为空时按 0 处理。
+     */
+    'safety_stock': number;
+    /**
+     * 净缺料数量，由后端根据 gross_requirement、material_stock.available_qty、 在途数量和 material.safety_stock 统一计算，公式为 max(gross_requirement - available_qty - in_transit_qty + safety_stock, 0)。 单位与物料 material.unit 一致，保留两位小数，取值范围大于等于 0。 
+     */
+    'net_shortage_qty': number;
+    /**
+     * 建议采购数量，由后端基于 net_shortage_qty 得到，当前口径为 suggested_purchase_qty = net_shortage_qty。 单位与物料 material.unit 一致，保留两位小数，取值范围大于等于 0；后续如引入最小采购批量或包装规格， 应在后端统一调整该字段计算逻辑。 
+     */
+    'suggested_purchase_qty'?: number;
+}
+export interface MaterialStock {
+    'material_id'?: number;
+    'available_qty'?: number;
+    'locked_qty'?: number;
+    'last_in_date'?: string | null;
+    'last_out_date'?: string | null;
+}
+export interface MaterialStockLockData {
+    'success': boolean;
+    'records': Array<StockLockRecord>;
+    'shortages': Array<MaterialStockLockDataShortagesInner>;
+}
+export interface MaterialStockLockDataShortagesInner {
+    'material_id': number;
+    'required_qty': number;
+    'available_qty': number;
+    /**
+     * 库存锁定缺口数量，由后端在锁定前根据请求锁定数量 required_qty 与 material_stock.available_qty 计算，公式为 max(required_qty - available_qty, 0)。 单位与物料 material.unit 一致，取值范围大于等于 0。 
+     */
+    'shortage_qty': number;
+}
+export interface MaterialStockLockRequest {
+    'order_id': number;
+    'operator_id': number;
+    'items': Array<MaterialStockLockRequestItemsInner>;
+}
+export interface MaterialStockLockRequestItemsInner {
+    'material_id': number;
+    'lock_qty': number;
+}
+export interface MaterialStockLockResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialStockLockResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const MaterialStockLockResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialStockLockResponseCodeEnum = typeof MaterialStockLockResponseCodeEnum[keyof typeof MaterialStockLockResponseCodeEnum];
+
+export interface MaterialStockReleaseRequest {
+    'lock_id': number;
+    'operator_id': number;
+}
+export interface MaterialStockResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': MaterialStockResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const MaterialStockResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type MaterialStockResponseCodeEnum = typeof MaterialStockResponseCodeEnum[keyof typeof MaterialStockResponseCodeEnum];
+
+export interface MaterialUpdateRequest {
+    'material_name': string;
+    'material_type': MaterialUpdateRequestMaterialTypeEnum;
+    'model'?: string;
+    'unit': string;
+    'category_id': number;
+    'safety_stock'?: number;
+    'default_supplier_id'?: number | null;
+    'current_version_id'?: number | null;
+    'material_id': number;
+}
+
+export const MaterialUpdateRequestMaterialTypeEnum = {
+    RawMaterial: 'raw_material',
+    SemiFinished: 'semi_finished',
+    Finished: 'finished',
+    Auxiliary: 'auxiliary',
+} as const;
+
+export type MaterialUpdateRequestMaterialTypeEnum = typeof MaterialUpdateRequestMaterialTypeEnum[keyof typeof MaterialUpdateRequestMaterialTypeEnum];
+
+export interface ObsoleteMaterialDetectRequest {
+    'idle_days_threshold': number;
+    'material_id'?: number | null;
+}
+export interface ObsoleteMaterialDetectResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ObsoleteMaterialDetectResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ObsoleteMaterialDetectResponseAllOfData | null;
+}
+
+export const ObsoleteMaterialDetectResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ObsoleteMaterialDetectResponseCodeEnum = typeof ObsoleteMaterialDetectResponseCodeEnum[keyof typeof ObsoleteMaterialDetectResponseCodeEnum];
+
+export interface ObsoleteMaterialDetectResponseAllOfData {
+    'detected_count'?: number;
+    'records'?: Array<ObsoleteMaterialDetection>;
+}
+export interface ObsoleteMaterialDetection {
+    'detection_id': number;
+    'detect_time': string;
+    'material_id': number;
+    'material_name'?: string;
+    'available_qty': number;
+    'last_out_date'?: string | null;
+    'idle_days': number;
+    'status': ObsoleteMaterialStatus;
+    'handler_id'?: number | null;
+}
+
+
+export interface ObsoleteMaterialHandleRequest {
+    'detection_id': number;
+    'status': ObsoleteMaterialHandleRequestStatusEnum;
+    'handler_id': number;
+}
+
+export const ObsoleteMaterialHandleRequestStatusEnum = {
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type ObsoleteMaterialHandleRequestStatusEnum = typeof ObsoleteMaterialHandleRequestStatusEnum[keyof typeof ObsoleteMaterialHandleRequestStatusEnum];
+
+export interface ObsoleteMaterialPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<ObsoleteMaterialDetection>;
+}
+export interface ObsoleteMaterialPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ObsoleteMaterialPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const ObsoleteMaterialPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ObsoleteMaterialPageResponseCodeEnum = typeof ObsoleteMaterialPageResponseCodeEnum[keyof typeof ObsoleteMaterialPageResponseCodeEnum];
+
+export interface ObsoleteMaterialResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ObsoleteMaterialResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const ObsoleteMaterialResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ObsoleteMaterialResponseCodeEnum = typeof ObsoleteMaterialResponseCodeEnum[keyof typeof ObsoleteMaterialResponseCodeEnum];
+
+/**
+ * 废弃物料检测状态。pending 待处理，可处理或忽略；handled 已处理，流程结束；ignored 已忽略，流程结束。允许流转：pending -> handled/ignored。
+ */
+
+export const ObsoleteMaterialStatus = {
+    Pending: 'pending',
+    Handled: 'handled',
+    Ignored: 'ignored',
+} as const;
+
+export type ObsoleteMaterialStatus = typeof ObsoleteMaterialStatus[keyof typeof ObsoleteMaterialStatus];
+
+
+export interface OperationLog {
+    'log_id'?: number;
+    'module'?: string;
+    'action'?: string;
+    'operator_id'?: number;
+    'operate_time'?: string;
+    'ip_address'?: string;
+    'before_data'?: { [key: string]: any; } | null;
+    'after_data'?: { [key: string]: any; } | null;
+}
+export interface OperationLogCreateRequest {
+    'module': string;
+    'action': string;
+    'operator_id': number;
+    'ip_address': string;
+    'before_data'?: { [key: string]: any; } | null;
+    'after_data'?: { [key: string]: any; } | null;
+}
+export interface OperationLogPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': OperationLogPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const OperationLogPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type OperationLogPageResponseCodeEnum = typeof OperationLogPageResponseCodeEnum[keyof typeof OperationLogPageResponseCodeEnum];
+
+export interface OperationLogResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': OperationLogResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const OperationLogResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type OperationLogResponseCodeEnum = typeof OperationLogResponseCodeEnum[keyof typeof OperationLogResponseCodeEnum];
+
+export interface PageQuery {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    'page'?: number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size'?: number;
+}
+export interface PageResult {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    /**
+     * 当前页数据。
+     */
+    'records': Array<any>;
+}
+export interface Permission {
+    'permission_id'?: number;
+    'resource'?: string;
+    'action'?: string;
+}
+export interface PermissionBrief {
+    'permission_id'?: number;
+    'resource'?: string;
+    'action'?: string;
+}
+export interface PermissionCreateRequest {
+    'resource': string;
+    'action': string;
+}
+export interface PermissionDeleteRequest {
+    'permission_id': number;
+}
+export interface PermissionPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PermissionPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PermissionPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PermissionPageResponseCodeEnum = typeof PermissionPageResponseCodeEnum[keyof typeof PermissionPageResponseCodeEnum];
+
+export interface PermissionResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PermissionResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PermissionResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PermissionResponseCodeEnum = typeof PermissionResponseCodeEnum[keyof typeof PermissionResponseCodeEnum];
+
+export interface PermissionUpdateRequest {
+    'resource': string;
+    'action': string;
+    'permission_id': number;
+}
+export interface ProductBatchTraceResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductBatchTraceResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductBatchTraceResult;
+}
+
+export const ProductBatchTraceResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductBatchTraceResponseCodeEnum = typeof ProductBatchTraceResponseCodeEnum[keyof typeof ProductBatchTraceResponseCodeEnum];
+
+export interface ProductBatchTraceResult {
+    'order_id': number;
+    /**
+     * 成品批次号，来自完工入库单。
+     */
+    'batch_no'?: string | null;
+    /**
+     * 成品物料编号。
+     */
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
+     */
+    'material_name'?: string | null;
+    /**
+     * 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，并通过 batch_consumption.item_id 关联采购订单明细表 purchase_order_item 得到该成品批次消耗的原材料批次。
+     */
+    'consumed_batches'?: Array<ConsumedMaterialBatch>;
+}
+export interface ProductCostCalculateRequest {
+    'material_id': number;
+    'version_id': number;
+    'production_qty'?: number;
+}
+/**
+ * 产品成本核算明细，由后端读取 BOM、损耗率和采购价格后计算得到。
+ */
+export interface ProductCostItem {
+    /**
+     * 物料编号，来源于 BOM 展开结果。
+     */
+    'material_id'?: number;
+    /**
+     * 物料名称，来源于 material.material_name。
+     */
+    'material_name'?: string;
+    /**
+     * 净需求量，由后端按 BOM 层级和生产数量计算得到。
+     */
+    'net_quantity'?: number;
+    /**
+     * 毛需求量，由后端按净需求量和 loss_rate 计算，公式为 net_quantity / (1 - loss_rate)。
+     */
+    'gross_quantity'?: number;
+    /**
+     * 单价，来源于采购价格、历史成交价或标准成本，单位为元。
+     */
+    'unit_price'?: number;
+    /**
+     * 明细金额，由后端按 gross_quantity × unit_price 计算，单位为元。
+     */
+    'amount'?: number;
+}
+export interface ProductCostResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductCostResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const ProductCostResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductCostResponseCodeEnum = typeof ProductCostResponseCodeEnum[keyof typeof ProductCostResponseCodeEnum];
+
+/**
+ * 产品成本核算结果，由后端汇总各物料成本明细得到。
+ */
+export interface ProductCostResult {
+    /**
+     * 核算产品物料编号。
+     */
+    'material_id'?: number;
+    /**
+     * 使用的 BOM 版本编号。
+     */
+    'version_id'?: number;
+    /**
+     * 产品总成本，由后端汇总所有明细 amount 得到，单位为元。
+     */
+    'total_cost'?: number;
+    /**
+     * 成本核算明细列表。
+     */
+    'items'?: Array<ProductCostItem>;
+}
+export interface ProductionCalendar {
+    /**
+     * 排产日期，与 line_id 共同构成生产日历主键。
+     */
+    'calendar_date': string;
+    'line_id': number;
+    /**
+     * 跨表展示字段，来源于生产线表 production_line.line_id，通过 production_calendar.line_id = production_line.line_id 关联后生成的产线展示名称。
+     */
+    'line_name'?: string | null;
+    'config_id': number;
+    'material_id'?: number | null;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 production_calendar.config_id 关联 capacity_config 后再按 material_id 查询得到。
+     */
+    'material_name'?: string | null;
+    'type_id'?: number | null;
+    /**
+     * 跨表展示字段，来源于产线类型表 line_type.type_name，通过 production_calendar.config_id 关联 capacity_config 后再按 type_id 查询得到。
+     */
+    'type_name'?: string | null;
+}
+export interface ProductionCalendarDeleteRequest {
+    'calendar_date': string;
+    'line_id': number;
+}
+export interface ProductionCalendarPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionCalendarPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionCalendarPageResponseAllOfData;
+}
+
+export const ProductionCalendarPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionCalendarPageResponseCodeEnum = typeof ProductionCalendarPageResponseCodeEnum[keyof typeof ProductionCalendarPageResponseCodeEnum];
+
+export interface ProductionCalendarPageResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<ProductionCalendar>;
+}
+export interface ProductionCalendarResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionCalendarResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionCalendar;
+}
+
+export const ProductionCalendarResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionCalendarResponseCodeEnum = typeof ProductionCalendarResponseCodeEnum[keyof typeof ProductionCalendarResponseCodeEnum];
+
+export interface ProductionCalendarSaveRequest {
+    'calendar_date': string;
+    'line_id': number;
+    'config_id': number;
+}
+/**
+ * 支持按已有生产订单 order_id 估算，或按产品、BOM 版本、计划数量、期望日期临时估算。
+ */
+export interface ProductionCapacityEstimateRequest {
+    /**
+     * 已存在的生产订单编号。审核生产订单时优先传 order_id。
+     */
+    'order_id'?: number;
+    'material_id'?: number;
+    'version_id'?: number;
+    'plan_qty'?: number;
+    'expected_date'?: string;
+}
+export interface ProductionCapacityEstimateResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionCapacityEstimateResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionCapacityEstimateResult;
+}
+
+export const ProductionCapacityEstimateResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionCapacityEstimateResponseCodeEnum = typeof ProductionCapacityEstimateResponseCodeEnum[keyof typeof ProductionCapacityEstimateResponseCodeEnum];
+
+export interface ProductionCapacityEstimateResult {
+    /**
+     * 后端计算字段，表示是否可按期交付；来源于物料齐套判断、产能满足判断和 estimated_finish_date 与请求期望日期或生产订单 plan_end 的比较，三者均满足时为 true。
+     */
+    'can_deliver_on_time'?: boolean;
+    /**
+     * 后端计算字段，表示物料是否齐套；来源于 BOM 用量、material_stock 库存数量以及采购在途/预计到货数据，按后端统一齐套规则判断。
+     */
+    'material_ready'?: boolean;
+    /**
+     * 后端计算字段，表示产能是否满足计划；来源于 capacity_config 单件工时、production_line 产线、production_calendar 排产日历和当前排程，比较 required_work_minutes 与 available_work_minutes 后判断。
+     */
+    'capacity_ready'?: boolean;
+    /**
+     * 后端计算字段，物料最晚齐套日期；来源于 BOM 需求、库存和采购订单 expected_date，物料已齐套时可为空。
+     */
+    'latest_material_ready_date'?: string | null;
+    /**
+     * 后端计算字段，预计完工日期；来源于物料齐套日期、可用产能排程和生产订单计划数量，由后端产能评估逻辑统一计算。
+     */
+    'estimated_finish_date'?: string;
+    /**
+     * 后端计算字段，所需生产工时，单位为分钟；计算依据为生产数量与 capacity_config.unit_time，通常为 plan_qty * unit_time。
+     */
+    'required_work_minutes'?: number;
+    /**
+     * 后端计算字段，可用生产工时，单位为分钟；来源于匹配产线类型的 production_line、production_calendar 和既有排程在评估周期内汇总得到。
+     */
+    'available_work_minutes'?: number;
+    /**
+     * 后端计算字段，交付风险原因；当物料不齐套、产能不足或预计完工日期晚于期望日期时，由后端根据失败的判断项生成。
+     */
+    'risk_reason'?: string | null;
+}
+export interface ProductionLine {
+    'line_id': number;
+    'type_id': number;
+    /**
+     * 跨表展示字段，来源于产线类型表 line_type.type_name，通过 production_line.type_id = line_type.type_id 关联查询得到。
+     */
+    'type_name'?: string;
+    'start_date': string;
+    'manager_id': number;
+    /**
+     * 跨表展示字段，根据 production_line.manager_id 关联 sys_user.user_id，取 sys_user.user_name。
+     */
+    'manager_name'?: string | null;
+    /**
+     * 跨表展示字段，通过 production_line.line_id 关联生产线状态记录 line_status.line_id，取 line_status.status。
+     */
+    'status'?: ProductionLineRunStatus;
+}
+
+
+export interface ProductionLineCreateRequest {
+    'type_id': number;
+    'start_date': string;
+    'manager_id': number;
+}
+export interface ProductionLinePageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionLinePageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionLinePageResponseAllOfData;
+}
+
+export const ProductionLinePageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionLinePageResponseCodeEnum = typeof ProductionLinePageResponseCodeEnum[keyof typeof ProductionLinePageResponseCodeEnum];
+
+export interface ProductionLinePageResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<ProductionLine>;
+}
+export interface ProductionLineResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionLineResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionLine;
+}
+
+export const ProductionLineResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionLineResponseCodeEnum = typeof ProductionLineResponseCodeEnum[keyof typeof ProductionLineResponseCodeEnum];
+
+/**
+ * 生产线状态。idle 空闲；running 运行中；fault 故障。
+ */
+
+export const ProductionLineRunStatus = {
+    Idle: 'idle',
+    Running: 'running',
+    Fault: 'fault',
+} as const;
+
+export type ProductionLineRunStatus = typeof ProductionLineRunStatus[keyof typeof ProductionLineRunStatus];
+
+
+export interface ProductionLineStatus {
+    'line_id': number;
+    'status': ProductionLineRunStatus;
+    'current_order_id'?: number | null;
+    'current_material_id'?: number | null;
+    'finished_qty': number;
+    /**
+     * 当前效率，0 到 1。
+     */
+    'efficiency': number;
+    'updated_time': string;
+}
+
+
+export interface ProductionLineStatusResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionLineStatusResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionLineStatus;
+}
+
+export const ProductionLineStatusResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionLineStatusResponseCodeEnum = typeof ProductionLineStatusResponseCodeEnum[keyof typeof ProductionLineStatusResponseCodeEnum];
+
+/**
+ * 操作人从当前登录用户推导，客户端不得传 operator_id。
+ */
+export interface ProductionLineStatusUpdateRequest {
+    'line_id': number;
+    'status': ProductionLineRunStatus;
+    'current_order_id'?: number | null;
+    'current_material_id'?: number | null;
+    'finished_qty'?: number | null;
+    'efficiency'?: number | null;
+}
+
+
+export interface ProductionLineUpdateRequest {
+    'type_id': number;
+    'start_date': string;
+    'manager_id': number;
+    'line_id': number;
+}
+/**
+ * 操作人从当前登录用户推导，客户端不得传 operator_id。
+ */
+export interface ProductionOrderActionRequest {
+    'order_id': number;
+    'remark'?: string | null;
+}
+/**
+ * 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+ */
+export interface ProductionOrderApproveRequest {
+    'order_id': number;
+    /**
+     * true 表示审核通过，false 表示审核拒绝。
+     */
+    'approved': boolean;
+    'review_comment'?: string | null;
+}
+export interface ProductionOrderBrief {
+    'order_id': number;
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id = material.material_id 关联查询得到。
+     */
+    'material_name'?: string;
+    'plan_qty': number;
+    'finished_qty'?: number;
+    'status': ProductionOrderStatus;
+}
+
+
+export interface ProductionOrderCreateRequest {
+    'material_id': number;
+    'version_id': number;
+    'plan_qty': number;
+    'plan_start': string;
+    'plan_end': string;
+}
+export interface ProductionOrderDetail {
+    'order_id': number;
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id = material.material_id 关联查询得到。
+     */
+    'material_name'?: string;
+    'plan_qty': number;
+    'finished_qty'?: number;
+    'status': ProductionOrderStatus;
+    'version_id': number;
+    /**
+     * 跨表展示字段，来源于 BOM 版本表 bom_version.version_no，通过 production_order.version_id = bom_version.version_id 关联查询得到。
+     */
+    'version_no'?: string;
+    'plan_start': string;
+    'plan_end': string;
+    'actual_start'?: string | null;
+    'actual_end'?: string | null;
+    'review_comment'?: string | null;
+}
+
+
+export interface ProductionOrderFinishRequest {
+    'order_id': number;
+    'remark'?: string | null;
+    'finished_qty': number;
+}
+export interface ProductionOrderPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionOrderPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionOrderPageResponseAllOfData;
+}
+
+export const ProductionOrderPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionOrderPageResponseCodeEnum = typeof ProductionOrderPageResponseCodeEnum[keyof typeof ProductionOrderPageResponseCodeEnum];
+
+export interface ProductionOrderPageResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<ProductionOrderDetail>;
+}
+export interface ProductionOrderResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionOrderResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionOrderDetail;
+}
+
+export const ProductionOrderResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionOrderResponseCodeEnum = typeof ProductionOrderResponseCodeEnum[keyof typeof ProductionOrderResponseCodeEnum];
+
+/**
+ * 生产订单状态。pending_review 待审核，可审核或取消；pending_schedule 待排产，可修改、开始或取消；in_progress 生产中，可完工或取消；completed 已完工，流程结束；cancelled 已取消，流程结束。
+ */
+
+export const ProductionOrderStatus = {
+    PendingReview: 'pending_review',
+    PendingSchedule: 'pending_schedule',
+    InProgress: 'in_progress',
+    Completed: 'completed',
+    Cancelled: 'cancelled',
+} as const;
+
+export type ProductionOrderStatus = typeof ProductionOrderStatus[keyof typeof ProductionOrderStatus];
+
+
+export interface ProductionOrderUpdateRequest {
+    'material_id': number;
+    'version_id': number;
+    'plan_qty': number;
+    'plan_start': string;
+    'plan_end': string;
+    'order_id': number;
+}
+export interface PurchaseDraftFromShortageRequest {
+    'expected_date': string;
+    'buyer_id': number;
+    'items': Array<PurchaseDraftFromShortageRequestItemsInner>;
+}
+export interface PurchaseDraftFromShortageRequestItemsInner {
+    'material_id': number;
+    /**
+     * 用户确认的本次采购数量，通常来自库存缺口计算响应中的 suggested_purchase_qty， 但作为请求字段时表示前端提交的采购数量。单位与物料 material.unit 一致，必须大于 0。 
+     */
+    'purchase_qty': number;
+    /**
+     * 指定供应商编号。为空时后端使用 material.default_supplier_id；仍为空则该物料进入 unassigned_items，不生成采购订单明细。 
+     */
+    'supplier_id'?: number | null;
+}
+export interface PurchaseDraftFromShortageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseDraftFromShortageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': PurchaseDraftFromShortageResponseAllOfData | null;
+}
+
+export const PurchaseDraftFromShortageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseDraftFromShortageResponseCodeEnum = typeof PurchaseDraftFromShortageResponseCodeEnum[keyof typeof PurchaseDraftFromShortageResponseCodeEnum];
+
+export interface PurchaseDraftFromShortageResponseAllOfData {
+    'created_count'?: number;
+    'records'?: Array<PurchaseOrder>;
+    /**
+     * 未找到默认供应商而无法生成草稿的物料。
+     */
+    'unassigned_items'?: Array<PurchaseDraftFromShortageResponseAllOfDataUnassignedItems>;
+}
+export interface PurchaseDraftFromShortageResponseAllOfDataUnassignedItems {
+    'material_id'?: number;
+    /**
+     * 用户确认但因缺少供应商而未生成采购草稿的采购数量，单位与物料 material.unit 一致。
+     */
+    'purchase_qty'?: number;
+}
+export interface PurchaseOrder {
+    'order_id': number;
+    'status': PurchaseOrderStatus;
+    'supplier': SupplierDetail;
+    'order_date': string;
+    'expected_date': string;
+    'actual_date'?: string | null;
+    'buyer_id': number;
+    /**
+     * 订单总金额，来源于 purchase_order.total_amount，由后端在新增、收货状态更新或明细变更时 统一按所有明细 sum(quantity * unit_price) 计算并保存。单位为元，保留两位小数， 取值范围大于等于 0。 
+     */
+    'total_amount': number;
+    /**
+     * 订单整体到货进度，由后端汇总采购明细计算，公式为 sum(purchase_order_item.received_qty) / sum(purchase_order_item.quantity)。 取值范围为 0 到 1；当明细总采购数量为 0 时返回 0。 
+     */
+    'receive_progress': number;
+    /**
+     * 是否逾期，由后端根据 purchase_order.expected_date、purchase_order.status 和当前日期判断。 当当前日期晚于 expected_date，且 status 不为 completed 或 cancelled 时为 true，否则为 false。 
+     */
+    'is_overdue': boolean;
+    /**
+     * 逾期天数，由后端在 is_overdue 为 true 时按当前日期 - purchase_order.expected_date 计算， 单位为天，取值范围大于等于 0；当订单未逾期、已完成或已取消时返回 0。 
+     */
+    'overdue_days'?: number;
+    'details': Array<PurchaseOrderDetailLine>;
+}
+
+
+export interface PurchaseOrderActionRequest {
+    'order_id': number;
+    'operator_id': number;
+}
+export interface PurchaseOrderCreateRequest {
+    'supplier_id': number;
+    'expected_date': string;
+    'buyer_id': number;
+    'details': Array<PurchaseOrderCreateRequestDetailsInner>;
+}
+export interface PurchaseOrderCreateRequestDetailsInner {
+    'material_id': number;
+    'quantity': number;
+    'unit_price': number;
+}
+export interface PurchaseOrderDetailLine {
+    'item_id': number;
+    'order_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'quantity': number;
+    'received_qty': number;
+    'unit_price': number;
+    /**
+     * 明细金额，由后端根据 purchase_order_item.quantity 与 purchase_order_item.unit_price 计算，公式为 quantity * unit_price。单位为元，保留两位小数，取值范围大于等于 0。 
+     */
+    'line_amount'?: number;
+    /**
+     * 明细到货进度，由后端根据 purchase_order_item.received_qty 与 purchase_order_item.quantity 计算，公式为 received_qty / quantity。取值范围为 0 到 1；当 quantity 为 0 时返回 0。 
+     */
+    'receive_progress'?: number;
+}
+export interface PurchaseOrderPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<PurchaseOrder>;
+}
+export interface PurchaseOrderPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOrderPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOrderPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOrderPageResponseCodeEnum = typeof PurchaseOrderPageResponseCodeEnum[keyof typeof PurchaseOrderPageResponseCodeEnum];
+
+export interface PurchaseOrderResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOrderResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOrderResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOrderResponseCodeEnum = typeof PurchaseOrderResponseCodeEnum[keyof typeof PurchaseOrderResponseCodeEnum];
+
+/**
+ * 采购订单状态。draft 草稿，可编辑、提交、取消；submitted 已提交，可收货、取消；partial_received 部分到货，可继续收货；completed 已完成，不可修改；cancelled 已取消，不可继续操作。允许流转：draft -> submitted/cancelled，submitted -> partial_received/completed/cancelled，partial_received -> completed。
+ */
+
+export const PurchaseOrderStatus = {
+    Draft: 'draft',
+    Submitted: 'submitted',
+    PartialReceived: 'partial_received',
+    Completed: 'completed',
+    Cancelled: 'cancelled',
+} as const;
+
+export type PurchaseOrderStatus = typeof PurchaseOrderStatus[keyof typeof PurchaseOrderStatus];
+
+
+export interface PurchaseOverdueReminder {
+    'reminder_id': number;
+    'order_id': number;
+    'expected_date': string;
+    'overdue_days': number;
+    'remind_time': string;
+    'status': PurchaseOverdueReminderStatus;
+    'remark'?: string | null;
+}
+
+
+export interface PurchaseOverdueReminderGenerateRequest {
+    'order_id'?: number | null;
+}
+export interface PurchaseOverdueReminderGenerateResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOverdueReminderGenerateResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': PurchaseOverdueReminderGenerateResponseAllOfData | null;
+}
+
+export const PurchaseOverdueReminderGenerateResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOverdueReminderGenerateResponseCodeEnum = typeof PurchaseOverdueReminderGenerateResponseCodeEnum[keyof typeof PurchaseOverdueReminderGenerateResponseCodeEnum];
+
+export interface PurchaseOverdueReminderGenerateResponseAllOfData {
+    'generated_count'?: number;
+    'records'?: Array<PurchaseOverdueReminder>;
+}
+export interface PurchaseOverdueReminderHandleRequest {
+    'reminder_id': number;
+    'status': PurchaseOverdueReminderHandleRequestStatusEnum;
+    'remark'?: string | null;
+}
+
+export const PurchaseOverdueReminderHandleRequestStatusEnum = {
+    Urged: 'urged',
+    Received: 'received',
+} as const;
+
+export type PurchaseOverdueReminderHandleRequestStatusEnum = typeof PurchaseOverdueReminderHandleRequestStatusEnum[keyof typeof PurchaseOverdueReminderHandleRequestStatusEnum];
+
+export interface PurchaseOverdueReminderPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<PurchaseOverdueReminder>;
+}
+export interface PurchaseOverdueReminderPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOverdueReminderPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOverdueReminderPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOverdueReminderPageResponseCodeEnum = typeof PurchaseOverdueReminderPageResponseCodeEnum[keyof typeof PurchaseOverdueReminderPageResponseCodeEnum];
+
+export interface PurchaseOverdueReminderResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseOverdueReminderResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseOverdueReminderResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseOverdueReminderResponseCodeEnum = typeof PurchaseOverdueReminderResponseCodeEnum[keyof typeof PurchaseOverdueReminderResponseCodeEnum];
+
+/**
+ * 采购逾期提醒状态。pending_urge 待催交，可催交或标记到货；urged 已催交，可继续备注或标记到货；received 已到货，流程结束。允许流转：pending_urge -> urged/received，urged -> received。
+ */
+
+export const PurchaseOverdueReminderStatus = {
+    PendingUrge: 'pending_urge',
+    Urged: 'urged',
+    Received: 'received',
+} as const;
+
+export type PurchaseOverdueReminderStatus = typeof PurchaseOverdueReminderStatus[keyof typeof PurchaseOverdueReminderStatus];
+
+
+export interface PurchaseReceipt {
+    'receive_id': number;
+    'order_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'quantity': number;
+    'receive_date': string;
+}
+export interface PurchaseReceiptCreateRequest {
+    'order_id': number;
+    'material_id': number;
+    'quantity': number;
+    'receive_date': string;
+}
+export interface PurchaseReceiptPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<PurchaseReceipt>;
+}
+export interface PurchaseReceiptPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseReceiptPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseReceiptPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseReceiptPageResponseCodeEnum = typeof PurchaseReceiptPageResponseCodeEnum[keyof typeof PurchaseReceiptPageResponseCodeEnum];
+
+export interface PurchaseReceiptResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': PurchaseReceiptResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const PurchaseReceiptResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type PurchaseReceiptResponseCodeEnum = typeof PurchaseReceiptResponseCodeEnum[keyof typeof PurchaseReceiptResponseCodeEnum];
+
+/**
+ * item_ids、material_id 或到货日期范围至少提供一种过滤条件。
+ */
+export interface QualityImpactAnalyzeRequest {
+    /**
+     * 问题采购明细编号列表。
+     */
+    'item_ids'?: Array<number>;
+    'material_id'?: number;
+    'receive_date_start'?: string;
+    'receive_date_end'?: string;
+}
+export interface QualityImpactAnalyzeResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': QualityImpactAnalyzeResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': QualityImpactAnalyzeResult;
+}
+
+export const QualityImpactAnalyzeResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type QualityImpactAnalyzeResponseCodeEnum = typeof QualityImpactAnalyzeResponseCodeEnum[keyof typeof QualityImpactAnalyzeResponseCodeEnum];
+
+export interface QualityImpactAnalyzeResult {
+    /**
+     * 后端统计字段，来源于受影响生产订单列表 affected_products，按去重后的 production_order.order_id 数量统计。
+     */
+    'affected_order_count'?: number;
+    /**
+     * 后端统计字段，来源于受影响成品批次列表 affected_products，按成品批次号 batch_no 或生产订单维度汇总统计。
+     */
+    'affected_batch_count'?: number;
+    /**
+     * 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，结合 production_order 和物料信息查询得到受影响成品批次。
+     */
+    'affected_products'?: Array<AffectedProductBatch>;
+    /**
+     * 后端判断字段，来源于受影响生产订单数量、受影响批次数量、问题采购明细和追溯结果，由后端质量追溯规则统一给出建议处理动作。
+     */
+    'suggested_action'?: QualityImpactAnalyzeResultSuggestedActionEnum;
+}
+
+export const QualityImpactAnalyzeResultSuggestedActionEnum = {
+    Freeze: 'freeze',
+    Recall: 'recall',
+    Observe: 'observe',
+} as const;
+
+export type QualityImpactAnalyzeResultSuggestedActionEnum = typeof QualityImpactAnalyzeResultSuggestedActionEnum[keyof typeof QualityImpactAnalyzeResultSuggestedActionEnum];
+
+export interface RegisterRequest {
+    /**
+     * 工号，唯一约束。
+     */
+    'employee_no': string;
+    /**
+     * 登录密码或前端传入的密码哈希值，sha256。
+     */
+    'password': string;
+    'user_name': string;
+    'phone': string;
+    'email'?: string | null;
+}
+export interface RegisterResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': RegisterResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const RegisterResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type RegisterResponseCodeEnum = typeof RegisterResponseCodeEnum[keyof typeof RegisterResponseCodeEnum];
+
+/**
+ * 反向追溯结果项，由后端以指定子物料为起点向上递归查找父项和最终产品得到。
+ */
+export interface ReverseTraceItem {
+    /**
+     * 受影响的产品物料编号，来源于递归追溯到的父级物料。
+     */
+    'product_material_id'?: number;
+    /**
+     * 受影响的产品物料名称，来源于 material.material_name。
+     */
+    'product_material_name'?: string;
+    /**
+     * BOM 版本编号，来源于 bom_version.version_id。
+     */
+    'version_id'?: number;
+    /**
+     * BOM 版本号，来源于 bom_version.version_no。
+     */
+    'version_no'?: string;
+    /**
+     * 版本状态，由后端根据有效期判断；effective 表示当前有效，history 表示历史版本。
+     */
+    'version_status'?: ReverseTraceItemVersionStatusEnum;
+    /**
+     * 从指定子物料向上追溯到产品的物料编号路径。
+     */
+    'path'?: string;
+    /**
+     * 追溯层级，由后端递归计算。
+     */
+    'depth'?: number;
+    /**
+     * 当前父子关系的单位用量，来源于 bom.quantity。
+     */
+    'quantity'?: number;
+    /**
+     * 累计影响用量，由后端按追溯路径上的 quantity 乘积计算得到。
+     */
+    'accumulated_quantity'?: number;
+}
+
+export const ReverseTraceItemVersionStatusEnum = {
+    Effective: 'effective',
+    History: 'history',
+} as const;
+
+export type ReverseTraceItemVersionStatusEnum = typeof ReverseTraceItemVersionStatusEnum[keyof typeof ReverseTraceItemVersionStatusEnum];
+
+export interface ReverseTraceResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ReverseTraceResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<ReverseTraceItem> | null;
+}
+
+export const ReverseTraceResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ReverseTraceResponseCodeEnum = typeof ReverseTraceResponseCodeEnum[keyof typeof ReverseTraceResponseCodeEnum];
+
+export interface Role {
+    'role_id'?: number;
+    'role_name'?: string;
+    /**
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
+     */
+    'status'?: RoleStatusEnum;
+    'description'?: string | null;
+}
+
+export const RoleStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type RoleStatusEnum = typeof RoleStatusEnum[keyof typeof RoleStatusEnum];
+
+export interface RoleBrief {
+    'role_id'?: number;
+    'role_name'?: string;
+    /**
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
+     */
+    'status'?: RoleBriefStatusEnum;
+}
+
+export const RoleBriefStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type RoleBriefStatusEnum = typeof RoleBriefStatusEnum[keyof typeof RoleBriefStatusEnum];
+
+export interface RoleCreateRequest {
+    'role_name': string;
+    'description'?: string | null;
+    /**
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
+     */
+    'status'?: RoleCreateRequestStatusEnum;
+}
+
+export const RoleCreateRequestStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type RoleCreateRequestStatusEnum = typeof RoleCreateRequestStatusEnum[keyof typeof RoleCreateRequestStatusEnum];
+
+export interface RoleDeleteRequest {
+    'role_id': number;
+}
+export interface RolePageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': RolePageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const RolePageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type RolePageResponseCodeEnum = typeof RolePageResponseCodeEnum[keyof typeof RolePageResponseCodeEnum];
+
+export interface RolePermission {
+    'role_id'?: number;
+    'permission_id'?: number;
+}
+export interface RolePermissionAssignRequest {
+    'role_id': number;
+    'permission_ids': Array<number>;
+}
+export interface RolePermissionAssignResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': RolePermissionAssignResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<RolePermission> | null;
+}
+
+export const RolePermissionAssignResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type RolePermissionAssignResponseCodeEnum = typeof RolePermissionAssignResponseCodeEnum[keyof typeof RolePermissionAssignResponseCodeEnum];
+
+export interface RolePermissionDeleteRequest {
+    'role_id': number;
+    'permission_id': number;
+}
+export interface RolePermissionPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': RolePermissionPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const RolePermissionPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type RolePermissionPageResponseCodeEnum = typeof RolePermissionPageResponseCodeEnum[keyof typeof RolePermissionPageResponseCodeEnum];
+
+export interface RoleResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': RoleResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const RoleResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type RoleResponseCodeEnum = typeof RoleResponseCodeEnum[keyof typeof RoleResponseCodeEnum];
+
+export interface RoleUpdateRequest {
+    'role_name': string;
+    'description'?: string | null;
+    /**
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
+     */
+    'status'?: RoleUpdateRequestStatusEnum;
+    'role_id': number;
+}
+
+export const RoleUpdateRequestStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type RoleUpdateRequestStatusEnum = typeof RoleUpdateRequestStatusEnum[keyof typeof RoleUpdateRequestStatusEnum];
+
+export interface StockLockRecord {
+    'lock_id': number;
+    'order_id': number;
+    'material_id': number;
+    'material_name'?: string;
+    'lock_qty': number;
+    'status': StockLockStatus;
+    'lock_time': string;
+    'release_time'?: string | null;
+    'operator_id': number;
+}
+
+
+export interface StockLockRecordPageData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<StockLockRecord>;
+}
+export interface StockLockRecordPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': StockLockRecordPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const StockLockRecordPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type StockLockRecordPageResponseCodeEnum = typeof StockLockRecordPageResponseCodeEnum[keyof typeof StockLockRecordPageResponseCodeEnum];
+
+export interface StockLockRecordResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': StockLockRecordResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const StockLockRecordResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type StockLockRecordResponseCodeEnum = typeof StockLockRecordResponseCodeEnum[keyof typeof StockLockRecordResponseCodeEnum];
+
+/**
+ * 库存锁定状态。locked 已锁定，可释放或消耗；cancelled 已取消，释放完成；consumed 已消耗，完工入库后不可释放。允许流转：locked -> cancelled/consumed。
+ */
+
+export const StockLockStatus = {
+    Locked: 'locked',
+    Cancelled: 'cancelled',
+    Consumed: 'consumed',
+} as const;
+
+export type StockLockStatus = typeof StockLockStatus[keyof typeof StockLockStatus];
+
+
+export interface SupplierBrief {
+    /**
+     * 供应商唯一标识，来源于 supplier.supplier_id。
+     */
+    'supplier_id': number;
+    /**
+     * 供应商名称，来源于 supplier.supplier_name。
+     */
+    'supplier_name': string;
+}
+export interface SupplierDetail {
+    /**
+     * 供应商唯一标识，来源于 supplier.supplier_id。
+     */
+    'supplier_id': number;
+    /**
+     * 供应商名称，来源于 supplier.supplier_name。
+     */
+    'supplier_name': string;
+    /**
+     * 供应商联系人，来源于 supplier.contact_person。
+     */
+    'contact_person'?: string | null;
+    /**
+     * 供应商联系电话，来源于 supplier.contact_phone。
+     */
+    'contact_phone'?: string | null;
+}
+export interface User {
+    'user_id'?: number;
+    'employee_no'?: string;
+    'user_name'?: string;
+    'phone'?: string;
+    'email'?: string | null;
+    /**
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 valid 与 disabled 之间切换。
+     */
+    'status'?: UserStatusEnum;
+    /**
+     * 密码哈希值，仅后端持久化使用，不在普通查询响应中返回。
+     */
+    'password_hash'?: string;
+    'created_time'?: string;
+    'last_login_time'?: string | null;
+    'pwd_update_time'?: string | null;
+}
+
+export const UserStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type UserStatusEnum = typeof UserStatusEnum[keyof typeof UserStatusEnum];
+
+export interface UserBrief {
+    'user_id'?: number;
+    'employee_no'?: string;
+    'user_name'?: string;
+    'phone'?: string;
+    'email'?: string | null;
+    /**
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 valid 与 disabled 之间切换。
+     */
+    'status'?: UserBriefStatusEnum;
+}
+
+export const UserBriefStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type UserBriefStatusEnum = typeof UserBriefStatusEnum[keyof typeof UserBriefStatusEnum];
+
+export interface UserCreateRequest {
+    'employee_no': string;
+    'password': string;
+    'user_name': string;
+    'phone': string;
+    'email'?: string | null;
+    /**
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。新增时默认为 valid，允许后续通过 updateUserData 修改为 disabled 或从 disabled 恢复为 valid。
+     */
+    'status'?: UserCreateRequestStatusEnum;
+}
+
+export const UserCreateRequestStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type UserCreateRequestStatusEnum = typeof UserCreateRequestStatusEnum[keyof typeof UserCreateRequestStatusEnum];
+
+export interface UserDeleteRequest {
+    'user_id': number;
+}
+export interface UserPageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': UserPageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const UserPageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type UserPageResponseCodeEnum = typeof UserPageResponseCodeEnum[keyof typeof UserPageResponseCodeEnum];
+
+export interface UserResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': UserResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const UserResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type UserResponseCodeEnum = typeof UserResponseCodeEnum[keyof typeof UserResponseCodeEnum];
+
+export interface UserRole {
+    'user_id'?: number;
+    'role_id'?: number;
+}
+export interface UserRoleAssignRequest {
+    'user_id': number;
+    'role_ids': Array<number>;
+}
+export interface UserRoleAssignResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': UserRoleAssignResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<UserRole> | null;
+}
+
+export const UserRoleAssignResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type UserRoleAssignResponseCodeEnum = typeof UserRoleAssignResponseCodeEnum[keyof typeof UserRoleAssignResponseCodeEnum];
+
+export interface UserRoleDeleteRequest {
+    'user_id': number;
+    'role_id': number;
+}
+export interface UserRolePageResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': UserRolePageResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const UserRolePageResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type UserRolePageResponseCodeEnum = typeof UserRolePageResponseCodeEnum[keyof typeof UserRolePageResponseCodeEnum];
+
+export interface UserUpdateRequest {
+    /**
+     * 用户编号。
+     */
+    'user_id': number;
+    /**
+     * 工号。
+     */
+    'employee_no'?: string;
+    /**
+     * 需要重置密码时传入。
+     */
+    'password'?: string;
+    /**
+     * 用户姓名。
+     */
+    'user_name'?: string;
+    /**
+     * 联系电话。
+     */
+    'phone'?: string;
+    /**
+     * 邮箱。
+     */
+    'email'?: string | null;
+    /**
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -> disabled、disabled -> valid。
+     */
+    'status'?: UserUpdateRequestStatusEnum;
+}
+
+export const UserUpdateRequestStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type UserUpdateRequestStatusEnum = typeof UserUpdateRequestStatusEnum[keyof typeof UserUpdateRequestStatusEnum];
+
+
+/**
+ * InventoryApi - axios parameter creator
+ */
+export const InventoryApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 
-         * @summary 获取测试用户数据表
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * @summary 登记完工入库
+         * @param {CompletionInboundCreateRequest} completionInboundCreateRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getUserTest: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/user-test`;
+        addCompletionInbound: async (completionInboundCreateRequest: CompletionInboundCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'completionInboundCreateRequest' is not null or undefined
+            assertParamExists('addCompletionInbound', 'completionInboundCreateRequest', completionInboundCreateRequest)
+            const localVarPath = `/api/addCompletionInbound`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(completionInboundCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 计算物料缺口
+         * @param {MaterialShortageCalculateRequest} materialShortageCalculateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        calculateMaterialShortage: async (materialShortageCalculateRequest: MaterialShortageCalculateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialShortageCalculateRequest' is not null or undefined
+            assertParamExists('calculateMaterialShortage', 'materialShortageCalculateRequest', materialShortageCalculateRequest)
+            const localVarPath = `/api/calculateMaterialShortage`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialShortageCalculateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 检测废弃物料
+         * @param {ObsoleteMaterialDetectRequest} obsoleteMaterialDetectRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        detectObsoleteMaterial: async (obsoleteMaterialDetectRequest: ObsoleteMaterialDetectRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'obsoleteMaterialDetectRequest' is not null or undefined
+            assertParamExists('detectObsoleteMaterial', 'obsoleteMaterialDetectRequest', obsoleteMaterialDetectRequest)
+            const localVarPath = `/api/detectObsoleteMaterial`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(obsoleteMaterialDetectRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 生成库存预警事件
+         * @param {InventoryAlertGenerateRequest} [inventoryAlertGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generateInventoryAlert: async (inventoryAlertGenerateRequest?: InventoryAlertGenerateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/generateInventoryAlert`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(inventoryAlertGenerateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理库存预警事件
+         * @param {InventoryAlertHandleRequest} inventoryAlertHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleInventoryAlert: async (inventoryAlertHandleRequest: InventoryAlertHandleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'inventoryAlertHandleRequest' is not null or undefined
+            assertParamExists('handleInventoryAlert', 'inventoryAlertHandleRequest', inventoryAlertHandleRequest)
+            const localVarPath = `/api/handleInventoryAlert`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(inventoryAlertHandleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理废弃物料检测结果
+         * @param {ObsoleteMaterialHandleRequest} obsoleteMaterialHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleObsoleteMaterialDetection: async (obsoleteMaterialHandleRequest: ObsoleteMaterialHandleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'obsoleteMaterialHandleRequest' is not null or undefined
+            assertParamExists('handleObsoleteMaterialDetection', 'obsoleteMaterialHandleRequest', obsoleteMaterialHandleRequest)
+            const localVarPath = `/api/handleObsoleteMaterialDetection`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(obsoleteMaterialHandleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询完工入库单
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {string} [inboundTimeStart] 
+         * @param {string} [inboundTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listCompletionInbound: async (page?: number, pageSize?: number, orderId?: number, materialId?: number, inboundTimeStart?: string, inboundTimeEnd?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listCompletionInbound`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -65,6 +4036,34 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             // http bearer authentication required
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (inboundTimeStart !== undefined) {
+                localVarQueryParameter['inbound_time_start'] = (inboundTimeStart as any instanceof Date) ?
+                    (inboundTimeStart as any).toISOString() :
+                    inboundTimeStart;
+            }
+
+            if (inboundTimeEnd !== undefined) {
+                localVarQueryParameter['inbound_time_end'] = (inboundTimeEnd as any instanceof Date) ?
+                    (inboundTimeEnd as any).toISOString() :
+                    inboundTimeEnd;
+            }
+
             localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -77,15 +4076,211 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             };
         },
         /**
-         * 
-         * @summary 登录
-         * @param {string} [userNo] 
-         * @param {string} [password] 
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询库存预警事件
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {InventoryAlertStatus} [status] 
+         * @param {string} [startTime] 
+         * @param {string} [endTime] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost: async (userNo?: string, password?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/login`;
+        listInventoryAlert: async (page?: number, pageSize?: number, materialId?: number, status?: InventoryAlertStatus, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listInventoryAlert`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (startTime !== undefined) {
+                localVarQueryParameter['start_time'] = (startTime as any instanceof Date) ?
+                    (startTime as any).toISOString() :
+                    startTime;
+            }
+
+            if (endTime !== undefined) {
+                localVarQueryParameter['end_time'] = (endTime as any instanceof Date) ?
+                    (endTime as any).toISOString() :
+                    endTime;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询物料锁定记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {StockLockStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialStockLock: async (page?: number, pageSize?: number, orderId?: number, materialId?: number, status?: StockLockStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listMaterialStockLock`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询废弃物料检测结果
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {ObsoleteMaterialStatus} [status] 
+         * @param {string} [detectTimeStart] 
+         * @param {string} [detectTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listObsoleteMaterialDetection: async (page?: number, pageSize?: number, materialId?: number, status?: ObsoleteMaterialStatus, detectTimeStart?: string, detectTimeEnd?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listObsoleteMaterialDetection`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (detectTimeStart !== undefined) {
+                localVarQueryParameter['detect_time_start'] = (detectTimeStart as any instanceof Date) ?
+                    (detectTimeStart as any).toISOString() :
+                    detectTimeStart;
+            }
+
+            if (detectTimeEnd !== undefined) {
+                localVarQueryParameter['detect_time_end'] = (detectTimeEnd as any instanceof Date) ?
+                    (detectTimeEnd as any).toISOString() :
+                    detectTimeEnd;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * @summary 锁定物料库存
+         * @param {MaterialStockLockRequest} materialStockLockRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        lockMaterialStock: async (materialStockLockRequest: MaterialStockLockRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialStockLockRequest' is not null or undefined
+            assertParamExists('lockMaterialStock', 'materialStockLockRequest', materialStockLockRequest)
+            const localVarPath = `/api/lockMaterialStock`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -96,23 +4291,18 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new URLSearchParams();
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
-            if (userNo !== undefined) { 
-                localVarFormParams.set('userNo', userNo as any);
-            }
-
-            if (password !== undefined) { 
-                localVarFormParams.set('password', password as any);
-            }
-            localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
+            localVarHeaderParameter['Content-Type'] = 'application/json';
             localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = localVarFormParams.toString();
+            localVarRequestOptions.data = serializeDataIfNeeded(materialStockLockRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -120,26 +4310,16 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             };
         },
         /**
-         * 
-         * @summary 注册系统用户
-         * @param {string} userNo 
-         * @param {string} password 
-         * @param {string} userName 
-         * @param {string} phone 
-         * @param {string} [email] 
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * @summary 释放物料锁定
+         * @param {MaterialStockReleaseRequest} materialStockReleaseRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        registerPost: async (userNo: string, password: string, userName: string, phone: string, email?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'userNo' is not null or undefined
-            assertParamExists('registerPost', 'userNo', userNo)
-            // verify required parameter 'password' is not null or undefined
-            assertParamExists('registerPost', 'password', password)
-            // verify required parameter 'userName' is not null or undefined
-            assertParamExists('registerPost', 'userName', userName)
-            // verify required parameter 'phone' is not null or undefined
-            assertParamExists('registerPost', 'phone', phone)
-            const localVarPath = `/register`;
+        releaseMaterialStock: async (materialStockReleaseRequest: MaterialStockReleaseRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialStockReleaseRequest' is not null or undefined
+            assertParamExists('releaseMaterialStock', 'materialStockReleaseRequest', materialStockReleaseRequest)
+            const localVarPath = `/api/releaseMaterialStock`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -150,35 +4330,18 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new URLSearchParams();
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
-            if (userNo !== undefined) { 
-                localVarFormParams.set('userNo', userNo as any);
-            }
-
-            if (password !== undefined) { 
-                localVarFormParams.set('password', password as any);
-            }
-
-            if (userName !== undefined) { 
-                localVarFormParams.set('userName', userName as any);
-            }
-
-            if (phone !== undefined) { 
-                localVarFormParams.set('phone', phone as any);
-            }
-
-            if (email !== undefined) { 
-                localVarFormParams.set('email', email as any);
-            }
-            localVarHeaderParameter['Content-Type'] = 'application/x-www-form-urlencoded';
+            localVarHeaderParameter['Content-Type'] = 'application/json';
             localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = localVarFormParams.toString();
+            localVarRequestOptions.data = serializeDataIfNeeded(materialStockReleaseRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -189,155 +4352,9863 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
 };
 
 /**
- * DefaultApi - functional programming interface
+ * InventoryApi - functional programming interface
  */
-export const DefaultApiFp = function(configuration?: Configuration) {
-    const localVarAxiosParamCreator = DefaultApiAxiosParamCreator(configuration)
+export const InventoryApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = InventoryApiAxiosParamCreator(configuration)
     return {
         /**
-         * 
-         * @summary 获取测试用户数据表
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * @summary 登记完工入库
+         * @param {CompletionInboundCreateRequest} completionInboundCreateRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getUserTest(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<UserData>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getUserTest(options);
+        async addCompletionInbound(completionInboundCreateRequest: CompletionInboundCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CompletionInboundResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addCompletionInbound(completionInboundCreateRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.getUserTest']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.addCompletionInbound']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 
-         * @summary 登录
-         * @param {string} [userNo] 
-         * @param {string} [password] 
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 计算物料缺口
+         * @param {MaterialShortageCalculateRequest} materialShortageCalculateRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async loginPost(userNo?: string, password?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginPost200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.loginPost(userNo, password, options);
+        async calculateMaterialShortage(materialShortageCalculateRequest: MaterialShortageCalculateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialShortageCalculateResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.calculateMaterialShortage(materialShortageCalculateRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.loginPost']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.calculateMaterialShortage']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 
-         * @summary 注册系统用户
-         * @param {string} userNo 
-         * @param {string} password 
-         * @param {string} userName 
-         * @param {string} phone 
-         * @param {string} [email] 
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 检测废弃物料
+         * @param {ObsoleteMaterialDetectRequest} obsoleteMaterialDetectRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async registerPost(userNo: string, password: string, userName: string, phone: string, email?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RegisterPost200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.registerPost(userNo, password, userName, phone, email, options);
+        async detectObsoleteMaterial(obsoleteMaterialDetectRequest: ObsoleteMaterialDetectRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ObsoleteMaterialDetectResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.detectObsoleteMaterial(obsoleteMaterialDetectRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.registerPost']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.detectObsoleteMaterial']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 生成库存预警事件
+         * @param {InventoryAlertGenerateRequest} [inventoryAlertGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async generateInventoryAlert(inventoryAlertGenerateRequest?: InventoryAlertGenerateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InventoryAlertGenerateResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.generateInventoryAlert(inventoryAlertGenerateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.generateInventoryAlert']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理库存预警事件
+         * @param {InventoryAlertHandleRequest} inventoryAlertHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async handleInventoryAlert(inventoryAlertHandleRequest: InventoryAlertHandleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InventoryAlertResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.handleInventoryAlert(inventoryAlertHandleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.handleInventoryAlert']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理废弃物料检测结果
+         * @param {ObsoleteMaterialHandleRequest} obsoleteMaterialHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async handleObsoleteMaterialDetection(obsoleteMaterialHandleRequest: ObsoleteMaterialHandleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ObsoleteMaterialResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.handleObsoleteMaterialDetection(obsoleteMaterialHandleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.handleObsoleteMaterialDetection']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询完工入库单
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {string} [inboundTimeStart] 
+         * @param {string} [inboundTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listCompletionInbound(page?: number, pageSize?: number, orderId?: number, materialId?: number, inboundTimeStart?: string, inboundTimeEnd?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CompletionInboundPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listCompletionInbound(page, pageSize, orderId, materialId, inboundTimeStart, inboundTimeEnd, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listCompletionInbound']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询库存预警事件
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {InventoryAlertStatus} [status] 
+         * @param {string} [startTime] 
+         * @param {string} [endTime] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listInventoryAlert(page?: number, pageSize?: number, materialId?: number, status?: InventoryAlertStatus, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InventoryAlertPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listInventoryAlert(page, pageSize, materialId, status, startTime, endTime, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listInventoryAlert']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询物料锁定记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {StockLockStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listMaterialStockLock(page?: number, pageSize?: number, orderId?: number, materialId?: number, status?: StockLockStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StockLockRecordPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listMaterialStockLock(page, pageSize, orderId, materialId, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listMaterialStockLock']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询废弃物料检测结果
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {ObsoleteMaterialStatus} [status] 
+         * @param {string} [detectTimeStart] 
+         * @param {string} [detectTimeEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listObsoleteMaterialDetection(page?: number, pageSize?: number, materialId?: number, status?: ObsoleteMaterialStatus, detectTimeStart?: string, detectTimeEnd?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ObsoleteMaterialPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listObsoleteMaterialDetection(page, pageSize, materialId, status, detectTimeStart, detectTimeEnd, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.listObsoleteMaterialDetection']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * @summary 锁定物料库存
+         * @param {MaterialStockLockRequest} materialStockLockRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async lockMaterialStock(materialStockLockRequest: MaterialStockLockRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialStockLockResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.lockMaterialStock(materialStockLockRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.lockMaterialStock']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * @summary 释放物料锁定
+         * @param {MaterialStockReleaseRequest} materialStockReleaseRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async releaseMaterialStock(materialStockReleaseRequest: MaterialStockReleaseRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StockLockRecordResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.releaseMaterialStock(materialStockReleaseRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InventoryApi.releaseMaterialStock']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
 };
 
 /**
- * DefaultApi - factory interface
+ * InventoryApi - factory interface
  */
-export const DefaultApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
-    const localVarFp = DefaultApiFp(configuration)
+export const InventoryApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = InventoryApiFp(configuration)
     return {
         /**
-         * 
-         * @summary 获取测试用户数据表
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * @summary 登记完工入库
+         * @param {InventoryApiAddCompletionInboundRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getUserTest(options?: RawAxiosRequestConfig): AxiosPromise<Array<UserData>> {
-            return localVarFp.getUserTest(options).then((request) => request(axios, basePath));
+        addCompletionInbound(requestParameters: InventoryApiAddCompletionInboundRequest, options?: RawAxiosRequestConfig): AxiosPromise<CompletionInboundResponse> {
+            return localVarFp.addCompletionInbound(requestParameters.completionInboundCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 
-         * @summary 登录
-         * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 计算物料缺口
+         * @param {InventoryApiCalculateMaterialShortageRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginPost200Response> {
-            return localVarFp.loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(axios, basePath));
+        calculateMaterialShortage(requestParameters: InventoryApiCalculateMaterialShortageRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialShortageCalculateResponse> {
+            return localVarFp.calculateMaterialShortage(requestParameters.materialShortageCalculateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 
-         * @summary 注册系统用户
-         * @param {DefaultApiRegisterPostRequest} requestParameters Request parameters.
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 检测废弃物料
+         * @param {InventoryApiDetectObsoleteMaterialRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        registerPost(requestParameters: DefaultApiRegisterPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<RegisterPost200Response> {
-            return localVarFp.registerPost(requestParameters.userNo, requestParameters.password, requestParameters.userName, requestParameters.phone, requestParameters.email, options).then((request) => request(axios, basePath));
+        detectObsoleteMaterial(requestParameters: InventoryApiDetectObsoleteMaterialRequest, options?: RawAxiosRequestConfig): AxiosPromise<ObsoleteMaterialDetectResponse> {
+            return localVarFp.detectObsoleteMaterial(requestParameters.obsoleteMaterialDetectRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 生成库存预警事件
+         * @param {InventoryApiGenerateInventoryAlertRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generateInventoryAlert(requestParameters: InventoryApiGenerateInventoryAlertRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<InventoryAlertGenerateResponse> {
+            return localVarFp.generateInventoryAlert(requestParameters.inventoryAlertGenerateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理库存预警事件
+         * @param {InventoryApiHandleInventoryAlertRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleInventoryAlert(requestParameters: InventoryApiHandleInventoryAlertRequest, options?: RawAxiosRequestConfig): AxiosPromise<InventoryAlertResponse> {
+            return localVarFp.handleInventoryAlert(requestParameters.inventoryAlertHandleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * @summary 处理废弃物料检测结果
+         * @param {InventoryApiHandleObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handleObsoleteMaterialDetection(requestParameters: InventoryApiHandleObsoleteMaterialDetectionRequest, options?: RawAxiosRequestConfig): AxiosPromise<ObsoleteMaterialResponse> {
+            return localVarFp.handleObsoleteMaterialDetection(requestParameters.obsoleteMaterialHandleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询完工入库单
+         * @param {InventoryApiListCompletionInboundRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listCompletionInbound(requestParameters: InventoryApiListCompletionInboundRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<CompletionInboundPageResponse> {
+            return localVarFp.listCompletionInbound(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.inboundTimeStart, requestParameters.inboundTimeEnd, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询库存预警事件
+         * @param {InventoryApiListInventoryAlertRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listInventoryAlert(requestParameters: InventoryApiListInventoryAlertRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<InventoryAlertPageResponse> {
+            return localVarFp.listInventoryAlert(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询物料锁定记录
+         * @param {InventoryApiListMaterialStockLockRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialStockLock(requestParameters: InventoryApiListMaterialStockLockRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<StockLockRecordPageResponse> {
+            return localVarFp.listMaterialStockLock(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询废弃物料检测结果
+         * @param {InventoryApiListObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listObsoleteMaterialDetection(requestParameters: InventoryApiListObsoleteMaterialDetectionRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ObsoleteMaterialPageResponse> {
+            return localVarFp.listObsoleteMaterialDetection(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.detectTimeStart, requestParameters.detectTimeEnd, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * @summary 锁定物料库存
+         * @param {InventoryApiLockMaterialStockRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        lockMaterialStock(requestParameters: InventoryApiLockMaterialStockRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialStockLockResponse> {
+            return localVarFp.lockMaterialStock(requestParameters.materialStockLockRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * @summary 释放物料锁定
+         * @param {InventoryApiReleaseMaterialStockRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        releaseMaterialStock(requestParameters: InventoryApiReleaseMaterialStockRequest, options?: RawAxiosRequestConfig): AxiosPromise<StockLockRecordResponse> {
+            return localVarFp.releaseMaterialStock(requestParameters.materialStockReleaseRequest, options).then((request) => request(axios, basePath));
         },
     };
 };
 
 /**
- * Request parameters for loginPost operation in DefaultApi.
+ * Request parameters for addCompletionInbound operation in InventoryApi.
  */
-export interface DefaultApiLoginPostRequest {
-    readonly userNo?: string
-
-    readonly password?: string
+export interface InventoryApiAddCompletionInboundRequest {
+    readonly completionInboundCreateRequest: CompletionInboundCreateRequest
 }
 
 /**
- * Request parameters for registerPost operation in DefaultApi.
+ * Request parameters for calculateMaterialShortage operation in InventoryApi.
  */
-export interface DefaultApiRegisterPostRequest {
-    readonly userNo: string
-
-    readonly password: string
-
-    readonly userName: string
-
-    readonly phone: string
-
-    readonly email?: string
+export interface InventoryApiCalculateMaterialShortageRequest {
+    readonly materialShortageCalculateRequest: MaterialShortageCalculateRequest
 }
 
 /**
- * DefaultApi - object-oriented interface
+ * Request parameters for detectObsoleteMaterial operation in InventoryApi.
  */
-export class DefaultApi extends BaseAPI {
+export interface InventoryApiDetectObsoleteMaterialRequest {
+    readonly obsoleteMaterialDetectRequest: ObsoleteMaterialDetectRequest
+}
+
+/**
+ * Request parameters for generateInventoryAlert operation in InventoryApi.
+ */
+export interface InventoryApiGenerateInventoryAlertRequest {
+    readonly inventoryAlertGenerateRequest?: InventoryAlertGenerateRequest
+}
+
+/**
+ * Request parameters for handleInventoryAlert operation in InventoryApi.
+ */
+export interface InventoryApiHandleInventoryAlertRequest {
+    readonly inventoryAlertHandleRequest: InventoryAlertHandleRequest
+}
+
+/**
+ * Request parameters for handleObsoleteMaterialDetection operation in InventoryApi.
+ */
+export interface InventoryApiHandleObsoleteMaterialDetectionRequest {
+    readonly obsoleteMaterialHandleRequest: ObsoleteMaterialHandleRequest
+}
+
+/**
+ * Request parameters for listCompletionInbound operation in InventoryApi.
+ */
+export interface InventoryApiListCompletionInboundRequest {
     /**
-     * 
-     * @summary 获取测试用户数据表
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly materialId?: number
+
+    readonly inboundTimeStart?: string
+
+    readonly inboundTimeEnd?: string
+}
+
+/**
+ * Request parameters for listInventoryAlert operation in InventoryApi.
+ */
+export interface InventoryApiListInventoryAlertRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly materialId?: number
+
+    readonly status?: InventoryAlertStatus
+
+    readonly startTime?: string
+
+    readonly endTime?: string
+}
+
+/**
+ * Request parameters for listMaterialStockLock operation in InventoryApi.
+ */
+export interface InventoryApiListMaterialStockLockRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly materialId?: number
+
+    readonly status?: StockLockStatus
+}
+
+/**
+ * Request parameters for listObsoleteMaterialDetection operation in InventoryApi.
+ */
+export interface InventoryApiListObsoleteMaterialDetectionRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly materialId?: number
+
+    readonly status?: ObsoleteMaterialStatus
+
+    readonly detectTimeStart?: string
+
+    readonly detectTimeEnd?: string
+}
+
+/**
+ * Request parameters for lockMaterialStock operation in InventoryApi.
+ */
+export interface InventoryApiLockMaterialStockRequest {
+    readonly materialStockLockRequest: MaterialStockLockRequest
+}
+
+/**
+ * Request parameters for releaseMaterialStock operation in InventoryApi.
+ */
+export interface InventoryApiReleaseMaterialStockRequest {
+    readonly materialStockReleaseRequest: MaterialStockReleaseRequest
+}
+
+/**
+ * InventoryApi - object-oriented interface
+ */
+export class InventoryApi extends BaseAPI {
+    /**
+     * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+     * @summary 登记完工入库
+     * @param {InventoryApiAddCompletionInboundRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public getUserTest(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getUserTest(options).then((request) => request(this.axios, this.basePath));
+    public addCompletionInbound(requestParameters: InventoryApiAddCompletionInboundRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).addCompletionInbound(requestParameters.completionInboundCreateRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * 
+     * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 计算物料缺口
+     * @param {InventoryApiCalculateMaterialShortageRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public calculateMaterialShortage(requestParameters: InventoryApiCalculateMaterialShortageRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).calculateMaterialShortage(requestParameters.materialShortageCalculateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 检测废弃物料
+     * @param {InventoryApiDetectObsoleteMaterialRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public detectObsoleteMaterial(requestParameters: InventoryApiDetectObsoleteMaterialRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).detectObsoleteMaterial(requestParameters.obsoleteMaterialDetectRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 生成库存预警事件
+     * @param {InventoryApiGenerateInventoryAlertRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public generateInventoryAlert(requestParameters: InventoryApiGenerateInventoryAlertRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).generateInventoryAlert(requestParameters.inventoryAlertGenerateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+     * @summary 处理库存预警事件
+     * @param {InventoryApiHandleInventoryAlertRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public handleInventoryAlert(requestParameters: InventoryApiHandleInventoryAlertRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).handleInventoryAlert(requestParameters.inventoryAlertHandleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+     * @summary 处理废弃物料检测结果
+     * @param {InventoryApiHandleObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public handleObsoleteMaterialDetection(requestParameters: InventoryApiHandleObsoleteMaterialDetectionRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).handleObsoleteMaterialDetection(requestParameters.obsoleteMaterialHandleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询完工入库单
+     * @param {InventoryApiListCompletionInboundRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listCompletionInbound(requestParameters: InventoryApiListCompletionInboundRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listCompletionInbound(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.inboundTimeStart, requestParameters.inboundTimeEnd, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询库存预警事件
+     * @param {InventoryApiListInventoryAlertRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listInventoryAlert(requestParameters: InventoryApiListInventoryAlertRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listInventoryAlert(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询物料锁定记录
+     * @param {InventoryApiListMaterialStockLockRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listMaterialStockLock(requestParameters: InventoryApiListMaterialStockLockRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listMaterialStockLock(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询废弃物料检测结果
+     * @param {InventoryApiListObsoleteMaterialDetectionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listObsoleteMaterialDetection(requestParameters: InventoryApiListObsoleteMaterialDetectionRequest = {}, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).listObsoleteMaterialDetection(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.detectTimeStart, requestParameters.detectTimeEnd, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+     * @summary 锁定物料库存
+     * @param {InventoryApiLockMaterialStockRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public lockMaterialStock(requestParameters: InventoryApiLockMaterialStockRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).lockMaterialStock(requestParameters.materialStockLockRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+     * @summary 释放物料锁定
+     * @param {InventoryApiReleaseMaterialStockRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public releaseMaterialStock(requestParameters: InventoryApiReleaseMaterialStockRequest, options?: RawAxiosRequestConfig) {
+        return InventoryApiFp(this.configuration).releaseMaterialStock(requestParameters.materialStockReleaseRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * MaterialBomApi - axios parameter creator
+ */
+export const MaterialBomApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增 BOM 明细
+         * @param {BomCreateRequest} bomCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addBomData: async (bomCreateRequest: BomCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomCreateRequest' is not null or undefined
+            assertParamExists('addBomData', 'bomCreateRequest', bomCreateRequest)
+            const localVarPath = `/api/addBomData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(bomCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增 BOM 版本
+         * @param {BomVersionCreateRequest} bomVersionCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addBomVersionData: async (bomVersionCreateRequest: BomVersionCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomVersionCreateRequest' is not null or undefined
+            assertParamExists('addBomVersionData', 'bomVersionCreateRequest', bomVersionCreateRequest)
+            const localVarPath = `/api/addBomVersionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(bomVersionCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增物料分类
+         * @param {MaterialCategoryCreateRequest} materialCategoryCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addMaterialCategoryData: async (materialCategoryCreateRequest: MaterialCategoryCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialCategoryCreateRequest' is not null or undefined
+            assertParamExists('addMaterialCategoryData', 'materialCategoryCreateRequest', materialCategoryCreateRequest)
+            const localVarPath = `/api/addMaterialCategoryData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialCategoryCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增物料
+         * @param {MaterialCreateRequest} materialCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addMaterialData: async (materialCreateRequest: MaterialCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialCreateRequest' is not null or undefined
+            assertParamExists('addMaterialData', 'materialCreateRequest', materialCreateRequest)
+            const localVarPath = `/api/addMaterialData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增需求分析
+         * @param {DemandAnalysisCreateRequest} demandAnalysisCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addRequirementAnalysis: async (demandAnalysisCreateRequest: DemandAnalysisCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'demandAnalysisCreateRequest' is not null or undefined
+            assertParamExists('addRequirementAnalysis', 'demandAnalysisCreateRequest', demandAnalysisCreateRequest)
+            const localVarPath = `/api/addRequirementAnalysis`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(demandAnalysisCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 生产损耗补偿计算
+         * @param {LossCompensationCalculateRequest} lossCompensationCalculateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        calculateLossCompensation: async (lossCompensationCalculateRequest: LossCompensationCalculateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'lossCompensationCalculateRequest' is not null or undefined
+            assertParamExists('calculateLossCompensation', 'lossCompensationCalculateRequest', lossCompensationCalculateRequest)
+            const localVarPath = `/api/calculateLossCompensation`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(lossCompensationCalculateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 产品成本核算
+         * @param {ProductCostCalculateRequest} productCostCalculateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        calculateProductCost: async (productCostCalculateRequest: ProductCostCalculateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productCostCalculateRequest' is not null or undefined
+            assertParamExists('calculateProductCost', 'productCostCalculateRequest', productCostCalculateRequest)
+            const localVarPath = `/api/calculateProductCost`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productCostCalculateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 检查 BOM 循环依赖
+         * @param {BomCycleCheckRequest} bomCycleCheckRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        checkBomCycleDependency: async (bomCycleCheckRequest: BomCycleCheckRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomCycleCheckRequest' is not null or undefined
+            assertParamExists('checkBomCycleDependency', 'bomCycleCheckRequest', bomCycleCheckRequest)
+            const localVarPath = `/api/checkBomCycleDependency`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(bomCycleCheckRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除 BOM 明细
+         * @param {BomDeleteRequest} bomDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteBomData: async (bomDeleteRequest: BomDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomDeleteRequest' is not null or undefined
+            assertParamExists('deleteBomData', 'bomDeleteRequest', bomDeleteRequest)
+            const localVarPath = `/api/deleteBomData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(bomDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除 BOM 版本
+         * @param {BomVersionDeleteRequest} bomVersionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteBomVersionData: async (bomVersionDeleteRequest: BomVersionDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomVersionDeleteRequest' is not null or undefined
+            assertParamExists('deleteBomVersionData', 'bomVersionDeleteRequest', bomVersionDeleteRequest)
+            const localVarPath = `/api/deleteBomVersionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(bomVersionDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除物料分类
+         * @param {MaterialCategoryDeleteRequest} materialCategoryDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteMaterialCategoryData: async (materialCategoryDeleteRequest: MaterialCategoryDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialCategoryDeleteRequest' is not null or undefined
+            assertParamExists('deleteMaterialCategoryData', 'materialCategoryDeleteRequest', materialCategoryDeleteRequest)
+            const localVarPath = `/api/deleteMaterialCategoryData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialCategoryDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除物料
+         * @param {MaterialDeleteRequest} materialDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteMaterialData: async (materialDeleteRequest: MaterialDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialDeleteRequest' is not null or undefined
+            assertParamExists('deleteMaterialData', 'materialDeleteRequest', materialDeleteRequest)
+            const localVarPath = `/api/deleteMaterialData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 明细详情
+         * @param {number} bomId BOM 明细编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getBomData: async (bomId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomId' is not null or undefined
+            assertParamExists('getBomData', 'bomId', bomId)
+            const localVarPath = `/api/getBomData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (bomId !== undefined) {
+                localVarQueryParameter['bom_id'] = bomId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 层级树
+         * @param {number} materialId 根产品物料唯一标识，支持精确匹配。
+         * @param {number} versionId 使用的 BOM 版本编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getBomTreeData: async (materialId: number, versionId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialId' is not null or undefined
+            assertParamExists('getBomTreeData', 'materialId', materialId)
+            // verify required parameter 'versionId' is not null or undefined
+            assertParamExists('getBomTreeData', 'versionId', versionId)
+            const localVarPath = `/api/getBomTreeData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (versionId !== undefined) {
+                localVarQueryParameter['version_id'] = versionId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 版本详情
+         * @param {number} versionId 版本编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getBomVersionData: async (versionId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'versionId' is not null or undefined
+            assertParamExists('getBomVersionData', 'versionId', versionId)
+            const localVarPath = `/api/getBomVersionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (versionId !== undefined) {
+                localVarQueryParameter['version_id'] = versionId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料详情
+         * @param {number} materialId 物料唯一标识，支持精确匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMaterialData: async (materialId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialId' is not null or undefined
+            assertParamExists('getMaterialData', 'materialId', materialId)
+            const localVarPath = `/api/getMaterialData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 查询指定物料库存。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料库存
+         * @param {number} materialId 物料唯一标识，支持精确匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMaterialStockData: async (materialId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialId' is not null or undefined
+            assertParamExists('getMaterialStockData', 'materialId', materialId)
+            const localVarPath = `/api/getMaterialStockData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询需求分析结果
+         * @param {number} [analysisId] 分析编号；传入时按单条记录查询。
+         * @param {number} [materialId] 分析产品物料唯一标识，支持精确匹配。
+         * @param {number} [versionId] 使用的 BOM 版本编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getRequirementAnalysis: async (analysisId?: number, materialId?: number, versionId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/getRequirementAnalysis`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (analysisId !== undefined) {
+                localVarQueryParameter['analysis_id'] = analysisId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (versionId !== undefined) {
+                localVarQueryParameter['version_id'] = versionId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 反向产品追溯
+         * @param {number} materialId 需要追溯的子项物料唯一标识，支持精确匹配。
+         * @param {boolean} [includeHistory] 是否包含历史版本依赖关系。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getReverseTraceData: async (materialId: number, includeHistory?: boolean, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialId' is not null or undefined
+            assertParamExists('getReverseTraceData', 'materialId', materialId)
+            const localVarPath = `/api/getReverseTraceData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (includeHistory !== undefined) {
+                localVarQueryParameter['include_history'] = includeHistory;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 明细列表
+         * @param {number} versionId 所属 BOM 版本编号。
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [parentMaterialId] 父物料编号。
+         * @param {number} [childMaterialId] 子物料编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listBomData: async (versionId: number, page?: number, pageSize?: number, parentMaterialId?: number, childMaterialId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'versionId' is not null or undefined
+            assertParamExists('listBomData', 'versionId', versionId)
+            const localVarPath = `/api/listBomData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (versionId !== undefined) {
+                localVarQueryParameter['version_id'] = versionId;
+            }
+
+            if (parentMaterialId !== undefined) {
+                localVarQueryParameter['parent_material_id'] = parentMaterialId;
+            }
+
+            if (childMaterialId !== undefined) {
+                localVarQueryParameter['child_material_id'] = childMaterialId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 版本列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 所属物料唯一标识，支持精确匹配。
+         * @param {string} [versionNo] 版本号。
+         * @param {boolean} [effectiveOnly] 是否仅查询当前有效版本。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listBomVersionData: async (page?: number, pageSize?: number, materialId?: number, versionNo?: string, effectiveOnly?: boolean, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listBomVersionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (versionNo !== undefined) {
+                localVarQueryParameter['version_no'] = versionNo;
+            }
+
+            if (effectiveOnly !== undefined) {
+                localVarQueryParameter['effective_only'] = effectiveOnly;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料分类列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {string} [categoryName] 分类名称，支持模糊匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialCategoryData: async (page?: number, pageSize?: number, categoryName?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listMaterialCategoryData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (categoryName !== undefined) {
+                localVarQueryParameter['category_name'] = categoryName;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 物料唯一标识，支持精确匹配。
+         * @param {string} [materialName] 物料名称，支持模糊匹配。
+         * @param {string} [materialType] 物料类型。
+         * @param {number} [categoryId] 物料分类编号。
+         * @param {number} [defaultSupplierId] 默认供应商编号。
+         * @param {number} [minSafetyStock] 安全库存下限。
+         * @param {number} [maxSafetyStock] 安全库存上限。
+         * @param {string} [createdStartTime] 创建开始时间。
+         * @param {string} [createdEndTime] 创建结束时间。
+         * @param {string} [updatedStartTime] 更新开始时间。
+         * @param {string} [updatedEndTime] 更新结束时间。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialData: async (page?: number, pageSize?: number, materialId?: number, materialName?: string, materialType?: string, categoryId?: number, defaultSupplierId?: number, minSafetyStock?: number, maxSafetyStock?: number, createdStartTime?: string, createdEndTime?: string, updatedStartTime?: string, updatedEndTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listMaterialData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (materialName !== undefined) {
+                localVarQueryParameter['material_name'] = materialName;
+            }
+
+            if (materialType !== undefined) {
+                localVarQueryParameter['material_type'] = materialType;
+            }
+
+            if (categoryId !== undefined) {
+                localVarQueryParameter['category_id'] = categoryId;
+            }
+
+            if (defaultSupplierId !== undefined) {
+                localVarQueryParameter['default_supplier_id'] = defaultSupplierId;
+            }
+
+            if (minSafetyStock !== undefined) {
+                localVarQueryParameter['min_safety_stock'] = minSafetyStock;
+            }
+
+            if (maxSafetyStock !== undefined) {
+                localVarQueryParameter['max_safety_stock'] = maxSafetyStock;
+            }
+
+            if (createdStartTime !== undefined) {
+                localVarQueryParameter['created_start_time'] = (createdStartTime as any instanceof Date) ?
+                    (createdStartTime as any).toISOString() :
+                    createdStartTime;
+            }
+
+            if (createdEndTime !== undefined) {
+                localVarQueryParameter['created_end_time'] = (createdEndTime as any instanceof Date) ?
+                    (createdEndTime as any).toISOString() :
+                    createdEndTime;
+            }
+
+            if (updatedStartTime !== undefined) {
+                localVarQueryParameter['updated_start_time'] = (updatedStartTime as any instanceof Date) ?
+                    (updatedStartTime as any).toISOString() :
+                    updatedStartTime;
+            }
+
+            if (updatedEndTime !== undefined) {
+                localVarQueryParameter['updated_end_time'] = (updatedEndTime as any instanceof Date) ?
+                    (updatedEndTime as any).toISOString() :
+                    updatedEndTime;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改 BOM 明细
+         * @param {BomUpdateRequest} bomUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateBomData: async (bomUpdateRequest: BomUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomUpdateRequest' is not null or undefined
+            assertParamExists('updateBomData', 'bomUpdateRequest', bomUpdateRequest)
+            const localVarPath = `/api/updateBomData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(bomUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改 BOM 版本
+         * @param {BomVersionUpdateRequest} bomVersionUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateBomVersionData: async (bomVersionUpdateRequest: BomVersionUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'bomVersionUpdateRequest' is not null or undefined
+            assertParamExists('updateBomVersionData', 'bomVersionUpdateRequest', bomVersionUpdateRequest)
+            const localVarPath = `/api/updateBomVersionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(bomVersionUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改物料分类
+         * @param {MaterialCategoryUpdateRequest} materialCategoryUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateMaterialCategoryData: async (materialCategoryUpdateRequest: MaterialCategoryUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialCategoryUpdateRequest' is not null or undefined
+            assertParamExists('updateMaterialCategoryData', 'materialCategoryUpdateRequest', materialCategoryUpdateRequest)
+            const localVarPath = `/api/updateMaterialCategoryData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialCategoryUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改物料
+         * @param {MaterialUpdateRequest} materialUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateMaterialData: async (materialUpdateRequest: MaterialUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'materialUpdateRequest' is not null or undefined
+            assertParamExists('updateMaterialData', 'materialUpdateRequest', materialUpdateRequest)
+            const localVarPath = `/api/updateMaterialData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(materialUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * MaterialBomApi - functional programming interface
+ */
+export const MaterialBomApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = MaterialBomApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增 BOM 明细
+         * @param {BomCreateRequest} bomCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addBomData(bomCreateRequest: BomCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addBomData(bomCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.addBomData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增 BOM 版本
+         * @param {BomVersionCreateRequest} bomVersionCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addBomVersionData(bomVersionCreateRequest: BomVersionCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomVersionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addBomVersionData(bomVersionCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.addBomVersionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增物料分类
+         * @param {MaterialCategoryCreateRequest} materialCategoryCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addMaterialCategoryData(materialCategoryCreateRequest: MaterialCategoryCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialCategoryResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addMaterialCategoryData(materialCategoryCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.addMaterialCategoryData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增物料
+         * @param {MaterialCreateRequest} materialCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addMaterialData(materialCreateRequest: MaterialCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addMaterialData(materialCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.addMaterialData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增需求分析
+         * @param {DemandAnalysisCreateRequest} demandAnalysisCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addRequirementAnalysis(demandAnalysisCreateRequest: DemandAnalysisCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DemandAnalysisResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addRequirementAnalysis(demandAnalysisCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.addRequirementAnalysis']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 生产损耗补偿计算
+         * @param {LossCompensationCalculateRequest} lossCompensationCalculateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async calculateLossCompensation(lossCompensationCalculateRequest: LossCompensationCalculateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LossCompensationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.calculateLossCompensation(lossCompensationCalculateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.calculateLossCompensation']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 产品成本核算
+         * @param {ProductCostCalculateRequest} productCostCalculateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async calculateProductCost(productCostCalculateRequest: ProductCostCalculateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductCostResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.calculateProductCost(productCostCalculateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.calculateProductCost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 检查 BOM 循环依赖
+         * @param {BomCycleCheckRequest} bomCycleCheckRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async checkBomCycleDependency(bomCycleCheckRequest: BomCycleCheckRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomCycleCheckResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.checkBomCycleDependency(bomCycleCheckRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.checkBomCycleDependency']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除 BOM 明细
+         * @param {BomDeleteRequest} bomDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteBomData(bomDeleteRequest: BomDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteBomData(bomDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.deleteBomData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除 BOM 版本
+         * @param {BomVersionDeleteRequest} bomVersionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteBomVersionData(bomVersionDeleteRequest: BomVersionDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteBomVersionData(bomVersionDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.deleteBomVersionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除物料分类
+         * @param {MaterialCategoryDeleteRequest} materialCategoryDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteMaterialCategoryData(materialCategoryDeleteRequest: MaterialCategoryDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteMaterialCategoryData(materialCategoryDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.deleteMaterialCategoryData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除物料
+         * @param {MaterialDeleteRequest} materialDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteMaterialData(materialDeleteRequest: MaterialDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteMaterialData(materialDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.deleteMaterialData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 明细详情
+         * @param {number} bomId BOM 明细编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getBomData(bomId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getBomData(bomId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getBomData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 层级树
+         * @param {number} materialId 根产品物料唯一标识，支持精确匹配。
+         * @param {number} versionId 使用的 BOM 版本编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getBomTreeData(materialId: number, versionId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomTreeResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getBomTreeData(materialId, versionId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getBomTreeData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 版本详情
+         * @param {number} versionId 版本编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getBomVersionData(versionId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomVersionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getBomVersionData(versionId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getBomVersionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料详情
+         * @param {number} materialId 物料唯一标识，支持精确匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getMaterialData(materialId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getMaterialData(materialId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getMaterialData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 查询指定物料库存。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料库存
+         * @param {number} materialId 物料唯一标识，支持精确匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getMaterialStockData(materialId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialStockResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getMaterialStockData(materialId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getMaterialStockData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询需求分析结果
+         * @param {number} [analysisId] 分析编号；传入时按单条记录查询。
+         * @param {number} [materialId] 分析产品物料唯一标识，支持精确匹配。
+         * @param {number} [versionId] 使用的 BOM 版本编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getRequirementAnalysis(analysisId?: number, materialId?: number, versionId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DemandAnalysisResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getRequirementAnalysis(analysisId, materialId, versionId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getRequirementAnalysis']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 反向产品追溯
+         * @param {number} materialId 需要追溯的子项物料唯一标识，支持精确匹配。
+         * @param {boolean} [includeHistory] 是否包含历史版本依赖关系。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getReverseTraceData(materialId: number, includeHistory?: boolean, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ReverseTraceResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getReverseTraceData(materialId, includeHistory, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getReverseTraceData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 明细列表
+         * @param {number} versionId 所属 BOM 版本编号。
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [parentMaterialId] 父物料编号。
+         * @param {number} [childMaterialId] 子物料编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listBomData(versionId: number, page?: number, pageSize?: number, parentMaterialId?: number, childMaterialId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listBomData(versionId, page, pageSize, parentMaterialId, childMaterialId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.listBomData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 版本列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 所属物料唯一标识，支持精确匹配。
+         * @param {string} [versionNo] 版本号。
+         * @param {boolean} [effectiveOnly] 是否仅查询当前有效版本。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listBomVersionData(page?: number, pageSize?: number, materialId?: number, versionNo?: string, effectiveOnly?: boolean, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomVersionPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listBomVersionData(page, pageSize, materialId, versionNo, effectiveOnly, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.listBomVersionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料分类列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {string} [categoryName] 分类名称，支持模糊匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listMaterialCategoryData(page?: number, pageSize?: number, categoryName?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialCategoryPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listMaterialCategoryData(page, pageSize, categoryName, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.listMaterialCategoryData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 物料唯一标识，支持精确匹配。
+         * @param {string} [materialName] 物料名称，支持模糊匹配。
+         * @param {string} [materialType] 物料类型。
+         * @param {number} [categoryId] 物料分类编号。
+         * @param {number} [defaultSupplierId] 默认供应商编号。
+         * @param {number} [minSafetyStock] 安全库存下限。
+         * @param {number} [maxSafetyStock] 安全库存上限。
+         * @param {string} [createdStartTime] 创建开始时间。
+         * @param {string} [createdEndTime] 创建结束时间。
+         * @param {string} [updatedStartTime] 更新开始时间。
+         * @param {string} [updatedEndTime] 更新结束时间。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listMaterialData(page?: number, pageSize?: number, materialId?: number, materialName?: string, materialType?: string, categoryId?: number, defaultSupplierId?: number, minSafetyStock?: number, maxSafetyStock?: number, createdStartTime?: string, createdEndTime?: string, updatedStartTime?: string, updatedEndTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listMaterialData(page, pageSize, materialId, materialName, materialType, categoryId, defaultSupplierId, minSafetyStock, maxSafetyStock, createdStartTime, createdEndTime, updatedStartTime, updatedEndTime, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.listMaterialData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改 BOM 明细
+         * @param {BomUpdateRequest} bomUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateBomData(bomUpdateRequest: BomUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateBomData(bomUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.updateBomData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改 BOM 版本
+         * @param {BomVersionUpdateRequest} bomVersionUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateBomVersionData(bomVersionUpdateRequest: BomVersionUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BomVersionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateBomVersionData(bomVersionUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.updateBomVersionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改物料分类
+         * @param {MaterialCategoryUpdateRequest} materialCategoryUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateMaterialCategoryData(materialCategoryUpdateRequest: MaterialCategoryUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialCategoryResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateMaterialCategoryData(materialCategoryUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.updateMaterialCategoryData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改物料
+         * @param {MaterialUpdateRequest} materialUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateMaterialData(materialUpdateRequest: MaterialUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateMaterialData(materialUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.updateMaterialData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * MaterialBomApi - factory interface
+ */
+export const MaterialBomApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = MaterialBomApiFp(configuration)
+    return {
+        /**
+         * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增 BOM 明细
+         * @param {MaterialBomApiAddBomDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addBomData(requestParameters: MaterialBomApiAddBomDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomResponse> {
+            return localVarFp.addBomData(requestParameters.bomCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增 BOM 版本
+         * @param {MaterialBomApiAddBomVersionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addBomVersionData(requestParameters: MaterialBomApiAddBomVersionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomVersionResponse> {
+            return localVarFp.addBomVersionData(requestParameters.bomVersionCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增物料分类
+         * @param {MaterialBomApiAddMaterialCategoryDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addMaterialCategoryData(requestParameters: MaterialBomApiAddMaterialCategoryDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialCategoryResponse> {
+            return localVarFp.addMaterialCategoryData(requestParameters.materialCategoryCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增物料
+         * @param {MaterialBomApiAddMaterialDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addMaterialData(requestParameters: MaterialBomApiAddMaterialDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialResponse> {
+            return localVarFp.addMaterialData(requestParameters.materialCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增需求分析
+         * @param {MaterialBomApiAddRequirementAnalysisRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addRequirementAnalysis(requestParameters: MaterialBomApiAddRequirementAnalysisRequest, options?: RawAxiosRequestConfig): AxiosPromise<DemandAnalysisResponse> {
+            return localVarFp.addRequirementAnalysis(requestParameters.demandAnalysisCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 生产损耗补偿计算
+         * @param {MaterialBomApiCalculateLossCompensationRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        calculateLossCompensation(requestParameters: MaterialBomApiCalculateLossCompensationRequest, options?: RawAxiosRequestConfig): AxiosPromise<LossCompensationResponse> {
+            return localVarFp.calculateLossCompensation(requestParameters.lossCompensationCalculateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 产品成本核算
+         * @param {MaterialBomApiCalculateProductCostRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        calculateProductCost(requestParameters: MaterialBomApiCalculateProductCostRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductCostResponse> {
+            return localVarFp.calculateProductCost(requestParameters.productCostCalculateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 检查 BOM 循环依赖
+         * @param {MaterialBomApiCheckBomCycleDependencyRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        checkBomCycleDependency(requestParameters: MaterialBomApiCheckBomCycleDependencyRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomCycleCheckResponse> {
+            return localVarFp.checkBomCycleDependency(requestParameters.bomCycleCheckRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除 BOM 明细
+         * @param {MaterialBomApiDeleteBomDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteBomData(requestParameters: MaterialBomApiDeleteBomDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteBomData(requestParameters.bomDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除 BOM 版本
+         * @param {MaterialBomApiDeleteBomVersionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteBomVersionData(requestParameters: MaterialBomApiDeleteBomVersionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteBomVersionData(requestParameters.bomVersionDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除物料分类
+         * @param {MaterialBomApiDeleteMaterialCategoryDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteMaterialCategoryData(requestParameters: MaterialBomApiDeleteMaterialCategoryDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteMaterialCategoryData(requestParameters.materialCategoryDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除物料
+         * @param {MaterialBomApiDeleteMaterialDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteMaterialData(requestParameters: MaterialBomApiDeleteMaterialDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteMaterialData(requestParameters.materialDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 明细详情
+         * @param {MaterialBomApiGetBomDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getBomData(requestParameters: MaterialBomApiGetBomDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomResponse> {
+            return localVarFp.getBomData(requestParameters.bomId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 层级树
+         * @param {MaterialBomApiGetBomTreeDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getBomTreeData(requestParameters: MaterialBomApiGetBomTreeDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomTreeResponse> {
+            return localVarFp.getBomTreeData(requestParameters.materialId, requestParameters.versionId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 版本详情
+         * @param {MaterialBomApiGetBomVersionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getBomVersionData(requestParameters: MaterialBomApiGetBomVersionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomVersionResponse> {
+            return localVarFp.getBomVersionData(requestParameters.versionId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料详情
+         * @param {MaterialBomApiGetMaterialDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMaterialData(requestParameters: MaterialBomApiGetMaterialDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialResponse> {
+            return localVarFp.getMaterialData(requestParameters.materialId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 查询指定物料库存。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料库存
+         * @param {MaterialBomApiGetMaterialStockDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMaterialStockData(requestParameters: MaterialBomApiGetMaterialStockDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialStockResponse> {
+            return localVarFp.getMaterialStockData(requestParameters.materialId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询需求分析结果
+         * @param {MaterialBomApiGetRequirementAnalysisRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getRequirementAnalysis(requestParameters: MaterialBomApiGetRequirementAnalysisRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<DemandAnalysisResponse> {
+            return localVarFp.getRequirementAnalysis(requestParameters.analysisId, requestParameters.materialId, requestParameters.versionId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 反向产品追溯
+         * @param {MaterialBomApiGetReverseTraceDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getReverseTraceData(requestParameters: MaterialBomApiGetReverseTraceDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ReverseTraceResponse> {
+            return localVarFp.getReverseTraceData(requestParameters.materialId, requestParameters.includeHistory, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 明细列表
+         * @param {MaterialBomApiListBomDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listBomData(requestParameters: MaterialBomApiListBomDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomPageResponse> {
+            return localVarFp.listBomData(requestParameters.versionId, requestParameters.page, requestParameters.pageSize, requestParameters.parentMaterialId, requestParameters.childMaterialId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询 BOM 版本列表
+         * @param {MaterialBomApiListBomVersionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listBomVersionData(requestParameters: MaterialBomApiListBomVersionDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<BomVersionPageResponse> {
+            return localVarFp.listBomVersionData(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.versionNo, requestParameters.effectiveOnly, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料分类列表
+         * @param {MaterialBomApiListMaterialCategoryDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialCategoryData(requestParameters: MaterialBomApiListMaterialCategoryDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<MaterialCategoryPageResponse> {
+            return localVarFp.listMaterialCategoryData(requestParameters.page, requestParameters.pageSize, requestParameters.categoryName, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询物料列表
+         * @param {MaterialBomApiListMaterialDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listMaterialData(requestParameters: MaterialBomApiListMaterialDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<MaterialPageResponse> {
+            return localVarFp.listMaterialData(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.materialName, requestParameters.materialType, requestParameters.categoryId, requestParameters.defaultSupplierId, requestParameters.minSafetyStock, requestParameters.maxSafetyStock, requestParameters.createdStartTime, requestParameters.createdEndTime, requestParameters.updatedStartTime, requestParameters.updatedEndTime, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改 BOM 明细
+         * @param {MaterialBomApiUpdateBomDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateBomData(requestParameters: MaterialBomApiUpdateBomDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomResponse> {
+            return localVarFp.updateBomData(requestParameters.bomUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改 BOM 版本
+         * @param {MaterialBomApiUpdateBomVersionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateBomVersionData(requestParameters: MaterialBomApiUpdateBomVersionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<BomVersionResponse> {
+            return localVarFp.updateBomVersionData(requestParameters.bomVersionUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改物料分类
+         * @param {MaterialBomApiUpdateMaterialCategoryDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateMaterialCategoryData(requestParameters: MaterialBomApiUpdateMaterialCategoryDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialCategoryResponse> {
+            return localVarFp.updateMaterialCategoryData(requestParameters.materialCategoryUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改物料
+         * @param {MaterialBomApiUpdateMaterialDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateMaterialData(requestParameters: MaterialBomApiUpdateMaterialDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialResponse> {
+            return localVarFp.updateMaterialData(requestParameters.materialUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addBomData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiAddBomDataRequest {
+    readonly bomCreateRequest: BomCreateRequest
+}
+
+/**
+ * Request parameters for addBomVersionData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiAddBomVersionDataRequest {
+    readonly bomVersionCreateRequest: BomVersionCreateRequest
+}
+
+/**
+ * Request parameters for addMaterialCategoryData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiAddMaterialCategoryDataRequest {
+    readonly materialCategoryCreateRequest: MaterialCategoryCreateRequest
+}
+
+/**
+ * Request parameters for addMaterialData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiAddMaterialDataRequest {
+    readonly materialCreateRequest: MaterialCreateRequest
+}
+
+/**
+ * Request parameters for addRequirementAnalysis operation in MaterialBomApi.
+ */
+export interface MaterialBomApiAddRequirementAnalysisRequest {
+    readonly demandAnalysisCreateRequest: DemandAnalysisCreateRequest
+}
+
+/**
+ * Request parameters for calculateLossCompensation operation in MaterialBomApi.
+ */
+export interface MaterialBomApiCalculateLossCompensationRequest {
+    readonly lossCompensationCalculateRequest: LossCompensationCalculateRequest
+}
+
+/**
+ * Request parameters for calculateProductCost operation in MaterialBomApi.
+ */
+export interface MaterialBomApiCalculateProductCostRequest {
+    readonly productCostCalculateRequest: ProductCostCalculateRequest
+}
+
+/**
+ * Request parameters for checkBomCycleDependency operation in MaterialBomApi.
+ */
+export interface MaterialBomApiCheckBomCycleDependencyRequest {
+    readonly bomCycleCheckRequest: BomCycleCheckRequest
+}
+
+/**
+ * Request parameters for deleteBomData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiDeleteBomDataRequest {
+    readonly bomDeleteRequest: BomDeleteRequest
+}
+
+/**
+ * Request parameters for deleteBomVersionData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiDeleteBomVersionDataRequest {
+    readonly bomVersionDeleteRequest: BomVersionDeleteRequest
+}
+
+/**
+ * Request parameters for deleteMaterialCategoryData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiDeleteMaterialCategoryDataRequest {
+    readonly materialCategoryDeleteRequest: MaterialCategoryDeleteRequest
+}
+
+/**
+ * Request parameters for deleteMaterialData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiDeleteMaterialDataRequest {
+    readonly materialDeleteRequest: MaterialDeleteRequest
+}
+
+/**
+ * Request parameters for getBomData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiGetBomDataRequest {
+    /**
+     * BOM 明细编号。
+     */
+    readonly bomId: number
+}
+
+/**
+ * Request parameters for getBomTreeData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiGetBomTreeDataRequest {
+    /**
+     * 根产品物料唯一标识，支持精确匹配。
+     */
+    readonly materialId: number
+
+    /**
+     * 使用的 BOM 版本编号。
+     */
+    readonly versionId: number
+}
+
+/**
+ * Request parameters for getBomVersionData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiGetBomVersionDataRequest {
+    /**
+     * 版本编号。
+     */
+    readonly versionId: number
+}
+
+/**
+ * Request parameters for getMaterialData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiGetMaterialDataRequest {
+    /**
+     * 物料唯一标识，支持精确匹配。
+     */
+    readonly materialId: number
+}
+
+/**
+ * Request parameters for getMaterialStockData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiGetMaterialStockDataRequest {
+    /**
+     * 物料唯一标识，支持精确匹配。
+     */
+    readonly materialId: number
+}
+
+/**
+ * Request parameters for getRequirementAnalysis operation in MaterialBomApi.
+ */
+export interface MaterialBomApiGetRequirementAnalysisRequest {
+    /**
+     * 分析编号；传入时按单条记录查询。
+     */
+    readonly analysisId?: number
+
+    /**
+     * 分析产品物料唯一标识，支持精确匹配。
+     */
+    readonly materialId?: number
+
+    /**
+     * 使用的 BOM 版本编号。
+     */
+    readonly versionId?: number
+}
+
+/**
+ * Request parameters for getReverseTraceData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiGetReverseTraceDataRequest {
+    /**
+     * 需要追溯的子项物料唯一标识，支持精确匹配。
+     */
+    readonly materialId: number
+
+    /**
+     * 是否包含历史版本依赖关系。
+     */
+    readonly includeHistory?: boolean
+}
+
+/**
+ * Request parameters for listBomData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiListBomDataRequest {
+    /**
+     * 所属 BOM 版本编号。
+     */
+    readonly versionId: number
+
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 父物料编号。
+     */
+    readonly parentMaterialId?: number
+
+    /**
+     * 子物料编号。
+     */
+    readonly childMaterialId?: number
+}
+
+/**
+ * Request parameters for listBomVersionData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiListBomVersionDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 所属物料唯一标识，支持精确匹配。
+     */
+    readonly materialId?: number
+
+    /**
+     * 版本号。
+     */
+    readonly versionNo?: string
+
+    /**
+     * 是否仅查询当前有效版本。
+     */
+    readonly effectiveOnly?: boolean
+}
+
+/**
+ * Request parameters for listMaterialCategoryData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiListMaterialCategoryDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 分类名称，支持模糊匹配。
+     */
+    readonly categoryName?: string
+}
+
+/**
+ * Request parameters for listMaterialData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiListMaterialDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 物料唯一标识，支持精确匹配。
+     */
+    readonly materialId?: number
+
+    /**
+     * 物料名称，支持模糊匹配。
+     */
+    readonly materialName?: string
+
+    /**
+     * 物料类型。
+     */
+    readonly materialType?: string
+
+    /**
+     * 物料分类编号。
+     */
+    readonly categoryId?: number
+
+    /**
+     * 默认供应商编号。
+     */
+    readonly defaultSupplierId?: number
+
+    /**
+     * 安全库存下限。
+     */
+    readonly minSafetyStock?: number
+
+    /**
+     * 安全库存上限。
+     */
+    readonly maxSafetyStock?: number
+
+    /**
+     * 创建开始时间。
+     */
+    readonly createdStartTime?: string
+
+    /**
+     * 创建结束时间。
+     */
+    readonly createdEndTime?: string
+
+    /**
+     * 更新开始时间。
+     */
+    readonly updatedStartTime?: string
+
+    /**
+     * 更新结束时间。
+     */
+    readonly updatedEndTime?: string
+}
+
+/**
+ * Request parameters for updateBomData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiUpdateBomDataRequest {
+    readonly bomUpdateRequest: BomUpdateRequest
+}
+
+/**
+ * Request parameters for updateBomVersionData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiUpdateBomVersionDataRequest {
+    readonly bomVersionUpdateRequest: BomVersionUpdateRequest
+}
+
+/**
+ * Request parameters for updateMaterialCategoryData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiUpdateMaterialCategoryDataRequest {
+    readonly materialCategoryUpdateRequest: MaterialCategoryUpdateRequest
+}
+
+/**
+ * Request parameters for updateMaterialData operation in MaterialBomApi.
+ */
+export interface MaterialBomApiUpdateMaterialDataRequest {
+    readonly materialUpdateRequest: MaterialUpdateRequest
+}
+
+/**
+ * MaterialBomApi - object-oriented interface
+ */
+export class MaterialBomApi extends BaseAPI {
+    /**
+     * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增 BOM 明细
+     * @param {MaterialBomApiAddBomDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addBomData(requestParameters: MaterialBomApiAddBomDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).addBomData(requestParameters.bomCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增 BOM 版本
+     * @param {MaterialBomApiAddBomVersionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addBomVersionData(requestParameters: MaterialBomApiAddBomVersionDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).addBomVersionData(requestParameters.bomVersionCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增物料分类
+     * @param {MaterialBomApiAddMaterialCategoryDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addMaterialCategoryData(requestParameters: MaterialBomApiAddMaterialCategoryDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).addMaterialCategoryData(requestParameters.materialCategoryCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增物料
+     * @param {MaterialBomApiAddMaterialDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addMaterialData(requestParameters: MaterialBomApiAddMaterialDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).addMaterialData(requestParameters.materialCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增需求分析
+     * @param {MaterialBomApiAddRequirementAnalysisRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addRequirementAnalysis(requestParameters: MaterialBomApiAddRequirementAnalysisRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).addRequirementAnalysis(requestParameters.demandAnalysisCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 生产损耗补偿计算
+     * @param {MaterialBomApiCalculateLossCompensationRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public calculateLossCompensation(requestParameters: MaterialBomApiCalculateLossCompensationRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).calculateLossCompensation(requestParameters.lossCompensationCalculateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 产品成本核算
+     * @param {MaterialBomApiCalculateProductCostRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public calculateProductCost(requestParameters: MaterialBomApiCalculateProductCostRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).calculateProductCost(requestParameters.productCostCalculateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 检查 BOM 循环依赖
+     * @param {MaterialBomApiCheckBomCycleDependencyRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public checkBomCycleDependency(requestParameters: MaterialBomApiCheckBomCycleDependencyRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).checkBomCycleDependency(requestParameters.bomCycleCheckRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 删除 BOM 明细
+     * @param {MaterialBomApiDeleteBomDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteBomData(requestParameters: MaterialBomApiDeleteBomDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).deleteBomData(requestParameters.bomDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 删除 BOM 版本
+     * @param {MaterialBomApiDeleteBomVersionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteBomVersionData(requestParameters: MaterialBomApiDeleteBomVersionDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).deleteBomVersionData(requestParameters.bomVersionDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 删除物料分类
+     * @param {MaterialBomApiDeleteMaterialCategoryDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteMaterialCategoryData(requestParameters: MaterialBomApiDeleteMaterialCategoryDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).deleteMaterialCategoryData(requestParameters.materialCategoryDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 删除物料
+     * @param {MaterialBomApiDeleteMaterialDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteMaterialData(requestParameters: MaterialBomApiDeleteMaterialDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).deleteMaterialData(requestParameters.materialDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询 BOM 明细详情
+     * @param {MaterialBomApiGetBomDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getBomData(requestParameters: MaterialBomApiGetBomDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).getBomData(requestParameters.bomId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询 BOM 层级树
+     * @param {MaterialBomApiGetBomTreeDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getBomTreeData(requestParameters: MaterialBomApiGetBomTreeDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).getBomTreeData(requestParameters.materialId, requestParameters.versionId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询 BOM 版本详情
+     * @param {MaterialBomApiGetBomVersionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getBomVersionData(requestParameters: MaterialBomApiGetBomVersionDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).getBomVersionData(requestParameters.versionId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询物料详情
+     * @param {MaterialBomApiGetMaterialDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getMaterialData(requestParameters: MaterialBomApiGetMaterialDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).getMaterialData(requestParameters.materialId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 查询指定物料库存。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询物料库存
+     * @param {MaterialBomApiGetMaterialStockDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getMaterialStockData(requestParameters: MaterialBomApiGetMaterialStockDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).getMaterialStockData(requestParameters.materialId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询需求分析结果
+     * @param {MaterialBomApiGetRequirementAnalysisRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getRequirementAnalysis(requestParameters: MaterialBomApiGetRequirementAnalysisRequest = {}, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).getRequirementAnalysis(requestParameters.analysisId, requestParameters.materialId, requestParameters.versionId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 反向产品追溯
+     * @param {MaterialBomApiGetReverseTraceDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getReverseTraceData(requestParameters: MaterialBomApiGetReverseTraceDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).getReverseTraceData(requestParameters.materialId, requestParameters.includeHistory, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询 BOM 明细列表
+     * @param {MaterialBomApiListBomDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listBomData(requestParameters: MaterialBomApiListBomDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).listBomData(requestParameters.versionId, requestParameters.page, requestParameters.pageSize, requestParameters.parentMaterialId, requestParameters.childMaterialId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询 BOM 版本列表
+     * @param {MaterialBomApiListBomVersionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listBomVersionData(requestParameters: MaterialBomApiListBomVersionDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).listBomVersionData(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.versionNo, requestParameters.effectiveOnly, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询物料分类列表
+     * @param {MaterialBomApiListMaterialCategoryDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listMaterialCategoryData(requestParameters: MaterialBomApiListMaterialCategoryDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).listMaterialCategoryData(requestParameters.page, requestParameters.pageSize, requestParameters.categoryName, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询物料列表
+     * @param {MaterialBomApiListMaterialDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listMaterialData(requestParameters: MaterialBomApiListMaterialDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).listMaterialData(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.materialName, requestParameters.materialType, requestParameters.categoryId, requestParameters.defaultSupplierId, requestParameters.minSafetyStock, requestParameters.maxSafetyStock, requestParameters.createdStartTime, requestParameters.createdEndTime, requestParameters.updatedStartTime, requestParameters.updatedEndTime, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 修改 BOM 明细
+     * @param {MaterialBomApiUpdateBomDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateBomData(requestParameters: MaterialBomApiUpdateBomDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).updateBomData(requestParameters.bomUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 修改 BOM 版本
+     * @param {MaterialBomApiUpdateBomVersionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateBomVersionData(requestParameters: MaterialBomApiUpdateBomVersionDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).updateBomVersionData(requestParameters.bomVersionUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 修改物料分类
+     * @param {MaterialBomApiUpdateMaterialCategoryDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateMaterialCategoryData(requestParameters: MaterialBomApiUpdateMaterialCategoryDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).updateMaterialCategoryData(requestParameters.materialCategoryUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 修改物料
+     * @param {MaterialBomApiUpdateMaterialDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateMaterialData(requestParameters: MaterialBomApiUpdateMaterialDataRequest, options?: RawAxiosRequestConfig) {
+        return MaterialBomApiFp(this.configuration).updateMaterialData(requestParameters.materialUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * ProductionApi - axios parameter creator
+ */
+export const ProductionApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+         * @summary 外部客户提交订单
+         * @param {ExternalOrderCreateRequest} externalOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addExternalOrder: async (externalOrderCreateRequest: ExternalOrderCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'externalOrderCreateRequest' is not null or undefined
+            assertParamExists('addExternalOrder', 'externalOrderCreateRequest', externalOrderCreateRequest)
+            const localVarPath = `/api/addExternalOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(externalOrderCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 新增生产线
+         * @param {ProductionLineCreateRequest} productionLineCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addProductionLine: async (productionLineCreateRequest: ProductionLineCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionLineCreateRequest' is not null or undefined
+            assertParamExists('addProductionLine', 'productionLineCreateRequest', productionLineCreateRequest)
+            const localVarPath = `/api/addProductionLine`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionLineCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+         * @summary 新增生产订单
+         * @param {ProductionOrderCreateRequest} productionOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addProductionOrder: async (productionOrderCreateRequest: ProductionOrderCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionOrderCreateRequest' is not null or undefined
+            assertParamExists('addProductionOrder', 'productionOrderCreateRequest', productionOrderCreateRequest)
+            const localVarPath = `/api/addProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionOrderCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 审核生产订单
+         * @param {ProductionOrderApproveRequest} productionOrderApproveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        approveProductionOrder: async (productionOrderApproveRequest: ProductionOrderApproveRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionOrderApproveRequest' is not null or undefined
+            assertParamExists('approveProductionOrder', 'productionOrderApproveRequest', productionOrderApproveRequest)
+            const localVarPath = `/api/approveProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionOrderApproveRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+         * @summary 取消生产订单
+         * @param {ProductionOrderActionRequest} productionOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancelProductionOrder: async (productionOrderActionRequest: ProductionOrderActionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionOrderActionRequest' is not null or undefined
+            assertParamExists('cancelProductionOrder', 'productionOrderActionRequest', productionOrderActionRequest)
+            const localVarPath = `/api/cancelProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionOrderActionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 外部订单转生产订单
+         * @param {ExternalOrderConvertRequest} externalOrderConvertRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        convertExternalOrderToProductionOrder: async (externalOrderConvertRequest: ExternalOrderConvertRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'externalOrderConvertRequest' is not null or undefined
+            assertParamExists('convertExternalOrderToProductionOrder', 'externalOrderConvertRequest', externalOrderConvertRequest)
+            const localVarPath = `/api/convertExternalOrderToProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(externalOrderConvertRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+         * @summary 删除生产日历
+         * @param {ProductionCalendarDeleteRequest} productionCalendarDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteProductionCalendar: async (productionCalendarDeleteRequest: ProductionCalendarDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionCalendarDeleteRequest' is not null or undefined
+            assertParamExists('deleteProductionCalendar', 'productionCalendarDeleteRequest', productionCalendarDeleteRequest)
+            const localVarPath = `/api/deleteProductionCalendar`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionCalendarDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 估计生产订单交付能力
+         * @param {ProductionCapacityEstimateRequest | null} productionCapacityEstimateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        estimateProductionCapacity: async (productionCapacityEstimateRequest: ProductionCapacityEstimateRequest | null, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionCapacityEstimateRequest' is not null or undefined
+            assertParamExists('estimateProductionCapacity', 'productionCapacityEstimateRequest', productionCapacityEstimateRequest)
+            const localVarPath = `/api/estimateProductionCapacity`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionCapacityEstimateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 完成生产订单
+         * @param {ProductionOrderFinishRequest} productionOrderFinishRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        finishProductionOrder: async (productionOrderFinishRequest: ProductionOrderFinishRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionOrderFinishRequest' is not null or undefined
+            assertParamExists('finishProductionOrder', 'productionOrderFinishRequest', productionOrderFinishRequest)
+            const localVarPath = `/api/finishProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionOrderFinishRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产订单详情
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getProductionOrder: async (orderId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'orderId' is not null or undefined
+            assertParamExists('getProductionOrder', 'orderId', orderId)
+            const localVarPath = `/api/getProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询产品产能配置
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {number} [typeId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listCapacityConfig: async (page?: number, pageSize?: number, materialId?: number, typeId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listCapacityConfig`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (typeId !== undefined) {
+                localVarQueryParameter['type_id'] = typeId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+         * @summary 查询外部订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [customerId] 外部客户角色只能传自身 user_id。
+         * @param {ExternalOrderStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listExternalOrder: async (page?: number, pageSize?: number, customerId?: number, status?: ExternalOrderStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listExternalOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (customerId !== undefined) {
+                localVarQueryParameter['customer_id'] = customerId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产日历
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [lineId] 
+         * @param {string} [calendarDateStart] 
+         * @param {string} [calendarDateEnd] 
+         * @param {number} [configId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionCalendar: async (page?: number, pageSize?: number, lineId?: number, calendarDateStart?: string, calendarDateEnd?: string, configId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listProductionCalendar`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (lineId !== undefined) {
+                localVarQueryParameter['line_id'] = lineId;
+            }
+
+            if (calendarDateStart !== undefined) {
+                localVarQueryParameter['calendar_date_start'] = (calendarDateStart as any instanceof Date) ?
+                    (calendarDateStart as any).toISOString().substring(0,10) :
+                    calendarDateStart;
+            }
+
+            if (calendarDateEnd !== undefined) {
+                localVarQueryParameter['calendar_date_end'] = (calendarDateEnd as any instanceof Date) ?
+                    (calendarDateEnd as any).toISOString().substring(0,10) :
+                    calendarDateEnd;
+            }
+
+            if (configId !== undefined) {
+                localVarQueryParameter['config_id'] = configId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [typeId] 
+         * @param {ProductionLineRunStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionLine: async (page?: number, pageSize?: number, typeId?: number, status?: ProductionLineRunStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listProductionLine`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (typeId !== undefined) {
+                localVarQueryParameter['type_id'] = typeId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线类型
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {string} [typeName] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionLineType: async (page?: number, pageSize?: number, typeName?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listProductionLineType`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (typeName !== undefined) {
+                localVarQueryParameter['type_name'] = typeName;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+         * @summary 查询生产订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {ProductionOrderStatus} [status] 
+         * @param {string} [planEndStart] 
+         * @param {string} [planEndEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionOrder: async (page?: number, pageSize?: number, materialId?: number, status?: ProductionOrderStatus, planEndStart?: string, planEndEnd?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (planEndStart !== undefined) {
+                localVarQueryParameter['plan_end_start'] = (planEndStart as any instanceof Date) ?
+                    (planEndStart as any).toISOString().substring(0,10) :
+                    planEndStart;
+            }
+
+            if (planEndEnd !== undefined) {
+                localVarQueryParameter['plan_end_end'] = (planEndEnd as any instanceof Date) ?
+                    (planEndEnd as any).toISOString().substring(0,10) :
+                    planEndEnd;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 上报生产线故障
+         * @param {FaultRecordCreateRequest} faultRecordCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reportProductionLineFault: async (faultRecordCreateRequest: FaultRecordCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'faultRecordCreateRequest' is not null or undefined
+            assertParamExists('reportProductionLineFault', 'faultRecordCreateRequest', faultRecordCreateRequest)
+            const localVarPath = `/api/reportProductionLineFault`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(faultRecordCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 审核外部订单
+         * @param {ExternalOrderReviewRequest} externalOrderReviewRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reviewExternalOrder: async (externalOrderReviewRequest: ExternalOrderReviewRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'externalOrderReviewRequest' is not null or undefined
+            assertParamExists('reviewExternalOrder', 'externalOrderReviewRequest', externalOrderReviewRequest)
+            const localVarPath = `/api/reviewExternalOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(externalOrderReviewRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 执行产能检测
+         * @param {CapacityDetectionRunRequest} capacityDetectionRunRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        runCapacityDetection: async (capacityDetectionRunRequest: CapacityDetectionRunRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'capacityDetectionRunRequest' is not null or undefined
+            assertParamExists('runCapacityDetection', 'capacityDetectionRunRequest', capacityDetectionRunRequest)
+            const localVarPath = `/api/runCapacityDetection`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(capacityDetectionRunRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 保存产能平衡调整
+         * @param {CapacityBalanceSaveRequest} capacityBalanceSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveCapacityBalance: async (capacityBalanceSaveRequest: CapacityBalanceSaveRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'capacityBalanceSaveRequest' is not null or undefined
+            assertParamExists('saveCapacityBalance', 'capacityBalanceSaveRequest', capacityBalanceSaveRequest)
+            const localVarPath = `/api/saveCapacityBalance`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(capacityBalanceSaveRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+         * @summary 保存产品产能配置
+         * @param {CapacityConfigSaveRequest} capacityConfigSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveCapacityConfig: async (capacityConfigSaveRequest: CapacityConfigSaveRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'capacityConfigSaveRequest' is not null or undefined
+            assertParamExists('saveCapacityConfig', 'capacityConfigSaveRequest', capacityConfigSaveRequest)
+            const localVarPath = `/api/saveCapacityConfig`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(capacityConfigSaveRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+         * @summary 保存生产日历
+         * @param {ProductionCalendarSaveRequest} productionCalendarSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveProductionCalendar: async (productionCalendarSaveRequest: ProductionCalendarSaveRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionCalendarSaveRequest' is not null or undefined
+            assertParamExists('saveProductionCalendar', 'productionCalendarSaveRequest', productionCalendarSaveRequest)
+            const localVarPath = `/api/saveProductionCalendar`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionCalendarSaveRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+         * @summary 保存生产线类型
+         * @param {LineTypeSaveRequest} lineTypeSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveProductionLineType: async (lineTypeSaveRequest: LineTypeSaveRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'lineTypeSaveRequest' is not null or undefined
+            assertParamExists('saveProductionLineType', 'lineTypeSaveRequest', lineTypeSaveRequest)
+            const localVarPath = `/api/saveProductionLineType`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(lineTypeSaveRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 开始生产订单
+         * @param {ProductionOrderActionRequest} productionOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        startProductionOrder: async (productionOrderActionRequest: ProductionOrderActionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionOrderActionRequest' is not null or undefined
+            assertParamExists('startProductionOrder', 'productionOrderActionRequest', productionOrderActionRequest)
+            const localVarPath = `/api/startProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionOrderActionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+         * @summary 修改生产线
+         * @param {ProductionLineUpdateRequest} productionLineUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionLine: async (productionLineUpdateRequest: ProductionLineUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionLineUpdateRequest' is not null or undefined
+            assertParamExists('updateProductionLine', 'productionLineUpdateRequest', productionLineUpdateRequest)
+            const localVarPath = `/api/updateProductionLine`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionLineUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+         * @summary 更新生产线故障状态
+         * @param {FaultRecordUpdateRequest} faultRecordUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionLineFault: async (faultRecordUpdateRequest: FaultRecordUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'faultRecordUpdateRequest' is not null or undefined
+            assertParamExists('updateProductionLineFault', 'faultRecordUpdateRequest', faultRecordUpdateRequest)
+            const localVarPath = `/api/updateProductionLineFault`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(faultRecordUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 更新生产线状态
+         * @param {ProductionLineStatusUpdateRequest} productionLineStatusUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionLineStatus: async (productionLineStatusUpdateRequest: ProductionLineStatusUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionLineStatusUpdateRequest' is not null or undefined
+            assertParamExists('updateProductionLineStatus', 'productionLineStatusUpdateRequest', productionLineStatusUpdateRequest)
+            const localVarPath = `/api/updateProductionLineStatus`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionLineStatusUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+         * @summary 修改生产订单计划
+         * @param {ProductionOrderUpdateRequest} productionOrderUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionOrder: async (productionOrderUpdateRequest: ProductionOrderUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionOrderUpdateRequest' is not null or undefined
+            assertParamExists('updateProductionOrder', 'productionOrderUpdateRequest', productionOrderUpdateRequest)
+            const localVarPath = `/api/updateProductionOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionOrderUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * ProductionApi - functional programming interface
+ */
+export const ProductionApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = ProductionApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+         * @summary 外部客户提交订单
+         * @param {ExternalOrderCreateRequest} externalOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addExternalOrder(externalOrderCreateRequest: ExternalOrderCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addExternalOrder(externalOrderCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.addExternalOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 新增生产线
+         * @param {ProductionLineCreateRequest} productionLineCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addProductionLine(productionLineCreateRequest: ProductionLineCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionLineResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addProductionLine(productionLineCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.addProductionLine']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+         * @summary 新增生产订单
+         * @param {ProductionOrderCreateRequest} productionOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addProductionOrder(productionOrderCreateRequest: ProductionOrderCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addProductionOrder(productionOrderCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.addProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 审核生产订单
+         * @param {ProductionOrderApproveRequest} productionOrderApproveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async approveProductionOrder(productionOrderApproveRequest: ProductionOrderApproveRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.approveProductionOrder(productionOrderApproveRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.approveProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+         * @summary 取消生产订单
+         * @param {ProductionOrderActionRequest} productionOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async cancelProductionOrder(productionOrderActionRequest: ProductionOrderActionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.cancelProductionOrder(productionOrderActionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.cancelProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 外部订单转生产订单
+         * @param {ExternalOrderConvertRequest} externalOrderConvertRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async convertExternalOrderToProductionOrder(externalOrderConvertRequest: ExternalOrderConvertRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderConvertResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.convertExternalOrderToProductionOrder(externalOrderConvertRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.convertExternalOrderToProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+         * @summary 删除生产日历
+         * @param {ProductionCalendarDeleteRequest} productionCalendarDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteProductionCalendar(productionCalendarDeleteRequest: ProductionCalendarDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteProductionCalendar(productionCalendarDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.deleteProductionCalendar']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 估计生产订单交付能力
+         * @param {ProductionCapacityEstimateRequest | null} productionCapacityEstimateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async estimateProductionCapacity(productionCapacityEstimateRequest: ProductionCapacityEstimateRequest | null, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionCapacityEstimateResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.estimateProductionCapacity(productionCapacityEstimateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.estimateProductionCapacity']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 完成生产订单
+         * @param {ProductionOrderFinishRequest} productionOrderFinishRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async finishProductionOrder(productionOrderFinishRequest: ProductionOrderFinishRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.finishProductionOrder(productionOrderFinishRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.finishProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产订单详情
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getProductionOrder(orderId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getProductionOrder(orderId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.getProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询产品产能配置
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {number} [typeId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listCapacityConfig(page?: number, pageSize?: number, materialId?: number, typeId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CapacityConfigPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listCapacityConfig(page, pageSize, materialId, typeId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listCapacityConfig']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+         * @summary 查询外部订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [customerId] 外部客户角色只能传自身 user_id。
+         * @param {ExternalOrderStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listExternalOrder(page?: number, pageSize?: number, customerId?: number, status?: ExternalOrderStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listExternalOrder(page, pageSize, customerId, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listExternalOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产日历
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [lineId] 
+         * @param {string} [calendarDateStart] 
+         * @param {string} [calendarDateEnd] 
+         * @param {number} [configId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listProductionCalendar(page?: number, pageSize?: number, lineId?: number, calendarDateStart?: string, calendarDateEnd?: string, configId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionCalendarPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listProductionCalendar(page, pageSize, lineId, calendarDateStart, calendarDateEnd, configId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listProductionCalendar']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [typeId] 
+         * @param {ProductionLineRunStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listProductionLine(page?: number, pageSize?: number, typeId?: number, status?: ProductionLineRunStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionLinePageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listProductionLine(page, pageSize, typeId, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listProductionLine']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线类型
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {string} [typeName] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listProductionLineType(page?: number, pageSize?: number, typeName?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LineTypePageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listProductionLineType(page, pageSize, typeName, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listProductionLineType']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+         * @summary 查询生产订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [materialId] 
+         * @param {ProductionOrderStatus} [status] 
+         * @param {string} [planEndStart] 
+         * @param {string} [planEndEnd] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listProductionOrder(page?: number, pageSize?: number, materialId?: number, status?: ProductionOrderStatus, planEndStart?: string, planEndEnd?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listProductionOrder(page, pageSize, materialId, status, planEndStart, planEndEnd, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 上报生产线故障
+         * @param {FaultRecordCreateRequest} faultRecordCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async reportProductionLineFault(faultRecordCreateRequest: FaultRecordCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<FaultRecordResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.reportProductionLineFault(faultRecordCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.reportProductionLineFault']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 审核外部订单
+         * @param {ExternalOrderReviewRequest} externalOrderReviewRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async reviewExternalOrder(externalOrderReviewRequest: ExternalOrderReviewRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.reviewExternalOrder(externalOrderReviewRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.reviewExternalOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 执行产能检测
+         * @param {CapacityDetectionRunRequest} capacityDetectionRunRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async runCapacityDetection(capacityDetectionRunRequest: CapacityDetectionRunRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CapacityDetectionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.runCapacityDetection(capacityDetectionRunRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.runCapacityDetection']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 保存产能平衡调整
+         * @param {CapacityBalanceSaveRequest} capacityBalanceSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async saveCapacityBalance(capacityBalanceSaveRequest: CapacityBalanceSaveRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CapacityBalanceResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.saveCapacityBalance(capacityBalanceSaveRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.saveCapacityBalance']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+         * @summary 保存产品产能配置
+         * @param {CapacityConfigSaveRequest} capacityConfigSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async saveCapacityConfig(capacityConfigSaveRequest: CapacityConfigSaveRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CapacityConfigResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.saveCapacityConfig(capacityConfigSaveRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.saveCapacityConfig']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+         * @summary 保存生产日历
+         * @param {ProductionCalendarSaveRequest} productionCalendarSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async saveProductionCalendar(productionCalendarSaveRequest: ProductionCalendarSaveRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionCalendarResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.saveProductionCalendar(productionCalendarSaveRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.saveProductionCalendar']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+         * @summary 保存生产线类型
+         * @param {LineTypeSaveRequest} lineTypeSaveRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async saveProductionLineType(lineTypeSaveRequest: LineTypeSaveRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LineTypeResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.saveProductionLineType(lineTypeSaveRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.saveProductionLineType']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 开始生产订单
+         * @param {ProductionOrderActionRequest} productionOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async startProductionOrder(productionOrderActionRequest: ProductionOrderActionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.startProductionOrder(productionOrderActionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.startProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+         * @summary 修改生产线
+         * @param {ProductionLineUpdateRequest} productionLineUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateProductionLine(productionLineUpdateRequest: ProductionLineUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionLineResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateProductionLine(productionLineUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.updateProductionLine']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+         * @summary 更新生产线故障状态
+         * @param {FaultRecordUpdateRequest} faultRecordUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateProductionLineFault(faultRecordUpdateRequest: FaultRecordUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<FaultRecordResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateProductionLineFault(faultRecordUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.updateProductionLineFault']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 更新生产线状态
+         * @param {ProductionLineStatusUpdateRequest} productionLineStatusUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateProductionLineStatus(productionLineStatusUpdateRequest: ProductionLineStatusUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionLineStatusResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateProductionLineStatus(productionLineStatusUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.updateProductionLineStatus']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+         * @summary 修改生产订单计划
+         * @param {ProductionOrderUpdateRequest} productionOrderUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateProductionOrder(productionOrderUpdateRequest: ProductionOrderUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateProductionOrder(productionOrderUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.updateProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * ProductionApi - factory interface
+ */
+export const ProductionApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = ProductionApiFp(configuration)
+    return {
+        /**
+         * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+         * @summary 外部客户提交订单
+         * @param {ProductionApiAddExternalOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addExternalOrder(requestParameters: ProductionApiAddExternalOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ExternalOrderResponse> {
+            return localVarFp.addExternalOrder(requestParameters.externalOrderCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 新增生产线
+         * @param {ProductionApiAddProductionLineRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addProductionLine(requestParameters: ProductionApiAddProductionLineRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionLineResponse> {
+            return localVarFp.addProductionLine(requestParameters.productionLineCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+         * @summary 新增生产订单
+         * @param {ProductionApiAddProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addProductionOrder(requestParameters: ProductionApiAddProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderResponse> {
+            return localVarFp.addProductionOrder(requestParameters.productionOrderCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 审核生产订单
+         * @param {ProductionApiApproveProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        approveProductionOrder(requestParameters: ProductionApiApproveProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderResponse> {
+            return localVarFp.approveProductionOrder(requestParameters.productionOrderApproveRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+         * @summary 取消生产订单
+         * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancelProductionOrder(requestParameters: ProductionApiCancelProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderResponse> {
+            return localVarFp.cancelProductionOrder(requestParameters.productionOrderActionRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 外部订单转生产订单
+         * @param {ProductionApiConvertExternalOrderToProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        convertExternalOrderToProductionOrder(requestParameters: ProductionApiConvertExternalOrderToProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ExternalOrderConvertResponse> {
+            return localVarFp.convertExternalOrderToProductionOrder(requestParameters.externalOrderConvertRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+         * @summary 删除生产日历
+         * @param {ProductionApiDeleteProductionCalendarRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteProductionCalendar(requestParameters: ProductionApiDeleteProductionCalendarRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteProductionCalendar(requestParameters.productionCalendarDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 估计生产订单交付能力
+         * @param {ProductionApiEstimateProductionCapacityRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        estimateProductionCapacity(requestParameters: ProductionApiEstimateProductionCapacityRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionCapacityEstimateResponse> {
+            return localVarFp.estimateProductionCapacity(requestParameters.productionCapacityEstimateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 完成生产订单
+         * @param {ProductionApiFinishProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        finishProductionOrder(requestParameters: ProductionApiFinishProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderResponse> {
+            return localVarFp.finishProductionOrder(requestParameters.productionOrderFinishRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产订单详情
+         * @param {ProductionApiGetProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getProductionOrder(requestParameters: ProductionApiGetProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderResponse> {
+            return localVarFp.getProductionOrder(requestParameters.orderId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询产品产能配置
+         * @param {ProductionApiListCapacityConfigRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listCapacityConfig(requestParameters: ProductionApiListCapacityConfigRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<CapacityConfigPageResponse> {
+            return localVarFp.listCapacityConfig(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.typeId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+         * @summary 查询外部订单列表
+         * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listExternalOrder(requestParameters: ProductionApiListExternalOrderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ExternalOrderPageResponse> {
+            return localVarFp.listExternalOrder(requestParameters.page, requestParameters.pageSize, requestParameters.customerId, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产日历
+         * @param {ProductionApiListProductionCalendarRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionCalendar(requestParameters: ProductionApiListProductionCalendarRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ProductionCalendarPageResponse> {
+            return localVarFp.listProductionCalendar(requestParameters.page, requestParameters.pageSize, requestParameters.lineId, requestParameters.calendarDateStart, requestParameters.calendarDateEnd, requestParameters.configId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线列表
+         * @param {ProductionApiListProductionLineRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionLine(requestParameters: ProductionApiListProductionLineRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ProductionLinePageResponse> {
+            return localVarFp.listProductionLine(requestParameters.page, requestParameters.pageSize, requestParameters.typeId, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线类型
+         * @param {ProductionApiListProductionLineTypeRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionLineType(requestParameters: ProductionApiListProductionLineTypeRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LineTypePageResponse> {
+            return localVarFp.listProductionLineType(requestParameters.page, requestParameters.pageSize, requestParameters.typeName, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+         * @summary 查询生产订单列表
+         * @param {ProductionApiListProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionOrder(requestParameters: ProductionApiListProductionOrderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderPageResponse> {
+            return localVarFp.listProductionOrder(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.planEndStart, requestParameters.planEndEnd, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 上报生产线故障
+         * @param {ProductionApiReportProductionLineFaultRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reportProductionLineFault(requestParameters: ProductionApiReportProductionLineFaultRequest, options?: RawAxiosRequestConfig): AxiosPromise<FaultRecordResponse> {
+            return localVarFp.reportProductionLineFault(requestParameters.faultRecordCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 审核外部订单
+         * @param {ProductionApiReviewExternalOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reviewExternalOrder(requestParameters: ProductionApiReviewExternalOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ExternalOrderResponse> {
+            return localVarFp.reviewExternalOrder(requestParameters.externalOrderReviewRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 执行产能检测
+         * @param {ProductionApiRunCapacityDetectionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        runCapacityDetection(requestParameters: ProductionApiRunCapacityDetectionRequest, options?: RawAxiosRequestConfig): AxiosPromise<CapacityDetectionResponse> {
+            return localVarFp.runCapacityDetection(requestParameters.capacityDetectionRunRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 保存产能平衡调整
+         * @param {ProductionApiSaveCapacityBalanceRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveCapacityBalance(requestParameters: ProductionApiSaveCapacityBalanceRequest, options?: RawAxiosRequestConfig): AxiosPromise<CapacityBalanceResponse> {
+            return localVarFp.saveCapacityBalance(requestParameters.capacityBalanceSaveRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+         * @summary 保存产品产能配置
+         * @param {ProductionApiSaveCapacityConfigRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveCapacityConfig(requestParameters: ProductionApiSaveCapacityConfigRequest, options?: RawAxiosRequestConfig): AxiosPromise<CapacityConfigResponse> {
+            return localVarFp.saveCapacityConfig(requestParameters.capacityConfigSaveRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+         * @summary 保存生产日历
+         * @param {ProductionApiSaveProductionCalendarRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveProductionCalendar(requestParameters: ProductionApiSaveProductionCalendarRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionCalendarResponse> {
+            return localVarFp.saveProductionCalendar(requestParameters.productionCalendarSaveRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+         * @summary 保存生产线类型
+         * @param {ProductionApiSaveProductionLineTypeRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        saveProductionLineType(requestParameters: ProductionApiSaveProductionLineTypeRequest, options?: RawAxiosRequestConfig): AxiosPromise<LineTypeResponse> {
+            return localVarFp.saveProductionLineType(requestParameters.lineTypeSaveRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * @summary 开始生产订单
+         * @param {ProductionApiStartProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        startProductionOrder(requestParameters: ProductionApiStartProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderResponse> {
+            return localVarFp.startProductionOrder(requestParameters.productionOrderActionRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+         * @summary 修改生产线
+         * @param {ProductionApiUpdateProductionLineRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionLine(requestParameters: ProductionApiUpdateProductionLineRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionLineResponse> {
+            return localVarFp.updateProductionLine(requestParameters.productionLineUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+         * @summary 更新生产线故障状态
+         * @param {ProductionApiUpdateProductionLineFaultRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionLineFault(requestParameters: ProductionApiUpdateProductionLineFaultRequest, options?: RawAxiosRequestConfig): AxiosPromise<FaultRecordResponse> {
+            return localVarFp.updateProductionLineFault(requestParameters.faultRecordUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 更新生产线状态
+         * @param {ProductionApiUpdateProductionLineStatusRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionLineStatus(requestParameters: ProductionApiUpdateProductionLineStatusRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionLineStatusResponse> {
+            return localVarFp.updateProductionLineStatus(requestParameters.productionLineStatusUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+         * @summary 修改生产订单计划
+         * @param {ProductionApiUpdateProductionOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProductionOrder(requestParameters: ProductionApiUpdateProductionOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderResponse> {
+            return localVarFp.updateProductionOrder(requestParameters.productionOrderUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addExternalOrder operation in ProductionApi.
+ */
+export interface ProductionApiAddExternalOrderRequest {
+    readonly externalOrderCreateRequest: ExternalOrderCreateRequest
+}
+
+/**
+ * Request parameters for addProductionLine operation in ProductionApi.
+ */
+export interface ProductionApiAddProductionLineRequest {
+    readonly productionLineCreateRequest: ProductionLineCreateRequest
+}
+
+/**
+ * Request parameters for addProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiAddProductionOrderRequest {
+    readonly productionOrderCreateRequest: ProductionOrderCreateRequest
+}
+
+/**
+ * Request parameters for approveProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiApproveProductionOrderRequest {
+    readonly productionOrderApproveRequest: ProductionOrderApproveRequest
+}
+
+/**
+ * Request parameters for cancelProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiCancelProductionOrderRequest {
+    readonly productionOrderActionRequest: ProductionOrderActionRequest
+}
+
+/**
+ * Request parameters for convertExternalOrderToProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiConvertExternalOrderToProductionOrderRequest {
+    readonly externalOrderConvertRequest: ExternalOrderConvertRequest
+}
+
+/**
+ * Request parameters for deleteProductionCalendar operation in ProductionApi.
+ */
+export interface ProductionApiDeleteProductionCalendarRequest {
+    readonly productionCalendarDeleteRequest: ProductionCalendarDeleteRequest
+}
+
+/**
+ * Request parameters for estimateProductionCapacity operation in ProductionApi.
+ */
+export interface ProductionApiEstimateProductionCapacityRequest {
+    readonly productionCapacityEstimateRequest: ProductionCapacityEstimateRequest | null
+}
+
+/**
+ * Request parameters for finishProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiFinishProductionOrderRequest {
+    readonly productionOrderFinishRequest: ProductionOrderFinishRequest
+}
+
+/**
+ * Request parameters for getProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiGetProductionOrderRequest {
+    readonly orderId: number
+}
+
+/**
+ * Request parameters for listCapacityConfig operation in ProductionApi.
+ */
+export interface ProductionApiListCapacityConfigRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly materialId?: number
+
+    readonly typeId?: number
+}
+
+/**
+ * Request parameters for listExternalOrder operation in ProductionApi.
+ */
+export interface ProductionApiListExternalOrderRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 外部客户角色只能传自身 user_id。
+     */
+    readonly customerId?: number
+
+    readonly status?: ExternalOrderStatus
+}
+
+/**
+ * Request parameters for listProductionCalendar operation in ProductionApi.
+ */
+export interface ProductionApiListProductionCalendarRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly lineId?: number
+
+    readonly calendarDateStart?: string
+
+    readonly calendarDateEnd?: string
+
+    readonly configId?: number
+}
+
+/**
+ * Request parameters for listProductionLine operation in ProductionApi.
+ */
+export interface ProductionApiListProductionLineRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly typeId?: number
+
+    readonly status?: ProductionLineRunStatus
+}
+
+/**
+ * Request parameters for listProductionLineType operation in ProductionApi.
+ */
+export interface ProductionApiListProductionLineTypeRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly typeName?: string
+}
+
+/**
+ * Request parameters for listProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiListProductionOrderRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly materialId?: number
+
+    readonly status?: ProductionOrderStatus
+
+    readonly planEndStart?: string
+
+    readonly planEndEnd?: string
+}
+
+/**
+ * Request parameters for reportProductionLineFault operation in ProductionApi.
+ */
+export interface ProductionApiReportProductionLineFaultRequest {
+    readonly faultRecordCreateRequest: FaultRecordCreateRequest
+}
+
+/**
+ * Request parameters for reviewExternalOrder operation in ProductionApi.
+ */
+export interface ProductionApiReviewExternalOrderRequest {
+    readonly externalOrderReviewRequest: ExternalOrderReviewRequest
+}
+
+/**
+ * Request parameters for runCapacityDetection operation in ProductionApi.
+ */
+export interface ProductionApiRunCapacityDetectionRequest {
+    readonly capacityDetectionRunRequest: CapacityDetectionRunRequest
+}
+
+/**
+ * Request parameters for saveCapacityBalance operation in ProductionApi.
+ */
+export interface ProductionApiSaveCapacityBalanceRequest {
+    readonly capacityBalanceSaveRequest: CapacityBalanceSaveRequest
+}
+
+/**
+ * Request parameters for saveCapacityConfig operation in ProductionApi.
+ */
+export interface ProductionApiSaveCapacityConfigRequest {
+    readonly capacityConfigSaveRequest: CapacityConfigSaveRequest
+}
+
+/**
+ * Request parameters for saveProductionCalendar operation in ProductionApi.
+ */
+export interface ProductionApiSaveProductionCalendarRequest {
+    readonly productionCalendarSaveRequest: ProductionCalendarSaveRequest
+}
+
+/**
+ * Request parameters for saveProductionLineType operation in ProductionApi.
+ */
+export interface ProductionApiSaveProductionLineTypeRequest {
+    readonly lineTypeSaveRequest: LineTypeSaveRequest
+}
+
+/**
+ * Request parameters for startProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiStartProductionOrderRequest {
+    readonly productionOrderActionRequest: ProductionOrderActionRequest
+}
+
+/**
+ * Request parameters for updateProductionLine operation in ProductionApi.
+ */
+export interface ProductionApiUpdateProductionLineRequest {
+    readonly productionLineUpdateRequest: ProductionLineUpdateRequest
+}
+
+/**
+ * Request parameters for updateProductionLineFault operation in ProductionApi.
+ */
+export interface ProductionApiUpdateProductionLineFaultRequest {
+    readonly faultRecordUpdateRequest: FaultRecordUpdateRequest
+}
+
+/**
+ * Request parameters for updateProductionLineStatus operation in ProductionApi.
+ */
+export interface ProductionApiUpdateProductionLineStatusRequest {
+    readonly productionLineStatusUpdateRequest: ProductionLineStatusUpdateRequest
+}
+
+/**
+ * Request parameters for updateProductionOrder operation in ProductionApi.
+ */
+export interface ProductionApiUpdateProductionOrderRequest {
+    readonly productionOrderUpdateRequest: ProductionOrderUpdateRequest
+}
+
+/**
+ * ProductionApi - object-oriented interface
+ */
+export class ProductionApi extends BaseAPI {
+    /**
+     * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+     * @summary 外部客户提交订单
+     * @param {ProductionApiAddExternalOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addExternalOrder(requestParameters: ProductionApiAddExternalOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).addExternalOrder(requestParameters.externalOrderCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 新增生产线
+     * @param {ProductionApiAddProductionLineRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addProductionLine(requestParameters: ProductionApiAddProductionLineRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).addProductionLine(requestParameters.productionLineCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+     * @summary 新增生产订单
+     * @param {ProductionApiAddProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addProductionOrder(requestParameters: ProductionApiAddProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).addProductionOrder(requestParameters.productionOrderCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * @summary 审核生产订单
+     * @param {ProductionApiApproveProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public approveProductionOrder(requestParameters: ProductionApiApproveProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).approveProductionOrder(requestParameters.productionOrderApproveRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+     * @summary 取消生产订单
+     * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public cancelProductionOrder(requestParameters: ProductionApiCancelProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).cancelProductionOrder(requestParameters.productionOrderActionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * @summary 外部订单转生产订单
+     * @param {ProductionApiConvertExternalOrderToProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public convertExternalOrderToProductionOrder(requestParameters: ProductionApiConvertExternalOrderToProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).convertExternalOrderToProductionOrder(requestParameters.externalOrderConvertRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+     * @summary 删除生产日历
+     * @param {ProductionApiDeleteProductionCalendarRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteProductionCalendar(requestParameters: ProductionApiDeleteProductionCalendarRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).deleteProductionCalendar(requestParameters.productionCalendarDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 估计生产订单交付能力
+     * @param {ProductionApiEstimateProductionCapacityRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public estimateProductionCapacity(requestParameters: ProductionApiEstimateProductionCapacityRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).estimateProductionCapacity(requestParameters.productionCapacityEstimateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * @summary 完成生产订单
+     * @param {ProductionApiFinishProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public finishProductionOrder(requestParameters: ProductionApiFinishProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).finishProductionOrder(requestParameters.productionOrderFinishRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询生产订单详情
+     * @param {ProductionApiGetProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getProductionOrder(requestParameters: ProductionApiGetProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).getProductionOrder(requestParameters.orderId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询产品产能配置
+     * @param {ProductionApiListCapacityConfigRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listCapacityConfig(requestParameters: ProductionApiListCapacityConfigRequest = {}, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listCapacityConfig(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.typeId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+     * @summary 查询外部订单列表
+     * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listExternalOrder(requestParameters: ProductionApiListExternalOrderRequest = {}, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listExternalOrder(requestParameters.page, requestParameters.pageSize, requestParameters.customerId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询生产日历
+     * @param {ProductionApiListProductionCalendarRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listProductionCalendar(requestParameters: ProductionApiListProductionCalendarRequest = {}, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listProductionCalendar(requestParameters.page, requestParameters.pageSize, requestParameters.lineId, requestParameters.calendarDateStart, requestParameters.calendarDateEnd, requestParameters.configId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询生产线列表
+     * @param {ProductionApiListProductionLineRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listProductionLine(requestParameters: ProductionApiListProductionLineRequest = {}, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listProductionLine(requestParameters.page, requestParameters.pageSize, requestParameters.typeId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询生产线类型
+     * @param {ProductionApiListProductionLineTypeRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listProductionLineType(requestParameters: ProductionApiListProductionLineTypeRequest = {}, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listProductionLineType(requestParameters.page, requestParameters.pageSize, requestParameters.typeName, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+     * @summary 查询生产订单列表
+     * @param {ProductionApiListProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listProductionOrder(requestParameters: ProductionApiListProductionOrderRequest = {}, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listProductionOrder(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.planEndStart, requestParameters.planEndEnd, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+     * @summary 上报生产线故障
+     * @param {ProductionApiReportProductionLineFaultRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public reportProductionLineFault(requestParameters: ProductionApiReportProductionLineFaultRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).reportProductionLineFault(requestParameters.faultRecordCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * @summary 审核外部订单
+     * @param {ProductionApiReviewExternalOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public reviewExternalOrder(requestParameters: ProductionApiReviewExternalOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).reviewExternalOrder(requestParameters.externalOrderReviewRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 执行产能检测
+     * @param {ProductionApiRunCapacityDetectionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public runCapacityDetection(requestParameters: ProductionApiRunCapacityDetectionRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).runCapacityDetection(requestParameters.capacityDetectionRunRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 保存产能平衡调整
+     * @param {ProductionApiSaveCapacityBalanceRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public saveCapacityBalance(requestParameters: ProductionApiSaveCapacityBalanceRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).saveCapacityBalance(requestParameters.capacityBalanceSaveRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+     * @summary 保存产品产能配置
+     * @param {ProductionApiSaveCapacityConfigRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public saveCapacityConfig(requestParameters: ProductionApiSaveCapacityConfigRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).saveCapacityConfig(requestParameters.capacityConfigSaveRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+     * @summary 保存生产日历
+     * @param {ProductionApiSaveProductionCalendarRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public saveProductionCalendar(requestParameters: ProductionApiSaveProductionCalendarRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).saveProductionCalendar(requestParameters.productionCalendarSaveRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+     * @summary 保存生产线类型
+     * @param {ProductionApiSaveProductionLineTypeRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public saveProductionLineType(requestParameters: ProductionApiSaveProductionLineTypeRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).saveProductionLineType(requestParameters.lineTypeSaveRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * @summary 开始生产订单
+     * @param {ProductionApiStartProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public startProductionOrder(requestParameters: ProductionApiStartProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).startProductionOrder(requestParameters.productionOrderActionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+     * @summary 修改生产线
+     * @param {ProductionApiUpdateProductionLineRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateProductionLine(requestParameters: ProductionApiUpdateProductionLineRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).updateProductionLine(requestParameters.productionLineUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+     * @summary 更新生产线故障状态
+     * @param {ProductionApiUpdateProductionLineFaultRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateProductionLineFault(requestParameters: ProductionApiUpdateProductionLineFaultRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).updateProductionLineFault(requestParameters.faultRecordUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+     * @summary 更新生产线状态
+     * @param {ProductionApiUpdateProductionLineStatusRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateProductionLineStatus(requestParameters: ProductionApiUpdateProductionLineStatusRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).updateProductionLineStatus(requestParameters.productionLineStatusUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+     * @summary 修改生产订单计划
+     * @param {ProductionApiUpdateProductionOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateProductionOrder(requestParameters: ProductionApiUpdateProductionOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).updateProductionOrder(requestParameters.productionOrderUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * PurchaseApi - axios parameter creator
+ */
+export const PurchaseApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * @summary 新增采购订单草稿
+         * @param {PurchaseOrderCreateRequest} purchaseOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseOrder: async (purchaseOrderCreateRequest: PurchaseOrderCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOrderCreateRequest' is not null or undefined
+            assertParamExists('addPurchaseOrder', 'purchaseOrderCreateRequest', purchaseOrderCreateRequest)
+            const localVarPath = `/api/addPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOrderCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * @summary 新增采购收货记录
+         * @param {PurchaseReceiptCreateRequest} purchaseReceiptCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseReceipt: async (purchaseReceiptCreateRequest: PurchaseReceiptCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseReceiptCreateRequest' is not null or undefined
+            assertParamExists('addPurchaseReceipt', 'purchaseReceiptCreateRequest', purchaseReceiptCreateRequest)
+            const localVarPath = `/api/addPurchaseReceipt`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseReceiptCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * @summary 取消采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancelPurchaseOrder: async (purchaseOrderActionRequest: PurchaseOrderActionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOrderActionRequest' is not null or undefined
+            assertParamExists('cancelPurchaseOrder', 'purchaseOrderActionRequest', purchaseOrderActionRequest)
+            const localVarPath = `/api/cancelPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOrderActionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * @summary 根据缺口生成采购订单草稿
+         * @param {PurchaseDraftFromShortageRequest} purchaseDraftFromShortageRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createPurchaseOrderDraftFromShortage: async (purchaseDraftFromShortageRequest: PurchaseDraftFromShortageRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseDraftFromShortageRequest' is not null or undefined
+            assertParamExists('createPurchaseOrderDraftFromShortage', 'purchaseDraftFromShortageRequest', purchaseDraftFromShortageRequest)
+            const localVarPath = `/api/createPurchaseOrderDraftFromShortage`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseDraftFromShortageRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * @summary 生成采购逾期提醒
+         * @param {PurchaseOverdueReminderGenerateRequest} [purchaseOverdueReminderGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generatePurchaseOverdueReminder: async (purchaseOverdueReminderGenerateRequest?: PurchaseOverdueReminderGenerateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/generatePurchaseOverdueReminder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOverdueReminderGenerateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单详情
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPurchaseOrder: async (orderId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'orderId' is not null or undefined
+            assertParamExists('getPurchaseOrder', 'orderId', orderId)
+            const localVarPath = `/api/getPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * @summary 处理采购逾期提醒
+         * @param {PurchaseOverdueReminderHandleRequest} purchaseOverdueReminderHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handlePurchaseOverdueReminder: async (purchaseOverdueReminderHandleRequest: PurchaseOverdueReminderHandleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOverdueReminderHandleRequest' is not null or undefined
+            assertParamExists('handlePurchaseOverdueReminder', 'purchaseOverdueReminderHandleRequest', purchaseOverdueReminderHandleRequest)
+            const localVarPath = `/api/handlePurchaseOverdueReminder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOverdueReminderHandleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [supplierId] 
+         * @param {number} [materialId] 
+         * @param {PurchaseOrderStatus} [status] 
+         * @param {string} [orderDateStart] 
+         * @param {string} [orderDateEnd] 
+         * @param {string} [expectedDateStart] 
+         * @param {string} [expectedDateEnd] 
+         * @param {number} [buyerId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOrder: async (page?: number, pageSize?: number, supplierId?: number, materialId?: number, status?: PurchaseOrderStatus, orderDateStart?: string, orderDateEnd?: string, expectedDateStart?: string, expectedDateEnd?: string, buyerId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (supplierId !== undefined) {
+                localVarQueryParameter['supplier_id'] = supplierId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (orderDateStart !== undefined) {
+                localVarQueryParameter['order_date_start'] = (orderDateStart as any instanceof Date) ?
+                    (orderDateStart as any).toISOString().substring(0,10) :
+                    orderDateStart;
+            }
+
+            if (orderDateEnd !== undefined) {
+                localVarQueryParameter['order_date_end'] = (orderDateEnd as any instanceof Date) ?
+                    (orderDateEnd as any).toISOString().substring(0,10) :
+                    orderDateEnd;
+            }
+
+            if (expectedDateStart !== undefined) {
+                localVarQueryParameter['expected_date_start'] = (expectedDateStart as any instanceof Date) ?
+                    (expectedDateStart as any).toISOString().substring(0,10) :
+                    expectedDateStart;
+            }
+
+            if (expectedDateEnd !== undefined) {
+                localVarQueryParameter['expected_date_end'] = (expectedDateEnd as any instanceof Date) ?
+                    (expectedDateEnd as any).toISOString().substring(0,10) :
+                    expectedDateEnd;
+            }
+
+            if (buyerId !== undefined) {
+                localVarQueryParameter['buyer_id'] = buyerId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购逾期提醒
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {PurchaseOverdueReminderStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOverdueReminder: async (page?: number, pageSize?: number, orderId?: number, status?: PurchaseOverdueReminderStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listPurchaseOverdueReminder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购收货记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseReceipt: async (page?: number, pageSize?: number, orderId?: number, materialId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listPurchaseReceipt`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * @summary 提交采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        submitPurchaseOrder: async (purchaseOrderActionRequest: PurchaseOrderActionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'purchaseOrderActionRequest' is not null or undefined
+            assertParamExists('submitPurchaseOrder', 'purchaseOrderActionRequest', purchaseOrderActionRequest)
+            const localVarPath = `/api/submitPurchaseOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(purchaseOrderActionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * PurchaseApi - functional programming interface
+ */
+export const PurchaseApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = PurchaseApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * @summary 新增采购订单草稿
+         * @param {PurchaseOrderCreateRequest} purchaseOrderCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addPurchaseOrder(purchaseOrderCreateRequest: PurchaseOrderCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addPurchaseOrder(purchaseOrderCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.addPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * @summary 新增采购收货记录
+         * @param {PurchaseReceiptCreateRequest} purchaseReceiptCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addPurchaseReceipt(purchaseReceiptCreateRequest: PurchaseReceiptCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseReceiptResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addPurchaseReceipt(purchaseReceiptCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.addPurchaseReceipt']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * @summary 取消采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async cancelPurchaseOrder(purchaseOrderActionRequest: PurchaseOrderActionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.cancelPurchaseOrder(purchaseOrderActionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.cancelPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * @summary 根据缺口生成采购订单草稿
+         * @param {PurchaseDraftFromShortageRequest} purchaseDraftFromShortageRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createPurchaseOrderDraftFromShortage(purchaseDraftFromShortageRequest: PurchaseDraftFromShortageRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseDraftFromShortageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createPurchaseOrderDraftFromShortage(purchaseDraftFromShortageRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.createPurchaseOrderDraftFromShortage']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * @summary 生成采购逾期提醒
+         * @param {PurchaseOverdueReminderGenerateRequest} [purchaseOverdueReminderGenerateRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async generatePurchaseOverdueReminder(purchaseOverdueReminderGenerateRequest?: PurchaseOverdueReminderGenerateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOverdueReminderGenerateResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.generatePurchaseOverdueReminder(purchaseOverdueReminderGenerateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.generatePurchaseOverdueReminder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单详情
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getPurchaseOrder(orderId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getPurchaseOrder(orderId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.getPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * @summary 处理采购逾期提醒
+         * @param {PurchaseOverdueReminderHandleRequest} purchaseOverdueReminderHandleRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async handlePurchaseOverdueReminder(purchaseOverdueReminderHandleRequest: PurchaseOverdueReminderHandleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOverdueReminderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.handlePurchaseOverdueReminder(purchaseOverdueReminderHandleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.handlePurchaseOverdueReminder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [supplierId] 
+         * @param {number} [materialId] 
+         * @param {PurchaseOrderStatus} [status] 
+         * @param {string} [orderDateStart] 
+         * @param {string} [orderDateEnd] 
+         * @param {string} [expectedDateStart] 
+         * @param {string} [expectedDateEnd] 
+         * @param {number} [buyerId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listPurchaseOrder(page?: number, pageSize?: number, supplierId?: number, materialId?: number, status?: PurchaseOrderStatus, orderDateStart?: string, orderDateEnd?: string, expectedDateStart?: string, expectedDateEnd?: string, buyerId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPurchaseOrder(page, pageSize, supplierId, materialId, status, orderDateStart, orderDateEnd, expectedDateStart, expectedDateEnd, buyerId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.listPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购逾期提醒
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {PurchaseOverdueReminderStatus} [status] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listPurchaseOverdueReminder(page?: number, pageSize?: number, orderId?: number, status?: PurchaseOverdueReminderStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOverdueReminderPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPurchaseOverdueReminder(page, pageSize, orderId, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.listPurchaseOverdueReminder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购收货记录
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [materialId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listPurchaseReceipt(page?: number, pageSize?: number, orderId?: number, materialId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseReceiptPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPurchaseReceipt(page, pageSize, orderId, materialId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.listPurchaseReceipt']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * @summary 提交采购订单
+         * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async submitPurchaseOrder(purchaseOrderActionRequest: PurchaseOrderActionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PurchaseOrderResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.submitPurchaseOrder(purchaseOrderActionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PurchaseApi.submitPurchaseOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * PurchaseApi - factory interface
+ */
+export const PurchaseApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = PurchaseApiFp(configuration)
+    return {
+        /**
+         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * @summary 新增采购订单草稿
+         * @param {PurchaseApiAddPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseOrder(requestParameters: PurchaseApiAddPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.addPurchaseOrder(requestParameters.purchaseOrderCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * @summary 新增采购收货记录
+         * @param {PurchaseApiAddPurchaseReceiptRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPurchaseReceipt(requestParameters: PurchaseApiAddPurchaseReceiptRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseReceiptResponse> {
+            return localVarFp.addPurchaseReceipt(requestParameters.purchaseReceiptCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * @summary 取消采购订单
+         * @param {PurchaseApiCancelPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancelPurchaseOrder(requestParameters: PurchaseApiCancelPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.cancelPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * @summary 根据缺口生成采购订单草稿
+         * @param {PurchaseApiCreatePurchaseOrderDraftFromShortageRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createPurchaseOrderDraftFromShortage(requestParameters: PurchaseApiCreatePurchaseOrderDraftFromShortageRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseDraftFromShortageResponse> {
+            return localVarFp.createPurchaseOrderDraftFromShortage(requestParameters.purchaseDraftFromShortageRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * @summary 生成采购逾期提醒
+         * @param {PurchaseApiGeneratePurchaseOverdueReminderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        generatePurchaseOverdueReminder(requestParameters: PurchaseApiGeneratePurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOverdueReminderGenerateResponse> {
+            return localVarFp.generatePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderGenerateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单详情
+         * @param {PurchaseApiGetPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPurchaseOrder(requestParameters: PurchaseApiGetPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.getPurchaseOrder(requestParameters.orderId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * @summary 处理采购逾期提醒
+         * @param {PurchaseApiHandlePurchaseOverdueReminderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        handlePurchaseOverdueReminder(requestParameters: PurchaseApiHandlePurchaseOverdueReminderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOverdueReminderResponse> {
+            return localVarFp.handlePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderHandleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购订单列表
+         * @param {PurchaseApiListPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOrder(requestParameters: PurchaseApiListPurchaseOrderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderPageResponse> {
+            return localVarFp.listPurchaseOrder(requestParameters.page, requestParameters.pageSize, requestParameters.supplierId, requestParameters.materialId, requestParameters.status, requestParameters.orderDateStart, requestParameters.orderDateEnd, requestParameters.expectedDateStart, requestParameters.expectedDateEnd, requestParameters.buyerId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购逾期提醒
+         * @param {PurchaseApiListPurchaseOverdueReminderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseOverdueReminder(requestParameters: PurchaseApiListPurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOverdueReminderPageResponse> {
+            return localVarFp.listPurchaseOverdueReminder(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询采购收货记录
+         * @param {PurchaseApiListPurchaseReceiptRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPurchaseReceipt(requestParameters: PurchaseApiListPurchaseReceiptRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseReceiptPageResponse> {
+            return localVarFp.listPurchaseReceipt(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * @summary 提交采购订单
+         * @param {PurchaseApiSubmitPurchaseOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        submitPurchaseOrder(requestParameters: PurchaseApiSubmitPurchaseOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<PurchaseOrderResponse> {
+            return localVarFp.submitPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiAddPurchaseOrderRequest {
+    readonly purchaseOrderCreateRequest: PurchaseOrderCreateRequest
+}
+
+/**
+ * Request parameters for addPurchaseReceipt operation in PurchaseApi.
+ */
+export interface PurchaseApiAddPurchaseReceiptRequest {
+    readonly purchaseReceiptCreateRequest: PurchaseReceiptCreateRequest
+}
+
+/**
+ * Request parameters for cancelPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiCancelPurchaseOrderRequest {
+    readonly purchaseOrderActionRequest: PurchaseOrderActionRequest
+}
+
+/**
+ * Request parameters for createPurchaseOrderDraftFromShortage operation in PurchaseApi.
+ */
+export interface PurchaseApiCreatePurchaseOrderDraftFromShortageRequest {
+    readonly purchaseDraftFromShortageRequest: PurchaseDraftFromShortageRequest
+}
+
+/**
+ * Request parameters for generatePurchaseOverdueReminder operation in PurchaseApi.
+ */
+export interface PurchaseApiGeneratePurchaseOverdueReminderRequest {
+    readonly purchaseOverdueReminderGenerateRequest?: PurchaseOverdueReminderGenerateRequest
+}
+
+/**
+ * Request parameters for getPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiGetPurchaseOrderRequest {
+    readonly orderId: number
+}
+
+/**
+ * Request parameters for handlePurchaseOverdueReminder operation in PurchaseApi.
+ */
+export interface PurchaseApiHandlePurchaseOverdueReminderRequest {
+    readonly purchaseOverdueReminderHandleRequest: PurchaseOverdueReminderHandleRequest
+}
+
+/**
+ * Request parameters for listPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiListPurchaseOrderRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly supplierId?: number
+
+    readonly materialId?: number
+
+    readonly status?: PurchaseOrderStatus
+
+    readonly orderDateStart?: string
+
+    readonly orderDateEnd?: string
+
+    readonly expectedDateStart?: string
+
+    readonly expectedDateEnd?: string
+
+    readonly buyerId?: number
+}
+
+/**
+ * Request parameters for listPurchaseOverdueReminder operation in PurchaseApi.
+ */
+export interface PurchaseApiListPurchaseOverdueReminderRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly status?: PurchaseOverdueReminderStatus
+}
+
+/**
+ * Request parameters for listPurchaseReceipt operation in PurchaseApi.
+ */
+export interface PurchaseApiListPurchaseReceiptRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly materialId?: number
+}
+
+/**
+ * Request parameters for submitPurchaseOrder operation in PurchaseApi.
+ */
+export interface PurchaseApiSubmitPurchaseOrderRequest {
+    readonly purchaseOrderActionRequest: PurchaseOrderActionRequest
+}
+
+/**
+ * PurchaseApi - object-oriented interface
+ */
+export class PurchaseApi extends BaseAPI {
+    /**
+     * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+     * @summary 新增采购订单草稿
+     * @param {PurchaseApiAddPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addPurchaseOrder(requestParameters: PurchaseApiAddPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).addPurchaseOrder(requestParameters.purchaseOrderCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+     * @summary 新增采购收货记录
+     * @param {PurchaseApiAddPurchaseReceiptRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addPurchaseReceipt(requestParameters: PurchaseApiAddPurchaseReceiptRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).addPurchaseReceipt(requestParameters.purchaseReceiptCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+     * @summary 取消采购订单
+     * @param {PurchaseApiCancelPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public cancelPurchaseOrder(requestParameters: PurchaseApiCancelPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).cancelPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+     * @summary 根据缺口生成采购订单草稿
+     * @param {PurchaseApiCreatePurchaseOrderDraftFromShortageRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public createPurchaseOrderDraftFromShortage(requestParameters: PurchaseApiCreatePurchaseOrderDraftFromShortageRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).createPurchaseOrderDraftFromShortage(requestParameters.purchaseDraftFromShortageRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+     * @summary 生成采购逾期提醒
+     * @param {PurchaseApiGeneratePurchaseOverdueReminderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public generatePurchaseOverdueReminder(requestParameters: PurchaseApiGeneratePurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).generatePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderGenerateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购订单详情
+     * @param {PurchaseApiGetPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getPurchaseOrder(requestParameters: PurchaseApiGetPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).getPurchaseOrder(requestParameters.orderId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+     * @summary 处理采购逾期提醒
+     * @param {PurchaseApiHandlePurchaseOverdueReminderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public handlePurchaseOverdueReminder(requestParameters: PurchaseApiHandlePurchaseOverdueReminderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).handlePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderHandleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购订单列表
+     * @param {PurchaseApiListPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listPurchaseOrder(requestParameters: PurchaseApiListPurchaseOrderRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).listPurchaseOrder(requestParameters.page, requestParameters.pageSize, requestParameters.supplierId, requestParameters.materialId, requestParameters.status, requestParameters.orderDateStart, requestParameters.orderDateEnd, requestParameters.expectedDateStart, requestParameters.expectedDateEnd, requestParameters.buyerId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购逾期提醒
+     * @param {PurchaseApiListPurchaseOverdueReminderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listPurchaseOverdueReminder(requestParameters: PurchaseApiListPurchaseOverdueReminderRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).listPurchaseOverdueReminder(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询采购收货记录
+     * @param {PurchaseApiListPurchaseReceiptRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listPurchaseReceipt(requestParameters: PurchaseApiListPurchaseReceiptRequest = {}, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).listPurchaseReceipt(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+     * @summary 提交采购订单
+     * @param {PurchaseApiSubmitPurchaseOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public submitPurchaseOrder(requestParameters: PurchaseApiSubmitPurchaseOrderRequest, options?: RawAxiosRequestConfig) {
+        return PurchaseApiFp(this.configuration).submitPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * QualityTraceabilityApi - axios parameter creator
+ */
+export const QualityTraceabilityApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+         * @summary 新增批次消耗关系
+         * @param {BatchConsumptionCreateRequest} batchConsumptionCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addBatchConsumption: async (batchConsumptionCreateRequest: BatchConsumptionCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'batchConsumptionCreateRequest' is not null or undefined
+            assertParamExists('addBatchConsumption', 'batchConsumptionCreateRequest', batchConsumptionCreateRequest)
+            const localVarPath = `/api/addBatchConsumption`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(batchConsumptionCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 分析问题批次影响范围
+         * @param {QualityImpactAnalyzeRequest | null} qualityImpactAnalyzeRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        analyzeQualityImpact: async (qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest | null, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'qualityImpactAnalyzeRequest' is not null or undefined
+            assertParamExists('analyzeQualityImpact', 'qualityImpactAnalyzeRequest', qualityImpactAnalyzeRequest)
+            const localVarPath = `/api/analyzeQualityImpact`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(qualityImpactAnalyzeRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+         * @summary 删除批次消耗关系
+         * @param {BatchConsumptionDeleteRequest} batchConsumptionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteBatchConsumption: async (batchConsumptionDeleteRequest: BatchConsumptionDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'batchConsumptionDeleteRequest' is not null or undefined
+            assertParamExists('deleteBatchConsumption', 'batchConsumptionDeleteRequest', batchConsumptionDeleteRequest)
+            const localVarPath = `/api/deleteBatchConsumption`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(batchConsumptionDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询批次消耗关系
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [itemId] 
+         * @param {number} [materialId] 采购明细对应的原材料编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listBatchConsumption: async (page?: number, pageSize?: number, orderId?: number, itemId?: number, materialId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listBatchConsumption`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (itemId !== undefined) {
+                localVarQueryParameter['item_id'] = itemId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 从采购订单明细、原材料编号或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id 或到货日期范围至少提供一种。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 反向追溯原材料批次
+         * @param {number} [itemId] 
+         * @param {number} [materialId] 
+         * @param {string} [receiveDateStart] 
+         * @param {string} [receiveDateEnd] 到货日期结束。item_id、material_id 或完整到货日期范围至少提供一种，由后端校验。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        traceMaterialBatch: async (itemId?: number, materialId?: number, receiveDateStart?: string, receiveDateEnd?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/traceMaterialBatch`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (itemId !== undefined) {
+                localVarQueryParameter['item_id'] = itemId;
+            }
+
+            if (materialId !== undefined) {
+                localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (receiveDateStart !== undefined) {
+                localVarQueryParameter['receive_date_start'] = (receiveDateStart as any instanceof Date) ?
+                    (receiveDateStart as any).toISOString().substring(0,10) :
+                    receiveDateStart;
+            }
+
+            if (receiveDateEnd !== undefined) {
+                localVarQueryParameter['receive_date_end'] = (receiveDateEnd as any instanceof Date) ?
+                    (receiveDateEnd as any).toISOString().substring(0,10) :
+                    receiveDateEnd;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 正向追溯成品批次
+         * @param {number} [orderId] 
+         * @param {string} [batchNo] 成品批次号，来自完工入库单。order_id 和 batch_no 至少提供一个，由后端校验。
+         * @param {boolean} [includeSupplier] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        traceProductBatch: async (orderId?: number, batchNo?: string, includeSupplier?: boolean, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/traceProductBatch`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (orderId !== undefined) {
+                localVarQueryParameter['order_id'] = orderId;
+            }
+
+            if (batchNo !== undefined) {
+                localVarQueryParameter['batch_no'] = batchNo;
+            }
+
+            if (includeSupplier !== undefined) {
+                localVarQueryParameter['include_supplier'] = includeSupplier;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+         * @summary 修改批次消耗关系
+         * @param {BatchConsumptionUpdateRequest} batchConsumptionUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateBatchConsumption: async (batchConsumptionUpdateRequest: BatchConsumptionUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'batchConsumptionUpdateRequest' is not null or undefined
+            assertParamExists('updateBatchConsumption', 'batchConsumptionUpdateRequest', batchConsumptionUpdateRequest)
+            const localVarPath = `/api/updateBatchConsumption`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(batchConsumptionUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * QualityTraceabilityApi - functional programming interface
+ */
+export const QualityTraceabilityApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = QualityTraceabilityApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+         * @summary 新增批次消耗关系
+         * @param {BatchConsumptionCreateRequest} batchConsumptionCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addBatchConsumption(batchConsumptionCreateRequest: BatchConsumptionCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BatchConsumptionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addBatchConsumption(batchConsumptionCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.addBatchConsumption']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 分析问题批次影响范围
+         * @param {QualityImpactAnalyzeRequest | null} qualityImpactAnalyzeRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async analyzeQualityImpact(qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest | null, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<QualityImpactAnalyzeResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.analyzeQualityImpact(qualityImpactAnalyzeRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.analyzeQualityImpact']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+         * @summary 删除批次消耗关系
+         * @param {BatchConsumptionDeleteRequest} batchConsumptionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteBatchConsumption(batchConsumptionDeleteRequest: BatchConsumptionDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteBatchConsumption(batchConsumptionDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.deleteBatchConsumption']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询批次消耗关系
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [orderId] 
+         * @param {number} [itemId] 
+         * @param {number} [materialId] 采购明细对应的原材料编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listBatchConsumption(page?: number, pageSize?: number, orderId?: number, itemId?: number, materialId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BatchConsumptionPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listBatchConsumption(page, pageSize, orderId, itemId, materialId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.listBatchConsumption']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 从采购订单明细、原材料编号或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id 或到货日期范围至少提供一种。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 反向追溯原材料批次
+         * @param {number} [itemId] 
+         * @param {number} [materialId] 
+         * @param {string} [receiveDateStart] 
+         * @param {string} [receiveDateEnd] 到货日期结束。item_id、material_id 或完整到货日期范围至少提供一种，由后端校验。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async traceMaterialBatch(itemId?: number, materialId?: number, receiveDateStart?: string, receiveDateEnd?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MaterialBatchTraceResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.traceMaterialBatch(itemId, materialId, receiveDateStart, receiveDateEnd, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.traceMaterialBatch']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 正向追溯成品批次
+         * @param {number} [orderId] 
+         * @param {string} [batchNo] 成品批次号，来自完工入库单。order_id 和 batch_no 至少提供一个，由后端校验。
+         * @param {boolean} [includeSupplier] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async traceProductBatch(orderId?: number, batchNo?: string, includeSupplier?: boolean, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductBatchTraceResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.traceProductBatch(orderId, batchNo, includeSupplier, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.traceProductBatch']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+         * @summary 修改批次消耗关系
+         * @param {BatchConsumptionUpdateRequest} batchConsumptionUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateBatchConsumption(batchConsumptionUpdateRequest: BatchConsumptionUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BatchConsumptionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateBatchConsumption(batchConsumptionUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['QualityTraceabilityApi.updateBatchConsumption']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * QualityTraceabilityApi - factory interface
+ */
+export const QualityTraceabilityApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = QualityTraceabilityApiFp(configuration)
+    return {
+        /**
+         * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+         * @summary 新增批次消耗关系
+         * @param {QualityTraceabilityApiAddBatchConsumptionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addBatchConsumption(requestParameters: QualityTraceabilityApiAddBatchConsumptionRequest, options?: RawAxiosRequestConfig): AxiosPromise<BatchConsumptionResponse> {
+            return localVarFp.addBatchConsumption(requestParameters.batchConsumptionCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 分析问题批次影响范围
+         * @param {QualityTraceabilityApiAnalyzeQualityImpactRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        analyzeQualityImpact(requestParameters: QualityTraceabilityApiAnalyzeQualityImpactRequest, options?: RawAxiosRequestConfig): AxiosPromise<QualityImpactAnalyzeResponse> {
+            return localVarFp.analyzeQualityImpact(requestParameters.qualityImpactAnalyzeRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+         * @summary 删除批次消耗关系
+         * @param {QualityTraceabilityApiDeleteBatchConsumptionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteBatchConsumption(requestParameters: QualityTraceabilityApiDeleteBatchConsumptionRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteBatchConsumption(requestParameters.batchConsumptionDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询批次消耗关系
+         * @param {QualityTraceabilityApiListBatchConsumptionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listBatchConsumption(requestParameters: QualityTraceabilityApiListBatchConsumptionRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<BatchConsumptionPageResponse> {
+            return localVarFp.listBatchConsumption(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.itemId, requestParameters.materialId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 从采购订单明细、原材料编号或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id 或到货日期范围至少提供一种。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 反向追溯原材料批次
+         * @param {QualityTraceabilityApiTraceMaterialBatchRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        traceMaterialBatch(requestParameters: QualityTraceabilityApiTraceMaterialBatchRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<MaterialBatchTraceResponse> {
+            return localVarFp.traceMaterialBatch(requestParameters.itemId, requestParameters.materialId, requestParameters.receiveDateStart, requestParameters.receiveDateEnd, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * @summary 正向追溯成品批次
+         * @param {QualityTraceabilityApiTraceProductBatchRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        traceProductBatch(requestParameters: QualityTraceabilityApiTraceProductBatchRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ProductBatchTraceResponse> {
+            return localVarFp.traceProductBatch(requestParameters.orderId, requestParameters.batchNo, requestParameters.includeSupplier, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+         * @summary 修改批次消耗关系
+         * @param {QualityTraceabilityApiUpdateBatchConsumptionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateBatchConsumption(requestParameters: QualityTraceabilityApiUpdateBatchConsumptionRequest, options?: RawAxiosRequestConfig): AxiosPromise<BatchConsumptionResponse> {
+            return localVarFp.updateBatchConsumption(requestParameters.batchConsumptionUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addBatchConsumption operation in QualityTraceabilityApi.
+ */
+export interface QualityTraceabilityApiAddBatchConsumptionRequest {
+    readonly batchConsumptionCreateRequest: BatchConsumptionCreateRequest
+}
+
+/**
+ * Request parameters for analyzeQualityImpact operation in QualityTraceabilityApi.
+ */
+export interface QualityTraceabilityApiAnalyzeQualityImpactRequest {
+    readonly qualityImpactAnalyzeRequest: QualityImpactAnalyzeRequest | null
+}
+
+/**
+ * Request parameters for deleteBatchConsumption operation in QualityTraceabilityApi.
+ */
+export interface QualityTraceabilityApiDeleteBatchConsumptionRequest {
+    readonly batchConsumptionDeleteRequest: BatchConsumptionDeleteRequest
+}
+
+/**
+ * Request parameters for listBatchConsumption operation in QualityTraceabilityApi.
+ */
+export interface QualityTraceabilityApiListBatchConsumptionRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    readonly orderId?: number
+
+    readonly itemId?: number
+
+    /**
+     * 采购明细对应的原材料编号。
+     */
+    readonly materialId?: number
+}
+
+/**
+ * Request parameters for traceMaterialBatch operation in QualityTraceabilityApi.
+ */
+export interface QualityTraceabilityApiTraceMaterialBatchRequest {
+    readonly itemId?: number
+
+    readonly materialId?: number
+
+    readonly receiveDateStart?: string
+
+    /**
+     * 到货日期结束。item_id、material_id 或完整到货日期范围至少提供一种，由后端校验。
+     */
+    readonly receiveDateEnd?: string
+}
+
+/**
+ * Request parameters for traceProductBatch operation in QualityTraceabilityApi.
+ */
+export interface QualityTraceabilityApiTraceProductBatchRequest {
+    readonly orderId?: number
+
+    /**
+     * 成品批次号，来自完工入库单。order_id 和 batch_no 至少提供一个，由后端校验。
+     */
+    readonly batchNo?: string
+
+    readonly includeSupplier?: boolean
+}
+
+/**
+ * Request parameters for updateBatchConsumption operation in QualityTraceabilityApi.
+ */
+export interface QualityTraceabilityApiUpdateBatchConsumptionRequest {
+    readonly batchConsumptionUpdateRequest: BatchConsumptionUpdateRequest
+}
+
+/**
+ * QualityTraceabilityApi - object-oriented interface
+ */
+export class QualityTraceabilityApi extends BaseAPI {
+    /**
+     * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+     * @summary 新增批次消耗关系
+     * @param {QualityTraceabilityApiAddBatchConsumptionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addBatchConsumption(requestParameters: QualityTraceabilityApiAddBatchConsumptionRequest, options?: RawAxiosRequestConfig) {
+        return QualityTraceabilityApiFp(this.configuration).addBatchConsumption(requestParameters.batchConsumptionCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 分析问题批次影响范围
+     * @param {QualityTraceabilityApiAnalyzeQualityImpactRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public analyzeQualityImpact(requestParameters: QualityTraceabilityApiAnalyzeQualityImpactRequest, options?: RawAxiosRequestConfig) {
+        return QualityTraceabilityApiFp(this.configuration).analyzeQualityImpact(requestParameters.qualityImpactAnalyzeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+     * @summary 删除批次消耗关系
+     * @param {QualityTraceabilityApiDeleteBatchConsumptionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteBatchConsumption(requestParameters: QualityTraceabilityApiDeleteBatchConsumptionRequest, options?: RawAxiosRequestConfig) {
+        return QualityTraceabilityApiFp(this.configuration).deleteBatchConsumption(requestParameters.batchConsumptionDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询批次消耗关系
+     * @param {QualityTraceabilityApiListBatchConsumptionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listBatchConsumption(requestParameters: QualityTraceabilityApiListBatchConsumptionRequest = {}, options?: RawAxiosRequestConfig) {
+        return QualityTraceabilityApiFp(this.configuration).listBatchConsumption(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.itemId, requestParameters.materialId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 从采购订单明细、原材料编号或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id 或到货日期范围至少提供一种。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 反向追溯原材料批次
+     * @param {QualityTraceabilityApiTraceMaterialBatchRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public traceMaterialBatch(requestParameters: QualityTraceabilityApiTraceMaterialBatchRequest = {}, options?: RawAxiosRequestConfig) {
+        return QualityTraceabilityApiFp(this.configuration).traceMaterialBatch(requestParameters.itemId, requestParameters.materialId, requestParameters.receiveDateStart, requestParameters.receiveDateEnd, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * @summary 正向追溯成品批次
+     * @param {QualityTraceabilityApiTraceProductBatchRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public traceProductBatch(requestParameters: QualityTraceabilityApiTraceProductBatchRequest = {}, options?: RawAxiosRequestConfig) {
+        return QualityTraceabilityApiFp(this.configuration).traceProductBatch(requestParameters.orderId, requestParameters.batchNo, requestParameters.includeSupplier, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+     * @summary 修改批次消耗关系
+     * @param {QualityTraceabilityApiUpdateBatchConsumptionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateBatchConsumption(requestParameters: QualityTraceabilityApiUpdateBatchConsumptionRequest, options?: RawAxiosRequestConfig) {
+        return QualityTraceabilityApiFp(this.configuration).updateBatchConsumption(requestParameters.batchConsumptionUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * SystemApi - axios parameter creator
+ */
+export const SystemApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+         * @summary 新增操作日志
+         * @param {OperationLogCreateRequest} operationLogCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addOperationLogData: async (operationLogCreateRequest: OperationLogCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'operationLogCreateRequest' is not null or undefined
+            assertParamExists('addOperationLogData', 'operationLogCreateRequest', operationLogCreateRequest)
+            const localVarPath = `/api/addOperationLogData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(operationLogCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增权限
+         * @param {PermissionCreateRequest} permissionCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPermissionData: async (permissionCreateRequest: PermissionCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'permissionCreateRequest' is not null or undefined
+            assertParamExists('addPermissionData', 'permissionCreateRequest', permissionCreateRequest)
+            const localVarPath = `/api/addPermissionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(permissionCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增角色
+         * @param {RoleCreateRequest} roleCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addRoleData: async (roleCreateRequest: RoleCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'roleCreateRequest' is not null or undefined
+            assertParamExists('addRoleData', 'roleCreateRequest', roleCreateRequest)
+            const localVarPath = `/api/addRoleData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(roleCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 给角色分配权限
+         * @param {RolePermissionAssignRequest} rolePermissionAssignRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addRolePermission: async (rolePermissionAssignRequest: RolePermissionAssignRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'rolePermissionAssignRequest' is not null or undefined
+            assertParamExists('addRolePermission', 'rolePermissionAssignRequest', rolePermissionAssignRequest)
+            const localVarPath = `/api/addRolePermission`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(rolePermissionAssignRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增用户
+         * @param {UserCreateRequest} userCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addUserData: async (userCreateRequest: UserCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userCreateRequest' is not null or undefined
+            assertParamExists('addUserData', 'userCreateRequest', userCreateRequest)
+            const localVarPath = `/api/addUserData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(userCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 给用户分配角色
+         * @param {UserRoleAssignRequest} userRoleAssignRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addUserRole: async (userRoleAssignRequest: UserRoleAssignRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userRoleAssignRequest' is not null or undefined
+            assertParamExists('addUserRole', 'userRoleAssignRequest', userRoleAssignRequest)
+            const localVarPath = `/api/addUserRole`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(userRoleAssignRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除权限
+         * @param {PermissionDeleteRequest} permissionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deletePermissionData: async (permissionDeleteRequest: PermissionDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'permissionDeleteRequest' is not null or undefined
+            assertParamExists('deletePermissionData', 'permissionDeleteRequest', permissionDeleteRequest)
+            const localVarPath = `/api/deletePermissionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(permissionDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除角色
+         * @param {RoleDeleteRequest} roleDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteRoleData: async (roleDeleteRequest: RoleDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'roleDeleteRequest' is not null or undefined
+            assertParamExists('deleteRoleData', 'roleDeleteRequest', roleDeleteRequest)
+            const localVarPath = `/api/deleteRoleData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(roleDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 移除角色权限
+         * @param {RolePermissionDeleteRequest} rolePermissionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteRolePermission: async (rolePermissionDeleteRequest: RolePermissionDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'rolePermissionDeleteRequest' is not null or undefined
+            assertParamExists('deleteRolePermission', 'rolePermissionDeleteRequest', rolePermissionDeleteRequest)
+            const localVarPath = `/api/deleteRolePermission`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(rolePermissionDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除用户
+         * @param {UserDeleteRequest} userDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteUserData: async (userDeleteRequest: UserDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userDeleteRequest' is not null or undefined
+            assertParamExists('deleteUserData', 'userDeleteRequest', userDeleteRequest)
+            const localVarPath = `/api/deleteUserData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(userDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 移除用户角色
+         * @param {UserRoleDeleteRequest} userRoleDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteUserRole: async (userRoleDeleteRequest: UserRoleDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userRoleDeleteRequest' is not null or undefined
+            assertParamExists('deleteUserRole', 'userRoleDeleteRequest', userRoleDeleteRequest)
+            const localVarPath = `/api/deleteUserRole`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(userRoleDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询权限详情
+         * @param {number} permissionId 权限编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPermissionData: async (permissionId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'permissionId' is not null or undefined
+            assertParamExists('getPermissionData', 'permissionId', permissionId)
+            const localVarPath = `/api/getPermissionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (permissionId !== undefined) {
+                localVarQueryParameter['permission_id'] = permissionId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色详情
+         * @param {number} roleId 角色编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getRoleData: async (roleId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'roleId' is not null or undefined
+            assertParamExists('getRoleData', 'roleId', roleId)
+            const localVarPath = `/api/getRoleData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (roleId !== undefined) {
+                localVarQueryParameter['role_id'] = roleId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户详情
+         * @param {number} userId 用户编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getUserData: async (userId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userId' is not null or undefined
+            assertParamExists('getUserData', 'userId', userId)
+            const localVarPath = `/api/getUserData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (userId !== undefined) {
+                localVarQueryParameter['user_id'] = userId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询登录日志
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [userId] 用户编号。
+         * @param {ListLoginRecordDataResultEnum} [result] 登录结果。
+         * @param {string} [startTime] 登录开始时间。
+         * @param {string} [endTime] 登录结束时间。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listLoginRecordData: async (page?: number, pageSize?: number, userId?: number, result?: ListLoginRecordDataResultEnum, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listLoginRecordData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (userId !== undefined) {
+                localVarQueryParameter['user_id'] = userId;
+            }
+
+            if (result !== undefined) {
+                localVarQueryParameter['result'] = result;
+            }
+
+            if (startTime !== undefined) {
+                localVarQueryParameter['start_time'] = (startTime as any instanceof Date) ?
+                    (startTime as any).toISOString() :
+                    startTime;
+            }
+
+            if (endTime !== undefined) {
+                localVarQueryParameter['end_time'] = (endTime as any instanceof Date) ?
+                    (endTime as any).toISOString() :
+                    endTime;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+         * @summary 查询操作日志
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {string} [module] 操作模块，支持模糊匹配。
+         * @param {string} [action] 操作类型，支持模糊匹配。
+         * @param {number} [operatorId] 操作人编号。
+         * @param {string} [startTime] 操作开始时间。
+         * @param {string} [endTime] 操作结束时间。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listOperationLogData: async (page?: number, pageSize?: number, module?: string, action?: string, operatorId?: number, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listOperationLogData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (module !== undefined) {
+                localVarQueryParameter['module'] = module;
+            }
+
+            if (action !== undefined) {
+                localVarQueryParameter['action'] = action;
+            }
+
+            if (operatorId !== undefined) {
+                localVarQueryParameter['operator_id'] = operatorId;
+            }
+
+            if (startTime !== undefined) {
+                localVarQueryParameter['start_time'] = (startTime as any instanceof Date) ?
+                    (startTime as any).toISOString() :
+                    startTime;
+            }
+
+            if (endTime !== undefined) {
+                localVarQueryParameter['end_time'] = (endTime as any instanceof Date) ?
+                    (endTime as any).toISOString() :
+                    endTime;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询权限列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [permissionId] 权限编号。
+         * @param {string} [resource] 资源名称，支持模糊匹配。
+         * @param {string} [action] 操作类型，支持模糊匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPermissionData: async (page?: number, pageSize?: number, permissionId?: number, resource?: string, action?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listPermissionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (permissionId !== undefined) {
+                localVarQueryParameter['permission_id'] = permissionId;
+            }
+
+            if (resource !== undefined) {
+                localVarQueryParameter['resource'] = resource;
+            }
+
+            if (action !== undefined) {
+                localVarQueryParameter['action'] = action;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [roleId] 角色编号。
+         * @param {string} [roleName] 角色名称，支持模糊匹配。
+         * @param {ListRoleDataStatusEnum} [status] 角色状态。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listRoleData: async (page?: number, pageSize?: number, roleId?: number, roleName?: string, status?: ListRoleDataStatusEnum, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listRoleData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (roleId !== undefined) {
+                localVarQueryParameter['role_id'] = roleId;
+            }
+
+            if (roleName !== undefined) {
+                localVarQueryParameter['role_name'] = roleName;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色权限关系列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [roleId] 角色编号。
+         * @param {number} [permissionId] 权限编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listRolePermissionData: async (page?: number, pageSize?: number, roleId?: number, permissionId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listRolePermissionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (roleId !== undefined) {
+                localVarQueryParameter['role_id'] = roleId;
+            }
+
+            if (permissionId !== undefined) {
+                localVarQueryParameter['permission_id'] = permissionId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [userId] 用户编号。
+         * @param {string} [employeeNo] 工号，支持精确或模糊匹配。
+         * @param {string} [userName] 用户姓名，支持模糊匹配。
+         * @param {ListUserDataStatusEnum} [status] 账号状态。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listUserData: async (page?: number, pageSize?: number, userId?: number, employeeNo?: string, userName?: string, status?: ListUserDataStatusEnum, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listUserData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (userId !== undefined) {
+                localVarQueryParameter['user_id'] = userId;
+            }
+
+            if (employeeNo !== undefined) {
+                localVarQueryParameter['employee_no'] = employeeNo;
+            }
+
+            if (userName !== undefined) {
+                localVarQueryParameter['user_name'] = userName;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户角色关系列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [userId] 用户编号。
+         * @param {number} [roleId] 角色编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listUserRoleData: async (page?: number, pageSize?: number, userId?: number, roleId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listUserRoleData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (userId !== undefined) {
+                localVarQueryParameter['user_id'] = userId;
+            }
+
+            if (roleId !== undefined) {
+                localVarQueryParameter['role_id'] = roleId;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+         * @summary 登录
+         * @param {LoginRequest} loginRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        login: async (loginRequest: LoginRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'loginRequest' is not null or undefined
+            assertParamExists('login', 'loginRequest', loginRequest)
+            const localVarPath = `/api/login`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(loginRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+         * @summary 注册系统用户
+         * @param {RegisterRequest} registerRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        register: async (registerRequest: RegisterRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'registerRequest' is not null or undefined
+            assertParamExists('register', 'registerRequest', registerRequest)
+            const localVarPath = `/api/register`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(registerRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改权限
+         * @param {PermissionUpdateRequest} permissionUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updatePermissionData: async (permissionUpdateRequest: PermissionUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'permissionUpdateRequest' is not null or undefined
+            assertParamExists('updatePermissionData', 'permissionUpdateRequest', permissionUpdateRequest)
+            const localVarPath = `/api/updatePermissionData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(permissionUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改角色
+         * @param {RoleUpdateRequest} roleUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateRoleData: async (roleUpdateRequest: RoleUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'roleUpdateRequest' is not null or undefined
+            assertParamExists('updateRoleData', 'roleUpdateRequest', roleUpdateRequest)
+            const localVarPath = `/api/updateRoleData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(roleUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改用户
+         * @param {UserUpdateRequest} userUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateUserData: async (userUpdateRequest: UserUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userUpdateRequest' is not null or undefined
+            assertParamExists('updateUserData', 'userUpdateRequest', userUpdateRequest)
+            const localVarPath = `/api/updateUserData`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(userUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * SystemApi - functional programming interface
+ */
+export const SystemApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = SystemApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+         * @summary 新增操作日志
+         * @param {OperationLogCreateRequest} operationLogCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addOperationLogData(operationLogCreateRequest: OperationLogCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OperationLogResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addOperationLogData(operationLogCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.addOperationLogData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增权限
+         * @param {PermissionCreateRequest} permissionCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addPermissionData(permissionCreateRequest: PermissionCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addPermissionData(permissionCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.addPermissionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增角色
+         * @param {RoleCreateRequest} roleCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addRoleData(roleCreateRequest: RoleCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RoleResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addRoleData(roleCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.addRoleData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 给角色分配权限
+         * @param {RolePermissionAssignRequest} rolePermissionAssignRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addRolePermission(rolePermissionAssignRequest: RolePermissionAssignRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RolePermissionAssignResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addRolePermission(rolePermissionAssignRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.addRolePermission']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增用户
+         * @param {UserCreateRequest} userCreateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addUserData(userCreateRequest: UserCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addUserData(userCreateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.addUserData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 给用户分配角色
+         * @param {UserRoleAssignRequest} userRoleAssignRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addUserRole(userRoleAssignRequest: UserRoleAssignRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserRoleAssignResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addUserRole(userRoleAssignRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.addUserRole']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除权限
+         * @param {PermissionDeleteRequest} permissionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deletePermissionData(permissionDeleteRequest: PermissionDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deletePermissionData(permissionDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.deletePermissionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除角色
+         * @param {RoleDeleteRequest} roleDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteRoleData(roleDeleteRequest: RoleDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteRoleData(roleDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.deleteRoleData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 移除角色权限
+         * @param {RolePermissionDeleteRequest} rolePermissionDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteRolePermission(rolePermissionDeleteRequest: RolePermissionDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteRolePermission(rolePermissionDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.deleteRolePermission']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除用户
+         * @param {UserDeleteRequest} userDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteUserData(userDeleteRequest: UserDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteUserData(userDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.deleteUserData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 移除用户角色
+         * @param {UserRoleDeleteRequest} userRoleDeleteRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteUserRole(userRoleDeleteRequest: UserRoleDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteUserRole(userRoleDeleteRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.deleteUserRole']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询权限详情
+         * @param {number} permissionId 权限编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getPermissionData(permissionId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getPermissionData(permissionId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.getPermissionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色详情
+         * @param {number} roleId 角色编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getRoleData(roleId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RoleResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getRoleData(roleId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.getRoleData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户详情
+         * @param {number} userId 用户编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getUserData(userId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getUserData(userId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.getUserData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询登录日志
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [userId] 用户编号。
+         * @param {ListLoginRecordDataResultEnum} [result] 登录结果。
+         * @param {string} [startTime] 登录开始时间。
+         * @param {string} [endTime] 登录结束时间。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listLoginRecordData(page?: number, pageSize?: number, userId?: number, result?: ListLoginRecordDataResultEnum, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginLogPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listLoginRecordData(page, pageSize, userId, result, startTime, endTime, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.listLoginRecordData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+         * @summary 查询操作日志
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {string} [module] 操作模块，支持模糊匹配。
+         * @param {string} [action] 操作类型，支持模糊匹配。
+         * @param {number} [operatorId] 操作人编号。
+         * @param {string} [startTime] 操作开始时间。
+         * @param {string} [endTime] 操作结束时间。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listOperationLogData(page?: number, pageSize?: number, module?: string, action?: string, operatorId?: number, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OperationLogPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listOperationLogData(page, pageSize, module, action, operatorId, startTime, endTime, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.listOperationLogData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询权限列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [permissionId] 权限编号。
+         * @param {string} [resource] 资源名称，支持模糊匹配。
+         * @param {string} [action] 操作类型，支持模糊匹配。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listPermissionData(page?: number, pageSize?: number, permissionId?: number, resource?: string, action?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPermissionData(page, pageSize, permissionId, resource, action, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.listPermissionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [roleId] 角色编号。
+         * @param {string} [roleName] 角色名称，支持模糊匹配。
+         * @param {ListRoleDataStatusEnum} [status] 角色状态。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listRoleData(page?: number, pageSize?: number, roleId?: number, roleName?: string, status?: ListRoleDataStatusEnum, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RolePageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listRoleData(page, pageSize, roleId, roleName, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.listRoleData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色权限关系列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [roleId] 角色编号。
+         * @param {number} [permissionId] 权限编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listRolePermissionData(page?: number, pageSize?: number, roleId?: number, permissionId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RolePermissionPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listRolePermissionData(page, pageSize, roleId, permissionId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.listRolePermissionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [userId] 用户编号。
+         * @param {string} [employeeNo] 工号，支持精确或模糊匹配。
+         * @param {string} [userName] 用户姓名，支持模糊匹配。
+         * @param {ListUserDataStatusEnum} [status] 账号状态。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listUserData(page?: number, pageSize?: number, userId?: number, employeeNo?: string, userName?: string, status?: ListUserDataStatusEnum, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listUserData(page, pageSize, userId, employeeNo, userName, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.listUserData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户角色关系列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [userId] 用户编号。
+         * @param {number} [roleId] 角色编号。
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listUserRoleData(page?: number, pageSize?: number, userId?: number, roleId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserRolePageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listUserRoleData(page, pageSize, userId, roleId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.listUserRoleData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+         * @summary 登录
+         * @param {LoginRequest} loginRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.login(loginRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.login']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+         * @summary 注册系统用户
+         * @param {RegisterRequest} registerRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async register(registerRequest: RegisterRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RegisterResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.register(registerRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.register']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改权限
+         * @param {PermissionUpdateRequest} permissionUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updatePermissionData(permissionUpdateRequest: PermissionUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updatePermissionData(permissionUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.updatePermissionData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改角色
+         * @param {RoleUpdateRequest} roleUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateRoleData(roleUpdateRequest: RoleUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RoleResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateRoleData(roleUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.updateRoleData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改用户
+         * @param {UserUpdateRequest} userUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateUserData(userUpdateRequest: UserUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateUserData(userUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.updateUserData']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * SystemApi - factory interface
+ */
+export const SystemApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = SystemApiFp(configuration)
+    return {
+        /**
+         * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+         * @summary 新增操作日志
+         * @param {SystemApiAddOperationLogDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addOperationLogData(requestParameters: SystemApiAddOperationLogDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<OperationLogResponse> {
+            return localVarFp.addOperationLogData(requestParameters.operationLogCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增权限
+         * @param {SystemApiAddPermissionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addPermissionData(requestParameters: SystemApiAddPermissionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<PermissionResponse> {
+            return localVarFp.addPermissionData(requestParameters.permissionCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增角色
+         * @param {SystemApiAddRoleDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addRoleData(requestParameters: SystemApiAddRoleDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<RoleResponse> {
+            return localVarFp.addRoleData(requestParameters.roleCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 给角色分配权限
+         * @param {SystemApiAddRolePermissionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addRolePermission(requestParameters: SystemApiAddRolePermissionRequest, options?: RawAxiosRequestConfig): AxiosPromise<RolePermissionAssignResponse> {
+            return localVarFp.addRolePermission(requestParameters.rolePermissionAssignRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 新增用户
+         * @param {SystemApiAddUserDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addUserData(requestParameters: SystemApiAddUserDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<UserResponse> {
+            return localVarFp.addUserData(requestParameters.userCreateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 给用户分配角色
+         * @param {SystemApiAddUserRoleRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addUserRole(requestParameters: SystemApiAddUserRoleRequest, options?: RawAxiosRequestConfig): AxiosPromise<UserRoleAssignResponse> {
+            return localVarFp.addUserRole(requestParameters.userRoleAssignRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除权限
+         * @param {SystemApiDeletePermissionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deletePermissionData(requestParameters: SystemApiDeletePermissionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deletePermissionData(requestParameters.permissionDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除角色
+         * @param {SystemApiDeleteRoleDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteRoleData(requestParameters: SystemApiDeleteRoleDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteRoleData(requestParameters.roleDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 移除角色权限
+         * @param {SystemApiDeleteRolePermissionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteRolePermission(requestParameters: SystemApiDeleteRolePermissionRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteRolePermission(requestParameters.rolePermissionDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 删除用户
+         * @param {SystemApiDeleteUserDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteUserData(requestParameters: SystemApiDeleteUserDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteUserData(requestParameters.userDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 移除用户角色
+         * @param {SystemApiDeleteUserRoleRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteUserRole(requestParameters: SystemApiDeleteUserRoleRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
+            return localVarFp.deleteUserRole(requestParameters.userRoleDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询权限详情
+         * @param {SystemApiGetPermissionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPermissionData(requestParameters: SystemApiGetPermissionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<PermissionResponse> {
+            return localVarFp.getPermissionData(requestParameters.permissionId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色详情
+         * @param {SystemApiGetRoleDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getRoleData(requestParameters: SystemApiGetRoleDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<RoleResponse> {
+            return localVarFp.getRoleData(requestParameters.roleId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户详情
+         * @param {SystemApiGetUserDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getUserData(requestParameters: SystemApiGetUserDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<UserResponse> {
+            return localVarFp.getUserData(requestParameters.userId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询登录日志
+         * @param {SystemApiListLoginRecordDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listLoginRecordData(requestParameters: SystemApiListLoginRecordDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginLogPageResponse> {
+            return localVarFp.listLoginRecordData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.result, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+         * @summary 查询操作日志
+         * @param {SystemApiListOperationLogDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listOperationLogData(requestParameters: SystemApiListOperationLogDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<OperationLogPageResponse> {
+            return localVarFp.listOperationLogData(requestParameters.page, requestParameters.pageSize, requestParameters.module, requestParameters.action, requestParameters.operatorId, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询权限列表
+         * @param {SystemApiListPermissionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listPermissionData(requestParameters: SystemApiListPermissionDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PermissionPageResponse> {
+            return localVarFp.listPermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.permissionId, requestParameters.resource, requestParameters.action, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色列表
+         * @param {SystemApiListRoleDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listRoleData(requestParameters: SystemApiListRoleDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<RolePageResponse> {
+            return localVarFp.listRoleData(requestParameters.page, requestParameters.pageSize, requestParameters.roleId, requestParameters.roleName, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询角色权限关系列表
+         * @param {SystemApiListRolePermissionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listRolePermissionData(requestParameters: SystemApiListRolePermissionDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<RolePermissionPageResponse> {
+            return localVarFp.listRolePermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.roleId, requestParameters.permissionId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户列表
+         * @param {SystemApiListUserDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listUserData(requestParameters: SystemApiListUserDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<UserPageResponse> {
+            return localVarFp.listUserData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.employeeNo, requestParameters.userName, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 查询用户角色关系列表
+         * @param {SystemApiListUserRoleDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listUserRoleData(requestParameters: SystemApiListUserRoleDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<UserRolePageResponse> {
+            return localVarFp.listUserRoleData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.roleId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+         * @summary 登录
+         * @param {SystemApiLoginRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        login(requestParameters: SystemApiLoginRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponse> {
+            return localVarFp.login(requestParameters.loginRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+         * @summary 注册系统用户
+         * @param {SystemApiRegisterRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        register(requestParameters: SystemApiRegisterRequest, options?: RawAxiosRequestConfig): AxiosPromise<RegisterResponse> {
+            return localVarFp.register(requestParameters.registerRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改权限
+         * @param {SystemApiUpdatePermissionDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updatePermissionData(requestParameters: SystemApiUpdatePermissionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<PermissionResponse> {
+            return localVarFp.updatePermissionData(requestParameters.permissionUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改角色
+         * @param {SystemApiUpdateRoleDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateRoleData(requestParameters: SystemApiUpdateRoleDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<RoleResponse> {
+            return localVarFp.updateRoleData(requestParameters.roleUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * @summary 修改用户
+         * @param {SystemApiUpdateUserDataRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateUserData(requestParameters: SystemApiUpdateUserDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<UserResponse> {
+            return localVarFp.updateUserData(requestParameters.userUpdateRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addOperationLogData operation in SystemApi.
+ */
+export interface SystemApiAddOperationLogDataRequest {
+    readonly operationLogCreateRequest: OperationLogCreateRequest
+}
+
+/**
+ * Request parameters for addPermissionData operation in SystemApi.
+ */
+export interface SystemApiAddPermissionDataRequest {
+    readonly permissionCreateRequest: PermissionCreateRequest
+}
+
+/**
+ * Request parameters for addRoleData operation in SystemApi.
+ */
+export interface SystemApiAddRoleDataRequest {
+    readonly roleCreateRequest: RoleCreateRequest
+}
+
+/**
+ * Request parameters for addRolePermission operation in SystemApi.
+ */
+export interface SystemApiAddRolePermissionRequest {
+    readonly rolePermissionAssignRequest: RolePermissionAssignRequest
+}
+
+/**
+ * Request parameters for addUserData operation in SystemApi.
+ */
+export interface SystemApiAddUserDataRequest {
+    readonly userCreateRequest: UserCreateRequest
+}
+
+/**
+ * Request parameters for addUserRole operation in SystemApi.
+ */
+export interface SystemApiAddUserRoleRequest {
+    readonly userRoleAssignRequest: UserRoleAssignRequest
+}
+
+/**
+ * Request parameters for deletePermissionData operation in SystemApi.
+ */
+export interface SystemApiDeletePermissionDataRequest {
+    readonly permissionDeleteRequest: PermissionDeleteRequest
+}
+
+/**
+ * Request parameters for deleteRoleData operation in SystemApi.
+ */
+export interface SystemApiDeleteRoleDataRequest {
+    readonly roleDeleteRequest: RoleDeleteRequest
+}
+
+/**
+ * Request parameters for deleteRolePermission operation in SystemApi.
+ */
+export interface SystemApiDeleteRolePermissionRequest {
+    readonly rolePermissionDeleteRequest: RolePermissionDeleteRequest
+}
+
+/**
+ * Request parameters for deleteUserData operation in SystemApi.
+ */
+export interface SystemApiDeleteUserDataRequest {
+    readonly userDeleteRequest: UserDeleteRequest
+}
+
+/**
+ * Request parameters for deleteUserRole operation in SystemApi.
+ */
+export interface SystemApiDeleteUserRoleRequest {
+    readonly userRoleDeleteRequest: UserRoleDeleteRequest
+}
+
+/**
+ * Request parameters for getPermissionData operation in SystemApi.
+ */
+export interface SystemApiGetPermissionDataRequest {
+    /**
+     * 权限编号。
+     */
+    readonly permissionId: number
+}
+
+/**
+ * Request parameters for getRoleData operation in SystemApi.
+ */
+export interface SystemApiGetRoleDataRequest {
+    /**
+     * 角色编号。
+     */
+    readonly roleId: number
+}
+
+/**
+ * Request parameters for getUserData operation in SystemApi.
+ */
+export interface SystemApiGetUserDataRequest {
+    /**
+     * 用户编号。
+     */
+    readonly userId: number
+}
+
+/**
+ * Request parameters for listLoginRecordData operation in SystemApi.
+ */
+export interface SystemApiListLoginRecordDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 用户编号。
+     */
+    readonly userId?: number
+
+    /**
+     * 登录结果。
+     */
+    readonly result?: ListLoginRecordDataResultEnum
+
+    /**
+     * 登录开始时间。
+     */
+    readonly startTime?: string
+
+    /**
+     * 登录结束时间。
+     */
+    readonly endTime?: string
+}
+
+/**
+ * Request parameters for listOperationLogData operation in SystemApi.
+ */
+export interface SystemApiListOperationLogDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 操作模块，支持模糊匹配。
+     */
+    readonly module?: string
+
+    /**
+     * 操作类型，支持模糊匹配。
+     */
+    readonly action?: string
+
+    /**
+     * 操作人编号。
+     */
+    readonly operatorId?: number
+
+    /**
+     * 操作开始时间。
+     */
+    readonly startTime?: string
+
+    /**
+     * 操作结束时间。
+     */
+    readonly endTime?: string
+}
+
+/**
+ * Request parameters for listPermissionData operation in SystemApi.
+ */
+export interface SystemApiListPermissionDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 权限编号。
+     */
+    readonly permissionId?: number
+
+    /**
+     * 资源名称，支持模糊匹配。
+     */
+    readonly resource?: string
+
+    /**
+     * 操作类型，支持模糊匹配。
+     */
+    readonly action?: string
+}
+
+/**
+ * Request parameters for listRoleData operation in SystemApi.
+ */
+export interface SystemApiListRoleDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 角色编号。
+     */
+    readonly roleId?: number
+
+    /**
+     * 角色名称，支持模糊匹配。
+     */
+    readonly roleName?: string
+
+    /**
+     * 角色状态。
+     */
+    readonly status?: ListRoleDataStatusEnum
+}
+
+/**
+ * Request parameters for listRolePermissionData operation in SystemApi.
+ */
+export interface SystemApiListRolePermissionDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 角色编号。
+     */
+    readonly roleId?: number
+
+    /**
+     * 权限编号。
+     */
+    readonly permissionId?: number
+}
+
+/**
+ * Request parameters for listUserData operation in SystemApi.
+ */
+export interface SystemApiListUserDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 用户编号。
+     */
+    readonly userId?: number
+
+    /**
+     * 工号，支持精确或模糊匹配。
+     */
+    readonly employeeNo?: string
+
+    /**
+     * 用户姓名，支持模糊匹配。
+     */
+    readonly userName?: string
+
+    /**
+     * 账号状态。
+     */
+    readonly status?: ListUserDataStatusEnum
+}
+
+/**
+ * Request parameters for listUserRoleData operation in SystemApi.
+ */
+export interface SystemApiListUserRoleDataRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 用户编号。
+     */
+    readonly userId?: number
+
+    /**
+     * 角色编号。
+     */
+    readonly roleId?: number
+}
+
+/**
+ * Request parameters for login operation in SystemApi.
+ */
+export interface SystemApiLoginRequest {
+    readonly loginRequest: LoginRequest
+}
+
+/**
+ * Request parameters for register operation in SystemApi.
+ */
+export interface SystemApiRegisterRequest {
+    readonly registerRequest: RegisterRequest
+}
+
+/**
+ * Request parameters for updatePermissionData operation in SystemApi.
+ */
+export interface SystemApiUpdatePermissionDataRequest {
+    readonly permissionUpdateRequest: PermissionUpdateRequest
+}
+
+/**
+ * Request parameters for updateRoleData operation in SystemApi.
+ */
+export interface SystemApiUpdateRoleDataRequest {
+    readonly roleUpdateRequest: RoleUpdateRequest
+}
+
+/**
+ * Request parameters for updateUserData operation in SystemApi.
+ */
+export interface SystemApiUpdateUserDataRequest {
+    readonly userUpdateRequest: UserUpdateRequest
+}
+
+/**
+ * SystemApi - object-oriented interface
+ */
+export class SystemApi extends BaseAPI {
+    /**
+     * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+     * @summary 新增操作日志
+     * @param {SystemApiAddOperationLogDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addOperationLogData(requestParameters: SystemApiAddOperationLogDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).addOperationLogData(requestParameters.operationLogCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增权限
+     * @param {SystemApiAddPermissionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addPermissionData(requestParameters: SystemApiAddPermissionDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).addPermissionData(requestParameters.permissionCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增角色
+     * @param {SystemApiAddRoleDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addRoleData(requestParameters: SystemApiAddRoleDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).addRoleData(requestParameters.roleCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 给角色分配权限
+     * @param {SystemApiAddRolePermissionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addRolePermission(requestParameters: SystemApiAddRolePermissionRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).addRolePermission(requestParameters.rolePermissionAssignRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 新增用户
+     * @param {SystemApiAddUserDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addUserData(requestParameters: SystemApiAddUserDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).addUserData(requestParameters.userCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 给用户分配角色
+     * @param {SystemApiAddUserRoleRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addUserRole(requestParameters: SystemApiAddUserRoleRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).addUserRole(requestParameters.userRoleAssignRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 删除权限
+     * @param {SystemApiDeletePermissionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deletePermissionData(requestParameters: SystemApiDeletePermissionDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).deletePermissionData(requestParameters.permissionDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 删除角色
+     * @param {SystemApiDeleteRoleDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteRoleData(requestParameters: SystemApiDeleteRoleDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).deleteRoleData(requestParameters.roleDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 移除角色权限
+     * @param {SystemApiDeleteRolePermissionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteRolePermission(requestParameters: SystemApiDeleteRolePermissionRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).deleteRolePermission(requestParameters.rolePermissionDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 删除用户
+     * @param {SystemApiDeleteUserDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteUserData(requestParameters: SystemApiDeleteUserDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).deleteUserData(requestParameters.userDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 移除用户角色
+     * @param {SystemApiDeleteUserRoleRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteUserRole(requestParameters: SystemApiDeleteUserRoleRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).deleteUserRole(requestParameters.userRoleDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询权限详情
+     * @param {SystemApiGetPermissionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getPermissionData(requestParameters: SystemApiGetPermissionDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).getPermissionData(requestParameters.permissionId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询角色详情
+     * @param {SystemApiGetRoleDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getRoleData(requestParameters: SystemApiGetRoleDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).getRoleData(requestParameters.roleId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询用户详情
+     * @param {SystemApiGetUserDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getUserData(requestParameters: SystemApiGetUserDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).getUserData(requestParameters.userId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询登录日志
+     * @param {SystemApiListLoginRecordDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listLoginRecordData(requestParameters: SystemApiListLoginRecordDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).listLoginRecordData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.result, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+     * @summary 查询操作日志
+     * @param {SystemApiListOperationLogDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listOperationLogData(requestParameters: SystemApiListOperationLogDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).listOperationLogData(requestParameters.page, requestParameters.pageSize, requestParameters.module, requestParameters.action, requestParameters.operatorId, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询权限列表
+     * @param {SystemApiListPermissionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listPermissionData(requestParameters: SystemApiListPermissionDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).listPermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.permissionId, requestParameters.resource, requestParameters.action, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询角色列表
+     * @param {SystemApiListRoleDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listRoleData(requestParameters: SystemApiListRoleDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).listRoleData(requestParameters.page, requestParameters.pageSize, requestParameters.roleId, requestParameters.roleName, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询角色权限关系列表
+     * @param {SystemApiListRolePermissionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listRolePermissionData(requestParameters: SystemApiListRolePermissionDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).listRolePermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.roleId, requestParameters.permissionId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询用户列表
+     * @param {SystemApiListUserDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listUserData(requestParameters: SystemApiListUserDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).listUserData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.employeeNo, requestParameters.userName, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 查询用户角色关系列表
+     * @param {SystemApiListUserRoleDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listUserRoleData(requestParameters: SystemApiListUserRoleDataRequest = {}, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).listUserRoleData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.roleId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
      * @summary 登录
-     * @param {DefaultApiLoginPostRequest} requestParameters Request parameters.
+     * @param {SystemApiLoginRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public loginPost(requestParameters: DefaultApiLoginPostRequest = {}, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).loginPost(requestParameters.userNo, requestParameters.password, options).then((request) => request(this.axios, this.basePath));
+    public login(requestParameters: SystemApiLoginRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).login(requestParameters.loginRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * 
+     * 公开接口，无需登录，所有用户可访问；不需要携带 Authorization 请求头。HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
      * @summary 注册系统用户
-     * @param {DefaultApiRegisterPostRequest} requestParameters Request parameters.
+     * @param {SystemApiRegisterRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public registerPost(requestParameters: DefaultApiRegisterPostRequest, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).registerPost(requestParameters.userNo, requestParameters.password, requestParameters.userName, requestParameters.phone, requestParameters.email, options).then((request) => request(this.axios, this.basePath));
+    public register(requestParameters: SystemApiRegisterRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).register(requestParameters.registerRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 修改权限
+     * @param {SystemApiUpdatePermissionDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updatePermissionData(requestParameters: SystemApiUpdatePermissionDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).updatePermissionData(requestParameters.permissionUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 修改角色
+     * @param {SystemApiUpdateRoleDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateRoleData(requestParameters: SystemApiUpdateRoleDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).updateRoleData(requestParameters.roleUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * @summary 修改用户
+     * @param {SystemApiUpdateUserDataRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateUserData(requestParameters: SystemApiUpdateUserDataRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).updateUserData(requestParameters.userUpdateRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
+export const ListLoginRecordDataResultEnum = {
+    Success: 'success',
+    Failure: 'failure',
+} as const;
+export type ListLoginRecordDataResultEnum = typeof ListLoginRecordDataResultEnum[keyof typeof ListLoginRecordDataResultEnum];
+export const ListRoleDataStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+export type ListRoleDataStatusEnum = typeof ListRoleDataStatusEnum[keyof typeof ListRoleDataStatusEnum];
+export const ListUserDataStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+export type ListUserDataStatusEnum = typeof ListUserDataStatusEnum[keyof typeof ListUserDataStatusEnum];
 
 

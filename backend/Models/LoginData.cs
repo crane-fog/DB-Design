@@ -1,7 +1,7 @@
 /*
- * 测试
+ * 数据库设计项目 API
  *
- * 这是一个示例项目
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -27,18 +27,22 @@ namespace Org.OpenAPITools.Models
     public partial class LoginData : IEquatable<LoginData>
     {
         /// <summary>
-        /// Gets or Sets Username
+        /// JWT 访问令牌。
         /// </summary>
+        /// <value>JWT 访问令牌。</value>
+        /* <example>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbXBsb3llZV9ubyI6IjI0NTAzMTMiLCJuYmYiOjE3ODM2OTg1ODAsImV4cCI6MTc4MzcwMjE4MH0.tFFAtFV5PaosfjMEVkQ0g97eK0RVAYHYvyxq7P3JKKw</example> */
         [Required]
-        [DataMember(Name="username", EmitDefaultValue=false)]
-        public string Username { get; set; }
+        [DataMember(Name="access_token", EmitDefaultValue=false)]
+        public string AccessToken { get; set; }
 
         /// <summary>
-        /// Gets or Sets Password
+        /// token 有效期，单位秒。
         /// </summary>
+        /// <value>token 有效期，单位秒。</value>
+        /* <example>7200</example> */
         [Required]
-        [DataMember(Name="password", EmitDefaultValue=false)]
-        public string Password { get; set; }
+        [DataMember(Name="expires", EmitDefaultValue=true)]
+        public int Expires { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -48,8 +52,8 @@ namespace Org.OpenAPITools.Models
         {
             var sb = new StringBuilder();
             sb.Append("class LoginData {\n");
-            sb.Append("  Username: ").Append(Username).Append("\n");
-            sb.Append("  Password: ").Append(Password).Append("\n");
+            sb.Append("  AccessToken: ").Append(AccessToken).Append("\n");
+            sb.Append("  Expires: ").Append(Expires).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -87,14 +91,14 @@ namespace Org.OpenAPITools.Models
 
             return 
                 (
-                    Username == other.Username ||
-                    Username != null &&
-                    Username.Equals(other.Username)
+                    AccessToken == other.AccessToken ||
+                    AccessToken != null &&
+                    AccessToken.Equals(other.AccessToken)
                 ) && 
                 (
-                    Password == other.Password ||
-                    Password != null &&
-                    Password.Equals(other.Password)
+                    Expires == other.Expires ||
+                    
+                    Expires.Equals(other.Expires)
                 );
         }
 
@@ -108,10 +112,10 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (Username != null)
-                    hashCode = hashCode * 59 + Username.GetHashCode();
-                    if (Password != null)
-                    hashCode = hashCode * 59 + Password.GetHashCode();
+                    if (AccessToken != null)
+                    hashCode = hashCode * 59 + AccessToken.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + Expires.GetHashCode();
                 return hashCode;
             }
         }

@@ -1,7 +1,6 @@
 <script setup lang="ts">
+import { Api, type UserData } from '@/api/client'
 import { onMounted, ref } from 'vue'
-import { Api } from '@/api/client'
-import type { UserData } from '@/api'
 
 const loading = ref(false)
 const error = ref('')

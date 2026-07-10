@@ -1,7 +1,7 @@
 /*
- * 测试
+ * 数据库设计项目 API
  *
- * 这是一个示例项目
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -24,21 +24,19 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class GetStatus200Response : IEquatable<GetStatus200Response>
+    public partial class MaterialCategory : IEquatable<MaterialCategory>
     {
         /// <summary>
-        /// Gets or Sets Status
+        /// Gets or Sets CategoryId
         /// </summary>
-        /* <example>ok</example> */
-        [DataMember(Name="status", EmitDefaultValue=false)]
-        public string Status { get; set; }
+        [DataMember(Name="category_id", EmitDefaultValue=true)]
+        public int CategoryId { get; set; }
 
         /// <summary>
-        /// Gets or Sets Uptime
+        /// Gets or Sets CategoryName
         /// </summary>
-        /* <example>123456</example> */
-        [DataMember(Name="uptime", EmitDefaultValue=true)]
-        public int Uptime { get; set; }
+        [DataMember(Name="category_name", EmitDefaultValue=false)]
+        public string CategoryName { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -47,9 +45,9 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class GetStatus200Response {\n");
-            sb.Append("  Status: ").Append(Status).Append("\n");
-            sb.Append("  Uptime: ").Append(Uptime).Append("\n");
+            sb.Append("class MaterialCategory {\n");
+            sb.Append("  CategoryId: ").Append(CategoryId).Append("\n");
+            sb.Append("  CategoryName: ").Append(CategoryName).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,29 +70,29 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((GetStatus200Response)obj);
+            return obj.GetType() == GetType() && Equals((MaterialCategory)obj);
         }
 
         /// <summary>
-        /// Returns true if GetStatus200Response instances are equal
+        /// Returns true if MaterialCategory instances are equal
         /// </summary>
-        /// <param name="other">Instance of GetStatus200Response to be compared</param>
+        /// <param name="other">Instance of MaterialCategory to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(GetStatus200Response other)
+        public bool Equals(MaterialCategory other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    Status == other.Status ||
-                    Status != null &&
-                    Status.Equals(other.Status)
+                    CategoryId == other.CategoryId ||
+                    
+                    CategoryId.Equals(other.CategoryId)
                 ) && 
                 (
-                    Uptime == other.Uptime ||
-                    
-                    Uptime.Equals(other.Uptime)
+                    CategoryName == other.CategoryName ||
+                    CategoryName != null &&
+                    CategoryName.Equals(other.CategoryName)
                 );
         }
 
@@ -108,10 +106,10 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (Status != null)
-                    hashCode = hashCode * 59 + Status.GetHashCode();
                     
-                    hashCode = hashCode * 59 + Uptime.GetHashCode();
+                    hashCode = hashCode * 59 + CategoryId.GetHashCode();
+                    if (CategoryName != null)
+                    hashCode = hashCode * 59 + CategoryName.GetHashCode();
                 return hashCode;
             }
         }
@@ -119,12 +117,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(GetStatus200Response left, GetStatus200Response right)
+        public static bool operator ==(MaterialCategory left, MaterialCategory right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(GetStatus200Response left, GetStatus200Response right)
+        public static bool operator !=(MaterialCategory left, MaterialCategory right)
         {
             return !Equals(left, right);
         }

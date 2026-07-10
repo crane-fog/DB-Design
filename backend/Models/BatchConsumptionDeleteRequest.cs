@@ -1,7 +1,7 @@
 /*
- * 测试
+ * 数据库设计项目 API
  *
- * 这是一个示例项目
+ * 项目 OpenAPI 总入口，按业务模块汇总接口定义。
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -24,14 +24,14 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class RegisterPost200Response : IEquatable<RegisterPost200Response>
+    public partial class BatchConsumptionDeleteRequest : IEquatable<BatchConsumptionDeleteRequest>
     {
         /// <summary>
-        /// Gets or Sets Msg
+        /// Gets or Sets ConsumptionId
         /// </summary>
         [Required]
-        [DataMember(Name="msg", EmitDefaultValue=false)]
-        public string Msg { get; set; }
+        [DataMember(Name="consumption_id", EmitDefaultValue=true)]
+        public long ConsumptionId { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -40,8 +40,8 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class RegisterPost200Response {\n");
-            sb.Append("  Msg: ").Append(Msg).Append("\n");
+            sb.Append("class BatchConsumptionDeleteRequest {\n");
+            sb.Append("  ConsumptionId: ").Append(ConsumptionId).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -64,24 +64,24 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((RegisterPost200Response)obj);
+            return obj.GetType() == GetType() && Equals((BatchConsumptionDeleteRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if RegisterPost200Response instances are equal
+        /// Returns true if BatchConsumptionDeleteRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of RegisterPost200Response to be compared</param>
+        /// <param name="other">Instance of BatchConsumptionDeleteRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(RegisterPost200Response other)
+        public bool Equals(BatchConsumptionDeleteRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    Msg == other.Msg ||
-                    Msg != null &&
-                    Msg.Equals(other.Msg)
+                    ConsumptionId == other.ConsumptionId ||
+                    
+                    ConsumptionId.Equals(other.ConsumptionId)
                 );
         }
 
@@ -95,8 +95,8 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (Msg != null)
-                    hashCode = hashCode * 59 + Msg.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + ConsumptionId.GetHashCode();
                 return hashCode;
             }
         }
@@ -104,12 +104,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(RegisterPost200Response left, RegisterPost200Response right)
+        public static bool operator ==(BatchConsumptionDeleteRequest left, BatchConsumptionDeleteRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(RegisterPost200Response left, RegisterPost200Response right)
+        public static bool operator !=(BatchConsumptionDeleteRequest left, BatchConsumptionDeleteRequest right)
         {
             return !Equals(left, right);
         }
