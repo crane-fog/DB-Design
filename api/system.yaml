@@ -86,7 +86,7 @@ paths:
                       user_name: 张三
                       phone: '13800000000'
                       email: zhangsan@example.com
-                      status: active
+                      status: valid
                 userExists:
                   summary: 工号已存在
                   value:
@@ -125,7 +125,7 @@ paths:
           schema:
             type: string
             enum:
-              - active
+              - valid
               - disabled
       responses:
         '200':
@@ -256,7 +256,7 @@ paths:
           schema:
             type: string
             enum:
-              - active
+              - valid
               - disabled
       responses:
         '200':
@@ -771,8 +771,8 @@ components:
         password:
           type: string
           format: password
-          description: 登录密码或前端传入的密码哈希值，以后端实现为准。
-          example: 5f4dcc3b5aa765d61d8327deb882cf99
+          description: 前端传入的密码哈希值，sha256。
+          example: 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
 
     LoginData:
       type: object
@@ -783,7 +783,7 @@ components:
         access_token:
           type: string
           description: JWT 访问令牌。
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbXBsb3llZV9ubyI6IjI0NTAzMTMiLCJuYmYiOjE3ODM2OTg1ODAsImV4cCI6MTc4MzcwMjE4MH0.tFFAtFV5PaosfjMEVkQ0g97eK0RVAYHYvyxq7P3JKKw
         expires:
           type: integer
           description: token 有效期，单位秒。
@@ -815,8 +815,8 @@ components:
         password:
           type: string
           format: password
-          description: 登录密码或前端传入的密码哈希值，以后端实现为准。
-          example: 5f4dcc3b5aa765d61d8327deb882cf99
+          description: 登录密码或前端传入的密码哈希值，sha256。
+          example: 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
         user_name:
           type: string
           example: 张三
@@ -856,9 +856,9 @@ components:
           nullable: true
         status:
           type: string
-          description: 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 active 与 disabled 之间切换。
+          description: 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 valid 与 disabled 之间切换。
           enum:
-            - active
+            - valid
             - disabled
 
     User:
@@ -905,11 +905,11 @@ components:
           nullable: true
         status:
           type: string
-          description: 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。新增时默认为 active，允许后续通过 updateUserData 修改为 disabled 或从 disabled 恢复为 active。
+          description: 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。新增时默认为 valid，允许后续通过 updateUserData 修改为 disabled 或从 disabled 恢复为 valid。
           enum:
-            - active
+            - valid
             - disabled
-          default: active
+          default: valid
 
     UserUpdateRequest:
       type: object
@@ -939,9 +939,9 @@ components:
           description: 邮箱。
         status:
           type: string
-          description: 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：active -> disabled、disabled -> active。
+          description: 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -> disabled、disabled -> valid。
           enum:
-            - active
+            - valid
             - disabled
 
     UserDeleteRequest:
@@ -961,9 +961,9 @@ components:
           type: string
         status:
           type: string
-          description: 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 active 与 disabled 之间切换。
+          description: 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
           enum:
-            - active
+            - valid
             - disabled
 
     Role:
@@ -987,11 +987,11 @@ components:
           nullable: true
         status:
           type: string
-          description: 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。
+          description: 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
           enum:
-            - active
+            - valid
             - disabled
-          default: active
+          default: valid
 
     RoleUpdateRequest:
       allOf:

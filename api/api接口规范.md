@@ -248,8 +248,8 @@ status:
 | 采购逾期提醒 | `status` | `pending_urge`、`urged`、`received` |
 | 生产线状态 | `status` | `idle`、`running`、`fault` |
 | 故障记录 | `status` | `pending_repair`、`repairing`、`recovered` |
-| 用户账号 | `status` | `active`、`disabled` |
-| 角色 | `status` | `active`、`disabled` |
+| 用户账号 | `status` | `valid`、`disabled` |
+| 角色 | `status` | `valid`、`disabled` |
 
 最终原则是：**大家共用的核心状态值全组统一；各模块新增状态值时，由模块负责人提出，并确认命名风格一致。**
 
