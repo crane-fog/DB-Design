@@ -1,0 +1,766 @@
+-- ============================================================================
+-- 初始化数据 · 电动平衡重叉车制造场景
+-- 数据基准日：2026-07-07
+-- 产品线：CPD15 / CPD20 / CPD30 电动平衡重叉车
+-- 价格字段按采购、报价、成本核算业务口径维护
+-- 执行顺序：先执行 01_schema_forklift.sql
+-- ============================================================================
+
+ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD';
+ALTER SESSION SET NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
+
+-- ============================================================
+-- 1. 系统用户 / 角色 / 权限
+-- ============================================================
+-- password_hash 为前端 SHA-256 结果，初始口令由系统统一维护
+INSERT INTO sys_user (user_id, employee_no, password_hash, user_name, phone, email, status, created_time, last_login_time, pwd_update_time) VALUES
+ (1,'GD0001','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','张建国','13812045067','zhangjg@gdforklift.cn','valid','2025-08-01 09:00:00','2026-07-07 08:32:11','2026-05-04 10:00:00');
+INSERT INTO sys_user VALUES (2,'GD0102','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','李文娟','13951862234','liwj@gdforklift.cn','valid','2025-08-01 09:05:00','2026-07-07 08:41:53','2026-04-11 14:20:00');
+INSERT INTO sys_user VALUES (3,'GD0201','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','王志强','13705178809','wangzq@gdforklift.cn','valid','2025-08-01 09:10:00','2026-07-06 16:22:40','2026-03-02 09:30:00');
+INSERT INTO sys_user VALUES (4,'GD0202','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','陈思远','13861799412','chensy@gdforklift.cn','valid','2025-09-15 10:00:00','2026-07-07 07:58:02','2026-06-01 11:00:00');
+INSERT INTO sys_user VALUES (5,'GD0301','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','赵丽华','13913246758','zhaolh@gdforklift.cn','valid','2025-08-01 09:20:00','2026-07-07 08:05:37','2026-02-14 16:45:00');
+INSERT INTO sys_user VALUES (6,'GD0401','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','刘洋','13585527391','liuyang@gdforklift.cn','valid','2025-08-01 09:25:00','2026-07-06 15:10:28','2026-05-20 09:15:00');
+INSERT INTO sys_user VALUES (7,'GD0501','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','孙德胜','13776083345','sunds@gdforklift.cn','valid','2025-08-01 09:30:00','2026-07-06 09:14:55','2026-01-09 08:50:00');
+INSERT INTO sys_user VALUES (8,'EXT9001','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','周明（江苏顺达物流）','13905141122','zhouming@sd-logistics.com','valid','2026-03-10 14:00:00','2026-07-05 10:18:46','2026-03-10 14:00:00');
+INSERT INTO sys_user VALUES (9,'EXT9002','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','吴晓东（浙江华仓仓储）','13757193308','wuxd@huacang-wh.cn','valid','2026-04-22 09:30:00','2026-07-06 14:47:12','2026-04-22 09:30:00');
+INSERT INTO sys_user VALUES (10,'GD0103','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','钱进','13641357790',NULL,'disabled','2025-08-01 09:35:00','2026-04-30 17:20:15','2025-08-01 09:35:00');
+
+INSERT INTO sys_role VALUES (1,'系统管理员','拥有全部资源的管理权限','valid');
+INSERT INTO sys_role VALUES (2,'生产管理员','生产订单、产能、生产线管理','valid');
+INSERT INTO sys_role VALUES (3,'采购员','采购订单全生命周期管理','valid');
+INSERT INTO sys_role VALUES (4,'库管员','库存、锁定、入库、预警处理','valid');
+INSERT INTO sys_role VALUES (5,'质检员','质量追溯与批次管理','valid');
+INSERT INTO sys_role VALUES (6,'设备管理员','生产线故障维修与状态维护','valid');
+INSERT INTO sys_role VALUES (7,'外部客户','仅可提交和查看自身外部订单','valid');
+
+INSERT INTO sys_permission VALUES ( 1,'物料','查看');
+INSERT INTO sys_permission VALUES ( 2,'物料','创建');
+INSERT INTO sys_permission VALUES ( 3,'物料','修改');
+INSERT INTO sys_permission VALUES ( 4,'BOM','查看');
+INSERT INTO sys_permission VALUES ( 5,'BOM','创建');
+INSERT INTO sys_permission VALUES ( 6,'BOM','修改');
+INSERT INTO sys_permission VALUES ( 7,'库存','查看');
+INSERT INTO sys_permission VALUES ( 8,'库存','修改');
+INSERT INTO sys_permission VALUES ( 9,'采购订单','查看');
+INSERT INTO sys_permission VALUES (10,'采购订单','创建');
+INSERT INTO sys_permission VALUES (11,'采购订单','修改');
+INSERT INTO sys_permission VALUES (12,'采购订单','审核');
+INSERT INTO sys_permission VALUES (13,'生产订单','查看');
+INSERT INTO sys_permission VALUES (14,'生产订单','创建');
+INSERT INTO sys_permission VALUES (15,'生产订单','审核');
+INSERT INTO sys_permission VALUES (16,'外部订单','查看');
+INSERT INTO sys_permission VALUES (17,'外部订单','创建');
+INSERT INTO sys_permission VALUES (18,'外部订单','审核');
+INSERT INTO sys_permission VALUES (19,'质量追溯','查看');
+INSERT INTO sys_permission VALUES (20,'生产线','查看');
+INSERT INTO sys_permission VALUES (21,'生产线','修改');
+INSERT INTO sys_permission VALUES (22,'用户管理','查看');
+INSERT INTO sys_permission VALUES (23,'用户管理','创建');
+INSERT INTO sys_permission VALUES (24,'用户管理','修改');
+
+-- 角色-权限
+INSERT INTO sys_role_permission SELECT 1, permission_id FROM sys_permission;
+-- 管理员全量
+INSERT INTO sys_role_permission VALUES (2, 1);
+INSERT INTO sys_role_permission VALUES (2, 4);
+INSERT INTO sys_role_permission VALUES (2, 7);
+INSERT INTO sys_role_permission VALUES (2,13);
+INSERT INTO sys_role_permission VALUES (2,14);
+INSERT INTO sys_role_permission VALUES (2,15);
+INSERT INTO sys_role_permission VALUES (2,18);
+INSERT INTO sys_role_permission VALUES (2,20);
+INSERT INTO sys_role_permission VALUES (3, 1);
+INSERT INTO sys_role_permission VALUES (3, 9);
+INSERT INTO sys_role_permission VALUES (3,10);
+INSERT INTO sys_role_permission VALUES (3,11);
+INSERT INTO sys_role_permission VALUES (4, 1);
+INSERT INTO sys_role_permission VALUES (4, 7);
+INSERT INTO sys_role_permission VALUES (4, 8);
+INSERT INTO sys_role_permission VALUES (4,13);
+INSERT INTO sys_role_permission VALUES (5, 1);
+INSERT INTO sys_role_permission VALUES (5, 7);
+INSERT INTO sys_role_permission VALUES (5,19);
+INSERT INTO sys_role_permission VALUES (6,20);
+INSERT INTO sys_role_permission VALUES (6,21);
+INSERT INTO sys_role_permission VALUES (7,16);
+INSERT INTO sys_role_permission VALUES (7,17);
+
+-- 用户-角色
+INSERT INTO sys_user_role VALUES ( 1,1);
+INSERT INTO sys_user_role VALUES ( 2,3);
+INSERT INTO sys_user_role VALUES ( 3,2);
+INSERT INTO sys_user_role VALUES ( 4,2);
+INSERT INTO sys_user_role VALUES ( 5,4);
+INSERT INTO sys_user_role VALUES ( 6,5);
+INSERT INTO sys_user_role VALUES ( 7,6);
+INSERT INTO sys_user_role VALUES ( 8,7);
+INSERT INTO sys_user_role VALUES ( 9,7);
+INSERT INTO sys_user_role VALUES (10,3);
+-- disabled 账号保留历史角色关联
+
+-- ============================================================
+-- 2. 物料分类 / 供应商
+-- ============================================================
+INSERT INTO material_category VALUES ( 1,'整机成品');
+INSERT INTO material_category VALUES ( 2,'结构件半成品');
+INSERT INTO material_category VALUES ( 3,'液压系统件');
+INSERT INTO material_category VALUES ( 4,'传动与桥总成');
+INSERT INTO material_category VALUES ( 5,'电气动力件');
+INSERT INTO material_category VALUES ( 6,'钢材原材料');
+INSERT INTO material_category VALUES ( 7,'铸造原材料');
+INSERT INTO material_category VALUES ( 8,'标准件与轴承');
+INSERT INTO material_category VALUES ( 9,'轮胎与属具');
+INSERT INTO material_category VALUES (10,'工艺辅料');
+
+INSERT INTO supplier VALUES ( 1,'宝山钢铁股份有限公司','销售热线','021-26648800');
+INSERT INTO supplier VALUES ( 2,'江苏常宝钢管股份有限公司','销售部','0519-88813911');
+INSERT INTO supplier VALUES ( 3,'天津市金桥焊材集团股份有限公司','国内销售','022-58296666');
+INSERT INTO supplier VALUES ( 4,'苏州汇川技术有限公司','服务热线','4000-300124');
+INSERT INTO supplier VALUES ( 5,'宁德时代新能源科技股份有限公司','总机','0593-2583668');
+INSERT INTO supplier VALUES ( 6,'天能电池集团股份有限公司','全球服务热线','400-8788-188');
+INSERT INTO supplier VALUES ( 7,'宁波拓普集团股份有限公司','总机','0574-56582888');
+INSERT INTO supplier VALUES ( 8,'人本股份有限公司','客服电话','400-820-3393');
+INSERT INTO supplier VALUES ( 9,'杭州东华链条集团有限公司','销售部','0571-85041448');
+INSERT INTO supplier VALUES (10,'厦门正新橡胶工业有限公司','客户服务','0592-6211606');
+INSERT INTO supplier VALUES (11,'江苏恒立液压股份有限公司','咨询热线','4001018889');
+INSERT INTO supplier VALUES (12,'安徽合力股份有限公司','配件公司','0551-63689202');
+INSERT INTO supplier VALUES (13,'江苏兰陵化工集团有限公司','工业涂料销售','0519-88604883');
+INSERT INTO supplier VALUES (14,'中国石化润滑油有限公司','客户服务热线','400-810-9886');
+
+-- ============================================================
+-- 3. 物料主数据（current_version_id 先置空，版本建成后回填）
+-- 编号段：1xx 成品 / 2xx 半成品 / 3xx 钢材铸造原材料 / 4xx 外购件 / 5xx 辅料
+-- ============================================================
+-- 成品
+INSERT INTO material VALUES (101,'CPD30电动平衡重叉车','成品','CPD30-GB2','台',1,3,NULL,NULL,3,'2025-09-01 10:00:00','2026-04-01 09:00:00');
+INSERT INTO material VALUES (102,'CPD20电动平衡重叉车','成品','CPD20-GB2','台',1,2,NULL,NULL,3,'2025-10-15 10:00:00','2025-10-15 10:00:00');
+INSERT INTO material VALUES (103,'CPD15电动平衡重叉车','成品','CPD15-GB2','台',1,0,NULL,NULL,3,'2026-01-10 10:00:00','2026-01-10 10:00:00');
+-- 半成品（自制件）
+INSERT INTO material VALUES (201,'车架总成','半成品','CJ30-01','件',2,2,NULL,NULL,3,'2025-09-01 10:05:00','2025-09-01 10:05:00');
+INSERT INTO material VALUES (202,'门架总成（两级3米）','半成品','MJ30-3000','套',2,2,NULL,NULL,3,'2025-09-01 10:06:00','2025-09-01 10:06:00');
+INSERT INTO material VALUES (203,'起升油缸','半成品','QSG-80/1500','支',3,4,NULL,NULL,3,'2025-09-01 10:07:00','2025-09-01 10:07:00');
+INSERT INTO material VALUES (204,'倾斜油缸','半成品','QXG-80/140','支',3,4,NULL,NULL,3,'2025-09-01 10:08:00','2025-09-01 10:08:00');
+INSERT INTO material VALUES (205,'转向油缸','半成品','ZXG-80/180','支',3,2,NULL,NULL,3,'2025-09-01 10:09:00','2025-09-01 10:09:00');
+INSERT INTO material VALUES (206,'液压缸筒（80缸径通用毛坯）','半成品','GT-80','件',3,10,NULL,NULL,3,'2025-09-01 10:10:00','2025-09-01 10:10:00');
+INSERT INTO material VALUES (207,'活塞杆（45镀铬）','半成品','HSG-45','件',3,10,NULL,NULL,3,'2025-09-01 10:11:00','2025-09-01 10:11:00');
+INSERT INTO material VALUES (208,'驱动桥总成','半成品','QDQ-30','套',4,2,NULL,NULL,3,'2025-09-01 10:12:00','2025-09-01 10:12:00');
+INSERT INTO material VALUES (209,'转向桥总成','半成品','ZXQ-30','套',4,2,NULL,NULL,3,'2025-09-01 10:13:00','2025-09-01 10:13:00');
+INSERT INTO material VALUES (210,'配重块（3吨型）','半成品','PZ-30','块',2,2,NULL,NULL,3,'2025-09-01 10:14:00','2025-09-01 10:14:00');
+INSERT INTO material VALUES (211,'护顶架','半成品','HDJ-30','件',2,2,NULL,NULL,3,'2025-09-01 10:15:00','2025-09-01 10:15:00');
+INSERT INTO material VALUES (212,'配重块（2吨型）','半成品','PZ-20','块',2,2,NULL,NULL,3,'2025-10-15 10:16:00','2025-10-15 10:16:00');
+-- 钢材与铸造原材料
+INSERT INTO material VALUES (301,'Q355B中厚钢板16mm','原材料','GB/T 1591','kg',6,5000,1,NULL,3,'2025-09-01 10:20:00','2025-09-01 10:20:00');
+INSERT INTO material VALUES (302,'Q355B钢板8mm','原材料','GB/T 1591','kg',6,3000,1,NULL,3,'2025-09-01 10:21:00','2025-09-01 10:21:00');
+INSERT INTO material VALUES (303,'45号无缝钢管121x20','原材料','GB/T 8163','米',6,50,2,NULL,3,'2025-09-01 10:22:00','2025-09-01 10:22:00');
+INSERT INTO material VALUES (304,'45号冷拔圆钢50','原材料','GB/T 905','米',6,60,1,NULL,3,'2025-09-01 10:23:00','2025-09-01 10:23:00');
+INSERT INTO material VALUES (305,'门架槽钢J180','原材料','25MnSi-J180','米',6,100,1,NULL,3,'2025-09-01 10:24:00','2025-09-01 10:24:00');
+INSERT INTO material VALUES (306,'方管60x60x4','原材料','GB/T 6728','米',6,80,1,NULL,3,'2025-09-01 10:25:00','2025-09-01 10:25:00');
+INSERT INTO material VALUES (307,'铸造生铁Z14','原材料','GB/T 718','kg',7,20000,1,NULL,3,'2025-09-01 10:26:00','2025-09-01 10:26:00');
+INSERT INTO material VALUES (308,'焊丝ER50-6直径1.2','原材料','GB/T 8110','kg',10,300,3,NULL,3,'2025-09-01 10:27:00','2025-09-01 10:27:00');
+-- 外购功能件（对本厂而言属采购投入，按文档枚举归类为"原材料"）
+INSERT INTO material VALUES (401,'交流驱动电机10kW','原材料','HC-AC10-80V','台',5,10,4,NULL,3,'2025-09-01 10:30:00','2025-09-01 10:30:00');
+INSERT INTO material VALUES (402,'锂电池组80V404Ah','原材料','LFP-80V404','组',5,5,5,NULL,3,'2026-03-20 10:31:00','2026-03-20 10:31:00');
+INSERT INTO material VALUES (403,'齿轮泵液压泵站','原材料','CBN-F320','台',3,8,11,NULL,3,'2025-09-01 10:32:00','2025-09-01 10:32:00');
+INSERT INTO material VALUES (404,'多路换向阀','原材料','DLS15-2T','件',3,8,11,NULL,3,'2025-09-01 10:33:00','2025-09-01 10:33:00');
+INSERT INTO material VALUES (405,'全液压转向器','原材料','BZZ1-100','件',3,8,11,NULL,3,'2025-09-01 10:34:00','2025-09-01 10:34:00');
+INSERT INTO material VALUES (406,'油缸密封件组','原材料','NOK-D80','套',3,40,7,NULL,3,'2025-09-01 10:35:00','2026-07-05 09:12:00');
+INSERT INTO material VALUES (407,'深沟球轴承6205-2RS','原材料','GB/T 276','套',8,200,8,NULL,3,'2025-09-01 10:36:00','2025-09-01 10:36:00');
+INSERT INTO material VALUES (408,'圆锥滚子轴承30208','原材料','GB/T 297','套',8,80,8,NULL,3,'2025-09-01 10:37:00','2025-09-01 10:37:00');
+INSERT INTO material VALUES (409,'起升板式链条LH2344','原材料','GB/T 6074','米',8,100,9,NULL,3,'2025-09-01 10:38:00','2025-09-01 10:38:00');
+INSERT INTO material VALUES (410,'实心轮胎28x9-15','原材料','J-LUG','条',9,30,10,NULL,3,'2025-09-01 10:39:00','2025-09-01 10:39:00');
+INSERT INTO material VALUES (411,'实心轮胎18x7-8','原材料','J-LUG','条',9,30,10,NULL,3,'2025-09-01 10:40:00','2025-09-01 10:40:00');
+INSERT INTO material VALUES (412,'货叉1070x125x45','原材料','ISO 2328-2A','支',9,20,12,NULL,3,'2025-09-01 10:41:00','2025-09-01 10:41:00');
+INSERT INTO material VALUES (413,'叉车座椅（带微动开关）','原材料','ZY-JD05','张',9,10,12,NULL,3,'2025-09-01 10:42:00','2025-09-01 10:42:00');
+INSERT INTO material VALUES (414,'组合仪表','原材料','ZB-80V','件',5,10,12,NULL,3,'2025-09-01 10:43:00','2025-09-01 10:43:00');
+INSERT INTO material VALUES (415,'铅酸蓄电池组80V500Ah','原材料','D-500','组',5,0,6,NULL,3,'2025-09-01 10:44:00','2026-04-01 09:00:00');
+-- 工艺辅料
+INSERT INTO material VALUES (501,'抗磨液压油L-HM46','辅料','GB 11118.1','升',10,200,14,NULL,3,'2025-09-01 10:50:00','2025-09-01 10:50:00');
+INSERT INTO material VALUES (502,'叉车专用漆（黄）底面合一','辅料','H06-4','kg',10,100,13,NULL,3,'2025-09-01 10:51:00','2025-09-01 10:51:00');
+
+-- ============================================================
+-- 4. BOM 版本（版本演进：CPD30 由铅酸 V1.0 升级为锂电 V2.0）
+-- ============================================================
+INSERT INTO bom_version VALUES ( 1,101,'V1.0','2025-09-01','2026-03-31','初始版本，动力采用铅酸蓄电池组',3);
+INSERT INTO bom_version VALUES ( 2,101,'V2.0','2026-04-01',NULL,'动力系统升级：铅酸蓄电池组更换为磷酸铁锂电池组，取消配液口结构',3);
+INSERT INTO bom_version VALUES ( 3,102,'V1.0','2025-10-15',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES ( 4,103,'V1.0','2026-01-10',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES ( 5,201,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES ( 6,202,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES ( 7,203,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES ( 8,204,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES ( 9,205,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES (10,206,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES (11,207,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES (12,208,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES (13,209,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES (14,210,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES (15,211,'V1.0','2025-09-01',NULL,'初始版本',3);
+INSERT INTO bom_version VALUES (16,212,'V1.0','2025-10-15',NULL,'初始版本',3);
+
+-- 回填当前生效版本（历史版本 V1.0 不被引用，即文档定义的"历史版本"）
+UPDATE material SET current_version_id =  2 WHERE material_id = 101;
+UPDATE material SET current_version_id =  3 WHERE material_id = 102;
+UPDATE material SET current_version_id =  4 WHERE material_id = 103;
+UPDATE material SET current_version_id =  5 WHERE material_id = 201;
+UPDATE material SET current_version_id =  6 WHERE material_id = 202;
+UPDATE material SET current_version_id =  7 WHERE material_id = 203;
+UPDATE material SET current_version_id =  8 WHERE material_id = 204;
+UPDATE material SET current_version_id =  9 WHERE material_id = 205;
+UPDATE material SET current_version_id = 10 WHERE material_id = 206;
+UPDATE material SET current_version_id = 11 WHERE material_id = 207;
+UPDATE material SET current_version_id = 12 WHERE material_id = 208;
+UPDATE material SET current_version_id = 13 WHERE material_id = 209;
+UPDATE material SET current_version_id = 14 WHERE material_id = 210;
+UPDATE material SET current_version_id = 15 WHERE material_id = 211;
+UPDATE material SET current_version_id = 16 WHERE material_id = 212;
+
+-- ============================================================
+-- 5. BOM 明细（4级嵌套：整机→门架→起升油缸→缸筒→无缝钢管）
+--    共用件关系：缸筒206被三种油缸引用；轴承407被门架和驱动桥引用
+-- ============================================================
+-- ---- CPD30 V2.0（version_id=2，当前生效，锂电池）----
+INSERT INTO bom (bom_id,parent_material_id,child_material_id,version_id,quantity,loss_rate) VALUES ( 1,101,201,2, 1,0);
+INSERT INTO bom VALUES ( 2,101,202,2, 1,0);
+INSERT INTO bom VALUES ( 3,101,204,2, 2,0);
+INSERT INTO bom VALUES ( 4,101,208,2, 1,0);
+INSERT INTO bom VALUES ( 5,101,209,2, 1,0);
+INSERT INTO bom VALUES ( 6,101,210,2, 1,0);
+INSERT INTO bom VALUES ( 7,101,211,2, 1,0);
+INSERT INTO bom VALUES ( 8,101,402,2, 1,0);
+INSERT INTO bom VALUES ( 9,101,403,2, 1,0);
+INSERT INTO bom VALUES (10,101,404,2, 1,0);
+INSERT INTO bom VALUES (11,101,405,2, 1,0);
+INSERT INTO bom VALUES (12,101,410,2, 2,0);
+INSERT INTO bom VALUES (13,101,411,2, 2,0);
+INSERT INTO bom VALUES (14,101,412,2, 2,0);
+INSERT INTO bom VALUES (15,101,413,2, 1,0);
+INSERT INTO bom VALUES (16,101,414,2, 1,0);
+INSERT INTO bom VALUES (17,101,501,2,32,0.03);
+-- 液压油加注损耗3%
+INSERT INTO bom VALUES (18,101,502,2, 9,0.10);
+-- 喷涂过喷损耗10%
+-- ---- CPD30 V1.0（version_id=1，历史版本，铅酸电池，供历史订单追溯）----
+INSERT INTO bom VALUES (19,101,201,1, 1,0);
+INSERT INTO bom VALUES (20,101,202,1, 1,0);
+INSERT INTO bom VALUES (21,101,204,1, 2,0);
+INSERT INTO bom VALUES (22,101,208,1, 1,0);
+INSERT INTO bom VALUES (23,101,209,1, 1,0);
+INSERT INTO bom VALUES (24,101,210,1, 1,0);
+INSERT INTO bom VALUES (25,101,211,1, 1,0);
+INSERT INTO bom VALUES (26,101,415,1, 1,0);
+-- 差异行：铅酸蓄电池组
+INSERT INTO bom VALUES (27,101,403,1, 1,0);
+INSERT INTO bom VALUES (28,101,404,1, 1,0);
+INSERT INTO bom VALUES (29,101,405,1, 1,0);
+INSERT INTO bom VALUES (30,101,410,1, 2,0);
+INSERT INTO bom VALUES (31,101,411,1, 2,0);
+INSERT INTO bom VALUES (32,101,412,1, 2,0);
+INSERT INTO bom VALUES (33,101,413,1, 1,0);
+INSERT INTO bom VALUES (34,101,414,1, 1,0);
+INSERT INTO bom VALUES (35,101,501,1,32,0.03);
+INSERT INTO bom VALUES (36,101,502,1, 9,0.10);
+-- ---- CPD20 V1.0（version_id=3，与CPD30共平台，配重减小）----
+INSERT INTO bom VALUES (37,102,201,3, 1,0);
+INSERT INTO bom VALUES (38,102,202,3, 1,0);
+INSERT INTO bom VALUES (39,102,204,3, 2,0);
+INSERT INTO bom VALUES (40,102,208,3, 1,0);
+INSERT INTO bom VALUES (41,102,209,3, 1,0);
+INSERT INTO bom VALUES (42,102,212,3, 1,0);
+-- 2吨配重
+INSERT INTO bom VALUES (43,102,211,3, 1,0);
+INSERT INTO bom VALUES (44,102,402,3, 1,0);
+INSERT INTO bom VALUES (45,102,403,3, 1,0);
+INSERT INTO bom VALUES (46,102,404,3, 1,0);
+INSERT INTO bom VALUES (47,102,405,3, 1,0);
+INSERT INTO bom VALUES (48,102,410,3, 2,0);
+INSERT INTO bom VALUES (49,102,411,3, 2,0);
+INSERT INTO bom VALUES (50,102,412,3, 2,0);
+INSERT INTO bom VALUES (51,102,413,3, 1,0);
+INSERT INTO bom VALUES (52,102,414,3, 1,0);
+INSERT INTO bom VALUES (53,102,501,3,28,0.03);
+INSERT INTO bom VALUES (54,102,502,3, 8,0.10);
+-- ---- CPD15 V1.0（version_id=4，共平台简化配置）----
+INSERT INTO bom VALUES (55,103,201,4, 1,0);
+INSERT INTO bom VALUES (56,103,202,4, 1,0);
+INSERT INTO bom VALUES (57,103,204,4, 2,0);
+INSERT INTO bom VALUES (58,103,208,4, 1,0);
+INSERT INTO bom VALUES (59,103,209,4, 1,0);
+INSERT INTO bom VALUES (60,103,212,4, 1,0);
+INSERT INTO bom VALUES (61,103,211,4, 1,0);
+INSERT INTO bom VALUES (62,103,402,4, 1,0);
+INSERT INTO bom VALUES (63,103,403,4, 1,0);
+INSERT INTO bom VALUES (64,103,405,4, 1,0);
+INSERT INTO bom VALUES (65,103,410,4, 2,0);
+INSERT INTO bom VALUES (66,103,411,4, 2,0);
+INSERT INTO bom VALUES (67,103,412,4, 2,0);
+INSERT INTO bom VALUES (68,103,413,4, 1,0);
+INSERT INTO bom VALUES (69,103,501,4,25,0.03);
+INSERT INTO bom VALUES (70,103,502,4, 7,0.10);
+-- ---- 车架总成 V1.0（version_id=5）：钢板下料损耗8%是行业典型值 ----
+INSERT INTO bom VALUES (71,201,301,5,420,0.08);
+-- 16mm钢板 420kg/件
+INSERT INTO bom VALUES (72,201,302,5,180,0.08);
+-- 8mm钢板 180kg/件
+INSERT INTO bom VALUES (73,201,308,5, 12,0.05);
+-- 焊丝 12kg/件
+-- ---- 门架总成 V1.0（version_id=6）----
+INSERT INTO bom VALUES (74,202,305,6, 24,0.06);
+-- 门架槽钢 24米/套，锯切损耗6%
+INSERT INTO bom VALUES (75,202,203,6,  2,0);
+-- 起升油缸 2支/套（第3级嵌套入口）
+INSERT INTO bom VALUES (76,202,409,6,  8,0.02);
+-- 起升链条 8米/套
+INSERT INTO bom VALUES (77,202,407,6,  4,0);
+-- 链轮轴承6205 4套（共用件路径1）
+INSERT INTO bom VALUES (78,202,308,6,  3,0.05);
+-- ---- 起升油缸 V1.0（version_id=7）----
+INSERT INTO bom VALUES (79,203,206,7,1,0);
+-- 缸筒（共用件路径1）
+INSERT INTO bom VALUES (80,203,207,7,1,0);
+INSERT INTO bom VALUES (81,203,406,7,1,0);
+-- ---- 倾斜油缸 V1.0（version_id=8）----
+INSERT INTO bom VALUES (82,204,206,8,1,0);
+-- 缸筒（共用件路径2）
+INSERT INTO bom VALUES (83,204,207,8,1,0);
+INSERT INTO bom VALUES (84,204,406,8,1,0);
+-- ---- 转向油缸 V1.0（version_id=9）----
+INSERT INTO bom VALUES (85,205,206,9,1,0);
+-- 缸筒（共用件路径3）
+INSERT INTO bom VALUES (86,205,207,9,1,0);
+INSERT INTO bom VALUES (87,205,406,9,1,0);
+-- ---- 液压缸筒 V1.0（version_id=10）：第4级，无缝钢管切割损耗5% ----
+INSERT INTO bom VALUES (88,206,303,10,0.8,0.05);
+-- ---- 活塞杆 V1.0（version_id=11）：圆钢车削损耗4% ----
+INSERT INTO bom VALUES (89,207,304,11,0.9,0.04);
+-- ---- 驱动桥总成 V1.0（version_id=12）----
+INSERT INTO bom VALUES (90,208,401,12, 1,0);
+INSERT INTO bom VALUES (91,208,407,12, 2,0);
+-- 轴承6205（共用件路径2）
+INSERT INTO bom VALUES (92,208,408,12, 2,0);
+INSERT INTO bom VALUES (93,208,302,12,45,0.06);
+-- 桥壳钢板
+INSERT INTO bom VALUES (94,208,308,12, 2,0.05);
+-- ---- 转向桥总成 V1.0（version_id=13）----
+INSERT INTO bom VALUES (95,209,205,13, 1,0);
+-- 转向油缸（嵌套引出缸筒第3条路径）
+INSERT INTO bom VALUES (96,209,408,13, 2,0);
+INSERT INTO bom VALUES (97,209,302,13,35,0.06);
+INSERT INTO bom VALUES (98,209,308,13, 1.5,0.05);
+-- ---- 配重块3吨 V1.0（version_id=14）：铸造浇冒口损耗6% ----
+INSERT INTO bom VALUES ( 99,210,307,14,1250,0.06);
+-- ---- 配重块2吨 V1.0（version_id=16）----
+INSERT INTO bom VALUES (100,212,307,16, 850,0.06);
+-- ---- 护顶架 V1.0（version_id=15）----
+INSERT INTO bom VALUES (101,211,306,15,14,0.05);
+INSERT INTO bom VALUES (102,211,308,15,1.5,0.05);
+
+-- ============================================================
+-- 6. 供应商报价（成本核算数据来源）
+-- ============================================================
+INSERT INTO supplier_price VALUES ( 1, 1,301,   4.25,'2026-01-01',NULL);
+-- 16mm钢板 约4250元/吨
+INSERT INTO supplier_price VALUES ( 2, 1,302,   4.35,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES ( 3, 1,304, 138.00,'2026-01-01',NULL);
+-- 冷拔圆钢50 约30kg/米
+INSERT INTO supplier_price VALUES ( 4, 1,305,  48.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES ( 5, 1,306,  27.50,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES ( 6, 1,307,   3.15,'2026-01-01',NULL);
+-- 铸造生铁 3150元/吨
+INSERT INTO supplier_price VALUES ( 7, 2,303, 158.00,'2026-01-01',NULL);
+-- 无缝钢管 约27kg/米
+INSERT INTO supplier_price VALUES ( 8, 3,308,   6.80,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES ( 9, 4,401,4850.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (10, 5,402,27500.00,'2026-03-01',NULL);
+INSERT INTO supplier_price VALUES (11, 6,415,16800.00,'2025-09-01','2026-03-31');
+-- 铅酸电池报价已随V1.0停用到期
+INSERT INTO supplier_price VALUES (12, 7,406,  85.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (13, 8,407,   8.50,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (14, 8,408,  22.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (15, 9,409,  95.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (16,10,410, 620.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (17,10,411, 365.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (18,11,403,3200.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (19,11,404,1450.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (20,11,405, 680.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (21,14,501,  11.80,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (22,12,412, 850.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (23,12,413, 380.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (24,12,414, 260.00,'2026-01-01',NULL);
+INSERT INTO supplier_price VALUES (25,13,502,  25.50,'2026-01-01',NULL);
+-- 多供应商比价记录：钢板的第二家报价
+INSERT INTO supplier_price VALUES (26, 2,301,   4.32,'2026-04-01',NULL);
+
+-- ============================================================
+-- 7. 采购订单 / 明细 / 收货 / 逾期提醒
+-- ============================================================
+-- PO1 宝钢股份 · 钢材大宗采购 · 已完成
+INSERT INTO purchase_order VALUES (1,1,'已完成','2026-05-06','2026-05-20','2026-05-18',2,175500.00);
+INSERT INTO purchase_order_item VALUES ( 1,1,301, 9000,9000,4.25);
+-- 38250
+INSERT INTO purchase_order_item VALUES ( 2,1,302, 5000,5000,4.35);
+-- 21750
+INSERT INTO purchase_order_item VALUES ( 3,1,307,26000,26000,3.15);
+-- 81900
+INSERT INTO purchase_order_item VALUES ( 4,1,305,  700, 700,48.00);
+-- 33600
+INSERT INTO receive_record VALUES (1,1,301, 9000,'2026-05-15');
+INSERT INTO receive_record VALUES (2,1,302, 5000,'2026-05-15');
+INSERT INTO receive_record VALUES (3,1,307,26000,'2026-05-18');
+INSERT INTO receive_record VALUES (4,1,305,  700,'2026-05-18');
+-- PO2 人本轴承 · 已完成（该批6205后续发现异响，质量追溯主线）
+INSERT INTO purchase_order VALUES (2,8,'已完成','2026-05-10','2026-05-17','2026-05-16',2,8650.00);
+INSERT INTO purchase_order_item VALUES ( 5,2,407,500,500, 8.50);
+-- 4250
+INSERT INTO purchase_order_item VALUES ( 6,2,408,200,200,22.00);
+-- 4400
+INSERT INTO receive_record VALUES (5,2,407,500,'2026-05-16');
+INSERT INTO receive_record VALUES (6,2,408,200,'2026-05-16');
+-- PO3 拓普集团 · 已完成
+INSERT INTO purchase_order VALUES (3,7,'已完成','2026-05-08','2026-05-15','2026-05-14',2,12750.00);
+INSERT INTO purchase_order_item VALUES ( 7,3,406,150,150,85.00);
+INSERT INTO receive_record VALUES (7,3,406,150,'2026-05-14');
+-- PO4 常宝钢管 · 部分到货且已逾期22天（逾期提醒记录）
+INSERT INTO purchase_order VALUES (4,2,'部分到货','2026-06-01','2026-06-15',NULL,2,47400.00);
+INSERT INTO purchase_order_item VALUES ( 8,4,303,300,180,158.00);
+INSERT INTO receive_record VALUES (8,4,303,120,'2026-06-14');
+INSERT INTO receive_record VALUES (9,4,303, 60,'2026-06-20');
+INSERT INTO overdue_reminder VALUES (1,4,'2026-06-15',22,'2026-07-07 06:00:00','已催交','供应商回复剩余120米预计7月12日发货');
+-- PO5 宁德时代 · 锂电池首批 · 已完成
+INSERT INTO purchase_order VALUES (5,5,'已完成','2026-05-12','2026-05-30','2026-05-28',2,550000.00);
+INSERT INTO purchase_order_item VALUES ( 9,5,402,20,20,27500.00);
+INSERT INTO receive_record VALUES (10,5,402,20,'2026-05-28');
+-- PO6 正新橡胶 · 已完成
+INSERT INTO purchase_order VALUES (6,10,'已完成','2026-05-20','2026-06-05','2026-06-02',2,78800.00);
+INSERT INTO purchase_order_item VALUES (10,6,410,80,80,620.00);
+INSERT INTO purchase_order_item VALUES (11,6,411,80,80,365.00);
+INSERT INTO receive_record VALUES (11,6,410,80,'2026-06-02');
+INSERT INTO receive_record VALUES (12,6,411,80,'2026-06-02');
+-- PO7 恒立液压 · 已完成
+INSERT INTO purchase_order VALUES (7,11,'已完成','2026-05-12','2026-05-26','2026-05-25',2,106600.00);
+INSERT INTO purchase_order_item VALUES (12,7,403,20,20,3200.00);
+INSERT INTO purchase_order_item VALUES (13,7,404,20,20,1450.00);
+INSERT INTO purchase_order_item VALUES (14,7,405,20,20, 680.00);
+INSERT INTO receive_record VALUES (13,7,403,20,'2026-05-25');
+INSERT INTO receive_record VALUES (14,7,404,20,'2026-05-25');
+INSERT INTO receive_record VALUES (15,7,405,20,'2026-05-25');
+-- PO8 东华链条 · 已完成
+INSERT INTO purchase_order VALUES (8,9,'已完成','2026-05-15','2026-05-29','2026-05-27',2,23750.00);
+INSERT INTO purchase_order_item VALUES (15,8,409,250,250,95.00);
+INSERT INTO receive_record VALUES (16,8,409,250,'2026-05-27');
+-- PO9 宁德时代 · 第二批锂电池 · 已提交在途（缺口计算"在途数量"来源）
+INSERT INTO purchase_order VALUES (9,5,'已提交','2026-06-25','2026-07-20',NULL,2,412500.00);
+INSERT INTO purchase_order_item VALUES (16,9,402,15,0,27500.00);
+-- PO10 拓普集团 · 草稿（由缺口计算自动生成，关联密封件低库存预警）
+INSERT INTO purchase_order VALUES (10,7,'草稿','2026-07-06','2026-07-21',NULL,2,10200.00);
+INSERT INTO purchase_order_item VALUES (17,10,406,120,0,85.00);
+
+-- ============================================================
+-- 8. 生产线 / 产能配置 / 生产日历
+-- ============================================================
+INSERT INTO line_type VALUES (1,'铸造线');
+INSERT INTO line_type VALUES (2,'焊接线');
+INSERT INTO line_type VALUES (3,'机加工线');
+INSERT INTO line_type VALUES (4,'涂装线');
+INSERT INTO line_type VALUES (5,'总装线');
+
+INSERT INTO production_line VALUES (1,1,'2025-08-20',7);
+-- 铸造1号线
+INSERT INTO production_line VALUES (2,2,'2025-08-20',3);
+-- 焊接1号线
+INSERT INTO production_line VALUES (3,2,'2025-11-05',3);
+-- 焊接2号线
+INSERT INTO production_line VALUES (4,3,'2025-08-20',4);
+-- 机加工1号线
+INSERT INTO production_line VALUES (5,4,'2025-08-20',4);
+-- 涂装1号线
+INSERT INTO production_line VALUES (6,5,'2025-08-20',3);
+-- 总装1号线
+INSERT INTO production_line VALUES (7,5,'2026-02-10',4);
+-- 总装2号线
+
+INSERT INTO capacity_config VALUES ( 1,210,1,240.00);
+-- 3吨配重 铸造 240分钟/块
+INSERT INTO capacity_config VALUES ( 2,212,1,210.00);
+INSERT INTO capacity_config VALUES ( 3,201,2,180.00);
+-- 车架 焊接 180分钟/件
+INSERT INTO capacity_config VALUES ( 4,202,2,150.00);
+INSERT INTO capacity_config VALUES ( 5,211,2, 60.00);
+INSERT INTO capacity_config VALUES ( 6,206,3, 35.00);
+-- 缸筒 机加 35分钟/件
+INSERT INTO capacity_config VALUES ( 7,207,3, 30.00);
+INSERT INTO capacity_config VALUES ( 8,203,5, 20.00);
+-- 油缸装配在总装线
+INSERT INTO capacity_config VALUES ( 9,204,5, 18.00);
+INSERT INTO capacity_config VALUES (10,205,5, 15.00);
+INSERT INTO capacity_config VALUES (11,208,5, 45.00);
+INSERT INTO capacity_config VALUES (12,209,5, 40.00);
+INSERT INTO capacity_config VALUES (13,101,5, 90.00);
+-- CPD30 总装 90分钟/台
+INSERT INTO capacity_config VALUES (14,102,5, 75.00);
+INSERT INTO capacity_config VALUES (15,103,5, 70.00);
+INSERT INTO capacity_config VALUES (16,101,4, 35.00);
+-- 同一产品需要多种线型：CPD30还需涂装
+INSERT INTO capacity_config VALUES (17,102,4, 30.00);
+
+-- 本周排产（2026-07-06 ~ 2026-07-10）
+INSERT INTO production_calendar VALUES ('2026-07-06',6,13);
+-- 总装1号：CPD30
+INSERT INTO production_calendar VALUES ('2026-07-07',6,13);
+INSERT INTO production_calendar VALUES ('2026-07-08',6,13);
+INSERT INTO production_calendar VALUES ('2026-07-09',6,13);
+INSERT INTO production_calendar VALUES ('2026-07-10',6,13);
+INSERT INTO production_calendar VALUES ('2026-07-06',5,16);
+-- 涂装1号：CPD30涂装
+INSERT INTO production_calendar VALUES ('2026-07-07',5,16);
+INSERT INTO production_calendar VALUES ('2026-07-08',5,16);
+INSERT INTO production_calendar VALUES ('2026-07-07',3,4);
+-- 焊接2号：门架（自焊接1号故障调入）
+INSERT INTO production_calendar VALUES ('2026-07-08',3,4);
+INSERT INTO production_calendar VALUES ('2026-07-09',3,4);
+INSERT INTO production_calendar VALUES ('2026-07-07',4,6);
+-- 机加1号：缸筒
+INSERT INTO production_calendar VALUES ('2026-07-08',4,6);
+INSERT INTO production_calendar VALUES ('2026-07-07',1,1);
+-- 铸造1号：3吨配重
+INSERT INTO production_calendar VALUES ('2026-07-08',1,1);
+INSERT INTO production_calendar VALUES ('2026-07-09',1,1);
+
+-- ============================================================
+-- 9. 生产订单（多级：半成品批次订单→整机订单，含在制与待审核）
+-- ============================================================
+-- 半成品批次生产（已完工）
+INSERT INTO production_order VALUES (1,206,10,120,120,'2026-05-25','2026-05-31','2026-05-26','2026-05-30','已完工');
+INSERT INTO production_order VALUES (2,207,11,120,120,'2026-05-25','2026-05-30','2026-05-26','2026-05-29','已完工');
+INSERT INTO production_order VALUES (3,203, 7, 40, 40,'2026-06-01','2026-06-07','2026-06-02','2026-06-06','已完工');
+INSERT INTO production_order VALUES (4,202, 6, 25, 25,'2026-06-08','2026-06-15','2026-06-08','2026-06-14','已完工');
+-- CPD20 整机批次（已完工，质量追溯成品批次）
+INSERT INTO production_order VALUES (5,102, 3, 15, 15,'2026-06-15','2026-06-30','2026-06-16','2026-06-28','已完工');
+-- CPD30 整机批次（生产中，库存锁定记录）
+INSERT INTO production_order VALUES (6,101, 2, 20,  8,'2026-06-30','2026-07-15','2026-06-30',NULL,'生产中');
+-- 外部订单转化而来（待审核）
+INSERT INTO production_order VALUES (7,101, 2, 10,  0,'2026-07-20','2026-08-05',NULL,NULL,'待审核');
+
+-- 完工入库单（成品批次号规则：型号-完工日期-班次批号）
+INSERT INTO finish_inbound VALUES (1,1,206,10,120,118,'GT80-20260530-B01','2026-05-30 16:40:00',5);
+INSERT INTO finish_inbound VALUES (2,2,207,11,120,120,'HSG45-20260529-B01','2026-05-29 15:30:00',5);
+INSERT INTO finish_inbound VALUES (3,3,203, 7, 40, 40,'QSG-20260606-B01','2026-06-06 17:10:00',5);
+INSERT INTO finish_inbound VALUES (4,4,202, 6, 25, 25,'MJ30-20260614-B01','2026-06-14 16:55:00',5);
+INSERT INTO finish_inbound VALUES (5,5,102, 3, 15, 15,'CPD20-20260628-B01','2026-06-28 18:20:00',5);
+
+-- ============================================================
+-- 10. 库存锁定（订单6在制锁定 + 订单5历史已消耗锁定）
+-- ============================================================
+-- 订单5（CPD20，已完工）：锁定→已消耗，release_time=完工入库时间
+INSERT INTO stock_lock VALUES ( 1,5,402,15,'已消耗','2026-06-15 09:00:00','2026-06-28 18:20:00',5);
+INSERT INTO stock_lock VALUES ( 2,5,202,15,'已消耗','2026-06-15 09:00:00','2026-06-28 18:20:00',5);
+INSERT INTO stock_lock VALUES ( 3,5,410,30,'已消耗','2026-06-15 09:00:00','2026-06-28 18:20:00',5);
+-- 订单6（CPD30×20，在制，剩余12台的物料保持锁定）
+INSERT INTO stock_lock VALUES ( 4,6,402,12,'已锁定','2026-06-30 08:30:00',NULL,5);
+INSERT INTO stock_lock VALUES ( 5,6,202,12,'已锁定','2026-06-30 08:30:00',NULL,5);
+INSERT INTO stock_lock VALUES ( 6,6,201,12,'已锁定','2026-06-30 08:30:00',NULL,5);
+INSERT INTO stock_lock VALUES ( 7,6,210,12,'已锁定','2026-06-30 08:30:00',NULL,5);
+INSERT INTO stock_lock VALUES ( 8,6,410,24,'已锁定','2026-06-30 08:30:00',NULL,5);
+INSERT INTO stock_lock VALUES ( 9,6,411,24,'已锁定','2026-06-30 08:30:00',NULL,5);
+INSERT INTO stock_lock VALUES (10,6,412,24,'已锁定','2026-06-30 08:30:00',NULL,5);
+
+-- ============================================================
+-- 11. 物料库存快照（locked_qty 与上表"已锁定"记录逐项对账一致）
+-- ============================================================
+INSERT INTO material_stock VALUES (101,  3, 0,'2026-07-06 17:30:00','2026-07-02 10:00:00');
+INSERT INTO material_stock VALUES (102, 12, 0,'2026-06-28 18:20:00','2026-07-03 14:00:00');
+INSERT INTO material_stock VALUES (103,  0, 0,NULL,NULL);
+INSERT INTO material_stock VALUES (201,  2,12,'2026-06-20 16:00:00','2026-06-30 08:30:00');
+INSERT INTO material_stock VALUES (202,  1,12,'2026-06-14 16:55:00','2026-06-30 08:30:00');
+INSERT INTO material_stock VALUES (203,  6, 0,'2026-06-06 17:10:00','2026-06-14 10:00:00');
+INSERT INTO material_stock VALUES (204,  9, 0,'2026-06-10 15:00:00','2026-06-30 09:00:00');
+INSERT INTO material_stock VALUES (205,  4, 0,'2026-06-10 15:00:00','2026-06-25 09:00:00');
+INSERT INTO material_stock VALUES (206, 14, 0,'2026-05-30 16:40:00','2026-06-10 08:00:00');
+INSERT INTO material_stock VALUES (207, 16, 0,'2026-05-29 15:30:00','2026-06-10 08:00:00');
+INSERT INTO material_stock VALUES (208,  5, 0,'2026-06-22 15:00:00','2026-06-30 09:00:00');
+INSERT INTO material_stock VALUES (209,  5, 0,'2026-06-22 15:00:00','2026-06-30 09:00:00');
+INSERT INTO material_stock VALUES (210,  2,12,'2026-06-24 16:00:00','2026-06-30 08:30:00');
+INSERT INTO material_stock VALUES (211,  8, 0,'2026-06-18 16:00:00','2026-06-30 09:00:00');
+INSERT INTO material_stock VALUES (212,  3, 0,'2026-06-12 16:00:00','2026-06-16 09:00:00');
+INSERT INTO material_stock VALUES (301, 3860, 0,'2026-05-15 10:00:00','2026-06-20 08:00:00');
+INSERT INTO material_stock VALUES (302, 2540, 0,'2026-05-15 10:00:00','2026-06-22 08:00:00');
+INSERT INTO material_stock VALUES (303,   42, 0,'2026-06-20 11:00:00','2026-05-26 08:00:00');
+INSERT INTO material_stock VALUES (304,   65, 0,'2026-04-18 10:00:00','2026-05-26 08:00:00');
+INSERT INTO material_stock VALUES (305,  180, 0,'2026-05-18 10:00:00','2026-06-08 08:00:00');
+INSERT INTO material_stock VALUES (306,   95, 0,'2026-04-18 10:00:00','2026-06-16 08:00:00');
+INSERT INTO material_stock VALUES (307,14200, 0,'2026-05-18 10:00:00','2026-06-24 08:00:00');
+INSERT INTO material_stock VALUES (308,  260, 0,'2026-04-18 10:00:00','2026-06-22 08:00:00');
+INSERT INTO material_stock VALUES (401,   9, 0,'2026-05-25 14:00:00','2026-06-20 09:00:00');
+INSERT INTO material_stock VALUES (402,   3,12,'2026-05-28 14:00:00','2026-06-16 09:00:00');
+INSERT INTO material_stock VALUES (403,  11, 0,'2026-05-25 14:00:00','2026-06-30 09:00:00');
+INSERT INTO material_stock VALUES (404,  12, 0,'2026-05-25 14:00:00','2026-06-30 09:00:00');
+INSERT INTO material_stock VALUES (405,  10, 0,'2026-05-25 14:00:00','2026-06-25 09:00:00');
+INSERT INTO material_stock VALUES (406,  35, 0,'2026-05-14 14:00:00','2026-06-02 08:00:00');
+-- 低于安全库存40，触发预警
+INSERT INTO material_stock VALUES (407, 265, 0,'2026-05-16 14:00:00','2026-06-20 09:00:00');
+INSERT INTO material_stock VALUES (408, 118, 0,'2026-05-16 14:00:00','2026-06-22 09:00:00');
+INSERT INTO material_stock VALUES (409, 168, 0,'2026-05-27 14:00:00','2026-06-08 08:00:00');
+INSERT INTO material_stock VALUES (410,  46,24,'2026-06-02 14:00:00','2026-06-30 08:30:00');
+INSERT INTO material_stock VALUES (411,  50,24,'2026-06-02 14:00:00','2026-06-30 08:30:00');
+INSERT INTO material_stock VALUES (412,  30,24,'2026-04-20 14:00:00','2026-06-30 08:30:00');
+INSERT INTO material_stock VALUES (413,  14, 0,'2026-04-20 14:00:00','2026-06-28 09:00:00');
+INSERT INTO material_stock VALUES (414,  16, 0,'2026-04-20 14:00:00','2026-06-28 09:00:00');
+INSERT INTO material_stock VALUES (415,   4, 0,'2025-11-20 14:00:00','2025-12-18 09:00:00');
+-- 铅酸电池闲置，废弃检测目标
+INSERT INTO material_stock VALUES (501, 480, 0,'2026-05-25 14:00:00','2026-06-28 09:00:00');
+INSERT INTO material_stock VALUES (502, 130, 0,'2026-04-25 14:00:00','2026-06-28 09:00:00');
+
+-- ============================================================
+-- 12. 库存预警 / 废弃物料检测
+-- ============================================================
+INSERT INTO stock_alert VALUES (1,303,'低库存', 42, 50,'2026-06-28 06:00:00','已处理',2,'2026-06-28 09:40:00');
+-- 处理动作：催交PO4
+INSERT INTO stock_alert VALUES (2,406,'低库存', 35, 40,'2026-07-05 06:00:00','待处理',NULL,NULL);
+-- 联动生成采购草稿PO10
+INSERT INTO stock_alert VALUES (3,402,'低库存',  3,  5,'2026-07-01 06:00:00','已处理',2,'2026-07-01 10:20:00');
+-- 在途PO9覆盖
+
+INSERT INTO waste_detection VALUES (1,415,'2026-07-01 06:30:00',4,'2025-12-18',195,'待处理',NULL);
+-- 铅酸电池组随CPD30 V1.0停用后闲置195天，且不再被任何生效BOM版本引用
+
+-- ============================================================
+-- 13. 质量追溯：批次消耗关系（召回追溯主线）
+-- 场景：PO2采购的人本6205轴承（item_id=5）发现异响
+--       正向消耗路径覆盖：门架批次订单4、CPD20整机订单5
+-- ============================================================
+-- 订单1（缸筒×120）消耗无缝钢管：120×0.8/(1-0.05)=101.05→102米（旧库存+PO4首批）
+INSERT INTO batch_consumption VALUES (1,1, 8,102);
+-- 订单2（活塞杆×120）消耗圆钢：120×0.9/(1-0.04)=112.5→113米（历史库存批次）
+-- 订单3（起升油缸×40）消耗密封件（PO3 item 7）
+INSERT INTO batch_consumption VALUES (2,3, 7, 40);
+-- 订单4（门架×25）消耗：槽钢（PO1 item 4）、链条（PO8 item 15）、6205轴承（PO2 item 5）
+INSERT INTO batch_consumption VALUES (3,4, 4,639);
+-- 25×24/(1-0.06)=638.3→639米
+INSERT INTO batch_consumption VALUES (4,4,15,205);
+-- 25×8/(1-0.02)=204.1→205米
+INSERT INTO batch_consumption VALUES (5,4, 5,100);
+-- 25×4=100套，问题批次
+-- 订单5（CPD20×15）消耗：锂电池（PO5 item 9）、轮胎（PO6）、驱动桥装配用6205（PO2 item 5）、钢板（PO1）
+INSERT INTO batch_consumption VALUES (6,5, 9, 15);
+INSERT INTO batch_consumption VALUES (7,5,10, 30);
+INSERT INTO batch_consumption VALUES (8,5,11, 30);
+INSERT INTO batch_consumption VALUES (9,5, 5, 30);
+-- 15台×驱动桥2套，问题批次
+INSERT INTO batch_consumption VALUES (10,5, 1,6848);
+-- 车架钢板 15×420/(1-0.08)=6847.9
+INSERT INTO batch_consumption VALUES (11,5, 3,13564);
+-- 配重生铁 15×850/(1-0.06)=13563.9
+-- 订单6（CPD30在制，已完工8台部分）消耗：6205、锂电池、生铁
+INSERT INTO batch_consumption VALUES (12,6, 5, 48);
+-- 8台×6套，问题批次
+INSERT INTO batch_consumption VALUES (13,6, 9,  8);
+INSERT INTO batch_consumption VALUES (14,6, 3,10639);
+-- 8×1250/(1-0.06)
+
+-- ============================================================
+-- 14. 外部订单及关联
+-- ============================================================
+INSERT INTO external_order VALUES (1,8,101,10,'2026-08-10','周明','13905141122','已接受','2026-07-02 10:15:00','排产计划已确认，预计8月5日前完工');
+INSERT INTO external_order VALUES (2,9,103, 5,'2026-08-20','吴晓东','13757193308','待审核','2026-07-06 14:47:00',NULL);
+INSERT INTO external_order_production VALUES (1,7);
+
+-- ============================================================
+-- 15. 产能检测 / 产能平衡 / 故障 / 生产线状态
+-- ============================================================
+INSERT INTO capacity_detection VALUES (1,6,'2026-06-29 00:00:00','2026-07-05 23:59:59',32,26,-6,-0.1875,'设备故障停机');
+INSERT INTO capacity_detection VALUES (2,4,'2026-06-29 00:00:00','2026-07-05 23:59:59',90,88,-2,-0.0222,'正常波动');
+INSERT INTO capacity_detection VALUES (3,1,'2026-06-29 00:00:00','2026-07-05 23:59:59',14,14, 0, 0.0000,'达成');
+
+INSERT INTO capacity_balance VALUES (1,
+'{"line":2,"date":"2026-07-07/2026-07-09","task":"门架总成焊接","config_id":4}',
+'{"line":3,"date":"2026-07-07/2026-07-09","task":"门架总成焊接","config_id":4}',
+3,'2026-07-06 10:30:00','[6]');
+
+INSERT INTO fault_record VALUES (1,6,'电气故障','总装线举升工位电动葫芦接触器烧蚀，无法起吊配重','2026-07-02 10:20:00','2026-07-02 16:45:00','已恢复',4,7);
+INSERT INTO fault_record VALUES (2,2,'机械故障','焊接机器人送丝机构卡滞，焊缝连续出现气孔','2026-07-06 09:10:00',NULL,'维修中',3,7);
+
+INSERT INTO line_status VALUES (1,'运行',NULL,210, 1,0.9500,'2026-07-07 08:00:00');
+INSERT INTO line_status VALUES (2,'故障',NULL,NULL,0,0.0000,'2026-07-06 09:15:00');
+INSERT INTO line_status VALUES (3,'运行',NULL,202, 2,0.8800,'2026-07-07 08:00:00');
+INSERT INTO line_status VALUES (4,'运行',NULL,206,11,0.9100,'2026-07-07 08:00:00');
+INSERT INTO line_status VALUES (5,'空闲',NULL,NULL,0,NULL,'2026-07-07 08:00:00');
+INSERT INTO line_status VALUES (6,'运行',6,101, 8,0.8600,'2026-07-07 08:10:00');
+INSERT INTO line_status VALUES (7,'空闲',NULL,NULL,0,NULL,'2026-07-07 08:00:00');
+
+-- ============================================================
+-- 16. 需求分析结果（CPD30 V2.0 × 20台 递归展开净需求快照）
+--    数值口径：累计用量路径连乘 + 逐层损耗补偿向上取整
+-- ============================================================
+INSERT INTO demand_analysis VALUES (1,101,2,20,
+'{"analysis_target":"CPD30电动平衡重叉车","qty":20,"items":[
+{"material_id":201,"name":"车架总成","gross":20},
+{"material_id":202,"name":"门架总成","gross":20},
+{"material_id":204,"name":"倾斜油缸","gross":40},
+{"material_id":203,"name":"起升油缸","gross":40},
+{"material_id":205,"name":"转向油缸","gross":20},
+{"material_id":206,"name":"液压缸筒","gross":100},
+{"material_id":303,"name":"45号无缝钢管","gross":85,"note":"100*0.8/(1-0.05)向上取整"},
+{"material_id":407,"name":"深沟球轴承6205","gross":120,"note":"门架4/台+驱动桥2/台"},
+{"material_id":406,"name":"油缸密封件组","gross":100},
+{"material_id":402,"name":"锂电池组","gross":20},
+{"material_id":307,"name":"铸造生铁","gross":26596,"note":"20*1250/(1-0.06)向上取整"}]}',
+'2026-06-25 14:30:00');
+
+-- ============================================================
+-- 17. 登录日志 / 操作日志
+-- ============================================================
+INSERT INTO login_log VALUES (1, 1,'2026-07-07 08:32:11','192.168.10.21','成功',NULL);
+INSERT INTO login_log VALUES (2, 2,'2026-07-07 08:41:53','192.168.10.35','成功',NULL);
+INSERT INTO login_log VALUES (3, 5,'2026-07-07 08:05:37','192.168.10.42','成功',NULL);
+INSERT INTO login_log VALUES (4, 8,'2026-07-05 10:18:46','58.213.104.77','成功',NULL);
+INSERT INTO login_log VALUES (5, 2,'2026-07-06 08:39:02','192.168.10.35','失败','密码错误');
+INSERT INTO login_log VALUES (6, 2,'2026-07-06 08:39:40','192.168.10.35','成功',NULL);
+INSERT INTO login_log VALUES (7,10,'2026-07-01 09:12:24','192.168.10.60','失败','账号已禁用');
+INSERT INTO login_log VALUES (8, 9,'2026-07-06 14:47:12','115.220.36.108','成功',NULL);
+
+INSERT INTO operation_log VALUES (1,'BOM','修改',3,'2026-04-01 09:00:00','192.168.10.28',
+ '{"material_id":101,"current_version":"V1.0"}','{"material_id":101,"current_version":"V2.0","reason":"动力系统升级为锂电池"}');
+INSERT INTO operation_log VALUES (2,'库存','修改',3,'2026-07-05 09:12:00','192.168.10.28',
+ '{"material_id":406,"safety_stock":30}','{"material_id":406,"safety_stock":40}');
+INSERT INTO operation_log VALUES (3,'采购订单','创建',2,'2026-07-06 11:05:00','192.168.10.35',
+ NULL,'{"order_id":10,"supplier_id":7,"status":"草稿","source":"缺口计算自动生成","total":10200}');
+INSERT INTO operation_log VALUES (4,'外部订单','审核',3,'2026-07-03 09:30:00','192.168.10.28',
+ '{"ext_order_id":1,"status":"待审核"}','{"ext_order_id":1,"status":"已接受","production_order_id":7}');
+INSERT INTO operation_log VALUES (5,'库存','修改',5,'2026-06-30 08:30:00','192.168.10.42',
+ '{"order_id":6,"locked":[]}','{"order_id":6,"locked":[{"material_id":402,"qty":12},{"material_id":202,"qty":12},{"material_id":210,"qty":12}]}');
+INSERT INTO operation_log VALUES (6,'用户管理','修改',1,'2026-05-06 10:00:00','192.168.10.21',
+ '{"user_id":10,"status":"valid"}','{"user_id":10,"status":"disabled"}');
+
+-- ============================================================
+-- 18. 重置各表 IDENTITY 起始值到当前最大值之后（保证后端新增不冲突）
+-- ============================================================
+ALTER TABLE sys_user            MODIFY (user_id       GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE sys_role            MODIFY (role_id       GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE sys_permission      MODIFY (permission_id GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE material_category   MODIFY (category_id   GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE supplier            MODIFY (supplier_id   GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE material            MODIFY (material_id   GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE bom_version         MODIFY (version_id    GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE bom                 MODIFY (bom_id        GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE demand_analysis     MODIFY (analysis_id   GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE purchase_order      MODIFY (order_id      GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE purchase_order_item MODIFY (item_id       GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE overdue_reminder    MODIFY (reminder_id   GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE receive_record      MODIFY (receive_id    GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE supplier_price      MODIFY (id            GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE line_type           MODIFY (type_id       GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE production_line     MODIFY (line_id       GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE capacity_config     MODIFY (config_id     GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE production_order    MODIFY (order_id      GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE external_order      MODIFY (ext_order_id  GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE capacity_detection  MODIFY (detection_id  GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE capacity_balance    MODIFY (balance_id    GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE fault_record        MODIFY (fault_id      GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE stock_alert         MODIFY (alert_id      GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE stock_lock          MODIFY (lock_id       GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE waste_detection     MODIFY (detection_id  GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE finish_inbound      MODIFY (inbound_id    GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE batch_consumption   MODIFY (consumption_id GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE login_log           MODIFY (log_id        GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+ALTER TABLE operation_log       MODIFY (log_id        GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));
+
+COMMIT;
