@@ -229,9 +229,15 @@ components:
           exclusiveMinimum: true
           example: 12.5
         production_order:
-          $ref: './production.yaml#/components/schemas/ProductionOrderBrief'
+          allOf:
+            - $ref: './production.yaml#/components/schemas/ProductionOrderBrief'
+          readOnly: true
+          description: 跨模块展示对象，来源于生产订单表 production_order，通过 batch_consumption.order_id = production_order.order_id 关联查询得到。
         purchase_item:
-          $ref: './purchase.yaml#/components/schemas/PurchaseOrderDetailLine'
+          allOf:
+            - $ref: './purchase.yaml#/components/schemas/PurchaseOrderDetailLine'
+          readOnly: true
+          description: 跨模块展示对象，来源于采购订单明细表 purchase_order_item，通过 batch_consumption.item_id = purchase_order_item.item_id 关联查询得到。
     BatchConsumptionCreateRequest:
       type: object
       required: [order_id, item_id, consume_qty]
@@ -264,7 +270,7 @@ components:
           format: int64
     ProductBatchTraceResult:
       type: object
-      required: [order_id, material_id, consumed_batches]
+      required: [order_id, material_id]
       properties:
         order_id:
           type: integer
@@ -272,6 +278,7 @@ components:
         batch_no:
           type: string
           nullable: true
+          readOnly: true
           description: 成品批次号，来自完工入库单。
         material_id:
           type: integer
@@ -280,10 +287,12 @@ components:
         material_name:
           type: string
           nullable: true
-          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+          readOnly: true
+          description: 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         consumed_batches:
           type: array
-          description: 该成品批次消耗的原材料批次列表。
+          readOnly: true
+          description: 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，并通过 batch_consumption.item_id 关联采购订单明细表 purchase_order_item 得到该成品批次消耗的原材料批次。
           items:
             $ref: '#/components/schemas/ConsumedMaterialBatch'
     ConsumedMaterialBatch:
@@ -300,28 +309,36 @@ components:
         material_name:
           type: string
           nullable: true
-          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+          readOnly: true
+          description: 跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         supplier_id:
           type: integer
           format: int64
           nullable: true
+          readOnly: true
+          description: 跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id = purchase_order.order_id 关联查询得到。
         supplier_name:
           type: string
           nullable: true
-          description: 冗余展示字段，权威供应商实体由采购模块维护。
-        purchase_order_id:
+          readOnly: true
+          description: 跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。
+        order_id:
           type: integer
           format: int64
           nullable: true
+          readOnly: true
+          description: 采购订单表 purchase_order.order_id，来源于 purchase_order_item.order_id，用于标识该原材料批次所属采购订单。
         receive_date:
           type: string
           format: date
           nullable: true
+          readOnly: true
+          description: 跨表展示字段，来源于到货记录表 receive_record.receive_date，通过 purchase_order_item.order_id 和 material_id 关联查询该批次到货日期。
         consume_qty:
           type: number
     MaterialBatchTraceResult:
       type: object
-      required: [item_id, material_id, affected_products]
+      required: [item_id, material_id]
       properties:
         item_id:
           type: integer
@@ -332,18 +349,23 @@ components:
         material_name:
           type: string
           nullable: true
-          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+          readOnly: true
+          description: 跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         supplier_id:
           type: integer
           format: int64
           nullable: true
+          readOnly: true
+          description: 跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id = purchase_order.order_id 关联查询得到。
         supplier_name:
           type: string
           nullable: true
-          description: 冗余展示字段，权威供应商实体由采购模块维护。
+          readOnly: true
+          description: 跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。
         affected_products:
           type: array
-          description: 使用该原材料批次的生产订单和成品批次。
+          readOnly: true
+          description: 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，通过 batch_consumption.item_id = purchase_order_item.item_id 反查使用该原材料批次的生产订单和成品批次。
           items:
             $ref: '#/components/schemas/AffectedProductBatch'
     AffectedProductBatch:
@@ -362,9 +384,13 @@ components:
         product_material_name:
           type: string
           nullable: true
-          description: 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+          readOnly: true
+          description: 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id = material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         production_status:
-          $ref: './production.yaml#/components/schemas/ProductionOrderStatus'
+          allOf:
+            - $ref: './production.yaml#/components/schemas/ProductionOrderStatus'
+          readOnly: true
+          description: 跨表展示字段，来源于生产订单表 production_order.status，通过 batch_consumption.order_id = production_order.order_id 关联查询得到。
         consume_qty:
           type: number
     QualityImpactAnalyzeRequest:
@@ -393,21 +419,27 @@ components:
       description: item_ids、material_id 或到货日期范围至少提供一种过滤条件。
     QualityImpactAnalyzeResult:
       type: object
-      required: [affected_order_count, affected_batch_count, affected_products]
       properties:
         affected_order_count:
           type: integer
+          readOnly: true
+          description: 后端统计字段，来源于受影响生产订单列表 affected_products，按去重后的 production_order.order_id 数量统计。
           example: 3
         affected_batch_count:
           type: integer
+          readOnly: true
+          description: 后端统计字段，来源于受影响成品批次列表 affected_products，按成品批次号 batch_no 或生产订单维度汇总统计。
           example: 5
         affected_products:
           type: array
+          readOnly: true
+          description: 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，结合 production_order 和物料信息查询得到受影响成品批次。
           items:
             $ref: '#/components/schemas/AffectedProductBatch'
         suggested_action:
           type: string
-          description: 建议处理动作。
+          readOnly: true
+          description: 后端判断字段，来源于受影响生产订单数量、受影响批次数量、问题采购明细和追溯结果，由后端质量追溯规则统一给出建议处理动作。
           enum: [freeze, recall, observe]
           example: freeze
     BatchConsumptionResponse:
