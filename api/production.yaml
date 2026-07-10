@@ -1202,7 +1202,7 @@ components:
           minimum: 0
           maximum: 1
           readOnly: true
-          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；由后端根据实际工时、停机时长和产能数据统一计算，取值范围 0 到 1。现有数据库设计文档未给出更细的固定公式，基础数据不足时可返回 null 或不返回。
+          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；由后端根据实际工时、停机时长和产能数据统一计算，取值范围 0 到 1。现有数据库设计文档未给出更细的固定公式，基础数据不足时可返回 null 或不返回。*猜测：表示统计周期内的产能达成效率。计算公式为 efficiency = actual_capacity / plan_capacity。
         diff_qty:
           type: number
         diff_rate:
