@@ -17,7 +17,7 @@ axiosInstance.interceptors.request.use((config) => {
 })
 
 const apiConfig = new Configuration({
-  basePath: '/api',
+  basePath: '/',
 })
 
 export const Api = new DefaultApi(apiConfig, apiConfig.basePath, axiosInstance)

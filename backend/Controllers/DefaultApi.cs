@@ -8,7 +8,7 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 [ApiController]
-[Route("/")]
+[Route("/api")]
 public class DefaultApiController(
     IUserTestService userTestService,
     AuthService authService) : ControllerBase
