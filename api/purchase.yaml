@@ -310,23 +310,19 @@ components:
       type: string
       description: 采购逾期提醒状态。pending_urge 待催交，可催交或标记到货；urged 已催交，可继续备注或标记到货；received 已到货，流程结束。允许流转：pending_urge -> urged/received，urged -> received。
       enum: [pending_urge, urged, received]
-    SupplierBrief:
-      type: object
-      required: [supplier_id, supplier_name]
-      properties:
-        supplier_id:
-          type: integer
-          format: int64
-          example: 1001
-        supplier_name:
-          type: string
-          example: 华东钢材供应商
-        contact_person:
-          type: string
-          nullable: true
-        contact_phone:
-          type: string
-          nullable: true
+    SupplierDetail:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/SupplierBrief'
+        - type: object
+          properties:
+            contact_person:
+              type: string
+              nullable: true
+              description: 供应商联系人，来源于 supplier.contact_person。
+            contact_phone:
+              type: string
+              nullable: true
+              description: 供应商联系电话，来源于 supplier.contact_phone。
     PurchaseOrderBrief:
       type: object
       required: [order_id, status, supplier_id]
@@ -391,7 +387,7 @@ components:
         status:
           $ref: '#/components/schemas/PurchaseOrderStatus'
         supplier:
-          $ref: '#/components/schemas/SupplierBrief'
+          $ref: '#/components/schemas/SupplierDetail'
         order_date:
           type: string
           format: date

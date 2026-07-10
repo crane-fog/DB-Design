@@ -757,14 +757,6 @@ components:
         unit:
           type: string
 
-    SupplierBrief:
-      type: object
-      properties:
-        supplier_id:
-          type: integer
-        supplier_name:
-          type: string
-
     BomVersionBrief:
       type: object
       properties:

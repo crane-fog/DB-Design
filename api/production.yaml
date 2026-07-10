@@ -853,9 +853,12 @@ components:
           type: string
           nullable: true
           readOnly: true
-          description: 跨表展示字段，来源于用户表 sys_user.username，通过 production_line.manager_id = sys_user.user_id 关联查询得到。
+          description: 跨表展示字段，根据 production_line.manager_id 关联 sys_user.user_id，取 sys_user.user_name。
         status:
-          $ref: '#/components/schemas/ProductionLineRunStatus'
+          allOf:
+            - $ref: '#/components/schemas/ProductionLineRunStatus'
+          readOnly: true
+          description: 跨表展示字段，通过 production_line.line_id 关联生产线状态记录 line_status.line_id，取 line_status.status。
     ProductionLineCreateRequest:
       type: object
       required: [type_id, start_date, manager_id]
@@ -1060,7 +1063,7 @@ components:
           type: string
           nullable: true
           readOnly: true
-          description: 跨表展示字段，来源于客户表 customer.customer_name，通过 external_order.customer_id = customer.customer_id 关联查询得到。
+          description: 跨表展示字段，根据 external_order.customer_id 关联 sys_user.user_id，取 sys_user.user_name。
         material_id:
           type: integer
           format: int64
@@ -1183,20 +1186,23 @@ components:
           type: number
         actual_work_hours:
           type: number
+          nullable: true
           minimum: 0
           readOnly: true
-          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内生产线实际运行和生产执行记录汇总，单位为小时。
+          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内生产线实际运行和生产执行记录汇总，单位为小时。基础数据不足时可返回 null 或不返回。
         downtime_minutes:
           type: number
+          nullable: true
           minimum: 0
           readOnly: true
-          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内故障记录、停机记录或生产线状态记录汇总，单位为分钟。
+          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内故障记录、停机记录或生产线状态记录汇总，单位为分钟。基础数据不足时可返回 null 或不返回。
         efficiency:
           type: number
+          nullable: true
           minimum: 0
           maximum: 1
           readOnly: true
-          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；由后端根据实际工时、停机时长和产能数据统一计算，取值范围 0 到 1。现有数据库设计文档未给出更细的固定公式。
+          description: 后端计算字段，数据库 capacity_detection 表不持久化该字段；由后端根据实际工时、停机时长和产能数据统一计算，取值范围 0 到 1。现有数据库设计文档未给出更细的固定公式，基础数据不足时可返回 null 或不返回。
         diff_qty:
           type: number
         diff_rate:
