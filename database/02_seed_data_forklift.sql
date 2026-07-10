@@ -12,26 +12,26 @@ ALTER SESSION SET NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
 -- ============================================================
 -- 1. 系统用户 / 角色 / 权限
 -- ============================================================
--- password_hash 为 bcrypt 哈希值，初始口令由系统统一维护
+-- password_hash 为前端 SHA-256 结果，初始口令由系统统一维护
 INSERT INTO sys_user (user_id, employee_no, password_hash, user_name, phone, email, status, created_time, last_login_time, pwd_update_time) VALUES
- (1,'GD0001','$2b$12$LJ3m4yXqK8vN2wRt5uHpBOxGkY7cQ9fT1aZsE6dW0iMnUj8oPlqCe','张建国','13812045067','zhangjg@gdforklift.cn','有效','2025-08-01 09:00:00','2026-07-07 08:32:11','2026-05-04 10:00:00');
-INSERT INTO sys_user VALUES (2,'GD0102','$2b$12$Ke9pQw2rT7uY4iO6aSdFgOhJkL0zXcV3bN5mQ8wE1rT6yU9iO2pAs','李文娟','13951862234','liwj@gdforklift.cn','有效','2025-08-01 09:05:00','2026-07-07 08:41:53','2026-04-11 14:20:00');
-INSERT INTO sys_user VALUES (3,'GD0201','$2b$12$Zx8cV5bN2mQ4wE7rT0yU3iOaSdFgHjKlPoIuYtRewQ1aZs6dX9cVu','王志强','13705178809','wangzq@gdforklift.cn','有效','2025-08-01 09:10:00','2026-07-06 16:22:40','2026-03-02 09:30:00');
-INSERT INTO sys_user VALUES (4,'GD0202','$2b$12$Qw1eR4tY7uI0oP3aSd6fGhJkLzXcVbNmQwErTyUiOpAsDfGhJkLzq','陈思远','13861799412','chensy@gdforklift.cn','有效','2025-09-15 10:00:00','2026-07-07 07:58:02','2026-06-01 11:00:00');
-INSERT INTO sys_user VALUES (5,'GD0301','$2b$12$Mn3bV6cX9zL2kJ5hG8fD1sAqWpE4rT7yU0iOaSdFgHjKlZxCvBnMu','赵丽华','13913246758','zhaolh@gdforklift.cn','有效','2025-08-01 09:20:00','2026-07-07 08:05:37','2026-02-14 16:45:00');
-INSERT INTO sys_user VALUES (6,'GD0401','$2b$12$Pl0oK3iJ6uH9yG2tF5rD8eSqAwZx1cV4bN7mQ0wE3rT6yU9iOaSdu','刘洋','13585527391','liuyang@gdforklift.cn','有效','2025-08-01 09:25:00','2026-07-06 15:10:28','2026-05-20 09:15:00');
-INSERT INTO sys_user VALUES (7,'GD0501','$2b$12$Aq2sW5dE8fR1gT4hY7uJ0kIzXcVbNmQwErTyUiOpLaSdFgHjKzXcu','孙德胜','13776083345','sunds@gdforklift.cn','有效','2025-08-01 09:30:00','2026-07-06 09:14:55','2026-01-09 08:50:00');
-INSERT INTO sys_user VALUES (8,'EXT9001','$2b$12$Ws4xC7vB0nM3qA6zE9dR2fTgYhUjIkOlPqWsEdRfTgYhUjIkOlPqu','周明（江苏顺达物流）','13905141122','zhouming@sd-logistics.com','有效','2026-03-10 14:00:00','2026-07-05 10:18:46','2026-03-10 14:00:00');
-INSERT INTO sys_user VALUES (9,'EXT9002','$2b$12$Ed5rF8gT1hY4uJ7iK0lOzXcVbNmQwPaSdFgHjKlQwErTyUiOpAsDu','吴晓东（浙江华仓仓储）','13757193308','wuxd@huacang-wh.cn','有效','2026-04-22 09:30:00','2026-07-06 14:47:12','2026-04-22 09:30:00');
-INSERT INTO sys_user VALUES (10,'GD0103','$2b$12$Rf6tG9hY2uJ5iK8lO1pQzXcVbNmAsDfGhJkLqWeRtYuIoPaSdFgHu','钱进','13641357790',NULL,'停用','2025-08-01 09:35:00','2026-04-30 17:20:15','2025-08-01 09:35:00');
+ (1,'GD0001','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','张建国','13812045067','zhangjg@gdforklift.cn','valid','2025-08-01 09:00:00','2026-07-07 08:32:11','2026-05-04 10:00:00');
+INSERT INTO sys_user VALUES (2,'GD0102','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','李文娟','13951862234','liwj@gdforklift.cn','valid','2025-08-01 09:05:00','2026-07-07 08:41:53','2026-04-11 14:20:00');
+INSERT INTO sys_user VALUES (3,'GD0201','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','王志强','13705178809','wangzq@gdforklift.cn','valid','2025-08-01 09:10:00','2026-07-06 16:22:40','2026-03-02 09:30:00');
+INSERT INTO sys_user VALUES (4,'GD0202','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','陈思远','13861799412','chensy@gdforklift.cn','valid','2025-09-15 10:00:00','2026-07-07 07:58:02','2026-06-01 11:00:00');
+INSERT INTO sys_user VALUES (5,'GD0301','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','赵丽华','13913246758','zhaolh@gdforklift.cn','valid','2025-08-01 09:20:00','2026-07-07 08:05:37','2026-02-14 16:45:00');
+INSERT INTO sys_user VALUES (6,'GD0401','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','刘洋','13585527391','liuyang@gdforklift.cn','valid','2025-08-01 09:25:00','2026-07-06 15:10:28','2026-05-20 09:15:00');
+INSERT INTO sys_user VALUES (7,'GD0501','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','孙德胜','13776083345','sunds@gdforklift.cn','valid','2025-08-01 09:30:00','2026-07-06 09:14:55','2026-01-09 08:50:00');
+INSERT INTO sys_user VALUES (8,'EXT9001','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','周明（江苏顺达物流）','13905141122','zhouming@sd-logistics.com','valid','2026-03-10 14:00:00','2026-07-05 10:18:46','2026-03-10 14:00:00');
+INSERT INTO sys_user VALUES (9,'EXT9002','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','吴晓东（浙江华仓仓储）','13757193308','wuxd@huacang-wh.cn','valid','2026-04-22 09:30:00','2026-07-06 14:47:12','2026-04-22 09:30:00');
+INSERT INTO sys_user VALUES (10,'GD0103','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','钱进','13641357790',NULL,'disabled','2025-08-01 09:35:00','2026-04-30 17:20:15','2025-08-01 09:35:00');
 
-INSERT INTO sys_role VALUES (1,'系统管理员','拥有全部资源的管理权限','有效');
-INSERT INTO sys_role VALUES (2,'生产管理员','生产订单、产能、生产线管理','有效');
-INSERT INTO sys_role VALUES (3,'采购员','采购订单全生命周期管理','有效');
-INSERT INTO sys_role VALUES (4,'库管员','库存、锁定、入库、预警处理','有效');
-INSERT INTO sys_role VALUES (5,'质检员','质量追溯与批次管理','有效');
-INSERT INTO sys_role VALUES (6,'设备管理员','生产线故障维修与状态维护','有效');
-INSERT INTO sys_role VALUES (7,'外部客户','仅可提交和查看自身外部订单','有效');
+INSERT INTO sys_role VALUES (1,'系统管理员','拥有全部资源的管理权限','valid');
+INSERT INTO sys_role VALUES (2,'生产管理员','生产订单、产能、生产线管理','valid');
+INSERT INTO sys_role VALUES (3,'采购员','采购订单全生命周期管理','valid');
+INSERT INTO sys_role VALUES (4,'库管员','库存、锁定、入库、预警处理','valid');
+INSERT INTO sys_role VALUES (5,'质检员','质量追溯与批次管理','valid');
+INSERT INTO sys_role VALUES (6,'设备管理员','生产线故障维修与状态维护','valid');
+INSERT INTO sys_role VALUES (7,'外部客户','仅可提交和查看自身外部订单','valid');
 
 INSERT INTO sys_permission VALUES ( 1,'物料','查看');
 INSERT INTO sys_permission VALUES ( 2,'物料','创建');
@@ -96,7 +96,7 @@ INSERT INTO sys_user_role VALUES ( 7,6);
 INSERT INTO sys_user_role VALUES ( 8,7);
 INSERT INTO sys_user_role VALUES ( 9,7);
 INSERT INTO sys_user_role VALUES (10,3);
--- 停用账号保留历史角色关联
+-- disabled 账号保留历史角色关联
 
 -- ============================================================
 -- 2. 物料分类 / 供应商
@@ -714,7 +714,7 @@ INSERT INTO login_log VALUES (3, 5,'2026-07-07 08:05:37','192.168.10.42','成功
 INSERT INTO login_log VALUES (4, 8,'2026-07-05 10:18:46','58.213.104.77','成功',NULL);
 INSERT INTO login_log VALUES (5, 2,'2026-07-06 08:39:02','192.168.10.35','失败','密码错误');
 INSERT INTO login_log VALUES (6, 2,'2026-07-06 08:39:40','192.168.10.35','成功',NULL);
-INSERT INTO login_log VALUES (7,10,'2026-07-01 09:12:24','192.168.10.60','失败','账号已停用');
+INSERT INTO login_log VALUES (7,10,'2026-07-01 09:12:24','192.168.10.60','失败','账号已禁用');
 INSERT INTO login_log VALUES (8, 9,'2026-07-06 14:47:12','115.220.36.108','成功',NULL);
 
 INSERT INTO operation_log VALUES (1,'BOM','修改',3,'2026-04-01 09:00:00','192.168.10.28',
@@ -728,7 +728,7 @@ INSERT INTO operation_log VALUES (4,'外部订单','审核',3,'2026-07-03 09:30:
 INSERT INTO operation_log VALUES (5,'库存','修改',5,'2026-06-30 08:30:00','192.168.10.42',
  '{"order_id":6,"locked":[]}','{"order_id":6,"locked":[{"material_id":402,"qty":12},{"material_id":202,"qty":12},{"material_id":210,"qty":12}]}');
 INSERT INTO operation_log VALUES (6,'用户管理','修改',1,'2026-05-06 10:00:00','192.168.10.21',
- '{"user_id":10,"status":"有效"}','{"user_id":10,"status":"停用"}');
+ '{"user_id":10,"status":"valid"}','{"user_id":10,"status":"disabled"}');
 
 -- ============================================================
 -- 18. 重置各表 IDENTITY 起始值到当前最大值之后（保证后端新增不冲突）
