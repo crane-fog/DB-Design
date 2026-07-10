@@ -30,7 +30,7 @@ namespace Org.OpenAPITools.Models
         /// JWT 访问令牌。
         /// </summary>
         /// <value>JWT 访问令牌。</value>
-        /* <example>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</example> */
+        /* <example>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbXBsb3llZV9ubyI6IjI0NTAzMTMiLCJuYmYiOjE3ODM2OTg1ODAsImV4cCI6MTc4MzcwMjE4MH0.tFFAtFV5PaosfjMEVkQ0g97eK0RVAYHYvyxq7P3JKKw</example> */
         [Required]
         [DataMember(Name="access_token", EmitDefaultValue=false)]
         public string AccessToken { get; set; }

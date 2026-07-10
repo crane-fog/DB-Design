@@ -36,10 +36,10 @@ namespace Org.OpenAPITools.Models
         public string EmployeeNo { get; set; }
 
         /// <summary>
-        /// 登录密码或前端传入的密码哈希值，以后端实现为准。
+        /// 前端传入的密码哈希值，sha256。
         /// </summary>
-        /// <value>登录密码或前端传入的密码哈希值，以后端实现为准。</value>
-        /* <example>5f4dcc3b5aa765d61d8327deb882cf99</example> */
+        /// <value>前端传入的密码哈希值，sha256。</value>
+        /* <example>8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92</example> */
         [Required]
         [DataMember(Name="password", EmitDefaultValue=false)]
         public string Password { get; set; }

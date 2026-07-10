@@ -71,19 +71,19 @@ namespace Org.OpenAPITools.Models
 
 
         /// <summary>
-        /// 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：active -> disabled、disabled -> active。
+        /// 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -> disabled、disabled -> valid。
         /// </summary>
-        /// <value>账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：active -> disabled、disabled -> active。</value>
+        /// <value>账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -> disabled、disabled -> valid。</value>
         [TypeConverter(typeof(CustomEnumConverter<StatusEnum>))]
         [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public enum StatusEnum
         {
             
             /// <summary>
-            /// Enum ActiveEnum for active
+            /// Enum ValidEnum for valid
             /// </summary>
-            [EnumMember(Value = "active")]
-            ActiveEnum = 1,
+            [EnumMember(Value = "valid")]
+            ValidEnum = 1,
             
             /// <summary>
             /// Enum DisabledEnum for disabled
@@ -93,9 +93,9 @@ namespace Org.OpenAPITools.Models
         }
 
         /// <summary>
-        /// 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：active -&gt; disabled、disabled -&gt; active。
+        /// 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -&gt; disabled、disabled -&gt; valid。
         /// </summary>
-        /// <value>账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：active -&gt; disabled、disabled -&gt; active。</value>
+        /// <value>账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -&gt; disabled、disabled -&gt; valid。</value>
         [DataMember(Name="status", EmitDefaultValue=true)]
         public StatusEnum Status { get; set; }
 

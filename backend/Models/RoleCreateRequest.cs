@@ -41,19 +41,19 @@ namespace Org.OpenAPITools.Models
 
 
         /// <summary>
-        /// 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。
+        /// 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
         /// </summary>
-        /// <value>角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。</value>
+        /// <value>角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。</value>
         [TypeConverter(typeof(CustomEnumConverter<StatusEnum>))]
         [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public enum StatusEnum
         {
             
             /// <summary>
-            /// Enum ActiveEnum for active
+            /// Enum ValidEnum for valid
             /// </summary>
-            [EnumMember(Value = "active")]
-            ActiveEnum = 1,
+            [EnumMember(Value = "valid")]
+            ValidEnum = 1,
             
             /// <summary>
             /// Enum DisabledEnum for disabled
@@ -63,11 +63,11 @@ namespace Org.OpenAPITools.Models
         }
 
         /// <summary>
-        /// 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。
+        /// 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
         /// </summary>
-        /// <value>角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。</value>
+        /// <value>角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。</value>
         [DataMember(Name="status", EmitDefaultValue=true)]
-        public StatusEnum Status { get; set; } = StatusEnum.ActiveEnum;
+        public StatusEnum Status { get; set; } = StatusEnum.ValidEnum;
 
         /// <summary>
         /// Returns the string presentation of the object

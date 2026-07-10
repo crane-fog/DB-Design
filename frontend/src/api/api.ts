@@ -1289,7 +1289,7 @@ export interface LoginRequest {
      */
     'employee_no': string;
     /**
-     * 登录密码或前端传入的密码哈希值，以后端实现为准。
+     * 前端传入的密码哈希值，sha256。
      */
     'password': string;
 }
@@ -3158,7 +3158,7 @@ export interface RegisterRequest {
      */
     'employee_no': string;
     /**
-     * 登录密码或前端传入的密码哈希值，以后端实现为准。
+     * 登录密码或前端传入的密码哈希值，sha256。
      */
     'password': string;
     'user_name': string;
@@ -3266,14 +3266,14 @@ export interface Role {
     'role_id'?: number;
     'role_name'?: string;
     /**
-     * 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 active 与 disabled 之间切换。
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
      */
     'status'?: RoleStatusEnum;
     'description'?: string | null;
 }
 
 export const RoleStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -3283,13 +3283,13 @@ export interface RoleBrief {
     'role_id'?: number;
     'role_name'?: string;
     /**
-     * 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 active 与 disabled 之间切换。
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
      */
     'status'?: RoleBriefStatusEnum;
 }
 
 export const RoleBriefStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -3299,13 +3299,13 @@ export interface RoleCreateRequest {
     'role_name': string;
     'description'?: string | null;
     /**
-     * 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
      */
     'status'?: RoleCreateRequestStatusEnum;
 }
 
 export const RoleCreateRequestStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -3426,14 +3426,14 @@ export interface RoleUpdateRequest {
     'role_name': string;
     'description'?: string | null;
     /**
-     * 角色状态。active：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 active，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 active。
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
      */
     'status'?: RoleUpdateRequestStatusEnum;
     'role_id': number;
 }
 
 export const RoleUpdateRequestStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -3563,7 +3563,7 @@ export interface User {
     'phone'?: string;
     'email'?: string | null;
     /**
-     * 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 active 与 disabled 之间切换。
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 valid 与 disabled 之间切换。
      */
     'status'?: UserStatusEnum;
     /**
@@ -3576,7 +3576,7 @@ export interface User {
 }
 
 export const UserStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -3589,13 +3589,13 @@ export interface UserBrief {
     'phone'?: string;
     'email'?: string | null;
     /**
-     * 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 active 与 disabled 之间切换。
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许通过 updateUserData 在 valid 与 disabled 之间切换。
      */
     'status'?: UserBriefStatusEnum;
 }
 
 export const UserBriefStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -3608,13 +3608,13 @@ export interface UserCreateRequest {
     'phone': string;
     'email'?: string | null;
     /**
-     * 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。新增时默认为 active，允许后续通过 updateUserData 修改为 disabled 或从 disabled 恢复为 active。
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。新增时默认为 valid，允许后续通过 updateUserData 修改为 disabled 或从 disabled 恢复为 valid。
      */
     'status'?: UserCreateRequestStatusEnum;
 }
 
 export const UserCreateRequestStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -3757,13 +3757,13 @@ export interface UserUpdateRequest {
      */
     'email'?: string | null;
     /**
-     * 账号状态。active：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：active -> disabled、disabled -> active。
+     * 账号状态。valid：启用，允许登录并按角色权限访问系统；disabled：停用，禁止登录但保留历史业务引用。允许状态流转：valid -> disabled、disabled -> valid。
      */
     'status'?: UserUpdateRequestStatusEnum;
 }
 
 export const UserUpdateRequestStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 
@@ -14201,12 +14201,12 @@ export const ListLoginRecordDataResultEnum = {
 } as const;
 export type ListLoginRecordDataResultEnum = typeof ListLoginRecordDataResultEnum[keyof typeof ListLoginRecordDataResultEnum];
 export const ListRoleDataStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 export type ListRoleDataStatusEnum = typeof ListRoleDataStatusEnum[keyof typeof ListRoleDataStatusEnum];
 export const ListUserDataStatusEnum = {
-    Active: 'active',
+    Valid: 'valid',
     Disabled: 'disabled',
 } as const;
 export type ListUserDataStatusEnum = typeof ListUserDataStatusEnum[keyof typeof ListUserDataStatusEnum];
