@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -9,6 +10,15 @@ using Oracle.ManagedDataAccess.Client;
 namespace Backend.Services;
 
 public sealed record AuthenticatedUser(long UserId, string EmployeeNo, string UserName);
+public sealed record RegisteredUser(
+    long UserId,
+    string EmployeeNo,
+    string UserName,
+    string Phone,
+    string? Email,
+    string Status);
+
+public sealed record RegisterResult(RegisteredUser? User, string? ErrorMessage);
 
 public class AuthService(string connString, string jwtSecret)
 {
@@ -53,7 +63,7 @@ public class AuthService(string connString, string jwtSecret)
         return new AuthenticatedUser(userId, storedEmployeeNo, userName);
     }
 
-    public string? Register(
+    public RegisterResult Register(
         string employeeNo,
         string passwordHash,
         string userName,
@@ -67,22 +77,30 @@ public class AuthService(string connString, string jwtSecret)
         cmd.CommandText = @"INSERT INTO SYS_USER
                             (EMPLOYEE_NO, PASSWORD_HASH, USER_NAME, PHONE, EMAIL, STATUS, PWD_UPDATE_TIME)
                             VALUES
-                            (:employeeNo, :passwordHash, :userName, :phone, :email, 'valid', SYSTIMESTAMP)";
+                            (:employeeNo, :passwordHash, :userName, :phone, :email, 'valid', SYSTIMESTAMP)
+                            RETURNING USER_ID INTO :userId";
         cmd.Parameters.Add(new OracleParameter("employeeNo", employeeNo));
         cmd.Parameters.Add(new OracleParameter("passwordHash", passwordHash));
         cmd.Parameters.Add(new OracleParameter("userName", userName));
         cmd.Parameters.Add(new OracleParameter("phone", phone));
         var emailValue = string.IsNullOrWhiteSpace(email) ? (object)DBNull.Value : email;
         cmd.Parameters.Add(new OracleParameter("email", emailValue));
+        var userIdParameter = new OracleParameter("userId", OracleDbType.Int64)
+        {
+            Direction = System.Data.ParameterDirection.Output
+        };
+        cmd.Parameters.Add(userIdParameter);
 
         try
         {
             cmd.ExecuteNonQuery();
-            return null;
+            var userId = long.Parse(userIdParameter.Value.ToString()!, CultureInfo.InvariantCulture);
+            var user = new RegisteredUser(userId, employeeNo, userName, phone, email, "valid");
+            return new RegisterResult(user, null);
         }
         catch (OracleException ex) when (ex.Number == 1)
         {
-            return "账号已存在";
+            return new RegisterResult(null, "工号已存在");
         }
     }
 

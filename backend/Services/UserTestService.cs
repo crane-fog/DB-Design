@@ -1,14 +1,12 @@
 using Oracle.ManagedDataAccess.Client;
 
-using Org.OpenAPITools.Models;
-
 namespace Backend.Services;
 
 public class UserTestService(string connString) : IUserTestService
 {
-    public List<UserData> GetLatestUsers()
+    public List<UserTestData> GetLatestUsers()
     {
-        var rows = new List<UserData>();
+        var rows = new List<UserTestData>();
 
         using var conn = new OracleConnection(connString);
         conn.Open();
@@ -22,11 +20,11 @@ public class UserTestService(string connString) : IUserTestService
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            rows.Add(new UserData
+            rows.Add(new UserTestData
             {
                 Id = reader.IsDBNull(0) ? 0 : Convert.ToInt64(reader.GetValue(0)),
                 Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                CreatedAt = reader.IsDBNull(2) ? default : reader.GetDateTime(2)
+                CreatedAt = reader.IsDBNull(2) ? null : reader.GetDateTime(2)
             });
         }
 

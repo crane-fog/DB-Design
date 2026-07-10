@@ -1,5 +1,13 @@
 // src/api/client.ts
-import { Configuration, DefaultApi } from './index'
+import {
+  Configuration,
+  InventoryApi,
+  MaterialBomApi,
+  ProductionApi,
+  PurchaseApi,
+  QualityTraceabilityApi,
+  SystemApi,
+} from './index'
 import axios, { AxiosHeaders } from 'axios'
 
 const axiosInstance = axios.create()
@@ -17,7 +25,28 @@ axiosInstance.interceptors.request.use((config) => {
 })
 
 const apiConfig = new Configuration({
-  basePath: '/',
+  basePath: '',
 })
 
-export const Api = new DefaultApi(apiConfig, apiConfig.basePath, axiosInstance)
+export interface UserData {
+  id: number
+  name?: string | null
+  createdAt?: string | null
+}
+
+export const inventoryApi = new InventoryApi(apiConfig, apiConfig.basePath, axiosInstance)
+export const materialBomApi = new MaterialBomApi(apiConfig, apiConfig.basePath, axiosInstance)
+export const productionApi = new ProductionApi(apiConfig, apiConfig.basePath, axiosInstance)
+export const purchaseApi = new PurchaseApi(apiConfig, apiConfig.basePath, axiosInstance)
+export const qualityTraceabilityApi = new QualityTraceabilityApi(
+  apiConfig,
+  apiConfig.basePath,
+  axiosInstance,
+)
+export const systemApi = new SystemApi(apiConfig, apiConfig.basePath, axiosInstance)
+
+export const Api = {
+  getUserTest() {
+    return axiosInstance.get<UserData[]>('/api/user-test')
+  },
+}

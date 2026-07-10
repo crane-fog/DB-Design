@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Api } from '@/api/client'
-import type { DefaultApiRegisterPostRequest } from '@/api'
+import type { RegisterRequest } from '@/api'
 import { ref } from 'vue'
+import { systemApi } from '@/api/client'
 
 const userNo = ref('')
 const password = ref('')
@@ -53,13 +53,13 @@ function validateForm() {
   return ''
 }
 
-async function buildRegisterData(): Promise<DefaultApiRegisterPostRequest> {
+async function buildRegisterData(): Promise<RegisterRequest> {
   return {
     email: email.value.trim() || undefined,
+    employee_no: userNo.value.trim(),
     password: await hashPassword(password.value),
     phone: phone.value.trim(),
-    userName: userName.value.trim(),
-    userNo: userNo.value.trim(),
+    user_name: userName.value.trim(),
   }
 }
 
@@ -79,8 +79,15 @@ async function submitRegister() {
   successMessage.value = ''
 
   try {
-    const response = await Api.registerPost(await buildRegisterData())
-    successMessage.value = response.data.msg || '注册成功'
+    const response = await systemApi.register({ registerRequest: await buildRegisterData() })
+    const result = response.data
+
+    if (result.code !== 200) {
+      errorMessage.value = result.message || '注册失败'
+      return
+    }
+
+    successMessage.value = result.message || '注册成功'
     password.value = ''
     confirmPassword.value = ''
     setTimeout(() => {

@@ -24,7 +24,7 @@ if (string.IsNullOrWhiteSpace(jwtSecret))
 var builder = WebApplication.CreateBuilder(args);
 var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddNewtonsoftJson();
 
 builder.Services.AddScoped(_ => new AuthService(connString, jwtSecret));
 builder.Services.AddScoped<IUserTestService>(_ => new UserTestService(connString));
