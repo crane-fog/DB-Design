@@ -27,56 +27,58 @@ namespace Org.OpenAPITools.Models
     public partial class ProductionCapacityEstimateResult : IEquatable<ProductionCapacityEstimateResult>
     {
         /// <summary>
-        /// Gets or Sets CanDeliverOnTime
+        /// 后端计算字段，表示是否可按期交付；来源于物料齐套判断、产能满足判断和 estimated_finish_date 与请求期望日期或生产订单 plan_end 的比较，三者均满足时为 true。
         /// </summary>
-        [Required]
+        /// <value>后端计算字段，表示是否可按期交付；来源于物料齐套判断、产能满足判断和 estimated_finish_date 与请求期望日期或生产订单 plan_end 的比较，三者均满足时为 true。</value>
         [DataMember(Name="can_deliver_on_time", EmitDefaultValue=true)]
         public bool CanDeliverOnTime { get; set; }
 
         /// <summary>
-        /// 物料是否齐套。
+        /// 后端计算字段，表示物料是否齐套；来源于 BOM 用量、material_stock 库存数量以及采购在途/预计到货数据，按后端统一齐套规则判断。
         /// </summary>
-        /// <value>物料是否齐套。</value>
-        [Required]
+        /// <value>后端计算字段，表示物料是否齐套；来源于 BOM 用量、material_stock 库存数量以及采购在途/预计到货数据，按后端统一齐套规则判断。</value>
         [DataMember(Name="material_ready", EmitDefaultValue=true)]
         public bool MaterialReady { get; set; }
 
         /// <summary>
-        /// 产能是否满足计划。
+        /// 后端计算字段，表示产能是否满足计划；来源于 capacity_config 单件工时、production_line 产线、production_calendar 排产日历和当前排程，比较 required_work_minutes 与 available_work_minutes 后判断。
         /// </summary>
-        /// <value>产能是否满足计划。</value>
-        [Required]
+        /// <value>后端计算字段，表示产能是否满足计划；来源于 capacity_config 单件工时、production_line 产线、production_calendar 排产日历和当前排程，比较 required_work_minutes 与 available_work_minutes 后判断。</value>
         [DataMember(Name="capacity_ready", EmitDefaultValue=true)]
         public bool CapacityReady { get; set; }
 
         /// <summary>
-        /// Gets or Sets LatestMaterialReadyDate
+        /// 后端计算字段，物料最晚齐套日期；来源于 BOM 需求、库存和采购订单 expected_date，物料已齐套时可为空。
         /// </summary>
+        /// <value>后端计算字段，物料最晚齐套日期；来源于 BOM 需求、库存和采购订单 expected_date，物料已齐套时可为空。</value>
         [DataMember(Name="latest_material_ready_date", EmitDefaultValue=true)]
         public DateOnly? LatestMaterialReadyDate { get; set; }
 
         /// <summary>
-        /// Gets or Sets EstimatedFinishDate
+        /// 后端计算字段，预计完工日期；来源于物料齐套日期、可用产能排程和生产订单计划数量，由后端产能评估逻辑统一计算。
         /// </summary>
-        [Required]
+        /// <value>后端计算字段，预计完工日期；来源于物料齐套日期、可用产能排程和生产订单计划数量，由后端产能评估逻辑统一计算。</value>
         [DataMember(Name="estimated_finish_date", EmitDefaultValue=true)]
         public DateOnly EstimatedFinishDate { get; set; }
 
         /// <summary>
-        /// Gets or Sets RequiredWorkMinutes
+        /// 后端计算字段，所需生产工时，单位为分钟；计算依据为生产数量与 capacity_config.unit_time，通常为 plan_qty * unit_time。
         /// </summary>
+        /// <value>后端计算字段，所需生产工时，单位为分钟；计算依据为生产数量与 capacity_config.unit_time，通常为 plan_qty * unit_time。</value>
         [DataMember(Name="required_work_minutes", EmitDefaultValue=true)]
         public decimal RequiredWorkMinutes { get; set; }
 
         /// <summary>
-        /// Gets or Sets AvailableWorkMinutes
+        /// 后端计算字段，可用生产工时，单位为分钟；来源于匹配产线类型的 production_line、production_calendar 和既有排程在评估周期内汇总得到。
         /// </summary>
+        /// <value>后端计算字段，可用生产工时，单位为分钟；来源于匹配产线类型的 production_line、production_calendar 和既有排程在评估周期内汇总得到。</value>
         [DataMember(Name="available_work_minutes", EmitDefaultValue=true)]
         public decimal AvailableWorkMinutes { get; set; }
 
         /// <summary>
-        /// Gets or Sets RiskReason
+        /// 后端计算字段，交付风险原因；当物料不齐套、产能不足或预计完工日期晚于期望日期时，由后端根据失败的判断项生成。
         /// </summary>
+        /// <value>后端计算字段，交付风险原因；当物料不齐套、产能不足或预计完工日期晚于期望日期时，由后端根据失败的判断项生成。</value>
         [DataMember(Name="risk_reason", EmitDefaultValue=true)]
         public string RiskReason { get; set; }
 

@@ -69,29 +69,26 @@ namespace Org.OpenAPITools.Models
         public decimal ActualCapacity { get; set; }
 
         /// <summary>
-        /// 统计周期内实际生产工时，单位为小时。
+        /// 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内生产线实际运行和生产执行记录汇总，单位为小时。基础数据不足时可返回 null 或不返回。
         /// </summary>
-        /// <value>统计周期内实际生产工时，单位为小时。</value>
-        [Required]
+        /// <value>后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内生产线实际运行和生产执行记录汇总，单位为小时。基础数据不足时可返回 null 或不返回。</value>
         [DataMember(Name="actual_work_hours", EmitDefaultValue=true)]
-        public decimal ActualWorkHours { get; set; }
+        public decimal? ActualWorkHours { get; set; }
 
         /// <summary>
-        /// 统计周期内停机时间，单位为分钟。
+        /// 后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内故障记录、停机记录或生产线状态记录汇总，单位为分钟。基础数据不足时可返回 null 或不返回。
         /// </summary>
-        /// <value>统计周期内停机时间，单位为分钟。</value>
-        [Required]
+        /// <value>后端计算字段，数据库 capacity_detection 表不持久化该字段；来源于统计周期内故障记录、停机记录或生产线状态记录汇总，单位为分钟。基础数据不足时可返回 null 或不返回。</value>
         [DataMember(Name="downtime_minutes", EmitDefaultValue=true)]
-        public decimal DowntimeMinutes { get; set; }
+        public decimal? DowntimeMinutes { get; set; }
 
         /// <summary>
-        /// 生产效率，0 到 1。
+        /// 后端计算字段，数据库 capacity_detection 表不持久化该字段；由后端根据实际工时、停机时长和产能数据统一计算，取值范围 0 到 1。现有数据库设计文档未给出更细的固定公式，基础数据不足时可返回 null 或不返回。*猜测：表示统计周期内的产能达成效率。计算公式为 efficiency &#x3D; actual_capacity / plan_capacity。
         /// </summary>
-        /// <value>生产效率，0 到 1。</value>
-        [Required]
+        /// <value>后端计算字段，数据库 capacity_detection 表不持久化该字段；由后端根据实际工时、停机时长和产能数据统一计算，取值范围 0 到 1。现有数据库设计文档未给出更细的固定公式，基础数据不足时可返回 null 或不返回。*猜测：表示统计周期内的产能达成效率。计算公式为 efficiency &#x3D; actual_capacity / plan_capacity。</value>
         [Range(0, 1)]
         [DataMember(Name="efficiency", EmitDefaultValue=true)]
-        public decimal Efficiency { get; set; }
+        public decimal? Efficiency { get; set; }
 
         /// <summary>
         /// Gets or Sets DiffQty
@@ -203,17 +200,17 @@ namespace Org.OpenAPITools.Models
                 ) && 
                 (
                     ActualWorkHours == other.ActualWorkHours ||
-                    
+                    ActualWorkHours != null &&
                     ActualWorkHours.Equals(other.ActualWorkHours)
                 ) && 
                 (
                     DowntimeMinutes == other.DowntimeMinutes ||
-                    
+                    DowntimeMinutes != null &&
                     DowntimeMinutes.Equals(other.DowntimeMinutes)
                 ) && 
                 (
                     Efficiency == other.Efficiency ||
-                    
+                    Efficiency != null &&
                     Efficiency.Equals(other.Efficiency)
                 ) && 
                 (
@@ -255,11 +252,11 @@ namespace Org.OpenAPITools.Models
                     hashCode = hashCode * 59 + PlanCapacity.GetHashCode();
                     
                     hashCode = hashCode * 59 + ActualCapacity.GetHashCode();
-                    
+                    if (ActualWorkHours != null)
                     hashCode = hashCode * 59 + ActualWorkHours.GetHashCode();
-                    
+                    if (DowntimeMinutes != null)
                     hashCode = hashCode * 59 + DowntimeMinutes.GetHashCode();
-                    
+                    if (Efficiency != null)
                     hashCode = hashCode * 59 + Efficiency.GetHashCode();
                     
                     hashCode = hashCode * 59 + DiffQty.GetHashCode();

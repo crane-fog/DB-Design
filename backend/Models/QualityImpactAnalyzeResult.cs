@@ -27,33 +27,33 @@ namespace Org.OpenAPITools.Models
     public partial class QualityImpactAnalyzeResult : IEquatable<QualityImpactAnalyzeResult>
     {
         /// <summary>
-        /// Gets or Sets AffectedOrderCount
+        /// 后端统计字段，来源于受影响生产订单列表 affected_products，按去重后的 production_order.order_id 数量统计。
         /// </summary>
+        /// <value>后端统计字段，来源于受影响生产订单列表 affected_products，按去重后的 production_order.order_id 数量统计。</value>
         /* <example>3</example> */
-        [Required]
         [DataMember(Name="affected_order_count", EmitDefaultValue=true)]
         public int AffectedOrderCount { get; set; }
 
         /// <summary>
-        /// Gets or Sets AffectedBatchCount
+        /// 后端统计字段，来源于受影响成品批次列表 affected_products，按成品批次号 batch_no 或生产订单维度汇总统计。
         /// </summary>
+        /// <value>后端统计字段，来源于受影响成品批次列表 affected_products，按成品批次号 batch_no 或生产订单维度汇总统计。</value>
         /* <example>5</example> */
-        [Required]
         [DataMember(Name="affected_batch_count", EmitDefaultValue=true)]
         public int AffectedBatchCount { get; set; }
 
         /// <summary>
-        /// Gets or Sets AffectedProducts
+        /// 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，结合 production_order 和物料信息查询得到受影响成品批次。
         /// </summary>
-        [Required]
+        /// <value>跨模块拼装列表，来源于批次消耗关系表 batch_consumption，结合 production_order 和物料信息查询得到受影响成品批次。</value>
         [DataMember(Name="affected_products", EmitDefaultValue=false)]
         public List<AffectedProductBatch> AffectedProducts { get; set; }
 
 
         /// <summary>
-        /// 建议处理动作。
+        /// 后端判断字段，来源于受影响生产订单数量、受影响批次数量、问题采购明细和追溯结果，由后端质量追溯规则统一给出建议处理动作。
         /// </summary>
-        /// <value>建议处理动作。</value>
+        /// <value>后端判断字段，来源于受影响生产订单数量、受影响批次数量、问题采购明细和追溯结果，由后端质量追溯规则统一给出建议处理动作。</value>
         [TypeConverter(typeof(CustomEnumConverter<SuggestedActionEnum>))]
         [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public enum SuggestedActionEnum
@@ -79,9 +79,9 @@ namespace Org.OpenAPITools.Models
         }
 
         /// <summary>
-        /// 建议处理动作。
+        /// 后端判断字段，来源于受影响生产订单数量、受影响批次数量、问题采购明细和追溯结果，由后端质量追溯规则统一给出建议处理动作。
         /// </summary>
-        /// <value>建议处理动作。</value>
+        /// <value>后端判断字段，来源于受影响生产订单数量、受影响批次数量、问题采购明细和追溯结果，由后端质量追溯规则统一给出建议处理动作。</value>
         /* <example>freeze</example> */
         [DataMember(Name="suggested_action", EmitDefaultValue=true)]
         public SuggestedActionEnum SuggestedAction { get; set; }

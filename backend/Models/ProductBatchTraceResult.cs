@@ -49,17 +49,16 @@ namespace Org.OpenAPITools.Models
         public long MaterialId { get; set; }
 
         /// <summary>
-        /// 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         /// </summary>
-        /// <value>冗余展示字段，权威物料实体由物料与 BOM 模块维护。</value>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。</value>
         [DataMember(Name="material_name", EmitDefaultValue=true)]
         public string MaterialName { get; set; }
 
         /// <summary>
-        /// 该成品批次消耗的原材料批次列表。
+        /// 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，并通过 batch_consumption.item_id 关联采购订单明细表 purchase_order_item 得到该成品批次消耗的原材料批次。
         /// </summary>
-        /// <value>该成品批次消耗的原材料批次列表。</value>
-        [Required]
+        /// <value>跨模块拼装列表，来源于批次消耗关系表 batch_consumption，并通过 batch_consumption.item_id 关联采购订单明细表 purchase_order_item 得到该成品批次消耗的原材料批次。</value>
         [DataMember(Name="consumed_batches", EmitDefaultValue=false)]
         public List<ConsumedMaterialBatch> ConsumedBatches { get; set; }
 

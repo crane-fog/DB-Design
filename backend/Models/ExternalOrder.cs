@@ -41,8 +41,9 @@ namespace Org.OpenAPITools.Models
         public long CustomerId { get; set; }
 
         /// <summary>
-        /// Gets or Sets CustomerName
+        /// 跨表展示字段，根据 external_order.customer_id 关联 sys_user.user_id，取 sys_user.user_name。
         /// </summary>
+        /// <value>跨表展示字段，根据 external_order.customer_id 关联 sys_user.user_id，取 sys_user.user_name。</value>
         [DataMember(Name="customer_name", EmitDefaultValue=true)]
         public string CustomerName { get; set; }
 
@@ -54,8 +55,9 @@ namespace Org.OpenAPITools.Models
         public long MaterialId { get; set; }
 
         /// <summary>
-        /// Gets or Sets MaterialName
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 external_order.material_id &#x3D; material.material_id 关联查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 external_order.material_id &#x3D; material.material_id 关联查询得到。</value>
         [DataMember(Name="material_name", EmitDefaultValue=true)]
         public string MaterialName { get; set; }
 

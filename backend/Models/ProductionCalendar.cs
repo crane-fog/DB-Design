@@ -42,8 +42,9 @@ namespace Org.OpenAPITools.Models
         public long LineId { get; set; }
 
         /// <summary>
-        /// Gets or Sets LineName
+        /// 跨表展示字段，来源于生产线表 production_line.line_id，通过 production_calendar.line_id &#x3D; production_line.line_id 关联后生成的产线展示名称。
         /// </summary>
+        /// <value>跨表展示字段，来源于生产线表 production_line.line_id，通过 production_calendar.line_id &#x3D; production_line.line_id 关联后生成的产线展示名称。</value>
         [DataMember(Name="line_name", EmitDefaultValue=true)]
         public string LineName { get; set; }
 
@@ -61,8 +62,9 @@ namespace Org.OpenAPITools.Models
         public long? MaterialId { get; set; }
 
         /// <summary>
-        /// Gets or Sets MaterialName
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 production_calendar.config_id 关联 capacity_config 后再按 material_id 查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 production_calendar.config_id 关联 capacity_config 后再按 material_id 查询得到。</value>
         [DataMember(Name="material_name", EmitDefaultValue=true)]
         public string MaterialName { get; set; }
 
@@ -73,8 +75,9 @@ namespace Org.OpenAPITools.Models
         public long? TypeId { get; set; }
 
         /// <summary>
-        /// Gets or Sets TypeName
+        /// 跨表展示字段，来源于产线类型表 line_type.type_name，通过 production_calendar.config_id 关联 capacity_config 后再按 type_id 查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于产线类型表 line_type.type_name，通过 production_calendar.config_id 关联 capacity_config 后再按 type_id 查询得到。</value>
         [DataMember(Name="type_name", EmitDefaultValue=true)]
         public string TypeName { get; set; }
 

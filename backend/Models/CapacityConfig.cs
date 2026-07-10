@@ -41,8 +41,9 @@ namespace Org.OpenAPITools.Models
         public long MaterialId { get; set; }
 
         /// <summary>
-        /// Gets or Sets MaterialName
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 capacity_config.material_id &#x3D; material.material_id 关联查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 capacity_config.material_id &#x3D; material.material_id 关联查询得到。</value>
         [DataMember(Name="material_name", EmitDefaultValue=true)]
         public string MaterialName { get; set; }
 
@@ -54,8 +55,9 @@ namespace Org.OpenAPITools.Models
         public long TypeId { get; set; }
 
         /// <summary>
-        /// Gets or Sets TypeName
+        /// 跨表展示字段，来源于产线类型表 line_type.type_name，通过 capacity_config.type_id &#x3D; line_type.type_id 关联查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于产线类型表 line_type.type_name，通过 capacity_config.type_id &#x3D; line_type.type_id 关联查询得到。</value>
         [DataMember(Name="type_name", EmitDefaultValue=true)]
         public string TypeName { get; set; }
 

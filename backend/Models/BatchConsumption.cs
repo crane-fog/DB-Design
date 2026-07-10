@@ -61,14 +61,16 @@ namespace Org.OpenAPITools.Models
         public decimal ConsumeQty { get; set; }
 
         /// <summary>
-        /// Gets or Sets ProductionOrder
+        /// 跨模块展示对象，来源于生产订单表 production_order，通过 batch_consumption.order_id &#x3D; production_order.order_id 关联查询得到。
         /// </summary>
+        /// <value>跨模块展示对象，来源于生产订单表 production_order，通过 batch_consumption.order_id &#x3D; production_order.order_id 关联查询得到。</value>
         [DataMember(Name="production_order", EmitDefaultValue=false)]
         public ProductionOrderBrief ProductionOrder { get; set; }
 
         /// <summary>
-        /// Gets or Sets PurchaseItem
+        /// 跨模块展示对象，来源于采购订单明细表 purchase_order_item，通过 batch_consumption.item_id &#x3D; purchase_order_item.item_id 关联查询得到。
         /// </summary>
+        /// <value>跨模块展示对象，来源于采购订单明细表 purchase_order_item，通过 batch_consumption.item_id &#x3D; purchase_order_item.item_id 关联查询得到。</value>
         [DataMember(Name="purchase_item", EmitDefaultValue=false)]
         public PurchaseOrderDetailLine PurchaseItem { get; set; }
 

@@ -43,8 +43,9 @@ namespace Org.OpenAPITools.Models
         public long MaterialId { get; set; }
 
         /// <summary>
-        /// Gets or Sets MaterialName
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id &#x3D; material.material_id 关联查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id &#x3D; material.material_id 关联查询得到。</value>
         /* <example>工业叉车</example> */
         [DataMember(Name="material_name", EmitDefaultValue=false)]
         public string MaterialName { get; set; }
@@ -80,8 +81,9 @@ namespace Org.OpenAPITools.Models
         public long VersionId { get; set; }
 
         /// <summary>
-        /// Gets or Sets VersionNo
+        /// 跨表展示字段，来源于 BOM 版本表 bom_version.version_no，通过 production_order.version_id &#x3D; bom_version.version_id 关联查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于 BOM 版本表 bom_version.version_no，通过 production_order.version_id &#x3D; bom_version.version_id 关联查询得到。</value>
         /* <example>V1.0</example> */
         [DataMember(Name="version_no", EmitDefaultValue=false)]
         public string VersionNo { get; set; }

@@ -47,15 +47,16 @@ namespace Org.OpenAPITools.Models
         public long ProductMaterialId { get; set; }
 
         /// <summary>
-        /// 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         /// </summary>
-        /// <value>冗余展示字段，权威物料实体由物料与 BOM 模块维护。</value>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 production_order.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。</value>
         [DataMember(Name="product_material_name", EmitDefaultValue=true)]
         public string ProductMaterialName { get; set; }
 
         /// <summary>
-        /// Gets or Sets ProductionStatus
+        /// 跨表展示字段，来源于生产订单表 production_order.status，通过 batch_consumption.order_id &#x3D; production_order.order_id 关联查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于生产订单表 production_order.status，通过 batch_consumption.order_id &#x3D; production_order.order_id 关联查询得到。</value>
         [DataMember(Name="production_status", EmitDefaultValue=true)]
         public ProductionOrderStatus ProductionStatus { get; set; }
 

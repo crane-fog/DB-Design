@@ -41,30 +41,30 @@ namespace Org.OpenAPITools.Models
         public long MaterialId { get; set; }
 
         /// <summary>
-        /// 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         /// </summary>
-        /// <value>冗余展示字段，权威物料实体由物料与 BOM 模块维护。</value>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。</value>
         [DataMember(Name="material_name", EmitDefaultValue=true)]
         public string MaterialName { get; set; }
 
         /// <summary>
-        /// Gets or Sets SupplierId
+        /// 跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id &#x3D; purchase_order.order_id 关联查询得到。
         /// </summary>
+        /// <value>跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id &#x3D; purchase_order.order_id 关联查询得到。</value>
         [DataMember(Name="supplier_id", EmitDefaultValue=true)]
         public long? SupplierId { get; set; }
 
         /// <summary>
-        /// 冗余展示字段，权威供应商实体由采购模块维护。
+        /// 跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。
         /// </summary>
-        /// <value>冗余展示字段，权威供应商实体由采购模块维护。</value>
+        /// <value>跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。</value>
         [DataMember(Name="supplier_name", EmitDefaultValue=true)]
         public string SupplierName { get; set; }
 
         /// <summary>
-        /// 使用该原材料批次的生产订单和成品批次。
+        /// 跨模块拼装列表，来源于批次消耗关系表 batch_consumption，通过 batch_consumption.item_id &#x3D; purchase_order_item.item_id 反查使用该原材料批次的生产订单和成品批次。
         /// </summary>
-        /// <value>使用该原材料批次的生产订单和成品批次。</value>
-        [Required]
+        /// <value>跨模块拼装列表，来源于批次消耗关系表 batch_consumption，通过 batch_consumption.item_id &#x3D; purchase_order_item.item_id 反查使用该原材料批次的生产订单和成品批次。</value>
         [DataMember(Name="affected_products", EmitDefaultValue=false)]
         public List<AffectedProductBatch> AffectedProducts { get; set; }
 

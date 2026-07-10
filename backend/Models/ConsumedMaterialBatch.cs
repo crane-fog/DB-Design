@@ -42,34 +42,37 @@ namespace Org.OpenAPITools.Models
         public long MaterialId { get; set; }
 
         /// <summary>
-        /// 冗余展示字段，权威物料实体由物料与 BOM 模块维护。
+        /// 跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。
         /// </summary>
-        /// <value>冗余展示字段，权威物料实体由物料与 BOM 模块维护。</value>
+        /// <value>跨表展示字段，来源于物料表 material.material_name，通过 purchase_order_item.material_id &#x3D; material.material_id 关联查询得到，权威物料实体由物料与 BOM 模块维护。</value>
         [DataMember(Name="material_name", EmitDefaultValue=true)]
         public string MaterialName { get; set; }
 
         /// <summary>
-        /// Gets or Sets SupplierId
+        /// 跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id &#x3D; purchase_order.order_id 关联查询得到。
         /// </summary>
+        /// <value>跨表字段，来源于采购订单表 purchase_order.supplier_id，通过 purchase_order_item.order_id &#x3D; purchase_order.order_id 关联查询得到。</value>
         [DataMember(Name="supplier_id", EmitDefaultValue=true)]
         public long? SupplierId { get; set; }
 
         /// <summary>
-        /// 冗余展示字段，权威供应商实体由采购模块维护。
+        /// 跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。
         /// </summary>
-        /// <value>冗余展示字段，权威供应商实体由采购模块维护。</value>
+        /// <value>跨表展示字段，来源于供应商表 supplier.supplier_name，通过 purchase_order_item.order_id 关联 purchase_order.supplier_id 后查询得到，权威供应商实体由采购模块维护。</value>
         [DataMember(Name="supplier_name", EmitDefaultValue=true)]
         public string SupplierName { get; set; }
 
         /// <summary>
-        /// Gets or Sets PurchaseOrderId
+        /// 采购订单表 purchase_order.order_id，来源于 purchase_order_item.order_id，用于标识该原材料批次所属采购订单。
         /// </summary>
-        [DataMember(Name="purchase_order_id", EmitDefaultValue=true)]
-        public long? PurchaseOrderId { get; set; }
+        /// <value>采购订单表 purchase_order.order_id，来源于 purchase_order_item.order_id，用于标识该原材料批次所属采购订单。</value>
+        [DataMember(Name="order_id", EmitDefaultValue=true)]
+        public long? OrderId { get; set; }
 
         /// <summary>
-        /// Gets or Sets ReceiveDate
+        /// 跨表展示字段，来源于到货记录表 receive_record.receive_date，通过 purchase_order_item.order_id 和 material_id 关联查询该批次到货日期。
         /// </summary>
+        /// <value>跨表展示字段，来源于到货记录表 receive_record.receive_date，通过 purchase_order_item.order_id 和 material_id 关联查询该批次到货日期。</value>
         [DataMember(Name="receive_date", EmitDefaultValue=true)]
         public DateOnly? ReceiveDate { get; set; }
 
@@ -93,7 +96,7 @@ namespace Org.OpenAPITools.Models
             sb.Append("  MaterialName: ").Append(MaterialName).Append("\n");
             sb.Append("  SupplierId: ").Append(SupplierId).Append("\n");
             sb.Append("  SupplierName: ").Append(SupplierName).Append("\n");
-            sb.Append("  PurchaseOrderId: ").Append(PurchaseOrderId).Append("\n");
+            sb.Append("  OrderId: ").Append(OrderId).Append("\n");
             sb.Append("  ReceiveDate: ").Append(ReceiveDate).Append("\n");
             sb.Append("  ConsumeQty: ").Append(ConsumeQty).Append("\n");
             sb.Append("}\n");
@@ -158,9 +161,9 @@ namespace Org.OpenAPITools.Models
                     SupplierName.Equals(other.SupplierName)
                 ) && 
                 (
-                    PurchaseOrderId == other.PurchaseOrderId ||
-                    PurchaseOrderId != null &&
-                    PurchaseOrderId.Equals(other.PurchaseOrderId)
+                    OrderId == other.OrderId ||
+                    OrderId != null &&
+                    OrderId.Equals(other.OrderId)
                 ) && 
                 (
                     ReceiveDate == other.ReceiveDate ||
@@ -194,8 +197,8 @@ namespace Org.OpenAPITools.Models
                     hashCode = hashCode * 59 + SupplierId.GetHashCode();
                     if (SupplierName != null)
                     hashCode = hashCode * 59 + SupplierName.GetHashCode();
-                    if (PurchaseOrderId != null)
-                    hashCode = hashCode * 59 + PurchaseOrderId.GetHashCode();
+                    if (OrderId != null)
+                    hashCode = hashCode * 59 + OrderId.GetHashCode();
                     if (ReceiveDate != null)
                     hashCode = hashCode * 59 + ReceiveDate.GetHashCode();
                     

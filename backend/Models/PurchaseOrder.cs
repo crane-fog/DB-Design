@@ -45,7 +45,7 @@ namespace Org.OpenAPITools.Models
         /// </summary>
         [Required]
         [DataMember(Name="supplier", EmitDefaultValue=false)]
-        public SupplierBrief Supplier { get; set; }
+        public SupplierDetail Supplier { get; set; }
 
         /// <summary>
         /// Gets or Sets OrderDate

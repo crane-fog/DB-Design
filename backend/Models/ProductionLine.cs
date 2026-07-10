@@ -41,8 +41,9 @@ namespace Org.OpenAPITools.Models
         public long TypeId { get; set; }
 
         /// <summary>
-        /// Gets or Sets TypeName
+        /// 跨表展示字段，来源于产线类型表 line_type.type_name，通过 production_line.type_id &#x3D; line_type.type_id 关联查询得到。
         /// </summary>
+        /// <value>跨表展示字段，来源于产线类型表 line_type.type_name，通过 production_line.type_id &#x3D; line_type.type_id 关联查询得到。</value>
         [DataMember(Name="type_name", EmitDefaultValue=false)]
         public string TypeName { get; set; }
 
@@ -61,14 +62,16 @@ namespace Org.OpenAPITools.Models
         public long ManagerId { get; set; }
 
         /// <summary>
-        /// Gets or Sets ManagerName
+        /// 跨表展示字段，根据 production_line.manager_id 关联 sys_user.user_id，取 sys_user.user_name。
         /// </summary>
+        /// <value>跨表展示字段，根据 production_line.manager_id 关联 sys_user.user_id，取 sys_user.user_name。</value>
         [DataMember(Name="manager_name", EmitDefaultValue=true)]
         public string ManagerName { get; set; }
 
         /// <summary>
-        /// Gets or Sets Status
+        /// 跨表展示字段，通过 production_line.line_id 关联生产线状态记录 line_status.line_id，取 line_status.status。
         /// </summary>
+        /// <value>跨表展示字段，通过 production_line.line_id 关联生产线状态记录 line_status.line_id，取 line_status.status。</value>
         [DataMember(Name="status", EmitDefaultValue=true)]
         public ProductionLineRunStatus Status { get; set; }
 

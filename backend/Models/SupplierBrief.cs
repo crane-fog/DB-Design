@@ -27,32 +27,20 @@ namespace Org.OpenAPITools.Models
     public partial class SupplierBrief : IEquatable<SupplierBrief>
     {
         /// <summary>
-        /// Gets or Sets SupplierId
+        /// 供应商唯一标识，来源于 supplier.supplier_id。
         /// </summary>
-        /* <example>1001</example> */
+        /// <value>供应商唯一标识，来源于 supplier.supplier_id。</value>
         [Required]
         [DataMember(Name="supplier_id", EmitDefaultValue=true)]
         public long SupplierId { get; set; }
 
         /// <summary>
-        /// Gets or Sets SupplierName
+        /// 供应商名称，来源于 supplier.supplier_name。
         /// </summary>
-        /* <example>华东钢材供应商</example> */
+        /// <value>供应商名称，来源于 supplier.supplier_name。</value>
         [Required]
         [DataMember(Name="supplier_name", EmitDefaultValue=false)]
         public string SupplierName { get; set; }
-
-        /// <summary>
-        /// Gets or Sets ContactPerson
-        /// </summary>
-        [DataMember(Name="contact_person", EmitDefaultValue=true)]
-        public string ContactPerson { get; set; }
-
-        /// <summary>
-        /// Gets or Sets ContactPhone
-        /// </summary>
-        [DataMember(Name="contact_phone", EmitDefaultValue=true)]
-        public string ContactPhone { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -64,8 +52,6 @@ namespace Org.OpenAPITools.Models
             sb.Append("class SupplierBrief {\n");
             sb.Append("  SupplierId: ").Append(SupplierId).Append("\n");
             sb.Append("  SupplierName: ").Append(SupplierName).Append("\n");
-            sb.Append("  ContactPerson: ").Append(ContactPerson).Append("\n");
-            sb.Append("  ContactPhone: ").Append(ContactPhone).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -111,16 +97,6 @@ namespace Org.OpenAPITools.Models
                     SupplierName == other.SupplierName ||
                     SupplierName != null &&
                     SupplierName.Equals(other.SupplierName)
-                ) && 
-                (
-                    ContactPerson == other.ContactPerson ||
-                    ContactPerson != null &&
-                    ContactPerson.Equals(other.ContactPerson)
-                ) && 
-                (
-                    ContactPhone == other.ContactPhone ||
-                    ContactPhone != null &&
-                    ContactPhone.Equals(other.ContactPhone)
                 );
         }
 
@@ -138,10 +114,6 @@ namespace Org.OpenAPITools.Models
                     hashCode = hashCode * 59 + SupplierId.GetHashCode();
                     if (SupplierName != null)
                     hashCode = hashCode * 59 + SupplierName.GetHashCode();
-                    if (ContactPerson != null)
-                    hashCode = hashCode * 59 + ContactPerson.GetHashCode();
-                    if (ContactPhone != null)
-                    hashCode = hashCode * 59 + ContactPhone.GetHashCode();
                 return hashCode;
             }
         }
