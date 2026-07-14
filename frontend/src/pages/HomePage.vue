@@ -1,57 +1,71 @@
 <script setup lang="ts">
-import { Api, type UserData } from '@/api/client'
-import { onMounted, ref } from 'vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import PageContainer from '@/components/common/PageContainer.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
+import PageLoading from '@/components/common/PageLoading.vue'
+import { getErrorMessage } from '@/utils/error'
+import { ref } from 'vue'
+import { systemService } from '@/services/SystemService'
 
-const loading = ref(false)
-const error = ref('')
-const rows = ref<UserData[]>([])
+const loadingTestData = ref(false)
+const testError = ref('')
+const testRowCount = ref<number>()
 
-async function loadRows() {
-  loading.value = true
-  error.value = ''
+async function loadTestData() {
+  loadingTestData.value = true
+  testError.value = ''
   try {
-    const response = await Api.getUserTest()
-    rows.value = response.data
-  } catch (err: any) {
-    error.value = err.response?.data?.message || err.message || '请求失败'
+    const response = await systemService.getUserTest()
+    testRowCount.value = response.data.length
+  } catch (error) {
+    testError.value = getErrorMessage(error)
   } finally {
-    loading.value = false
+    loadingTestData.value = false
   }
 }
-
-onMounted(loadRows)
 </script>
 
 <template>
-  <section class="page-placeholder">
-    <h1>管理系统首页</h1>
-    <p>
-      整个管理系统的首页 <br /><br />
-      这是一个调用后端 api 的示例，开发时确认自己电脑上 VS C# 后端在运行状态 <br /><br />
-    </p>
-  </section>
-  <button type="button" @click="loadRows" :disabled="loading">
-    {{ loading ? '加载中......' : '刷新数据' }}
-  </button>
+  <PageContainer>
+    <PageHeader
+      title="工作台"
+      description="统计、待办、预警和业务记录将在对应数据接口接入后展示。"
+    />
 
-  <p v-if="error">{{ error }}</p>
+    <div class="dashboard-grid">
+      <section
+        v-for="title in ['统计概览', '待办事项', '预警信息', '最近业务记录']"
+        :key="title"
+        class="dashboard-card"
+      >
+        <h2>{{ title }}</h2>
+        <p>数据接口待接入</p>
+      </section>
+    </div>
 
-  <table v-if="rows.length">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>NAME</th>
-        <th>CREATED_AT</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-for="row in rows" :key="row.id">
-        <td>{{ row.id }}</td>
-        <td>{{ row.name || '-' }}</td>
-        <td>{{ row.createdAt ? new Date(row.createdAt).toLocaleString() : '-' }}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <p v-else-if="!loading && !error">暂无数据</p>
+    <section class="content-card dashboard-test-card">
+      <div>
+        <h2>开发测试接口</h2>
+        <p>保留原有 <code>/api/user-test</code> 调用入口，仅用于联调验证，不作为正式业务统计。</p>
+      </div>
+      <button
+        class="button button--secondary"
+        type="button"
+        :disabled="loadingTestData"
+        @click="loadTestData"
+      >
+        {{ loadingTestData ? '加载中...' : '验证接口' }}
+      </button>
+      <PageLoading v-if="loadingTestData" text="正在请求测试数据..." />
+      <p v-else-if="testError" class="page-error">{{ testError }}</p>
+      <p v-else-if="testRowCount !== undefined" class="test-result">
+        接口响应 {{ testRowCount }} 条测试记录。
+      </p>
+      <EmptyState
+        v-else
+        title="尚未执行接口验证"
+        description="测试数据不会展示为工作台业务数据。"
+      />
+    </section>
+  </PageContainer>
 </template>
