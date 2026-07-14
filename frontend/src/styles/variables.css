@@ -1,0 +1,14 @@
+:root {
+  --app-background: #f5f7fa;
+  --border-color: #d8dee8;
+  --card-background: #ffffff;
+  --danger-color: #b42318;
+  --info-color: #2563eb;
+  --page-gap: 24px;
+  --page-padding: 32px;
+  --primary-color: #2563eb;
+  --success-color: #027a48;
+  --text-color: #1f2937;
+  --text-muted: #526071;
+  --warning-color: #b54708;
+}

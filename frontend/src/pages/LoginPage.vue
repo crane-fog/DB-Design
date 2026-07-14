@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { LoginData, LoginRequest } from '@/api'
-import { ref } from 'vue'
-import { systemApi } from '@/api/client'
+import { onMounted, ref } from 'vue'
+import { getErrorMessage } from '@/utils/error'
+import { systemService } from '@/services/SystemService'
+import { useAuthStore } from '@/stores/auth'
 
 const userNo = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
+const auth = useAuthStore()
 
 function getRedirectTarget() {
   const redirect = new URLSearchParams(globalThis.location.search).get('redirect')
@@ -16,27 +19,6 @@ function getRedirectTarget() {
   }
 
   return '/'
-}
-
-function getLoginErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const axiosError = error as {
-      response?: {
-        data?: {
-          message?: string
-          msg?: string
-        }
-      }
-    }
-
-    return axiosError.response?.data?.message || axiosError.response?.data?.msg || '登录失败'
-  }
-
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  return '登录失败'
 }
 
 async function hashPassword(value: string) {
@@ -64,14 +46,14 @@ function isLoginData(data: unknown): data is LoginData {
   )
 }
 
-function handleLoginSuccess(accessToken?: string, expiresInSeconds?: number) {
+function handleLoginSuccess(accessToken?: string, expiresInSeconds?: number, employeeNo?: string) {
   if (!accessToken || expiresInSeconds === undefined || expiresInSeconds <= 0) {
     errorMessage.value = '登录响应缺少令牌信息'
     return
   }
 
-  localStorage.setItem('jwt', accessToken)
-  localStorage.setItem('expires', String(Math.floor(Date.now() / 1000) + expiresInSeconds))
+  auth.setToken(accessToken, Math.floor(Date.now() / 1000) + expiresInSeconds)
+  auth.setCurrentUser({ employeeNo })
   globalThis.location.href = getRedirectTarget()
 }
 
@@ -92,26 +74,25 @@ async function submitLogin() {
 
   try {
     const loginData = await buildLoginData(employeeNo)
-    const response = await systemApi.login({ loginRequest: loginData })
-    const result = response.data
-
-    if (result.code !== 200) {
-      errorMessage.value = result.message || '登录失败'
-      return
-    }
-
-    if (!isLoginData(result.data)) {
+    const result = await systemService.login(loginData)
+    if (!isLoginData(result)) {
       errorMessage.value = '登录响应缺少令牌信息'
       return
     }
 
-    handleLoginSuccess(result.data.access_token, result.data.expires)
+    handleLoginSuccess(result.access_token, result.expires, employeeNo)
   } catch (error) {
-    errorMessage.value = getLoginErrorMessage(error)
+    errorMessage.value = getErrorMessage(error, '登录失败')
   } finally {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  if (auth.restoreSession()) {
+    globalThis.location.replace('/')
+  }
+})
 </script>
 
 <template>
