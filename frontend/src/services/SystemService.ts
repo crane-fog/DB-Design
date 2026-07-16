@@ -11,6 +11,8 @@ import type {
   User,
   UserRole,
 } from '@/api'
+import { getMockAccessProfile, getSystemAdministratorPermissions } from '@/config/mock-access'
+import axios from 'axios'
 
 export type AccountStatus = 'disabled' | 'valid'
 
@@ -142,15 +144,25 @@ export interface SystemOperationLog {
 }
 
 export interface SystemAccessContext {
-  currentUser: Pick<SystemUser, 'employeeNo' | 'id' | 'name'>
+  currentUser: Pick<SystemUser, 'employeeNo' | 'name'> & { id?: number }
   permissions: string[]
   roles: string[]
+  source: 'api' | 'mock'
 }
 
 interface ApiEnvelope<TPayload> {
   code?: number
   data?: TPayload
   message?: string
+}
+
+class ApiRequestError extends Error {
+  readonly status: number | undefined
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.status = status
+  }
 }
 
 interface RawPageResult {
@@ -166,7 +178,7 @@ interface RawPageResult {
 
 function unwrap<TPayload>(payload: ApiEnvelope<TPayload>) {
   if (payload.code !== undefined && payload.code !== 200) {
-    throw new Error(payload.message || '接口请求失败')
+    throw new ApiRequestError(payload.message || '接口请求失败', payload.code)
   }
 
   return payload.data
@@ -278,29 +290,6 @@ const permissionActionCodes: Record<string, string> = {
   审核: 'approve',
   查看: 'view',
 }
-
-const systemAdministratorPermissions = [
-  'inventory:calc',
-  'inventory:monitor',
-  'inventory:register',
-  'inventory:view',
-  'material:view',
-  'production:breakdown',
-  'production:capacity',
-  'production:orders',
-  'production:view',
-  'purchase:view',
-  'system:audit:view',
-  'system:role:assign-permission',
-  'system:role:create',
-  'system:role:update',
-  'system:role:view',
-  'system:user:create',
-  'system:user:update',
-  'system:user:view',
-  'system:view',
-  'trace:view',
-]
 
 function toPermissionCode(permission: Permission) {
   const resource = permission.resource && permissionResourceCodes[permission.resource]
@@ -481,7 +470,31 @@ async function getAuditUsers() {
   return userMap
 }
 
-async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContext> {
+export function getRequestStatus(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    return error.status
+  }
+  if (axios.isAxiosError(error)) {
+    return error.response?.status
+  }
+  return undefined
+}
+
+function getMockAccessContext(employeeNo: string): SystemAccessContext {
+  const profile = getMockAccessProfile(employeeNo)
+
+  return {
+    currentUser: {
+      employeeNo,
+      name: profile.name || '',
+    },
+    permissions: profile.permissions,
+    roles: profile.roles,
+    source: 'mock',
+  }
+}
+
+async function loadCurrentAccessFromApi(employeeNo: string): Promise<SystemAccessContext> {
   const userResponse = await systemApi.listUserData({
     employeeNo: employeeNo.trim(),
     page: 1,
@@ -549,7 +562,7 @@ async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContex
   )
 
   if (activeRoles.some((role) => role.name === '系统管理员')) {
-    systemAdministratorPermissions.forEach((permission) => permissionCodes.add(permission))
+    getSystemAdministratorPermissions().forEach((permission) => permissionCodes.add(permission))
   }
 
   return {
@@ -560,6 +573,18 @@ async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContex
     },
     permissions: [...permissionCodes],
     roles: activeRoles.map((role) => role.name),
+    source: 'api',
+  }
+}
+
+async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContext> {
+  try {
+    return await loadCurrentAccessFromApi(employeeNo)
+  } catch (error) {
+    if (getRequestStatus(error) === 404) {
+      return getMockAccessContext(employeeNo)
+    }
+    throw error
   }
 }
 
