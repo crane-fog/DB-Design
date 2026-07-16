@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { LoginData, LoginRequest } from '@/api'
+import { getRequestStatus, systemService } from '@/services/SystemService'
 import { onMounted, ref } from 'vue'
 import { getErrorMessage } from '@/utils/error'
-import { systemService } from '@/services/SystemService'
 import { useAuthStore } from '@/stores/auth'
 
 const userNo = ref('')
@@ -57,14 +57,27 @@ async function handleLoginSuccess(
   }
 
   auth.setToken(accessToken, Math.floor(Date.now() / 1000) + expiresInSeconds)
+  auth.setCurrentUser({ employeeNo })
+  auth.setRoles([])
+  auth.setPermissions([])
   try {
     const access = await systemService.loadCurrentAccess(employeeNo ?? '')
     auth.setCurrentUser(access.currentUser)
     auth.setRoles(access.roles)
     auth.setPermissions(access.permissions)
   } catch (error) {
-    auth.logout(false)
-    errorMessage.value = getErrorMessage(error, '加载账号角色和权限失败')
+    const status = getRequestStatus(error)
+    if (status === 401) {
+      auth.logout(false)
+      errorMessage.value = '登录状态已失效，请重新登录'
+      return false
+    }
+    if (status === 403) {
+      globalThis.location.href = '/forbidden'
+      return true
+    }
+
+    errorMessage.value = `登录已成功，但权限初始化失败。${getErrorMessage(error, '请稍后刷新重试')}`
     return false
   }
 
