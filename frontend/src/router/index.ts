@@ -215,7 +215,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       icon: 'audit',
       module: 'system',
-      pageOrder: 14,
+      pageOrder: 15,
       permission: 'system:audit:view',
       requiresAuth: true,
       showInMenu: true,
@@ -223,6 +223,20 @@ const adminRoutes: RouteRecordRaw[] = [
     },
     name: 'system-audit-logs',
     path: 'system/audit-logs',
+  },
+  {
+    component: () => import('@/pages/system/RolesPage.vue'),
+    meta: {
+      icon: 'roles',
+      module: 'system',
+      pageOrder: 14,
+      permission: 'system:role:view',
+      requiresAuth: true,
+      showInMenu: true,
+      title: '角色管理',
+    },
+    name: 'system-roles',
+    path: 'system/roles',
   },
   {
     component: () => import('@/pages/errors/ForbiddenPage.vue'),
