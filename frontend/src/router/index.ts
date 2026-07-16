@@ -265,10 +265,14 @@ router.beforeEach((to) => {
   }
 
   const auth = useAuthStore(pinia)
-  if (auth.restoreSession()) {
-    return true
+  if (!auth.restoreSession()) {
+    globalThis.location.assign(`/login.html?redirect=${encodeURIComponent(to.fullPath)}`)
+    return false
   }
 
-  globalThis.location.assign(`/login.html?redirect=${encodeURIComponent(to.fullPath)}`)
-  return false
+  if (typeof to.meta.permission === 'string' && !auth.hasPermission(to.meta.permission)) {
+    return { name: 'forbidden', replace: true }
+  }
+
+  return true
 })

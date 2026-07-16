@@ -48,8 +48,7 @@ function canAccessMenu(permission?: unknown) {
     return true
   }
 
-  // 登录响应尚未提供权限列表时，保持当前菜单全量展示的行为。
-  return auth.permissions.length === 0 || auth.hasPermission(permission)
+  return auth.hasPermission(permission)
 }
 
 function insertByOrder<ItemWithOrder extends { order: number }>(
@@ -66,8 +65,13 @@ function insertByOrder<ItemWithOrder extends { order: number }>(
 }
 
 const menuGroups = computed<MenuGroup[]>(() => {
-  const items = router
-    .getRoutes()
+  const routeRecords = router.getRoutes()
+  const moduleRoutes = new Map(
+    routeRecords
+      .filter((record) => record.meta.isModule && record.meta.module)
+      .map((record) => [String(record.meta.module), record]),
+  )
+  const items = routeRecords
     .filter(
       (record) =>
         record.meta.showInMenu &&
@@ -86,13 +90,14 @@ const menuGroups = computed<MenuGroup[]>(() => {
 
   const groups = new Map<string, MenuGroup>()
   for (const item of items) {
+    const moduleRoute = moduleRoutes.get(item.module)
     const group = groups.get(item.module) ?? {
       icon: moduleIcons[item.module] ?? MenuIcon,
       items: [],
       module: item.module,
       order: item.order,
-      path: item.path,
-      title: item.title,
+      path: moduleRoute?.path ?? item.path,
+      title: String(moduleRoute?.meta.title ?? item.title),
     }
 
     group.order = Math.min(group.order, item.order)
