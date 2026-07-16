@@ -46,15 +46,30 @@ function isLoginData(data: unknown): data is LoginData {
   )
 }
 
-function handleLoginSuccess(accessToken?: string, expiresInSeconds?: number, employeeNo?: string) {
+async function handleLoginSuccess(
+  accessToken?: string,
+  expiresInSeconds?: number,
+  employeeNo?: string,
+) {
   if (!accessToken || expiresInSeconds === undefined || expiresInSeconds <= 0) {
     errorMessage.value = '登录响应缺少令牌信息'
-    return
+    return false
   }
 
   auth.setToken(accessToken, Math.floor(Date.now() / 1000) + expiresInSeconds)
-  auth.setCurrentUser({ employeeNo })
+  try {
+    const access = await systemService.loadCurrentAccess(employeeNo ?? '')
+    auth.setCurrentUser(access.currentUser)
+    auth.setRoles(access.roles)
+    auth.setPermissions(access.permissions)
+  } catch (error) {
+    auth.logout(false)
+    errorMessage.value = getErrorMessage(error, '加载账号角色和权限失败')
+    return false
+  }
+
   globalThis.location.href = getRedirectTarget()
+  return true
 }
 
 async function submitLogin() {
@@ -80,7 +95,7 @@ async function submitLogin() {
       return
     }
 
-    handleLoginSuccess(result.access_token, result.expires, employeeNo)
+    await handleLoginSuccess(result.access_token, result.expires, employeeNo)
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '登录失败')
   } finally {

@@ -141,6 +141,12 @@ export interface SystemOperationLog {
   operatorName?: string
 }
 
+export interface SystemAccessContext {
+  currentUser: Pick<SystemUser, 'employeeNo' | 'id' | 'name'>
+  permissions: string[]
+  roles: string[]
+}
+
 interface ApiEnvelope<TPayload> {
   code?: number
   data?: TPayload
@@ -252,6 +258,57 @@ function toSystemRole(role: Role): SystemRole | undefined {
     name: role.role_name ?? '',
     status: asAccountStatus(role.status),
   }
+}
+
+const permissionResourceCodes: Record<string, string> = {
+  BOM: 'material',
+  外部订单: 'external-order',
+  库存: 'inventory',
+  物料: 'material',
+  生产线: 'production',
+  生产订单: 'production',
+  用户管理: 'system:user',
+  质量追溯: 'trace',
+  采购订单: 'purchase',
+}
+
+const permissionActionCodes: Record<string, string> = {
+  修改: 'update',
+  创建: 'create',
+  审核: 'approve',
+  查看: 'view',
+}
+
+const systemAdministratorPermissions = [
+  'inventory:calc',
+  'inventory:monitor',
+  'inventory:register',
+  'inventory:view',
+  'material:view',
+  'production:breakdown',
+  'production:capacity',
+  'production:orders',
+  'production:view',
+  'purchase:view',
+  'system:audit:view',
+  'system:role:assign-permission',
+  'system:role:create',
+  'system:role:update',
+  'system:role:view',
+  'system:user:create',
+  'system:user:update',
+  'system:user:view',
+  'system:view',
+  'trace:view',
+]
+
+function toPermissionCode(permission: Permission) {
+  const resource = permission.resource && permissionResourceCodes[permission.resource]
+  const action = permission.action && permissionActionCodes[permission.action]
+  if (!resource || !action) {
+    return undefined
+  }
+  return `${resource}:${action}`
 }
 
 function toLoginResult(value: unknown): LoginResult | undefined {
@@ -424,6 +481,88 @@ async function getAuditUsers() {
   return userMap
 }
 
+async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContext> {
+  const userResponse = await systemApi.listUserData({
+    employeeNo: employeeNo.trim(),
+    page: 1,
+    pageSize: 100,
+  })
+  const userData = unwrap(userResponse.data as ApiEnvelope<unknown>)
+  const currentUser = getPageItems<User>(userData)
+    .map(toSystemUser)
+    .find((user): user is SystemUser => user !== undefined && user.employeeNo === employeeNo.trim())
+
+  if (!currentUser) {
+    throw new Error('未找到当前登录用户的权限数据')
+  }
+
+  const [userRoles, roles, rolePermissions, permissions] = await Promise.all([
+    getAllPageItems<UserRole>((page, pageSize) =>
+      systemApi.listUserRoleData({ page, pageSize, userId: currentUser.id }),
+    ),
+    getAllPageItems<Role>((page, pageSize) => systemApi.listRoleData({ page, pageSize })),
+    getAllPageItems<RolePermission>((page, pageSize) =>
+      systemApi.listRolePermissionData({ page, pageSize }),
+    ),
+    getAllPageItems<Permission>((page, pageSize) =>
+      systemApi.listPermissionData({ page, pageSize }),
+    ),
+  ])
+  const roleIds = new Set(
+    userRoles
+      .filter(
+        (relation) => relation.user_id === currentUser.id && typeof relation.role_id === 'number',
+      )
+      .map((relation) => relation.role_id as number),
+  )
+  const activeRoles = roles
+    .map(toSystemRole)
+    .filter(
+      (role): role is SystemRole =>
+        role !== undefined && role.status === 'valid' && roleIds.has(role.id),
+    )
+  const activeRoleIds = new Set(activeRoles.map((role) => role.id))
+  const permissionIds = new Set(
+    rolePermissions
+      .filter(
+        (relation) =>
+          activeRoleIds.has(relation.role_id ?? Number.NaN) &&
+          typeof relation.permission_id === 'number',
+      )
+      .map((relation) => relation.permission_id as number),
+  )
+  const permissionsById = new Map(
+    permissions
+      .filter((permission) => typeof permission.permission_id === 'number')
+      .map((permission) => [permission.permission_id as number, permission]),
+  )
+  const permissionCodes = new Set(
+    [...permissionIds]
+      .map((permissionId) => permissionsById.get(permissionId))
+      .map((permission) => {
+        if (permission) {
+          return toPermissionCode(permission)
+        }
+        return undefined
+      })
+      .filter((permission): permission is string => Boolean(permission)),
+  )
+
+  if (activeRoles.some((role) => role.name === '系统管理员')) {
+    systemAdministratorPermissions.forEach((permission) => permissionCodes.add(permission))
+  }
+
+  return {
+    currentUser: {
+      employeeNo: currentUser.employeeNo,
+      id: currentUser.id,
+      name: currentUser.name,
+    },
+    permissions: [...permissionCodes],
+    roles: activeRoles.map((role) => role.name),
+  }
+}
+
 export const systemService = {
   async assignRolePermissions(roleId: number, permissionIds: number[]) {
     if (!permissionIds.length) {
@@ -483,18 +622,22 @@ export const systemService = {
 
   getUserTest: () => Api.getUserTest(),
 
-  async listLoginLogs(query: LoginLogQuery): Promise<PageResult<SystemLoginLog>> {
-    const [response, users] = await Promise.all([
-      systemApi.listLoginRecordData({
-        endTime: query.endTime,
-        page: query.page,
-        pageSize: query.pageSize,
-        result: query.result,
-        startTime: query.startTime,
-        userId: query.userId,
-      }),
-      getAuditUsers(),
-    ])
+  async listLoginLogs(
+    query: LoginLogQuery,
+    includeUserDirectory = false,
+  ): Promise<PageResult<SystemLoginLog>> {
+    const response = await systemApi.listLoginRecordData({
+      endTime: query.endTime,
+      page: query.page,
+      pageSize: query.pageSize,
+      result: query.result,
+      startTime: query.startTime,
+      userId: query.userId,
+    })
+    let users = new Map<number, SystemUser>()
+    if (includeUserDirectory) {
+      users = await getAuditUsers()
+    }
     const data = unwrap(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<LoginLog>(data).map((log) => toSystemLoginLog(log, users))
     const metadata = getPageMetadata(data, {
@@ -506,19 +649,23 @@ export const systemService = {
     return { items, ...metadata }
   },
 
-  async listOperationLogs(query: OperationLogQuery): Promise<PageResult<SystemOperationLog>> {
-    const [response, users] = await Promise.all([
-      systemApi.listOperationLogData({
-        action: query.action || undefined,
-        endTime: query.endTime,
-        module: query.module || undefined,
-        operatorId: query.operatorId,
-        page: query.page,
-        pageSize: query.pageSize,
-        startTime: query.startTime,
-      }),
-      getAuditUsers(),
-    ])
+  async listOperationLogs(
+    query: OperationLogQuery,
+    includeUserDirectory = false,
+  ): Promise<PageResult<SystemOperationLog>> {
+    const response = await systemApi.listOperationLogData({
+      action: query.action || undefined,
+      endTime: query.endTime,
+      module: query.module || undefined,
+      operatorId: query.operatorId,
+      page: query.page,
+      pageSize: query.pageSize,
+      startTime: query.startTime,
+    })
+    let users = new Map<number, SystemUser>()
+    if (includeUserDirectory) {
+      users = await getAuditUsers()
+    }
     const data = unwrap(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<OperationLog>(data).map((log) => toSystemOperationLog(log, users))
     const metadata = getPageMetadata(data, {
@@ -605,6 +752,8 @@ export const systemService = {
 
     return { items, ...metadata }
   },
+
+  loadCurrentAccess,
 
   async loadRolePermissionAssignment(roleId: number): Promise<RolePermissionAssignment> {
     const [permissions, rolePermissions] = await Promise.all([

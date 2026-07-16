@@ -41,9 +41,8 @@ const operationResult = ref<PageResult<SystemOperationLog>>({
 const detailDialogVisible = ref(false)
 const selectedOperation = ref<SystemOperationLog>()
 
-const canViewAudit = computed(
-  () => auth.permissions.length === 0 || auth.hasPermission('system:audit:view'),
-)
+const canViewAudit = computed(() => auth.hasPermission('system:audit:view'))
+const canResolveAuditUserNames = computed(() => auth.hasPermission('system:user:view'))
 
 function selectedUserId(value: string) {
   const userId = Number(value)
@@ -73,14 +72,17 @@ async function loadLoginLogs(targetPage = loginPage.value) {
   loginError.value = ''
   try {
     const { endTime, startTime } = getTimeRange(loginFilters.timeRange)
-    loginResult.value = await systemService.listLoginLogs({
-      endTime,
-      page: targetPage,
-      pageSize,
-      result: selectedLoginResult(),
-      startTime,
-      userId: selectedUserId(loginFilters.userId),
-    })
+    loginResult.value = await systemService.listLoginLogs(
+      {
+        endTime,
+        page: targetPage,
+        pageSize,
+        result: selectedLoginResult(),
+        startTime,
+        userId: selectedUserId(loginFilters.userId),
+      },
+      canResolveAuditUserNames.value,
+    )
     loginPage.value = loginResult.value.page
   } catch (requestError) {
     loginError.value = getErrorMessage(requestError, '登录日志加载失败')
@@ -99,15 +101,18 @@ async function loadOperationLogs(targetPage = operationPage.value) {
   operationError.value = ''
   try {
     const { endTime, startTime } = getTimeRange(operationFilters.timeRange)
-    operationResult.value = await systemService.listOperationLogs({
-      action: operationFilters.action,
-      endTime,
-      module: operationFilters.module,
-      operatorId: selectedUserId(operationFilters.operatorId),
-      page: targetPage,
-      pageSize,
-      startTime,
-    })
+    operationResult.value = await systemService.listOperationLogs(
+      {
+        action: operationFilters.action,
+        endTime,
+        module: operationFilters.module,
+        operatorId: selectedUserId(operationFilters.operatorId),
+        page: targetPage,
+        pageSize,
+        startTime,
+      },
+      canResolveAuditUserNames.value,
+    )
     operationPage.value = operationResult.value.page
   } catch (requestError) {
     operationError.value = getErrorMessage(requestError, '操作日志加载失败')
@@ -211,7 +216,9 @@ onMounted(() => void loadLoginLogs())
             stripe
           >
             <el-table-column label="工号" min-width="120">
-              <template #default="{ row }">{{ row.employeeNo || '-' }}</template>
+              <template #default="{ row }">
+                {{ row.employeeNo || (row.userId ? `用户 #${row.userId}` : '-') }}
+              </template>
             </el-table-column>
             <el-table-column label="用户姓名" min-width="120">
               <template #default="{ row }">{{ row.userName || '-' }}</template>
