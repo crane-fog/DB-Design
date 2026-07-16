@@ -1,5 +1,13 @@
 import { Api, systemApi } from '@/api/client'
-import type { LoginData, LoginRequest, RegisterRequest, Role, User, UserRole } from '@/api'
+import type {
+  LoginData,
+  LoginRequest,
+  RegisterRequest,
+  Role,
+  RolePermission,
+  User,
+  UserRole,
+} from '@/api'
 
 export type AccountStatus = 'disabled' | 'valid'
 
@@ -9,6 +17,14 @@ export interface UserQuery {
   pageSize: number
   status?: AccountStatus
   userName?: string
+}
+
+export interface RoleQuery {
+  page: number
+  pageSize: number
+  roleId?: number
+  roleName?: string
+  status?: AccountStatus
 }
 
 export interface PageResult<TEntity> {
@@ -45,6 +61,17 @@ export interface UserCreateFormData extends UserFormData {
 export interface SystemRole {
   description?: string
   id: number
+  name: string
+  status: AccountStatus
+}
+
+export interface SystemRoleSummary extends SystemRole {
+  permissionCount: number
+  userCount: number
+}
+
+export interface RoleFormData {
+  description?: string
   name: string
   status: AccountStatus
 }
@@ -173,12 +200,56 @@ function toNullableText(value: string | undefined) {
   return value?.trim() || undefined
 }
 
+function countRoleRelations<TItem extends { role_id?: number }>(relations: TItem[]) {
+  const counts = new Map<number, number>()
+  for (const relation of relations) {
+    if (typeof relation.role_id === 'number') {
+      counts.set(relation.role_id, (counts.get(relation.role_id) ?? 0) + 1)
+    }
+  }
+  return counts
+}
+
+async function getAllPageItems<TItem>(
+  request: (page: number, pageSize: number) => Promise<{ data: unknown }>,
+) {
+  const pageSize = 100
+  async function loadPage(page: number, allItems: TItem[]): Promise<TItem[]> {
+    const response = await request(page, pageSize)
+    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const items = getPageItems<TItem>(data)
+    allItems.push(...items)
+    const metadata = getPageMetadata(data, { page, pageSize, total: allItems.length })
+    if (!items.length || allItems.length >= metadata.total) {
+      return allItems
+    }
+    return loadPage(page + 1, allItems)
+  }
+
+  return loadPage(1, [])
+}
+
 export const systemService = {
   async assignUserRoles(userId: number, roleIds: number[]) {
     const response = await systemApi.addUserRole({
       userRoleAssignRequest: { role_ids: roleIds, user_id: userId },
     })
     return unwrap(response.data as ApiEnvelope<unknown>)
+  },
+
+  async createRole(form: RoleFormData) {
+    const response = await systemApi.addRoleData({
+      roleCreateRequest: {
+        description: toNullableText(form.description),
+        role_name: form.name.trim(),
+        status: form.status,
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<Role | undefined>)
+    if (data) {
+      return toSystemRole(data)
+    }
+    return undefined
   },
 
   async createUser(form: UserCreateFormData) {
@@ -200,6 +271,43 @@ export const systemService = {
   },
 
   getUserTest: () => Api.getUserTest(),
+
+  async listRolePage(query: RoleQuery): Promise<PageResult<SystemRoleSummary>> {
+    const response = await systemApi.listRoleData({
+      page: query.page,
+      pageSize: query.pageSize,
+      roleId: query.roleId,
+      roleName: query.roleName || undefined,
+      status: query.status,
+    })
+    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const [userRelations, permissionRelations] = await Promise.all([
+      getAllPageItems<UserRole>((page, pageSize) => systemApi.listUserRoleData({ page, pageSize })),
+      getAllPageItems<RolePermission>((page, pageSize) =>
+        systemApi.listRolePermissionData({ page, pageSize }),
+      ),
+    ])
+    const userCounts = countRoleRelations(userRelations)
+    const permissionCounts = countRoleRelations(permissionRelations)
+    const items = getPageItems<Role>(data)
+      .map(toSystemRole)
+      .filter((role): role is SystemRole => Boolean(role))
+      .map((role) => ({
+        description: role.description,
+        id: role.id,
+        name: role.name,
+        permissionCount: permissionCounts.get(role.id) ?? 0,
+        status: role.status,
+        userCount: userCounts.get(role.id) ?? 0,
+      }))
+    const metadata = getPageMetadata(data, {
+      page: query.page,
+      pageSize: query.pageSize,
+      total: items.length,
+    })
+
+    return { items, ...metadata }
+  },
 
   async listRoles(): Promise<SystemRole[]> {
     const response = await systemApi.listRoleData({ page: 1, pageSize: 100 })
@@ -253,6 +361,34 @@ export const systemService = {
   async resetUserPassword(userId: number, password: string) {
     const response = await systemApi.updateUserData({
       userUpdateRequest: { password: await hashPassword(password), user_id: userId },
+    })
+    return unwrap(response.data as ApiEnvelope<unknown>)
+  },
+
+  async updateRole(roleId: number, form: RoleFormData) {
+    const response = await systemApi.updateRoleData({
+      roleUpdateRequest: {
+        description: toNullableText(form.description),
+        role_id: roleId,
+        role_name: form.name.trim(),
+        status: form.status,
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<Role | undefined>)
+    if (data) {
+      return toSystemRole(data)
+    }
+    return undefined
+  },
+
+  async updateRoleStatus(role: SystemRole, status: AccountStatus) {
+    const response = await systemApi.updateRoleData({
+      roleUpdateRequest: {
+        description: toNullableText(role.description),
+        role_id: role.id,
+        role_name: role.name,
+        status,
+      },
     })
     return unwrap(response.data as ApiEnvelope<unknown>)
   },
