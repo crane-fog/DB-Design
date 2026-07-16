@@ -2,6 +2,7 @@ import { Api, systemApi } from '@/api/client'
 import type {
   LoginData,
   LoginRequest,
+  Permission,
   RegisterRequest,
   Role,
   RolePermission,
@@ -74,6 +75,24 @@ export interface RoleFormData {
   description?: string
   name: string
   status: AccountStatus
+}
+
+export interface PermissionTreeLeaf {
+  id: string
+  label: string
+  permissionId: number
+}
+
+export interface PermissionTreeNode {
+  children: PermissionTreeLeaf[]
+  id: string
+  label: string
+}
+
+export interface RolePermissionAssignment {
+  allPermissionNodeKeys: string[]
+  checkedPermissionNodeKeys: string[]
+  tree: PermissionTreeNode[]
 }
 
 interface ApiEnvelope<TPayload> {
@@ -189,6 +208,53 @@ function toSystemRole(role: Role): SystemRole | undefined {
   }
 }
 
+function toPermissionTreeLeaf(permission: Permission): PermissionTreeLeaf | undefined {
+  if (typeof permission.permission_id !== 'number') {
+    return undefined
+  }
+
+  const action = optionalText(permission.action) ?? '未命名操作'
+  return {
+    id: `permission:${permission.permission_id}`,
+    label: action,
+    permissionId: permission.permission_id,
+  }
+}
+
+function buildPermissionTree(permissions: Permission[]) {
+  const groups = new Map<string, PermissionTreeNode>()
+  for (const permission of permissions) {
+    const leaf = toPermissionTreeLeaf(permission)
+    if (leaf) {
+      const resource = optionalText(permission.resource) ?? '未分类资源'
+      const group = groups.get(resource) ?? {
+        children: [],
+        id: `resource:${resource}`,
+        label: resource,
+      }
+      group.children.push(leaf)
+      groups.set(resource, group)
+    }
+  }
+
+  const tree: PermissionTreeNode[] = []
+  for (const group of groups.values()) {
+    tree.push({ children: group.children, id: group.id, label: group.label })
+  }
+  return tree
+}
+
+function toPermissionId(nodeKey: unknown) {
+  if (typeof nodeKey !== 'string' || !nodeKey.startsWith('permission:')) {
+    return undefined
+  }
+  const permissionId = Number(nodeKey.slice('permission:'.length))
+  if (Number.isInteger(permissionId) && permissionId > 0) {
+    return permissionId
+  }
+  return undefined
+}
+
 async function hashPassword(value: string) {
   const passwordBytes = new TextEncoder().encode(value)
   const hashBuffer = await crypto.subtle.digest('SHA-256', passwordBytes)
@@ -230,6 +296,16 @@ async function getAllPageItems<TItem>(
 }
 
 export const systemService = {
+  async assignRolePermissions(roleId: number, permissionIds: number[]) {
+    if (!permissionIds.length) {
+      throw new Error('请至少选择一个权限')
+    }
+    const response = await systemApi.addRolePermission({
+      rolePermissionAssignRequest: { permission_ids: permissionIds, role_id: roleId },
+    })
+    return unwrap(response.data as ApiEnvelope<unknown>)
+  },
+
   async assignUserRoles(userId: number, roleIds: number[]) {
     const response = await systemApi.addUserRole({
       userRoleAssignRequest: { role_ids: roleIds, user_id: userId },
@@ -268,6 +344,12 @@ export const systemService = {
       return toSystemUser(data)
     }
     return undefined
+  },
+
+  getPermissionIdsFromNodeKeys(nodeKeys: unknown[]) {
+    return nodeKeys
+      .map(toPermissionId)
+      .filter((permissionId): permissionId is number => permissionId !== undefined)
   },
 
   getUserTest: () => Api.getUserTest(),
@@ -346,6 +428,28 @@ export const systemService = {
     })
 
     return { items, ...metadata }
+  },
+
+  async loadRolePermissionAssignment(roleId: number): Promise<RolePermissionAssignment> {
+    const [permissions, rolePermissions] = await Promise.all([
+      getAllPageItems<Permission>((page, pageSize) =>
+        systemApi.listPermissionData({ page, pageSize }),
+      ),
+      getAllPageItems<RolePermission>((page, pageSize) =>
+        systemApi.listRolePermissionData({ page, pageSize, roleId }),
+      ),
+    ])
+    const tree = buildPermissionTree(permissions)
+    const allPermissionNodeKeys = tree.flatMap((group) =>
+      group.children.map((permission) => permission.id),
+    )
+    const checkedPermissionNodeKeys = rolePermissions
+      .filter(
+        (relation) => relation.role_id === roleId && typeof relation.permission_id === 'number',
+      )
+      .map((relation) => `permission:${relation.permission_id as number}`)
+
+    return { allPermissionNodeKeys, checkedPermissionNodeKeys, tree }
   },
 
   async login(request: LoginRequest) {
