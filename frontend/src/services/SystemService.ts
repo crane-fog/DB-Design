@@ -1,7 +1,9 @@
 import { Api, systemApi } from '@/api/client'
 import type {
   LoginData,
+  LoginLog,
   LoginRequest,
+  OperationLog,
   Permission,
   RegisterRequest,
   Role,
@@ -26,6 +28,27 @@ export interface RoleQuery {
   roleId?: number
   roleName?: string
   status?: AccountStatus
+}
+
+export type LoginResult = 'failure' | 'success'
+
+export interface LoginLogQuery {
+  endTime?: string
+  page: number
+  pageSize: number
+  result?: LoginResult
+  startTime?: string
+  userId?: number
+}
+
+export interface OperationLogQuery {
+  action?: string
+  endTime?: string
+  module?: string
+  operatorId?: number
+  page: number
+  pageSize: number
+  startTime?: string
 }
 
 export interface PageResult<TEntity> {
@@ -93,6 +116,29 @@ export interface RolePermissionAssignment {
   allPermissionNodeKeys: string[]
   checkedPermissionNodeKeys: string[]
   tree: PermissionTreeNode[]
+}
+
+export interface SystemLoginLog {
+  employeeNo?: string
+  failReason?: string
+  id?: number
+  ipAddress?: string
+  loginTime?: string
+  result?: LoginResult
+  userId?: number
+  userName?: string
+}
+
+export interface SystemOperationLog {
+  action?: string
+  afterData?: string
+  beforeData?: string
+  id?: number
+  ipAddress?: string
+  module?: string
+  operateTime?: string
+  operatorId?: number
+  operatorName?: string
 }
 
 interface ApiEnvelope<TPayload> {
@@ -208,6 +254,75 @@ function toSystemRole(role: Role): SystemRole | undefined {
   }
 }
 
+function toLoginResult(value: unknown): LoginResult | undefined {
+  if (value === 'failure' || value === 'success') {
+    return value
+  }
+  return undefined
+}
+
+function formatJsonSnapshot(value: unknown) {
+  if (value === undefined || value === null) {
+    return undefined
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      const formatted = JSON.stringify(parsed, undefined, 2)
+      if (formatted) {
+        return formatted
+      }
+    } catch {
+      return value
+    }
+    return value
+  }
+
+  const formatted = JSON.stringify(value, undefined, 2)
+  if (formatted) {
+    return formatted
+  }
+  return String(value)
+}
+
+function toSystemLoginLog(log: LoginLog, users: Map<number, SystemUser>): SystemLoginLog {
+  let user: SystemUser | undefined = undefined
+  if (typeof log.user_id === 'number') {
+    user = users.get(log.user_id)
+  }
+  return {
+    employeeNo: user?.employeeNo,
+    failReason: optionalText(log.fail_reason),
+    id: log.log_id,
+    ipAddress: optionalText(log.ip_address),
+    loginTime: optionalText(log.login_time),
+    result: toLoginResult(log.result),
+    userId: log.user_id,
+    userName: user?.name,
+  }
+}
+
+function toSystemOperationLog(
+  log: OperationLog,
+  users: Map<number, SystemUser>,
+): SystemOperationLog {
+  let user: SystemUser | undefined = undefined
+  if (typeof log.operator_id === 'number') {
+    user = users.get(log.operator_id)
+  }
+  return {
+    action: optionalText(log.action),
+    afterData: formatJsonSnapshot(log.after_data),
+    beforeData: formatJsonSnapshot(log.before_data),
+    id: log.log_id,
+    ipAddress: optionalText(log.ip_address),
+    module: optionalText(log.module),
+    operateTime: optionalText(log.operate_time),
+    operatorId: log.operator_id,
+    operatorName: user?.name,
+  }
+}
+
 function toPermissionTreeLeaf(permission: Permission): PermissionTreeLeaf | undefined {
   if (typeof permission.permission_id !== 'number') {
     return undefined
@@ -295,6 +410,20 @@ async function getAllPageItems<TItem>(
   return loadPage(1, [])
 }
 
+async function getAuditUsers() {
+  const users = await getAllPageItems<User>((page, pageSize) =>
+    systemApi.listUserData({ page, pageSize }),
+  )
+  const userMap = new Map<number, SystemUser>()
+  for (const user of users) {
+    const systemUser = toSystemUser(user)
+    if (systemUser) {
+      userMap.set(systemUser.id, systemUser)
+    }
+  }
+  return userMap
+}
+
 export const systemService = {
   async assignRolePermissions(roleId: number, permissionIds: number[]) {
     if (!permissionIds.length) {
@@ -353,6 +482,53 @@ export const systemService = {
   },
 
   getUserTest: () => Api.getUserTest(),
+
+  async listLoginLogs(query: LoginLogQuery): Promise<PageResult<SystemLoginLog>> {
+    const [response, users] = await Promise.all([
+      systemApi.listLoginRecordData({
+        endTime: query.endTime,
+        page: query.page,
+        pageSize: query.pageSize,
+        result: query.result,
+        startTime: query.startTime,
+        userId: query.userId,
+      }),
+      getAuditUsers(),
+    ])
+    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const items = getPageItems<LoginLog>(data).map((log) => toSystemLoginLog(log, users))
+    const metadata = getPageMetadata(data, {
+      page: query.page,
+      pageSize: query.pageSize,
+      total: items.length,
+    })
+
+    return { items, ...metadata }
+  },
+
+  async listOperationLogs(query: OperationLogQuery): Promise<PageResult<SystemOperationLog>> {
+    const [response, users] = await Promise.all([
+      systemApi.listOperationLogData({
+        action: query.action || undefined,
+        endTime: query.endTime,
+        module: query.module || undefined,
+        operatorId: query.operatorId,
+        page: query.page,
+        pageSize: query.pageSize,
+        startTime: query.startTime,
+      }),
+      getAuditUsers(),
+    ])
+    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const items = getPageItems<OperationLog>(data).map((log) => toSystemOperationLog(log, users))
+    const metadata = getPageMetadata(data, {
+      page: query.page,
+      pageSize: query.pageSize,
+      total: items.length,
+    })
+
+    return { items, ...metadata }
+  },
 
   async listRolePage(query: RoleQuery): Promise<PageResult<SystemRoleSummary>> {
     const response = await systemApi.listRoleData({
