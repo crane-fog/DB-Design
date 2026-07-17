@@ -27,6 +27,7 @@ const roleDialogMode = ref<'create' | 'edit'>('create')
 const roleFormRef = ref<FormInstance>()
 const editingRoleId = ref<number>()
 const submitting = ref(false)
+const statusSubmitting = ref(false)
 const permissionDialogVisible = ref(false)
 const permissionTreeRef = ref<{
   getCheckedKeys: (leafOnly?: boolean) => unknown[]
@@ -147,6 +148,10 @@ async function submitRoleForm() {
 }
 
 async function updateStatus(role: SystemRoleSummary) {
+  if (statusSubmitting.value) {
+    return
+  }
+
   let nextStatus: AccountStatus = 'valid'
   let action = '启用'
   if (role.status === 'valid') {
@@ -154,6 +159,7 @@ async function updateStatus(role: SystemRoleSummary) {
     action = '停用'
   }
   try {
+    statusSubmitting.value = true
     await ElMessageBox.confirm(`确定要${action}角色“${role.name}”吗？`, `${action}角色`, {
       confirmButtonText: `确定${action}`,
       type: 'warning',
@@ -165,6 +171,8 @@ async function updateStatus(role: SystemRoleSummary) {
     if (requestError !== 'cancel' && requestError !== 'close') {
       ElMessage.error(getErrorMessage(requestError, `${action}角色失败`))
     }
+  } finally {
+    statusSubmitting.value = false
   }
 }
 
@@ -333,6 +341,7 @@ onMounted(() => void loadRoles())
             <el-button
               v-if="canUpdate"
               link
+              :disabled="statusSubmitting"
               :type="row.status === 'valid' ? 'danger' : 'success'"
               @click="updateStatus(row)"
             >

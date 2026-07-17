@@ -147,7 +147,6 @@ export interface SystemAccessContext {
   currentUser: Pick<SystemUser, 'employeeNo' | 'name'> & { id?: number }
   permissions: string[]
   roles: string[]
-  source: 'api' | 'mock'
 }
 
 interface ApiEnvelope<TPayload> {
@@ -490,7 +489,6 @@ function getMockAccessContext(employeeNo: string): SystemAccessContext {
     },
     permissions: profile.permissions,
     roles: profile.roles,
-    source: 'mock',
   }
 }
 
@@ -573,7 +571,6 @@ async function loadCurrentAccessFromApi(employeeNo: string): Promise<SystemAcces
     },
     permissions: [...permissionCodes],
     roles: activeRoles.map((role) => role.name),
-    source: 'api',
   }
 }
 
