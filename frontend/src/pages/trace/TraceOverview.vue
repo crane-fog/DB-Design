@@ -18,6 +18,7 @@ import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
+import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
 
 type TraceTab = 'consumption' | 'impact' | 'material' | 'product'
@@ -47,14 +48,6 @@ const auth = useAuthStore()
 const canManage = computed(() => auth.hasPermission('trace:manage'))
 const activeTab = ref<TraceTab>('consumption')
 
-function parsePositiveInt(value: string) {
-  const parsed = Number(value)
-  if (Number.isInteger(parsed) && parsed > 0) {
-    return parsed
-  }
-  return undefined
-}
-
 // ---------- 批次消耗关系 ----------
 const consumptionFilters = reactive({ itemId: '', materialId: '', orderId: '' })
 const consumptionPage = ref(1)
@@ -70,6 +63,7 @@ const consumptionDialogVisible = ref(false)
 const consumptionDialogMode = ref<'create' | 'edit'>('create')
 const consumptionFormRef = ref<FormInstance>()
 const consumptionSubmitting = ref(false)
+const consumptionDeleting = ref(false)
 const editingConsumptionId = ref<number>()
 const consumptionForm = reactive<BatchConsumptionCreateFormData>({
   consumeQty: 1,
@@ -168,7 +162,11 @@ async function submitConsumptionForm() {
 }
 
 async function removeConsumption(record: BatchConsumptionItem) {
+  if (consumptionDeleting.value) {
+    return
+  }
   try {
+    consumptionDeleting.value = true
     await ElMessageBox.confirm(
       `确定要删除消耗记录 #${record.consumptionId} 吗？删除后无法恢复。`,
       '删除批次消耗',
@@ -181,6 +179,8 @@ async function removeConsumption(record: BatchConsumptionItem) {
     if (requestError !== 'cancel' && requestError !== 'close') {
       ElMessage.error(getErrorMessage(requestError, '批次消耗删除失败'))
     }
+  } finally {
+    consumptionDeleting.value = false
   }
 }
 
@@ -418,7 +418,13 @@ onMounted(() => void loadConsumption())
                 <el-button link type="primary" :icon="EditPen" @click="openConsumptionEdit(row)">
                   修改
                 </el-button>
-                <el-button link type="danger" :icon="Delete" @click="removeConsumption(row)">
+                <el-button
+                  link
+                  type="danger"
+                  :icon="Delete"
+                  :disabled="consumptionDeleting"
+                  @click="removeConsumption(row)"
+                >
                   删除
                 </el-button>
               </template>

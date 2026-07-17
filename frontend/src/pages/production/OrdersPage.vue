@@ -14,6 +14,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { formatDateTime } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
+import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
 
 const statusLabels: Record<ProductionOrderStatus, string> = {
@@ -93,11 +94,7 @@ function selectedStatus(): ProductionOrderStatus | undefined {
 }
 
 function parseMaterialId() {
-  const value = Number(filters.materialId)
-  if (Number.isInteger(value) && value > 0) {
-    return value
-  }
-  return undefined
+  return parsePositiveInt(filters.materialId)
 }
 
 async function loadOrders(targetPage = page.value) {

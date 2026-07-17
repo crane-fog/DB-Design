@@ -1,3 +1,12 @@
+import {
+  type ApiEnvelope,
+  type PageResult,
+  getPageItems,
+  getPageMetadata,
+  nullableText,
+  optionalText,
+  unwrap,
+} from '@/services/pagination'
 import type {
   CapacityConfig,
   ExternalOrder,
@@ -8,6 +17,8 @@ import type {
   ProductionOrderDetail,
 } from '@/api'
 import { productionApi } from '@/api/client'
+
+export type { PageResult }
 
 /** 生产订单状态。 */
 export type ProductionOrderStatus =
@@ -25,13 +36,6 @@ export type ExternalOrderStatusValue = 'accepted' | 'pending_review' | 'rejected
 
 /** 故障记录状态。 */
 export type FaultStatusValue = 'pending_repair' | 'recovered' | 'repairing'
-
-export interface PageResult<TEntity> {
-  items: TEntity[]
-  page: number
-  pageSize: number
-  total: number
-}
 
 export interface ProductionOrderQuery {
   materialId?: number
@@ -199,90 +203,6 @@ export interface FaultUpdateFormData {
   recoverTime?: string
   repairerId?: number
   status: FaultStatusValue
-}
-
-interface ApiEnvelope<TPayload> {
-  code?: number
-  data?: TPayload
-  message?: string
-}
-
-interface RawPageResult {
-  items?: unknown
-  list?: unknown
-  page?: unknown
-  page_size?: unknown
-  pageSize?: unknown
-  records?: unknown
-  rows?: unknown
-  total?: unknown
-}
-
-class ApiRequestError extends Error {
-  readonly status: number | undefined
-
-  constructor(message: string, status?: number) {
-    super(message)
-    this.status = status
-  }
-}
-
-function unwrap<TPayload>(payload: ApiEnvelope<TPayload>) {
-  if (payload.code !== undefined && payload.code !== 200) {
-    throw new ApiRequestError(payload.message || '接口请求失败', payload.code)
-  }
-  return payload.data
-}
-
-function getPageItems<TItem>(value: unknown): TItem[] {
-  if (Array.isArray(value)) {
-    return value as TItem[]
-  }
-  if (!value || typeof value !== 'object') {
-    return []
-  }
-  const data = value as RawPageResult
-  const items = data.records ?? data.items ?? data.list ?? data.rows
-  if (Array.isArray(items)) {
-    return items as TItem[]
-  }
-  return []
-}
-
-function getPageMetadata(
-  value: unknown,
-  fallback: Pick<PageResult<unknown>, 'page' | 'pageSize' | 'total'>,
-) {
-  if (!value || typeof value !== 'object') {
-    return fallback
-  }
-  const data = value as RawPageResult
-  let { page } = fallback
-  let { pageSize } = fallback
-  let { total } = fallback
-  if (typeof data.page === 'number') {
-    ;({ page } = data)
-  }
-  if (typeof data.page_size === 'number') {
-    pageSize = data.page_size
-  } else if (typeof data.pageSize === 'number') {
-    ;({ pageSize } = data)
-  }
-  if (typeof data.total === 'number') {
-    ;({ total } = data)
-  }
-  return { page, pageSize, total }
-}
-
-function optionalText(value: unknown) {
-  if (typeof value === 'string' && value.trim()) {
-    return value
-  }
-  return undefined
-}
-
-function nullableText(value: string | undefined) {
-  return value?.trim() || undefined
 }
 
 function toProductionOrder(order: ProductionOrderDetail): ProductionOrderItem {
