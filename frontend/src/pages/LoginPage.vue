@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { LoginData, LoginRequest } from '@/api'
-import { getRequestStatus, systemService } from '@/services/SystemService'
+import { type AuthLoginResult, authService, isMockAuthEnabled } from '@/services/AuthService'
 import { onMounted, ref } from 'vue'
 import { getErrorMessage } from '@/utils/error'
+import { getRequestStatus } from '@/services/SystemService'
 import { useAuthStore } from '@/stores/auth'
 
 const userNo = ref('')
@@ -10,6 +10,7 @@ const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const auth = useAuthStore()
+const mockLoginAccounts = ref<{ account: string; password: string }[]>([])
 
 function getRedirectTarget() {
   const redirect = new URLSearchParams(globalThis.location.search).get('redirect')
@@ -21,47 +22,19 @@ function getRedirectTarget() {
   return '/'
 }
 
-async function hashPassword(value: string) {
-  const passwordBytes = new TextEncoder().encode(value)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', passwordBytes)
-
-  return [...new Uint8Array(hashBuffer)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
-async function buildLoginData(employeeNo: string): Promise<LoginRequest> {
-  return {
-    employee_no: employeeNo,
-    password: await hashPassword(password.value),
-  }
-}
-
-function isLoginData(data: unknown): data is LoginData {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'access_token' in data &&
-    'expires' in data &&
-    typeof data.access_token === 'string' &&
-    typeof data.expires === 'number'
-  )
-}
-
-async function handleLoginSuccess(
-  accessToken?: string,
-  expiresInSeconds?: number,
-  employeeNo?: string,
-) {
+async function handleLoginSuccess(result: AuthLoginResult, employeeNo: string) {
+  const { accessToken, expiresInSeconds } = result
   if (!accessToken || expiresInSeconds === undefined || expiresInSeconds <= 0) {
     errorMessage.value = '登录响应缺少令牌信息'
     return false
   }
 
   auth.setToken(accessToken, Math.floor(Date.now() / 1000) + expiresInSeconds)
-  auth.setCurrentUser({ employeeNo })
+  auth.setCurrentUser(result.access?.currentUser ?? { employeeNo })
   auth.setRoles([])
   auth.setPermissions([])
   try {
-    const access = await systemService.loadCurrentAccess(employeeNo ?? '')
+    const access = await authService.initializeAccess(employeeNo, result)
     auth.setCurrentUser(access.currentUser)
     auth.setRoles(access.roles)
     auth.setPermissions(access.permissions)
@@ -101,14 +74,8 @@ async function submitLogin() {
   errorMessage.value = ''
 
   try {
-    const loginData = await buildLoginData(employeeNo)
-    const result = await systemService.login(loginData)
-    if (!isLoginData(result)) {
-      errorMessage.value = '登录响应缺少令牌信息'
-      return
-    }
-
-    await handleLoginSuccess(result.access_token, result.expires, employeeNo)
+    const result = await authService.login(employeeNo, password.value)
+    await handleLoginSuccess(result, employeeNo)
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '登录失败')
   } finally {
@@ -116,7 +83,12 @@ async function submitLogin() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (isMockAuthEnabled()) {
+    const { getMockLoginAccounts } = await import('@/config/mock-auth')
+    mockLoginAccounts.value = getMockLoginAccounts()
+  }
+
   if (auth.restoreSession()) {
     globalThis.location.replace('/')
   }
@@ -163,7 +135,30 @@ onMounted(() => {
         </button>
       </form>
 
+      <aside v-if="mockLoginAccounts.length" class="mock-login-hint">
+        <strong>本地开发账号</strong>
+        <p v-for="account in mockLoginAccounts" :key="account.account">
+          {{ account.account }} / {{ account.password }}
+        </p>
+      </aside>
+
       <a class="login-register" href="/register.html">注册</a>
     </section>
   </main>
 </template>
+
+<style scoped>
+.mock-login-hint {
+  margin-top: 18px;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  padding: 12px;
+}
+
+.mock-login-hint p {
+  margin: 6px 0 0;
+}
+</style>

@@ -4,7 +4,7 @@ export interface MockAccessProfile {
   roles: string[]
 }
 
-const systemAdministratorPermissions = [
+export const systemAdministratorPermissions = [
   'inventory:calc',
   'inventory:monitor',
   'inventory:register',
@@ -27,7 +27,25 @@ const systemAdministratorPermissions = [
   'trace:view',
 ]
 
-const mockAccessProfiles: Record<string, MockAccessProfile> = {
+export const ordinaryUserPermissions = [
+  'inventory:view',
+  'material:view',
+  'production:view',
+  'purchase:view',
+  'trace:view',
+]
+
+export const mockAccessProfiles: Record<string, MockAccessProfile> = {
+  DEV_ADMIN: {
+    name: '本地开发管理员',
+    permissions: systemAdministratorPermissions,
+    roles: ['系统管理员'],
+  },
+  DEV_USER: {
+    name: '本地开发普通用户',
+    permissions: ordinaryUserPermissions,
+    roles: ['普通用户'],
+  },
   GD0001: {
     name: '系统管理员',
     permissions: systemAdministratorPermissions,
@@ -36,13 +54,7 @@ const mockAccessProfiles: Record<string, MockAccessProfile> = {
 }
 
 const defaultMockAccessProfile: MockAccessProfile = {
-  permissions: [
-    'inventory:view',
-    'material:view',
-    'production:view',
-    'purchase:view',
-    'trace:view',
-  ],
+  permissions: ordinaryUserPermissions,
   roles: ['Mock普通用户'],
 }
 
