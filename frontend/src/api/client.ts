@@ -54,7 +54,7 @@ axiosInstance.interceptors.response.use(
   },
 )
 
-const apiConfig = new Configuration({ basePath: '' })
+const apiConfig = new Configuration({ basePath: import.meta.env.VITE_API_BASE_URL || '' })
 
 export interface UserData {
   createdAt?: string | null
