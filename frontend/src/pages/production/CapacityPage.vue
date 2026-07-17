@@ -19,6 +19,7 @@ import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
+import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
 
 type CapacityTab = 'calendars' | 'configs' | 'lines' | 'types'
@@ -84,14 +85,6 @@ const configRules: FormRules<CapacityConfigFormData> = {
     { message: '请输入单件工时', required: true, trigger: 'blur', type: 'number' },
     { message: '单件工时必须大于 0', min: 0.01, trigger: 'blur', type: 'number' },
   ],
-}
-
-function parsePositiveInt(value: string) {
-  const parsed = Number(value)
-  if (Number.isInteger(parsed) && parsed > 0) {
-    return parsed
-  }
-  return undefined
 }
 
 async function loadConfigs(targetPage = configPage.value) {

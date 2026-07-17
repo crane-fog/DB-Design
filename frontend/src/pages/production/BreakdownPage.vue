@@ -57,6 +57,18 @@ const updateRules: FormRules<FaultUpdateFormData> = {
     { message: '请输入故障记录 ID', required: true, trigger: 'blur', type: 'number' },
     { message: '故障记录 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
   ],
+  recoverTime: [
+    {
+      trigger: 'change',
+      validator: (_rule, value, callback) => {
+        if (updateForm.status === 'recovered' && !value) {
+          callback(new Error('故障状态为已恢复时必须填写恢复时间'))
+          return
+        }
+        callback()
+      },
+    },
+  ],
   status: [{ message: '请选择故障状态', required: true, trigger: 'change' }],
 }
 
