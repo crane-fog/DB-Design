@@ -37,8 +37,30 @@ copy .env.example .env
 - `.env.production`：仅生产构建使用的公开配置；所有 `VITE_` 前缀变量会被打包到浏览器，不能存放秘密。
 - `VITE_API_BASE_URL`：生成 API 客户端的基址。默认留空，接口仍以同源 `/api` 路径访问。
 - `VITE_API_PROXY_TARGET`：Vite 开发代理的目标地址，默认 `http://localhost:5000`。
+- `VITE_USE_MOCK_AUTH`：只在 Vite 开发环境启用本地 Mock 登录；即使生产环境设为 `true`，生产构建也会禁用。
 
 页面只能通过 Service 调用 API，禁止在页面中硬编码完整接口地址。新增环境变量时先补充 `.env.example` 和本节说明；不要提交 `.env`、Token、密码或个人本地配置。
+
+## 本地 Mock 登录
+
+当 Oracle 或后端暂不可用时，在本机 `.env` 中设置后重启 Vite：
+
+```env
+VITE_USE_MOCK_AUTH=true
+```
+
+可使用以下公开测试账号登录：
+
+```text
+DEV_ADMIN / dev-admin-123
+DEV_USER / dev-user-123
+```
+
+- `DEV_ADMIN` 拥有当前前端全部已注册权限，可进入系统管理、用户管理、角色管理和审计日志。
+- `DEV_USER` 仅拥有普通业务查看权限；不显示系统管理，访问 `/system` 会进入 403。
+- 设置 `VITE_USE_MOCK_AUTH=false` 后，登录会恢复调用真实 `/api/login`，请求体与密码哈希流程不变。
+
+Mock 账号仅用于本地前端开发，密码属于可公开的测试数据，不能替代真实账号。Mock 登录要求同时满足 `import.meta.env.DEV` 和 `VITE_USE_MOCK_AUTH=true`；因此生产构建无法启用该入口，也不得将真实账号、密码、Token 或数据库连接写入仓库。
 
 ## Mock 与 Service 规范
 
