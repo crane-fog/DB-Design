@@ -33,6 +33,7 @@ const userDialogMode = ref<'create' | 'edit'>('create')
 const userFormRef = ref<FormInstance>()
 const editingUserId = ref<number>()
 const submitting = ref(false)
+const statusSubmitting = ref(false)
 const passwordDialogVisible = ref(false)
 const passwordFormRef = ref<FormInstance>()
 const passwordSubmitting = ref(false)
@@ -198,6 +199,10 @@ async function submitUserForm() {
 }
 
 async function updateStatus(user: SystemUser) {
+  if (statusSubmitting.value) {
+    return
+  }
+
   let nextStatus: AccountStatus = 'valid'
   let action = '启用'
   if (user.status === 'valid') {
@@ -205,6 +210,7 @@ async function updateStatus(user: SystemUser) {
     action = '停用'
   }
   try {
+    statusSubmitting.value = true
     await ElMessageBox.confirm(
       `确定要${action}用户“${user.name || user.employeeNo}”吗？`,
       `${action}用户`,
@@ -220,6 +226,8 @@ async function updateStatus(user: SystemUser) {
     if (requestError !== 'cancel' && requestError !== 'close') {
       ElMessage.error(getErrorMessage(requestError, `${action}用户失败`))
     }
+  } finally {
+    statusSubmitting.value = false
   }
 }
 
@@ -373,6 +381,7 @@ onMounted(() => void loadUsers())
             >
             <el-button
               link
+              :disabled="statusSubmitting"
               :type="row.status === 'valid' ? 'danger' : 'success'"
               @click="updateStatus(row)"
             >

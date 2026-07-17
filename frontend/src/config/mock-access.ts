@@ -36,7 +36,13 @@ const mockAccessProfiles: Record<string, MockAccessProfile> = {
 }
 
 const defaultMockAccessProfile: MockAccessProfile = {
-  permissions: [],
+  permissions: [
+    'inventory:view',
+    'material:view',
+    'production:view',
+    'purchase:view',
+    'trace:view',
+  ],
   roles: ['Mock普通用户'],
 }
 
