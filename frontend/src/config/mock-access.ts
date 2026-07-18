@@ -24,6 +24,7 @@ export const systemAdministratorPermissions = [
   'system:user:update',
   'system:user:view',
   'system:view',
+  'trace:manage',
   'trace:view',
 ]
 
