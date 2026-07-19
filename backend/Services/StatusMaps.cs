@@ -12,13 +12,23 @@ namespace Backend.Services;
 /// </summary>
 public static class ProductionStatusMap
 {
+    /// <summary>数据库 production_order.status 的中文常量，作为全模块唯一状态字面量来源。</summary>
+    public static class Db
+    {
+        public const string PendingReview = "待审核";
+        public const string PendingSchedule = "待排产";
+        public const string InProgress = "生产中";
+        public const string Completed = "已完工";
+        public const string Cancelled = "已取消";
+    }
+
     private static readonly Dictionary<string, ProductionOrderStatus> DbToEnum = new()
     {
-        ["待审核"] = ProductionOrderStatus.PendingReviewEnum,
-        ["待排产"] = ProductionOrderStatus.PendingScheduleEnum,
-        ["生产中"] = ProductionOrderStatus.InProgressEnum,
-        ["已完工"] = ProductionOrderStatus.CompletedEnum,
-        ["已取消"] = ProductionOrderStatus.CancelledEnum,
+        [Db.PendingReview] = ProductionOrderStatus.PendingReviewEnum,
+        [Db.PendingSchedule] = ProductionOrderStatus.PendingScheduleEnum,
+        [Db.InProgress] = ProductionOrderStatus.InProgressEnum,
+        [Db.Completed] = ProductionOrderStatus.CompletedEnum,
+        [Db.Cancelled] = ProductionOrderStatus.CancelledEnum,
     };
 
     private static readonly Dictionary<ProductionOrderStatus, string> EnumToDb =
@@ -39,11 +49,19 @@ public static class ProductionStatusMap
 /// </summary>
 public static class ExternalOrderStatusMap
 {
+    /// <summary>数据库 external_order.status 的中文常量，作为全模块唯一状态字面量来源。</summary>
+    public static class Db
+    {
+        public const string PendingReview = "待审核";
+        public const string Accepted = "已接受";
+        public const string Rejected = "已拒绝";
+    }
+
     private static readonly Dictionary<string, ExternalOrderStatus> DbToEnum = new()
     {
-        ["待审核"] = ExternalOrderStatus.PendingReviewEnum,
-        ["已接受"] = ExternalOrderStatus.AcceptedEnum,
-        ["已拒绝"] = ExternalOrderStatus.RejectedEnum,
+        [Db.PendingReview] = ExternalOrderStatus.PendingReviewEnum,
+        [Db.Accepted] = ExternalOrderStatus.AcceptedEnum,
+        [Db.Rejected] = ExternalOrderStatus.RejectedEnum,
     };
 
     private static readonly Dictionary<ExternalOrderStatus, string> EnumToDb =

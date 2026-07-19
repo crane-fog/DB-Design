@@ -89,7 +89,8 @@ public class ProductionOrderService(string connString)
 
             if (planEndEnd.HasValue)
             {
-                cmd.Parameters.Add(new OracleParameter("planEndEnd", planEndEnd.Value.ToDateTime(TimeOnly.MinValue)));
+                // 用当天最大时间作为上界，避免排除 plan_end 落在当天较晚时刻的记录。
+                cmd.Parameters.Add(new OracleParameter("planEndEnd", planEndEnd.Value.ToDateTime(TimeOnly.MaxValue)));
             }
         }
 
@@ -158,13 +159,14 @@ public class ProductionOrderService(string connString)
         {
             cmd.CommandText = @"INSERT INTO PRODUCTION_ORDER
                                 (MATERIAL_ID, VERSION_ID, PLAN_QTY, FINISHED_QTY, PLAN_START, PLAN_END, STATUS)
-                                VALUES (:materialId, :versionId, :planQty, 0, :planStart, :planEnd, '待审核')
+                                VALUES (:materialId, :versionId, :planQty, 0, :planStart, :planEnd, :status)
                                 RETURNING ORDER_ID INTO :newId";
             cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
             cmd.Parameters.Add(new OracleParameter("versionId", request.VersionId));
             cmd.Parameters.Add(new OracleParameter("planQty", request.PlanQty));
             cmd.Parameters.Add(new OracleParameter("planStart", request.PlanStart.ToDateTime(TimeOnly.MinValue)));
             cmd.Parameters.Add(new OracleParameter("planEnd", request.PlanEnd.ToDateTime(TimeOnly.MinValue)));
+            cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.PendingReview));
             var idParam = new OracleParameter("newId", OracleDbType.Int64)
             {
                 Direction = System.Data.ParameterDirection.Output,
@@ -198,7 +200,7 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(404, "生产订单不存在");
         }
 
-        if (current is not ("待审核" or "待排产"))
+        if (current is not (ProductionStatusMap.Db.PendingReview or ProductionStatusMap.Db.PendingSchedule))
         {
             return ProductionOrderResult.Fail(409, "当前状态不允许修改");
         }
@@ -242,12 +244,12 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(404, "生产订单不存在");
         }
 
-        if (current != "待审核")
+        if (current != ProductionStatusMap.Db.PendingReview)
         {
             return ProductionOrderResult.Fail(409, "仅待审核订单可审核");
         }
 
-        var newStatus = request.Approved ? "待排产" : "已取消";
+        var newStatus = request.Approved ? ProductionStatusMap.Db.PendingSchedule : ProductionStatusMap.Db.Cancelled;
 
         // production_order 无 review_comment 列，审核意见暂不落库（仅驱动状态流转）。
         using (var cmd = conn.CreateCommand())
@@ -274,7 +276,7 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(404, "生产订单不存在");
         }
 
-        if (current != "待排产")
+        if (current != ProductionStatusMap.Db.PendingSchedule)
         {
             return ProductionOrderResult.Fail(409, "仅待排产订单可开工");
         }
@@ -282,8 +284,9 @@ public class ProductionOrderService(string connString)
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
-                                SET STATUS = '生产中', ACTUAL_START = SYSDATE
+                                SET STATUS = :status, ACTUAL_START = SYSDATE
                                 WHERE ORDER_ID = :orderId";
+            cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.InProgress));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
             cmd.ExecuteNonQuery();
         }
@@ -307,7 +310,7 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(404, "生产订单不存在");
         }
 
-        if (current != "生产中")
+        if (current != ProductionStatusMap.Db.InProgress)
         {
             return ProductionOrderResult.Fail(409, "仅生产中订单可完工");
         }
@@ -316,8 +319,9 @@ public class ProductionOrderService(string connString)
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
-                                SET STATUS = '已完工', FINISHED_QTY = :finishedQty, ACTUAL_END = SYSDATE
+                                SET STATUS = :status, FINISHED_QTY = :finishedQty, ACTUAL_END = SYSDATE
                                 WHERE ORDER_ID = :orderId";
+            cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.Completed));
             cmd.Parameters.Add(new OracleParameter("finishedQty", request.FinishedQty));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
             cmd.ExecuteNonQuery();
@@ -337,14 +341,15 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(404, "生产订单不存在");
         }
 
-        if (current is "已完工" or "已取消")
+        if (current is ProductionStatusMap.Db.Completed or ProductionStatusMap.Db.Cancelled)
         {
             return ProductionOrderResult.Fail(409, "已完工或已取消订单不可取消");
         }
 
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = @"UPDATE PRODUCTION_ORDER SET STATUS = '已取消' WHERE ORDER_ID = :orderId";
+            cmd.CommandText = @"UPDATE PRODUCTION_ORDER SET STATUS = :status WHERE ORDER_ID = :orderId";
+            cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.Cancelled));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
             cmd.ExecuteNonQuery();
         }

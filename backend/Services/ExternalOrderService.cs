@@ -130,7 +130,7 @@ public class ExternalOrderService(string connString)
                                 (CUSTOMER_ID, MATERIAL_ID, QUANTITY, EXPECTED_DATE,
                                  CONTACT_PERSON, CONTACT_PHONE, STATUS, SUBMIT_TIME)
                                 VALUES (:customerId, :materialId, :quantity, :expectedDate,
-                                        :contactPerson, :contactPhone, '待审核', SYSTIMESTAMP)
+                                        :contactPerson, :contactPhone, :status, SYSTIMESTAMP)
                                 RETURNING EXT_ORDER_ID INTO :newId";
             cmd.Parameters.Add(new OracleParameter("customerId", customerId));
             cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
@@ -138,6 +138,7 @@ public class ExternalOrderService(string connString)
             cmd.Parameters.Add(new OracleParameter("expectedDate", request.ExpectedDate.ToDateTime(TimeOnly.MinValue)));
             cmd.Parameters.Add(new OracleParameter("contactPerson", request.ContactPerson?.Trim()));
             cmd.Parameters.Add(new OracleParameter("contactPhone", request.ContactPhone?.Trim()));
+            cmd.Parameters.Add(new OracleParameter("status", ExternalOrderStatusMap.Db.PendingReview));
             var idParam = new OracleParameter("newId", OracleDbType.Int64)
             {
                 Direction = System.Data.ParameterDirection.Output,
@@ -161,12 +162,12 @@ public class ExternalOrderService(string connString)
             return ExternalOrderResult.Fail(404, "外部订单不存在");
         }
 
-        if (current != "待审核")
+        if (current != ExternalOrderStatusMap.Db.PendingReview)
         {
             return ExternalOrderResult.Fail(409, "仅待审核外部订单可审核");
         }
 
-        var newStatus = request.Accepted ? "已接受" : "已拒绝";
+        var newStatus = request.Accepted ? ExternalOrderStatusMap.Db.Accepted : ExternalOrderStatusMap.Db.Rejected;
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE EXTERNAL_ORDER
@@ -201,7 +202,7 @@ public class ExternalOrderService(string connString)
             return ExternalOrderConvertOutcome.Fail(404, "外部订单不存在");
         }
 
-        if (current != "已接受")
+        if (current != ExternalOrderStatusMap.Db.Accepted)
         {
             return ExternalOrderConvertOutcome.Fail(409, "仅已接受外部订单可转换");
         }
@@ -244,13 +245,14 @@ public class ExternalOrderService(string connString)
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO PRODUCTION_ORDER
                                         (MATERIAL_ID, VERSION_ID, PLAN_QTY, FINISHED_QTY, PLAN_START, PLAN_END, STATUS)
-                                        VALUES (:materialId, :versionId, :planQty, 0, :planStart, :planEnd, '待审核')
+                                        VALUES (:materialId, :versionId, :planQty, 0, :planStart, :planEnd, :status)
                                         RETURNING ORDER_ID INTO :newId";
                     cmd.Parameters.Add(new OracleParameter("materialId", po.MaterialId));
                     cmd.Parameters.Add(new OracleParameter("versionId", po.VersionId));
                     cmd.Parameters.Add(new OracleParameter("planQty", po.PlanQty));
                     cmd.Parameters.Add(new OracleParameter("planStart", po.PlanStart.ToDateTime(TimeOnly.MinValue)));
                     cmd.Parameters.Add(new OracleParameter("planEnd", po.PlanEnd.ToDateTime(TimeOnly.MinValue)));
+                    cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.PendingReview));
                     var idParam = new OracleParameter("newId", OracleDbType.Int64)
                     {
                         Direction = System.Data.ParameterDirection.Output,
