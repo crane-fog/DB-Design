@@ -215,19 +215,28 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(400, "BOM 版本不存在或与产品不匹配");
         }
 
+        int affected;
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
                                 SET MATERIAL_ID = :materialId, VERSION_ID = :versionId,
                                     PLAN_QTY = :planQty, PLAN_START = :planStart, PLAN_END = :planEnd
-                                WHERE ORDER_ID = :orderId";
+                                WHERE ORDER_ID = :orderId
+                                  AND STATUS IN (:allowedReview, :allowedSchedule)";
             cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
             cmd.Parameters.Add(new OracleParameter("versionId", request.VersionId));
             cmd.Parameters.Add(new OracleParameter("planQty", request.PlanQty));
             cmd.Parameters.Add(new OracleParameter("planStart", request.PlanStart.ToDateTime(TimeOnly.MinValue)));
             cmd.Parameters.Add(new OracleParameter("planEnd", request.PlanEnd.ToDateTime(TimeOnly.MinValue)));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.ExecuteNonQuery();
+            cmd.Parameters.Add(new OracleParameter("allowedReview", ProductionStatusMap.Db.PendingReview));
+            cmd.Parameters.Add(new OracleParameter("allowedSchedule", ProductionStatusMap.Db.PendingSchedule));
+            affected = cmd.ExecuteNonQuery();
+        }
+
+        if (affected == 0)
+        {
+            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
         }
 
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
@@ -252,14 +261,22 @@ public class ProductionOrderService(string connString)
         var newStatus = request.Approved ? ProductionStatusMap.Db.PendingSchedule : ProductionStatusMap.Db.Cancelled;
 
         // production_order 无 review_comment 列，审核意见暂不落库（仅驱动状态流转）。
+        // 状态作为 UPDATE 条件的一部分，确保并发下只有一次流转生效，避免绕过状态机。
+        int affected;
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
                                 SET STATUS = :status
-                                WHERE ORDER_ID = :orderId";
+                                WHERE ORDER_ID = :orderId AND STATUS = :expected";
             cmd.Parameters.Add(new OracleParameter("status", newStatus));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.ExecuteNonQuery();
+            cmd.Parameters.Add(new OracleParameter("expected", ProductionStatusMap.Db.PendingReview));
+            affected = cmd.ExecuteNonQuery();
+        }
+
+        if (affected == 0)
+        {
+            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
         }
 
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
@@ -281,14 +298,21 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(409, "仅待排产订单可开工");
         }
 
+        int affected;
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
                                 SET STATUS = :status, ACTUAL_START = SYSDATE
-                                WHERE ORDER_ID = :orderId";
+                                WHERE ORDER_ID = :orderId AND STATUS = :expected";
             cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.InProgress));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.ExecuteNonQuery();
+            cmd.Parameters.Add(new OracleParameter("expected", ProductionStatusMap.Db.PendingSchedule));
+            affected = cmd.ExecuteNonQuery();
+        }
+
+        if (affected == 0)
+        {
+            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
         }
 
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
@@ -316,15 +340,22 @@ public class ProductionOrderService(string connString)
         }
 
         // 注：按当前分工，本阶段不联动库存（finish_inbound / stock_lock / material_stock 由 B 就绪后接入）。
+        int affected;
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
                                 SET STATUS = :status, FINISHED_QTY = :finishedQty, ACTUAL_END = SYSDATE
-                                WHERE ORDER_ID = :orderId";
+                                WHERE ORDER_ID = :orderId AND STATUS = :expected";
             cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.Completed));
             cmd.Parameters.Add(new OracleParameter("finishedQty", request.FinishedQty));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.ExecuteNonQuery();
+            cmd.Parameters.Add(new OracleParameter("expected", ProductionStatusMap.Db.InProgress));
+            affected = cmd.ExecuteNonQuery();
+        }
+
+        if (affected == 0)
+        {
+            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
         }
 
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
@@ -346,12 +377,22 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(409, "已完工或已取消订单不可取消");
         }
 
+        int affected;
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = @"UPDATE PRODUCTION_ORDER SET STATUS = :status WHERE ORDER_ID = :orderId";
+            cmd.CommandText = @"UPDATE PRODUCTION_ORDER SET STATUS = :status
+                                WHERE ORDER_ID = :orderId
+                                  AND STATUS NOT IN (:completed, :cancelled)";
             cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.Cancelled));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.ExecuteNonQuery();
+            cmd.Parameters.Add(new OracleParameter("completed", ProductionStatusMap.Db.Completed));
+            cmd.Parameters.Add(new OracleParameter("cancelled", ProductionStatusMap.Db.Cancelled));
+            affected = cmd.ExecuteNonQuery();
+        }
+
+        if (affected == 0)
+        {
+            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
         }
 
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);

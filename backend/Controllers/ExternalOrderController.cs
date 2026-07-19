@@ -32,8 +32,21 @@ public class ExternalOrderController(
             return Ok(Page(ExternalOrderPageResponse.CodeEnum._401Enum, "登录状态无效", null));
         }
 
-        // 外部客户强制只看自己的订单，忽略传入的 customer_id。
-        var effectiveCustomerId = user.IsExternalCustomer ? user.UserId : customerId;
+        // 数据自限：外部客户强制只看自己的订单（忽略传入 customer_id）；
+        // 管理员可查看全部或按 customer_id 过滤；其余内部角色无权查看外部订单。
+        long? effectiveCustomerId;
+        if (user.IsExternalCustomer)
+        {
+            effectiveCustomerId = user.UserId;
+        }
+        else if (user.IsProductionManager)
+        {
+            effectiveCustomerId = customerId;
+        }
+        else
+        {
+            return Ok(Page(ExternalOrderPageResponse.CodeEnum._403Enum, "无权查看外部订单", null));
+        }
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = externalOrderService.List(

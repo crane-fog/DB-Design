@@ -168,15 +168,23 @@ public class ExternalOrderService(string connString)
         }
 
         var newStatus = request.Accepted ? ExternalOrderStatusMap.Db.Accepted : ExternalOrderStatusMap.Db.Rejected;
+        int affected;
         using (var cmd = conn.CreateCommand())
         {
+            // 状态作为 UPDATE 条件，确保并发下仅一次审核生效，避免绕过状态机重复审核。
             cmd.CommandText = @"UPDATE EXTERNAL_ORDER
                                 SET STATUS = :status, REVIEW_COMMENT = :reviewComment
-                                WHERE EXT_ORDER_ID = :extOrderId";
+                                WHERE EXT_ORDER_ID = :extOrderId AND STATUS = :expected";
             cmd.Parameters.Add(new OracleParameter("status", newStatus));
             cmd.Parameters.Add(NullableString("reviewComment", request.ReviewComment));
             cmd.Parameters.Add(new OracleParameter("extOrderId", request.ExtOrderId));
-            cmd.ExecuteNonQuery();
+            cmd.Parameters.Add(new OracleParameter("expected", ExternalOrderStatusMap.Db.PendingReview));
+            affected = cmd.ExecuteNonQuery();
+        }
+
+        if (affected == 0)
+        {
+            return ExternalOrderResult.Fail(409, "外部订单状态已变更，请刷新后重试");
         }
 
         return ExternalOrderResult.Success(GetInternal(conn, request.ExtOrderId)!);
