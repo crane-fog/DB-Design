@@ -121,9 +121,19 @@ public class QualityTraceService(string connString)
             return BatchConsumptionResult.Fail(400, "生产订单不存在");
         }
 
+        if (!OrderHasActualStart(conn, request.OrderId))
+        {
+            return BatchConsumptionResult.Fail(409, "仅已开工生产订单可录入消耗");
+        }
+
         if (!PurchaseItemExists(conn, request.ItemId))
         {
             return BatchConsumptionResult.Fail(400, "采购订单明细不存在");
+        }
+
+        if (ConsumptionExists(conn, request.OrderId, request.ItemId))
+        {
+            return BatchConsumptionResult.Fail(409, "该原材料已存在消耗记录，请使用更新接口");
         }
 
         long newId;
@@ -167,6 +177,11 @@ public class QualityTraceService(string connString)
             return BatchConsumptionResult.Fail(400, "生产订单不存在");
         }
 
+        if (!OrderHasActualStart(conn, request.OrderId))
+        {
+            return BatchConsumptionResult.Fail(409, "仅已开工生产订单可录入消耗");
+        }
+
         if (!PurchaseItemExists(conn, request.ItemId))
         {
             return BatchConsumptionResult.Fail(400, "采购订单明细不存在");
@@ -192,14 +207,23 @@ public class QualityTraceService(string connString)
         using var conn = new OracleConnection(connString);
         conn.Open();
 
+        if (!ConsumptionExists(conn, consumptionId))
+        {
+            return BatchConsumptionResult.Fail(404, "批次消耗关系不存在");
+        }
+
+        // 仅 in_progress 状态允许删除，防止追溯链断裂。
+        if (!IsConsumptionOrderInProgress(conn, consumptionId))
+        {
+            return BatchConsumptionResult.Fail(409, "仅生产中订单可删除消耗记录");
+        }
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM BATCH_CONSUMPTION WHERE CONSUMPTION_ID = :consumptionId";
         cmd.Parameters.Add(new OracleParameter("consumptionId", consumptionId));
-        var affected = cmd.ExecuteNonQuery();
+        cmd.ExecuteNonQuery();
 
-        return affected == 0
-            ? BatchConsumptionResult.Fail(404, "批次消耗关系不存在")
-            : BatchConsumptionResult.Success(null!);
+        return BatchConsumptionResult.Success(null!);
     }
 
     /// <summary>
@@ -556,6 +580,14 @@ public class QualityTraceService(string connString)
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
+    private static bool OrderHasActualStart(OracleConnection conn, long orderId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM PRODUCTION_ORDER WHERE ORDER_ID = :orderId AND ACTUAL_START IS NOT NULL";
+        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+    }
+
     private static bool PurchaseItemExists(OracleConnection conn, long itemId)
     {
         using var cmd = conn.CreateCommand();
@@ -569,6 +601,27 @@ public class QualityTraceService(string connString)
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM BATCH_CONSUMPTION WHERE CONSUMPTION_ID = :consumptionId";
         cmd.Parameters.Add(new OracleParameter("consumptionId", consumptionId));
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+    }
+
+    private static bool ConsumptionExists(OracleConnection conn, long orderId, long itemId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM BATCH_CONSUMPTION WHERE ORDER_ID = :orderId AND ITEM_ID = :itemId";
+        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
+        cmd.Parameters.Add(new OracleParameter("itemId", itemId));
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+    }
+
+    private static bool IsConsumptionOrderInProgress(OracleConnection conn, long consumptionId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT COUNT(*) FROM BATCH_CONSUMPTION bc
+            JOIN PRODUCTION_ORDER po ON po.ORDER_ID = bc.ORDER_ID
+            WHERE bc.CONSUMPTION_ID = :consumptionId AND TRIM(po.STATUS) = :inProgress";
+        cmd.Parameters.Add(new OracleParameter("consumptionId", consumptionId));
+        cmd.Parameters.Add(new OracleParameter("inProgress", ProductionStatusMap.Db.InProgress));
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
