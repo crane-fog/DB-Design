@@ -296,6 +296,24 @@ public class ExternalOrderService(string connString)
                 });
             }
 
+            // 更新外部订单状态为"已转换"，使用 CAS 防止并发重复转换。
+            using (var statusCmd = conn.CreateCommand())
+            {
+                statusCmd.Transaction = tx;
+                statusCmd.CommandText = @"UPDATE EXTERNAL_ORDER
+                                          SET STATUS = :newStatus
+                                          WHERE EXT_ORDER_ID = :extOrderId AND STATUS = :expected";
+                statusCmd.Parameters.Add(new OracleParameter("newStatus", ExternalOrderStatusMap.Db.Converted));
+                statusCmd.Parameters.Add(new OracleParameter("extOrderId", request.ExtOrderId));
+                statusCmd.Parameters.Add(new OracleParameter("expected", ExternalOrderStatusMap.Db.Accepted));
+                var affected = statusCmd.ExecuteNonQuery();
+                if (affected == 0)
+                {
+                    tx.Rollback();
+                    return ExternalOrderConvertOutcome.Fail(409, "外部订单状态已变更，请刷新后重试");
+                }
+            }
+
             tx.Commit();
         }
         catch (OracleException)

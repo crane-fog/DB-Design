@@ -54,6 +54,7 @@ public static class ExternalOrderStatusMap
     {
         public const string PendingReview = "待审核";
         public const string Accepted = "已接受";
+        public const string Converted = "已转换";
         public const string Rejected = "已拒绝";
     }
 
@@ -61,6 +62,7 @@ public static class ExternalOrderStatusMap
     {
         [Db.PendingReview] = ExternalOrderStatus.PendingReviewEnum,
         [Db.Accepted] = ExternalOrderStatus.AcceptedEnum,
+        [Db.Converted] = ExternalOrderStatus.ConvertedEnum,
         [Db.Rejected] = ExternalOrderStatus.RejectedEnum,
     };
 

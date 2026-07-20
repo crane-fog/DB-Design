@@ -673,8 +673,8 @@ components:
       enum: [pending_review, pending_schedule, in_progress, completed, cancelled]
     ExternalOrderStatus:
       type: string
-      description: 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；rejected 已拒绝，流程结束。
-      enum: [pending_review, accepted, rejected]
+      description: 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，已转为正式生产订单；rejected 已拒绝，流程结束。
+      enum: [pending_review, accepted, converted, rejected]
     ProductionLineRunStatus:
       type: string
       description: 生产线状态。idle 空闲；running 运行中；fault 故障。
