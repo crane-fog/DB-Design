@@ -35,8 +35,9 @@ public sealed record ExternalOrderConvertOutcome(
 /// 状态机：pending_review → accepted / rejected；仅 accepted 可转为正式生产订单。
 /// 外部客户只能查询/提交自己的订单，customer_id 由登录态推导。
 /// </summary>
-public class ExternalOrderService(string connString)
+public class ExternalOrderService(string connString, ILogger<ExternalOrderService> logger)
 {
+    private readonly ILogger<ExternalOrderService> _logger = logger;
     private const string SelectColumns = @"
         SELECT eo.EXT_ORDER_ID, eo.CUSTOMER_ID, u.USER_NAME, eo.MATERIAL_ID, m.MATERIAL_NAME,
                eo.QUANTITY, eo.EXPECTED_DATE, eo.CONTACT_PERSON, eo.CONTACT_PHONE,
@@ -316,10 +317,11 @@ public class ExternalOrderService(string connString)
 
             tx.Commit();
         }
-        catch (OracleException)
+        catch (OracleException ex)
         {
             tx.Rollback();
-            throw;
+            _logger.LogError(ex, "ConvertToProductionOrders 事务提交失败，extOrderId={ExtOrderId}", request.ExtOrderId);
+            return ExternalOrderConvertOutcome.Fail(500, "外部订单转换失败，请稍后重试");
         }
 
         return ExternalOrderConvertOutcome.Success(new ExternalOrderConvertResult

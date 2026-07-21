@@ -23,16 +23,36 @@ COMMIT;
 -- ============================================================================
 
 DECLARE
-  v_constraint_name VARCHAR2(128);
+  v_constraint_name user_constraints.constraint_name%TYPE;
+  v_cnt             PLS_INTEGER;
 BEGIN
-  SELECT constraint_name INTO v_constraint_name
-  FROM user_constraints
-  WHERE table_name = 'EXTERNAL_ORDER'
-    AND constraint_type = 'C'
-    AND search_condition_vc LIKE '%STATUS%';
-  EXECUTE IMMEDIATE 'ALTER TABLE external_order DROP CONSTRAINT ' || v_constraint_name;
-EXCEPTION
-  WHEN NO_DATA_FOUND THEN NULL;
+  -- 精确匹配 external_order 的 STATUS CHECK 约束：
+  -- 1. 优先按约束名模式 CHK_EXTERNAL_ORDER_STATUS% 匹配（新建表时统一命名）
+  -- 2. 兜底按 search_condition_vc 匹配 'STATUS IN'（兼容旧自动命名约束）
+  SELECT COUNT(*)
+    INTO v_cnt
+    FROM user_constraints
+   WHERE table_name      = 'EXTERNAL_ORDER'
+     AND constraint_type = 'C'
+     AND (   constraint_name LIKE 'CK_EXTERNAL_ORDER_STATUS%'
+          OR search_condition_vc LIKE '%STATUS IN%');
+
+  IF v_cnt = 0 THEN
+    NULL; -- 无匹配约束，跳过
+  ELSIF v_cnt = 1 THEN
+    SELECT constraint_name
+      INTO v_constraint_name
+      FROM user_constraints
+     WHERE table_name      = 'EXTERNAL_ORDER'
+       AND constraint_type = 'C'
+       AND (   constraint_name LIKE 'CK_EXTERNAL_ORDER_STATUS%'
+            OR search_condition_vc LIKE '%STATUS IN%');
+    EXECUTE IMMEDIATE 'ALTER TABLE external_order DROP CONSTRAINT ' || v_constraint_name;
+  ELSE
+    RAISE_APPLICATION_ERROR(
+      -20001,
+      'Multiple STATUS check constraints found on EXTERNAL_ORDER; review and drop manually.');
+  END IF;
 END;
 /
 

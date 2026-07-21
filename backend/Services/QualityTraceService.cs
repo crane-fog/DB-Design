@@ -189,10 +189,11 @@ public class QualityTraceService(string connString)
 
         using (var cmd = conn.CreateCommand())
         {
+            // 消耗记录归属特定生产订单不可变更（仅允许修正 item_id 和 consume_qty），
+            // 如需跨订单调整应删除后重新录入（终态订单不可删除以保证追溯链完整）。
             cmd.CommandText = @"UPDATE BATCH_CONSUMPTION
-                                SET ORDER_ID = :orderId, ITEM_ID = :itemId, CONSUME_QTY = :consumeQty
+                                SET ITEM_ID = :itemId, CONSUME_QTY = :consumeQty
                                 WHERE CONSUMPTION_ID = :consumptionId";
-            cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
             cmd.Parameters.Add(new OracleParameter("itemId", request.ItemId));
             cmd.Parameters.Add(new OracleParameter("consumeQty", request.ConsumeQty));
             cmd.Parameters.Add(new OracleParameter("consumptionId", request.ConsumptionId));

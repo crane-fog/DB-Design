@@ -131,9 +131,17 @@ public class ExternalOrderController(
     [Route("convertExternalOrderToProductionOrder")]
     public IActionResult Convert([FromBody] ExternalOrderConvertRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        // 鉴权内联：必须返回 ExternalOrderConvertResponse 而非 ExternalOrderResponse，
+        // 否则 OpenAPI 契约中 convert 接口的响应体类型不匹配。
+        var user = userContext.Resolve(User.GetEmployeeNo());
+        if (user is null)
         {
-            return forbidden;
+            return Ok(ConvertResp(ExternalOrderConvertResponse.CodeEnum._401Enum, "登录状态无效", null));
+        }
+
+        if (!user.IsProductionManager)
+        {
+            return Ok(ConvertResp(ExternalOrderConvertResponse.CodeEnum._403Enum, "无权操作外部订单", null));
         }
 
         if (request is null)

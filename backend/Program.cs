@@ -30,7 +30,7 @@ builder.Services.AddScoped(_ => new AuthService(connString, jwtSecret));
 builder.Services.AddScoped<IUserTestService>(_ => new UserTestService(connString));
 builder.Services.AddScoped(_ => new UserContextService(connString));
 builder.Services.AddScoped(_ => new ProductionOrderService(connString));
-builder.Services.AddScoped(_ => new ExternalOrderService(connString));
+builder.Services.AddScoped(sp => new ExternalOrderService(connString, sp.GetRequiredService<ILogger<ExternalOrderService>>()));
 builder.Services.AddScoped(_ => new QualityTraceService(connString));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
