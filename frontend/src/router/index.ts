@@ -32,7 +32,7 @@ const adminRoutes: RouteRecordRaw[] = [
       permission: 'material:view',
       requiresAuth: true,
       showInMenu: true,
-      title: '物料管理',
+      title: '物料 BOM',
     },
     name: 'materials',
     path: 'materials',
