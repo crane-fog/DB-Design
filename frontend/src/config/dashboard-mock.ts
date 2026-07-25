@@ -90,11 +90,11 @@ const shortcuts: DashboardShortcut[] = [
     title: '审计日志',
   },
   {
-    description: '进入物料主数据管理模块',
+    description: '查看物料 BOM 版本和组件用量',
     icon: 'materials',
     permission: 'material:view',
     route: '/materials',
-    title: '物料管理',
+    title: '物料 BOM',
   },
 ]
 
