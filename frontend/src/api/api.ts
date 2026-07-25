@@ -938,12 +938,13 @@ export interface ExternalOrderReviewRequest {
     'review_comment'?: string | null;
 }
 /**
- * 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；rejected 已拒绝，流程结束。
+ * 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，已转为正式生产订单；rejected 已拒绝，流程结束。
  */
 
 export const ExternalOrderStatus = {
     PendingReview: 'pending_review',
     Accepted: 'accepted',
+    Converted: 'converted',
     Rejected: 'rejected',
 } as const;
 

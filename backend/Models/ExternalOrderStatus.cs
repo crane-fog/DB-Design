@@ -21,9 +21,9 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
         /// <summary>
-        /// 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；rejected 已拒绝，流程结束。
+        /// 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，已转为正式生产订单；rejected 已拒绝，流程结束。
         /// </summary>
-        /// <value>外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；rejected 已拒绝，流程结束。</value>
+        /// <value>外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，已转为正式生产订单；rejected 已拒绝，流程结束。</value>
         [TypeConverter(typeof(CustomEnumConverter<ExternalOrderStatus>))]
         [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public enum ExternalOrderStatus
@@ -42,9 +42,15 @@ namespace Org.OpenAPITools.Models
             AcceptedEnum = 2,
             
             /// <summary>
+            /// Enum ConvertedEnum for converted
+            /// </summary>
+            [EnumMember(Value = "converted")]
+            ConvertedEnum = 3,
+            
+            /// <summary>
             /// Enum RejectedEnum for rejected
             /// </summary>
             [EnumMember(Value = "rejected")]
-            RejectedEnum = 3
+            RejectedEnum = 4
         }
 }

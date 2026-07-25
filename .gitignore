@@ -49,3 +49,4 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+/backend/.trae/documents
