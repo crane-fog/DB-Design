@@ -32,7 +32,6 @@ export const ordinaryUserPermissions = [
   'inventory:view',
   'material:view',
   'production:view',
-  'purchase:view',
   'trace:view',
 ]
 
