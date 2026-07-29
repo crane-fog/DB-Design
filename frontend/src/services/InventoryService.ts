@@ -163,15 +163,8 @@ function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
   return parsed.toISOString()
 }
 
-function assertInventoryMockIsReadOnly() {
-  if (isMockEnabled()) {
-    throw new Error('库存 Mock 当前为只读模式，暂不支持写操作。')
-  }
-}
-
 export const inventoryService = {
   async addCompletionInbound(form: CompletionInboundFormData) {
-    assertInventoryMockIsReadOnly()
     if (isMockEnabled()) {
       return inventoryMock.addCompletionInbound(form)
     }
@@ -232,7 +225,6 @@ export const inventoryService = {
   },
 
   async generateAlerts(materialId?: number): Promise<InventoryAlertGenerateResult> {
-    assertInventoryMockIsReadOnly()
     if (isMockEnabled()) {
       return inventoryMock.generateAlerts(materialId)
     }
@@ -267,7 +259,6 @@ export const inventoryService = {
   },
 
   async handleAlert(alertId: number, status: 'handled' | 'ignored', handlerId: number) {
-    assertInventoryMockIsReadOnly()
     if (isMockEnabled()) {
       return inventoryMock.handleAlert(alertId, status, handlerId)
     }
@@ -279,7 +270,6 @@ export const inventoryService = {
   },
 
   async handleObsolete(detectionId: number, status: 'handled' | 'ignored', handlerId: number) {
-    assertInventoryMockIsReadOnly()
     if (isMockEnabled()) {
       return inventoryMock.handleObsolete(detectionId, status, handlerId)
     }
@@ -382,7 +372,6 @@ export const inventoryService = {
   },
 
   async lockStock(form: StockLockFormData): Promise<StockLockResult> {
-    assertInventoryMockIsReadOnly()
     if (isMockEnabled()) {
       return inventoryMock.lockStock(form)
     }
@@ -410,7 +399,6 @@ export const inventoryService = {
   },
 
   async releaseLock(lockId: number, operatorId: number) {
-    assertInventoryMockIsReadOnly()
     if (isMockEnabled()) {
       return inventoryMock.releaseLock(lockId, operatorId)
     }
