@@ -17,7 +17,9 @@ import {
   unwrap,
 } from '@/services/pagination'
 import type { ProductionOrderStatus } from '@/services/ProductionService'
+import { isMockEnabled } from '@/config/mock'
 import { qualityTraceabilityApi } from '@/api/client'
+import { traceMock } from '@/config/trace-mock'
 
 export type { PageResult }
 
@@ -183,9 +185,18 @@ function toQualityImpact(result: QualityImpactAnalyzeResult): QualityImpactResul
   }
 }
 
+function assertTraceMockIsReadOnly() {
+  if (isMockEnabled()) {
+    throw new Error('质量追溯 Mock 当前为只读模式，暂不支持写操作。')
+  }
+}
+
 /** 质量追溯接口的唯一入口；页面只允许通过此对象访问后端。 */
 export const traceService = {
   async analyzeQualityImpact(form: QualityImpactAnalyzeFormData) {
+    if (isMockEnabled()) {
+      return traceMock.analyzeQualityImpact(form)
+    }
     let itemIds: number[] | undefined = undefined
     if (form.itemIds?.length) {
       ;({ itemIds } = form)
@@ -208,6 +219,7 @@ export const traceService = {
   api: qualityTraceabilityApi,
 
   async createBatchConsumption(form: BatchConsumptionCreateFormData) {
+    assertTraceMockIsReadOnly()
     const response = await qualityTraceabilityApi.addBatchConsumption({
       batchConsumptionCreateRequest: {
         consume_qty: form.consumeQty,
@@ -223,6 +235,7 @@ export const traceService = {
   },
 
   async deleteBatchConsumption(consumptionId: number) {
+    assertTraceMockIsReadOnly()
     const response = await qualityTraceabilityApi.deleteBatchConsumption({
       batchConsumptionDeleteRequest: { consumption_id: consumptionId },
     })
@@ -232,6 +245,9 @@ export const traceService = {
   async listBatchConsumption(
     query: BatchConsumptionQuery,
   ): Promise<PageResult<BatchConsumptionItem>> {
+    if (isMockEnabled()) {
+      return traceMock.listBatchConsumption(query)
+    }
     const response = await qualityTraceabilityApi.listBatchConsumption({
       itemId: query.itemId,
       materialId: query.materialId,
@@ -250,6 +266,9 @@ export const traceService = {
   },
 
   async traceMaterialBatch(query: MaterialBatchTraceQuery): Promise<MaterialBatchTraceItem[]> {
+    if (isMockEnabled()) {
+      return traceMock.traceMaterialBatch(query)
+    }
     const response = await qualityTraceabilityApi.traceMaterialBatch({
       itemId: query.itemId,
       materialId: query.materialId,
@@ -261,6 +280,9 @@ export const traceService = {
   },
 
   async traceProductBatch(query: ProductBatchTraceQuery) {
+    if (isMockEnabled()) {
+      return traceMock.traceProductBatch(query)
+    }
     const response = await qualityTraceabilityApi.traceProductBatch({
       batchNo: query.batchNo,
       includeSupplier: query.includeSupplier,
@@ -274,6 +296,7 @@ export const traceService = {
   },
 
   async updateBatchConsumption(form: BatchConsumptionUpdateFormData) {
+    assertTraceMockIsReadOnly()
     const response = await qualityTraceabilityApi.updateBatchConsumption({
       batchConsumptionUpdateRequest: {
         consume_qty: form.consumeQty,

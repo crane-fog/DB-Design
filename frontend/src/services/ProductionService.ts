@@ -17,7 +17,9 @@ import type {
   ProductionLine,
   ProductionOrderDetail,
 } from '@/api'
+import { isMockEnabled } from '@/config/mock'
 import { productionApi } from '@/api/client'
+import { productionMock } from '@/config/production-mock'
 
 export type { PageResult }
 
@@ -286,10 +288,17 @@ function toFaultRecord(record: FaultRecord): FaultRecordItem {
   }
 }
 
+function assertProductionMockIsReadOnly() {
+  if (isMockEnabled()) {
+    throw new Error('生产 Mock 当前为只读模式，暂不支持写操作。')
+  }
+}
+
 export const productionService = {
   api: productionApi,
 
   async approveOrder(orderId: number, approved: boolean, reviewComment?: string) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.approveProductionOrder({
       productionOrderApproveRequest: {
         approved,
@@ -305,6 +314,7 @@ export const productionService = {
   },
 
   async cancelOrder(orderId: number, remark?: string) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.cancelProductionOrder({
       productionOrderActionRequest: { order_id: orderId, remark: nullableText(remark) },
     })
@@ -316,6 +326,7 @@ export const productionService = {
   },
 
   async createLine(form: ProductionLineFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.addProductionLine({
       productionLineCreateRequest: {
         manager_id: form.managerId,
@@ -331,6 +342,7 @@ export const productionService = {
   },
 
   async createOrder(form: ProductionOrderFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.addProductionOrder({
       productionOrderCreateRequest: {
         material_id: form.materialId,
@@ -348,6 +360,7 @@ export const productionService = {
   },
 
   async deleteCalendar(calendarDate: string, lineId: number) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.deleteProductionCalendar({
       productionCalendarDeleteRequest: { calendar_date: calendarDate, line_id: lineId },
     })
@@ -355,6 +368,7 @@ export const productionService = {
   },
 
   async finishOrder(orderId: number, finishedQty: number, remark?: string) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.finishProductionOrder({
       productionOrderFinishRequest: {
         finished_qty: finishedQty,
@@ -370,6 +384,9 @@ export const productionService = {
   },
 
   async getOrder(orderId: number) {
+    if (isMockEnabled()) {
+      return productionMock.getOrder(orderId)
+    }
     const response = await productionApi.getProductionOrder({ orderId })
     const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
     if (data) {
@@ -379,12 +396,18 @@ export const productionService = {
   },
 
   async listAllLineTypes(): Promise<LineTypeItem[]> {
+    if (isMockEnabled()) {
+      return productionMock.listAllLineTypes()
+    }
     const response = await productionApi.listProductionLineType({ page: 1, pageSize: 100 })
     const data = unwrap(response.data as ApiEnvelope<unknown>)
     return getPageItems<LineType>(data).map(toLineType)
   },
 
   async listCalendars(query: ProductionCalendarQuery): Promise<PageResult<ProductionCalendarItem>> {
+    if (isMockEnabled()) {
+      return productionMock.listCalendars(query)
+    }
     const response = await productionApi.listProductionCalendar({
       calendarDateEnd: query.calendarDateEnd,
       calendarDateStart: query.calendarDateStart,
@@ -404,6 +427,9 @@ export const productionService = {
   },
 
   async listCapacityConfigs(query: CapacityConfigQuery): Promise<PageResult<CapacityConfigItem>> {
+    if (isMockEnabled()) {
+      return productionMock.listCapacityConfigs(query)
+    }
     const response = await productionApi.listCapacityConfig({
       materialId: query.materialId,
       page: query.page,
@@ -421,6 +447,9 @@ export const productionService = {
   },
 
   async listExternalOrders(query: ExternalOrderQuery): Promise<PageResult<ExternalOrderItem>> {
+    if (isMockEnabled()) {
+      return productionMock.listExternalOrders(query)
+    }
     const response = await productionApi.listExternalOrder({
       customerId: query.customerId,
       page: query.page,
@@ -438,6 +467,9 @@ export const productionService = {
   },
 
   async listLineTypes(query: LineTypeQuery): Promise<PageResult<LineTypeItem>> {
+    if (isMockEnabled()) {
+      return productionMock.listLineTypes(query)
+    }
     const response = await productionApi.listProductionLineType({
       page: query.page,
       pageSize: query.pageSize,
@@ -454,6 +486,9 @@ export const productionService = {
   },
 
   async listLines(query: ProductionLineQuery): Promise<PageResult<ProductionLineItem>> {
+    if (isMockEnabled()) {
+      return productionMock.listLines(query)
+    }
     const response = await productionApi.listProductionLine({
       page: query.page,
       pageSize: query.pageSize,
@@ -471,6 +506,9 @@ export const productionService = {
   },
 
   async listOrders(query: ProductionOrderQuery): Promise<PageResult<ProductionOrderItem>> {
+    if (isMockEnabled()) {
+      return productionMock.listOrders(query)
+    }
     const response = await productionApi.listProductionOrder({
       materialId: query.materialId,
       page: query.page,
@@ -490,6 +528,7 @@ export const productionService = {
   },
 
   async reportFault(form: FaultReportFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.reportProductionLineFault({
       faultRecordCreateRequest: {
         description: form.description.trim(),
@@ -505,6 +544,7 @@ export const productionService = {
   },
 
   async reviewExternalOrder(extOrderId: number, accepted: boolean, reviewComment?: string) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.reviewExternalOrder({
       externalOrderReviewRequest: {
         accepted,
@@ -520,6 +560,7 @@ export const productionService = {
   },
 
   async saveCalendar(form: ProductionCalendarFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.saveProductionCalendar({
       productionCalendarSaveRequest: {
         calendar_date: form.calendarDate,
@@ -535,6 +576,7 @@ export const productionService = {
   },
 
   async saveCapacityConfig(form: CapacityConfigFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.saveCapacityConfig({
       capacityConfigSaveRequest: {
         config_id: form.configId ?? undefined,
@@ -551,6 +593,7 @@ export const productionService = {
   },
 
   async saveLineType(form: LineTypeFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.saveProductionLineType({
       lineTypeSaveRequest: { type_id: form.typeId ?? undefined, type_name: form.typeName.trim() },
     })
@@ -562,6 +605,7 @@ export const productionService = {
   },
 
   async startOrder(orderId: number, remark?: string) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.startProductionOrder({
       productionOrderActionRequest: { order_id: orderId, remark: nullableText(remark) },
     })
@@ -573,6 +617,7 @@ export const productionService = {
   },
 
   async updateFault(form: FaultUpdateFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionLineFault({
       faultRecordUpdateRequest: {
         fault_id: form.faultId,
@@ -589,6 +634,7 @@ export const productionService = {
   },
 
   async updateLine(lineId: number, form: ProductionLineFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionLine({
       productionLineUpdateRequest: {
         line_id: lineId,
@@ -605,6 +651,7 @@ export const productionService = {
   },
 
   async updateOrder(orderId: number, form: ProductionOrderFormData) {
+    assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionOrder({
       productionOrderUpdateRequest: {
         material_id: form.materialId,
