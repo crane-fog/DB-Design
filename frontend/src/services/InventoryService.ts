@@ -32,7 +32,7 @@ import type {
 } from '@/types/inventory'
 import { cleanQuery } from '@/services/request'
 import { inventoryApi } from '@/api/client'
-import { inventoryMock } from '@/config/inventory-mock'
+import { inventoryRepository as inventoryMock } from '@/mock/repositories'
 import { isMockEnabled } from '@/config/mock'
 
 export type { PageResult }

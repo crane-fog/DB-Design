@@ -720,6 +720,14 @@ function queryBoms(query: MaterialBomListQuery) {
   )
 }
 
+export function snapshotMaterialBomMock() {
+  return structuredClone({ bomDetails })
+}
+
+export function restoreMaterialBomMock(state: ReturnType<typeof snapshotMaterialBomMock>) {
+  bomDetails.splice(0, bomDetails.length, ...structuredClone(state.bomDetails))
+}
+
 function delay<TResult>(factory: () => TResult): Promise<TResult> {
   return new Promise((resolve, reject) => {
     globalThis.setTimeout(() => {

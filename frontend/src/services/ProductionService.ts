@@ -19,7 +19,7 @@ import type {
 } from '@/api'
 import { isMockEnabled } from '@/config/mock'
 import { productionApi } from '@/api/client'
-import { productionMock } from '@/config/production-mock'
+import { productionRepository as productionMock } from '@/mock/repositories'
 import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }

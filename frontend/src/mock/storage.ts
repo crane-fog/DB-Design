@@ -11,6 +11,7 @@ interface StoredValue<TValue> {
 
 const memoryValues = new Map<string, unknown>()
 const memoryCounters = new Map<string, number>()
+const resetHandlers = new Set<() => void>()
 
 function clone<TValue>(value: TValue): TValue {
   return structuredClone(value)
@@ -77,6 +78,71 @@ export interface MockStore<TValue> {
   reset(): TValue
 }
 
+export interface PersistedMockAdapter<TState> {
+  read<TResult>(operation: () => TResult): TResult
+  write<TResult>(operation: () => TResult | Promise<TResult>): Promise<TResult>
+  reset(): TState
+}
+
+export function createPersistedMockProxy<TTarget extends object, TState>(
+  target: TTarget,
+  adapter: PersistedMockAdapter<TState>,
+  writeMethods: ReadonlySet<PropertyKey>,
+): TTarget {
+  return new Proxy(target, {
+    get(currentTarget, property, receiver) {
+      const value = Reflect.get(currentTarget, property, receiver)
+      if (typeof value !== 'function') {
+        return value
+      }
+      return (...argumentsList: unknown[]) => {
+        const invoke = () => value.apply(currentTarget, argumentsList)
+        if (writeMethods.has(property)) {
+          return adapter.write(invoke)
+        }
+        return adapter.read(invoke)
+      }
+    },
+  })
+}
+
+export function createPersistedMockAdapter<TState>(options: {
+  key: string
+  seedFactory: () => TState
+  snapshot: () => TState
+  restore: (state: TState) => void
+}): PersistedMockAdapter<TState> {
+  const store = createMockStore(options.key, options.seedFactory)
+
+  function hydrate() {
+    options.restore(store.read())
+  }
+
+  function reset() {
+    const state = store.reset()
+    options.restore(state)
+    return state
+  }
+
+  resetHandlers.add(() => {
+    reset()
+  })
+
+  return {
+    read(operation) {
+      hydrate()
+      return operation()
+    },
+    reset,
+    async write(operation) {
+      hydrate()
+      const result = await operation()
+      store.write(options.snapshot())
+      return result
+    },
+  }
+}
+
 export function createMockStore<TValue>(key: string, seedFactory: () => TValue): MockStore<TValue> {
   let storageKey = key
   if (!key.startsWith(MOCK_STORAGE_NAMESPACE)) {
@@ -122,6 +188,7 @@ export function resetMockData() {
   memoryCounters.clear()
   const storage = getLocalStorage()
   if (!storage) {
+    resetHandlers.forEach((handler) => handler())
     return
   }
   const keys: string[] = []
@@ -132,6 +199,7 @@ export function resetMockData() {
     }
   }
   keys.forEach((key) => storage.removeItem(key))
+  resetHandlers.forEach((handler) => handler())
 }
 
 export function nextMockId(key: string, initialValue = 1) {

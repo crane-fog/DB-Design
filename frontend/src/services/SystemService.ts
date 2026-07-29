@@ -23,7 +23,7 @@ import type {
 import { getMockAccessProfile, getSystemAdministratorPermissions } from '@/config/mock-access'
 import { getMockScenario, isMockEnabled } from '@/config/mock'
 import { getRequestStatus } from '@/services/request'
-import { systemMock } from '@/config/system-mock'
+import { systemRepository as systemMock } from '@/mock/repositories'
 
 export { getRequestStatus }
 export type { PageResult }

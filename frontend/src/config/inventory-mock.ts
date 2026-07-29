@@ -154,6 +154,27 @@ let inbounds: CompletionInboundItem[] = [
   },
 ]
 
+export interface InventoryMockState {
+  alerts: InventoryAlertItem[]
+  inbounds: CompletionInboundItem[]
+  locks: StockLockItem[]
+  obsoleteItems: ObsoleteMaterialItem[]
+  stockByMaterial: Record<number, number>
+}
+
+export function snapshotInventoryMock(): InventoryMockState {
+  return structuredClone({ alerts, inbounds, locks, obsoleteItems, stockByMaterial })
+}
+
+export function restoreInventoryMock(state: InventoryMockState) {
+  Object.keys(stockByMaterial).forEach((key) => delete stockByMaterial[Number(key)])
+  Object.assign(stockByMaterial, structuredClone(state.stockByMaterial))
+  alerts.splice(0, alerts.length, ...structuredClone(state.alerts))
+  inbounds.splice(0, inbounds.length, ...structuredClone(state.inbounds))
+  locks.splice(0, locks.length, ...structuredClone(state.locks))
+  obsoleteItems.splice(0, obsoleteItems.length, ...structuredClone(state.obsoleteItems))
+}
+
 function delay<TResult>(factory: () => TResult) {
   return new Promise<TResult>((resolve, reject) => {
     globalThis.setTimeout(() => {

@@ -1,6 +1,6 @@
 import type { MaterialBomListQuery } from '@/types/material'
 import { isMockEnabled } from '@/config/mock'
-import { materialBomMock } from '@/config/material-bom-mock'
+import { materialRepository as materialBomMock } from '@/mock/repositories'
 
 function requireMaterialMock() {
   if (!isMockEnabled()) {
