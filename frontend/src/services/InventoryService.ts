@@ -37,8 +37,6 @@ import { isMockEnabled } from '@/config/mock'
 
 export type { PageResult }
 
-const useInventoryMock = isMockEnabled('inventory')
-
 interface ShortagePayload {
   calculation_time?: string
   records?: ApiMaterialShortageItem[]
@@ -167,7 +165,7 @@ function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
 
 export const inventoryService = {
   async addCompletionInbound(form: CompletionInboundFormData) {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.addCompletionInbound(form)
     }
     const response = await inventoryApi.addCompletionInbound({
@@ -186,7 +184,7 @@ export const inventoryService = {
   },
 
   async calculateShortage(items: MaterialShortageRequestItem[]): Promise<MaterialShortageResult> {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.calculateShortage(items)
     }
     const response = await inventoryApi.calculateMaterialShortage({
@@ -209,7 +207,7 @@ export const inventoryService = {
     idleDaysThreshold: number,
     materialId?: number,
   ): Promise<ObsoleteDetectionResult> {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.detectObsolete(idleDaysThreshold, materialId)
     }
     const response = await inventoryApi.detectObsoleteMaterial({
@@ -227,7 +225,7 @@ export const inventoryService = {
   },
 
   async generateAlerts(materialId?: number): Promise<InventoryAlertGenerateResult> {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.generateAlerts(materialId)
     }
     let request: { material_id: number } | undefined = undefined
@@ -261,7 +259,7 @@ export const inventoryService = {
   },
 
   async handleAlert(alertId: number, status: 'handled' | 'ignored', handlerId: number) {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.handleAlert(alertId, status, handlerId)
     }
     const response = await inventoryApi.handleInventoryAlert({
@@ -272,7 +270,7 @@ export const inventoryService = {
   },
 
   async handleObsolete(detectionId: number, status: 'handled' | 'ignored', handlerId: number) {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.handleObsolete(detectionId, status, handlerId)
     }
     const response = await inventoryApi.handleObsoleteMaterialDetection({
@@ -292,7 +290,7 @@ export const inventoryService = {
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
     })
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.listAlerts(normalizedQuery)
     }
     const response = await inventoryApi.listInventoryAlert({
@@ -313,7 +311,7 @@ export const inventoryService = {
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
     })
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.listCompletionInbound(normalizedQuery)
     }
     const response = await inventoryApi.listCompletionInbound({
@@ -334,7 +332,7 @@ export const inventoryService = {
 
   async listLocks(query: StockLockQuery) {
     const normalizedQuery = cleanQuery(query)
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.listLocks(normalizedQuery)
     }
     const response = await inventoryApi.listMaterialStockLock({
@@ -354,7 +352,7 @@ export const inventoryService = {
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
     })
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.listObsolete(normalizedQuery)
     }
     const response = await inventoryApi.listObsoleteMaterialDetection({
@@ -374,7 +372,7 @@ export const inventoryService = {
   },
 
   async lockStock(form: StockLockFormData): Promise<StockLockResult> {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.lockStock(form)
     }
     const response = await inventoryApi.lockMaterialStock({
@@ -401,7 +399,7 @@ export const inventoryService = {
   },
 
   async releaseLock(lockId: number, operatorId: number) {
-    if (useInventoryMock) {
+    if (isMockEnabled()) {
       return inventoryMock.releaseLock(lockId, operatorId)
     }
     const response = await inventoryApi.releaseMaterialStock({

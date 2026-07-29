@@ -7,14 +7,14 @@ import { dashboardMock } from '@/config/dashboard-mock'
  */
 export const dashboardService = {
   getHomeDashboard() {
-    if (!isMockEnabled('dashboard')) {
-      throw new Error('工作台 API 尚未接入；开发环境请显式启用 VITE_USE_DASHBOARD_MOCK。')
+    if (!isMockEnabled()) {
+      throw new Error('工作台 API 尚未接入；请将 VITE_DATA_MODE 设置为 mock 使用演示数据。')
     }
     return dashboardMock.getHomeDashboard(getDashboardMockScenario())
   },
   getSystemDashboard() {
-    if (!isMockEnabled('dashboard')) {
-      throw new Error('工作台 API 尚未接入；开发环境请显式启用 VITE_USE_DASHBOARD_MOCK。')
+    if (!isMockEnabled()) {
+      throw new Error('工作台 API 尚未接入；请将 VITE_DATA_MODE 设置为 mock 使用演示数据。')
     }
     return dashboardMock.getSystemDashboard(getDashboardMockScenario())
   },

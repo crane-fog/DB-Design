@@ -38,7 +38,7 @@ copy .env.example .env
 - `VITE_API_BASE_URL`：生成 API 客户端的基址。默认留空，接口仍以同源 `/api` 路径访问。
 - `VITE_API_PROXY_TARGET`：Vite 开发代理的目标地址，默认 `http://localhost:5000`。
 - `VITE_USE_MOCK_AUTH`：只在 Vite 开发环境启用本地 Mock 登录；即使生产环境设为 `true`，生产构建也会禁用。
-- `VITE_USE_DASHBOARD_MOCK`、`VITE_USE_MATERIAL_MOCK`、`VITE_USE_INVENTORY_MOCK`、`VITE_USE_PURCHASE_MOCK`：独立的模块 Mock 开关，仅在开发环境有效。生产构建始终禁用；关闭后 Service 会调用真实 API，尚未接入 API 的工作台和物料模块会明确报错，不会伪装为成功。
+- `VITE_DATA_MODE`：`mock`（默认）让具有 Mock 分支的业务 Service 使用本地演示数据；`api` 只调用真实接口，不会自动回退 Mock。尚未接入 API 的工作台和物料模块会明确报错。`VITE_MOCK_PERSIST=true` 会将演示数据保存到 localStorage。
 
 页面只能通过 Service 调用 API，禁止在页面中硬编码完整接口地址。新增环境变量时先补充 `.env.example` 和本节说明；不要提交 `.env`、Token、密码或个人本地配置。
 
@@ -65,13 +65,15 @@ Mock 账号仅用于本地前端开发，密码属于可公开的测试数据，
 
 ## Mock 与 Service 规范
 
-Mock 开关统一由 `src/config/mock.ts` 读取。库存和采购不再共用开关，方便后续按模块联调；Mock 仅作为显式开发数据源，API 网络或业务错误不会自动回退成 Mock。
+业务数据模式统一由 `src/config/mock.ts` 读取。`VITE_DATA_MODE` 是唯一的全局 Mock/API 入口；Mock 仅作为显式数据源，API 网络或业务错误不会自动回退成 Mock。`VITE_USE_MOCK_AUTH` 保持独立，仅用于受开发环境限制的 Mock 登录。
+
+全量 Mock 演示模式下，开发环境默认使用 `VITE_DATA_MODE=mock`。如需恢复稳定种子数据，可在浏览器控制台执行 `resetMockDatabase()` 后刷新页面；该函数仅在开发环境挂载，且不会保存真实账号、Token 或密码。
 
 - 页面只能调用 `src/services/`，禁止直接调用 Axios、自动生成 API 或在模板中编写大型 Mock 数组。
 - 工作台 Mock 集中放在 `src/config/dashboard-mock.ts`，类型位于 `src/types/dashboard.ts`，唯一调用入口为 `DashboardService.ts`。
 - Mock 与未来接口共用同一套 TypeScript 类型。列表/分页统一使用 `{ items, total, page, pageSize }`；成功数据由 Service 返回该业务类型，失败必须 `throw Error` 供页面捕获。
 - 当前工作台没有 OpenAPI 契约接口，因此 Service 使用集中 Mock。后端契约和实现可用后，只替换 Service 内部实现，不改页面和类型。
-- `VITE_DASHBOARD_MOCK_SCENARIO` 可设为 `success`、`empty` 或 `error`，用于验证正常、空数据和失败重试状态；修改后重启 `pnpm dev`。未配置时为稳定的 `success` 数据。
+- `VITE_MOCK_SCENARIO` 可设为 `success`、`empty` 或 `error`，用于验证工作台正常、空数据和失败重试状态；修改后重启 `pnpm dev`。未配置时为稳定的 `success` 数据。它只选择场景，不决定是否启用 Mock。
 - 只有已知“后端尚未实现且返回 404”的权限联调链路可以降级到既有 Mock；其他 404、网络错误和前端运行时错误必须如实显示，不能被 Mock 掩盖。
 - 当真实接口已经覆盖页面所需字段、分页和错误语义，并完成联调验证后，删除对应 Mock 降级分支。
 
