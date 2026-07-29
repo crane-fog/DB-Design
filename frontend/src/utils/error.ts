@@ -1,19 +1,9 @@
-import axios from 'axios'
+import { getRequestErrorMessage } from '@/services/request'
 
 export function getErrorMessage(error: unknown, fallback = '请求失败，请稍后重试') {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data
-    if (typeof data === 'object' && data !== null) {
-      const message =
-        (data as { message?: unknown; msg?: unknown }).message ?? (data as { msg?: unknown }).msg
-      if (typeof message === 'string' && message.trim()) {
-        return message
-      }
-    }
+  const message = getRequestErrorMessage(error)
+  if (message === '请求失败') {
+    return fallback
   }
-
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-  return fallback
+  return message
 }

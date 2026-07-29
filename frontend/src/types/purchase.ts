@@ -41,15 +41,13 @@ export interface PurchaseOrderItem {
   totalAmount: number
 }
 
-export interface PurchaseOrderQuery {
+export interface PurchaseOrderQuery extends PageRequest {
   buyerId?: number
   expectedDateEnd?: string
   expectedDateStart?: string
   materialId?: number
   orderDateEnd?: string
   orderDateStart?: string
-  page: number
-  pageSize: number
   status?: PurchaseOrderStatus
   supplierId?: number
 }
@@ -82,11 +80,9 @@ export interface PurchaseReceiptItem {
   receiveId: number
 }
 
-export interface PurchaseReceiptQuery {
+export interface PurchaseReceiptQuery extends PageRequest {
   materialId?: number
   orderId?: number
-  page: number
-  pageSize: number
 }
 
 export interface PurchaseReceiptFormData {
@@ -106,10 +102,8 @@ export interface PurchaseReminderItem {
   status: PurchaseReminderStatus
 }
 
-export interface PurchaseReminderQuery {
+export interface PurchaseReminderQuery extends PageRequest {
   orderId?: number
-  page: number
-  pageSize: number
   status?: PurchaseReminderStatus
 }
 
@@ -119,3 +113,4 @@ export interface PurchaseOverviewSummary {
   receivingOrderCount: number
   totalOrderCount: number
 }
+import type { PageRequest } from '@/services/pagination'

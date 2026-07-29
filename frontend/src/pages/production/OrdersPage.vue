@@ -2,28 +2,22 @@
 import { EditPen, Plus, Refresh, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
-  type PageResult,
   type ProductionOrderFormData,
   type ProductionOrderItem,
   type ProductionOrderStatus,
   productionService,
 } from '@/services/ProductionService'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { formatDateTime } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
+import { productionOrderStatusLabels as statusLabels } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
-
-const statusLabels: Record<ProductionOrderStatus, string> = {
-  cancelled: '已取消',
-  completed: '已完工',
-  in_progress: '生产中',
-  pending_review: '待审核',
-  pending_schedule: '待排产',
-}
 
 const pageSize = 10
 const auth = useAuthStore()
@@ -33,7 +27,7 @@ const loading = ref(false)
 const error = ref('')
 const result = ref<PageResult<ProductionOrderItem>>({ items: [], page: 1, pageSize, total: 0 })
 
-const canManage = computed(() => auth.hasPermission('production:orders'))
+const canManage = computed(() => auth.hasPermission(PERMISSIONS.production.orders))
 
 const orderDialogVisible = ref(false)
 const orderDialogMode = ref<'create' | 'edit'>('create')

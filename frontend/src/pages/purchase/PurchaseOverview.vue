@@ -14,7 +14,12 @@ import type {
 } from '@/types/purchase'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { formatAmount, formatDateTime, formatNumber } from '@/utils/format'
+import {
+  purchaseOrderStatusLabels as orderStatusLabels,
+  purchaseReminderStatusLabels as reminderStatusLabels,
+} from '@/constants/status'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -23,19 +28,6 @@ import { purchaseService } from '@/services/PurchaseService'
 import { useAuthStore } from '@/stores/auth'
 
 type PurchaseTab = 'orders' | 'receipts' | 'reminders'
-
-const orderStatusLabels = {
-  cancelled: '已取消',
-  completed: '已完成',
-  draft: '草稿',
-  partial_received: '部分到货',
-  submitted: '已提交',
-}
-const reminderStatusLabels = {
-  pending_urge: '待催交',
-  received: '已到货',
-  urged: '已催交',
-}
 
 const orderActionConfig = {
   cancel: {
@@ -60,7 +52,7 @@ const orderActionConfig = {
 
 const auth = useAuthStore()
 const operatorId = computed(() => auth.currentUser?.id)
-const canManagePurchase = computed(() => auth.hasPermission('purchase:view'))
+const canManagePurchase = computed(() => auth.hasPermission(PERMISSIONS.purchase.manage))
 const activeTab = ref<PurchaseTab>('orders')
 const summary = ref<PurchaseOverviewSummary>()
 const summaryLoading = ref(false)

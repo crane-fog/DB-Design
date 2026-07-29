@@ -5,34 +5,19 @@ export interface MockAccessProfile {
 }
 
 export const systemAdministratorPermissions = [
-  'inventory:calc',
-  'inventory:monitor',
-  'inventory:register',
-  'inventory:view',
-  'material:view',
-  'production:breakdown',
-  'production:capacity',
-  'production:orders',
-  'production:view',
-  'purchase:view',
-  'system:audit:view',
-  'system:role:assign-permission',
-  'system:role:create',
-  'system:role:update',
-  'system:role:view',
-  'system:user:create',
-  'system:user:update',
-  'system:user:view',
-  'system:view',
-  'trace:manage',
-  'trace:view',
+  ...Object.values(PERMISSIONS.inventory),
+  ...Object.values(PERMISSIONS.material),
+  ...Object.values(PERMISSIONS.production),
+  ...Object.values(PERMISSIONS.purchase),
+  ...Object.values(PERMISSIONS.system),
+  ...Object.values(PERMISSIONS.trace),
 ]
 
 export const ordinaryUserPermissions = [
-  'inventory:view',
-  'material:view',
-  'production:view',
-  'trace:view',
+  PERMISSIONS.inventory.view,
+  PERMISSIONS.material.view,
+  PERMISSIONS.production.view,
+  PERMISSIONS.trace.view,
 ]
 
 export const mockAccessProfiles: Record<string, MockAccessProfile> = {
@@ -75,3 +60,4 @@ export function getMockAccessProfile(employeeNo?: string): MockAccessProfile {
 export function getSystemAdministratorPermissions() {
   return [...systemAdministratorPermissions]
 }
+import { PERMISSIONS } from '@/constants/permissions'

@@ -1,4 +1,13 @@
 import { Api, systemApi } from '@/api/client'
+import {
+  type ApiEnvelope,
+  type PageRequest,
+  type PageResult,
+  getPageItems,
+  getPageMetadata,
+  optionalText,
+  unwrap,
+} from '@/services/pagination'
 import type {
   LoginData,
   LoginLog,
@@ -12,21 +21,20 @@ import type {
   UserRole,
 } from '@/api'
 import { getMockAccessProfile, getSystemAdministratorPermissions } from '@/config/mock-access'
-import axios from 'axios'
+import { getRequestStatus } from '@/services/request'
+
+export { getRequestStatus }
+export type { PageResult }
 
 export type AccountStatus = 'disabled' | 'valid'
 
-export interface UserQuery {
+export interface UserQuery extends PageRequest {
   employeeNo?: string
-  page: number
-  pageSize: number
   status?: AccountStatus
   userName?: string
 }
 
-export interface RoleQuery {
-  page: number
-  pageSize: number
+export interface RoleQuery extends PageRequest {
   roleId?: number
   roleName?: string
   status?: AccountStatus
@@ -34,30 +42,19 @@ export interface RoleQuery {
 
 export type LoginResult = 'failure' | 'success'
 
-export interface LoginLogQuery {
+export interface LoginLogQuery extends PageRequest {
   endTime?: string
-  page: number
-  pageSize: number
   result?: LoginResult
   startTime?: string
   userId?: number
 }
 
-export interface OperationLogQuery {
+export interface OperationLogQuery extends PageRequest {
   action?: string
   endTime?: string
   module?: string
   operatorId?: number
-  page: number
-  pageSize: number
   startTime?: string
-}
-
-export interface PageResult<TEntity> {
-  items: TEntity[]
-  page: number
-  pageSize: number
-  total: number
 }
 
 export interface SystemUser {
@@ -82,6 +79,14 @@ export interface UserFormData {
 
 export interface UserCreateFormData extends UserFormData {
   password: string
+}
+
+export interface RegisterFormData {
+  email?: string
+  employeeNo: string
+  password: string
+  phone: string
+  userName: string
 }
 
 export interface SystemRole {
@@ -149,95 +154,11 @@ export interface SystemAccessContext {
   roles: string[]
 }
 
-interface ApiEnvelope<TPayload> {
-  code?: number
-  data?: TPayload
-  message?: string
-}
-
-class ApiRequestError extends Error {
-  readonly status: number | undefined
-
-  constructor(message: string, status?: number) {
-    super(message)
-    this.status = status
-  }
-}
-
-interface RawPageResult {
-  items?: unknown
-  list?: unknown
-  page?: unknown
-  page_size?: unknown
-  pageSize?: unknown
-  records?: unknown
-  rows?: unknown
-  total?: unknown
-}
-
-function unwrap<TPayload>(payload: ApiEnvelope<TPayload>) {
-  if (payload.code !== undefined && payload.code !== 200) {
-    throw new ApiRequestError(payload.message || '接口请求失败', payload.code)
-  }
-
-  return payload.data
-}
-
-function getPageItems<TItem>(value: unknown): TItem[] {
-  if (Array.isArray(value)) {
-    return value as TItem[]
-  }
-  if (!value || typeof value !== 'object') {
-    return []
-  }
-
-  const data = value as RawPageResult
-  const items = data.records ?? data.items ?? data.list ?? data.rows
-  if (Array.isArray(items)) {
-    return items as TItem[]
-  }
-  return []
-}
-
-function getPageMetadata(
-  value: unknown,
-  fallback: Pick<PageResult<unknown>, 'page' | 'pageSize' | 'total'>,
-) {
-  if (!value || typeof value !== 'object') {
-    return fallback
-  }
-
-  const data = value as RawPageResult
-  let { page } = fallback
-  let { pageSize } = fallback
-  let { total } = fallback
-  if (typeof data.page === 'number') {
-    ;({ page } = data)
-  }
-  if (typeof data.page_size === 'number') {
-    pageSize = data.page_size
-  } else if (typeof data.pageSize === 'number') {
-    ;({ pageSize } = data)
-  }
-  if (typeof data.total === 'number') {
-    ;({ total } = data)
-  }
-
-  return { page, pageSize, total }
-}
-
 function asAccountStatus(value: unknown): AccountStatus {
   if (value === 'disabled') {
     return 'disabled'
   }
   return 'valid'
-}
-
-function optionalText(value: unknown) {
-  if (typeof value === 'string' && value.trim()) {
-    return value
-  }
-  return undefined
 }
 
 function toSystemUser(user: User): SystemUser | undefined {
@@ -467,16 +388,6 @@ async function getAuditUsers() {
     }
   }
   return userMap
-}
-
-export function getRequestStatus(error: unknown) {
-  if (error instanceof ApiRequestError) {
-    return error.status
-  }
-  if (axios.isAxiosError(error)) {
-    return error.response?.status
-  }
-  return undefined
 }
 
 function getMockAccessContext(employeeNo: string): SystemAccessContext {
@@ -804,7 +715,14 @@ export const systemService = {
     return unwrap(response.data as ApiEnvelope<LoginData>)
   },
 
-  async register(request: RegisterRequest) {
+  async register(form: RegisterFormData) {
+    const request: RegisterRequest = {
+      email: toNullableText(form.email),
+      employee_no: form.employeeNo.trim(),
+      password: await hashPassword(form.password),
+      phone: form.phone.trim(),
+      user_name: form.userName.trim(),
+    }
     const response = await systemApi.register({ registerRequest: request })
     return unwrap(response.data as ApiEnvelope<unknown>)
   },

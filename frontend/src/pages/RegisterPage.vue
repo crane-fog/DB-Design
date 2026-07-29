@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import type { RegisterRequest } from '@/api'
+import { type RegisterFormData, systemService } from '@/services/SystemService'
 import { getErrorMessage } from '@/utils/error'
 import { ref } from 'vue'
-import { systemService } from '@/services/SystemService'
 
 const userNo = ref('')
 const password = ref('')
@@ -13,13 +12,6 @@ const email = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-
-async function hashPassword(value: string) {
-  const passwordBytes = new TextEncoder().encode(value)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', passwordBytes)
-
-  return [...new Uint8Array(hashBuffer)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-}
 
 function validateForm() {
   if (!userNo.value.trim() || !password.value || !userName.value.trim() || !phone.value.trim()) {
@@ -33,13 +25,13 @@ function validateForm() {
   return ''
 }
 
-async function buildRegisterData(): Promise<RegisterRequest> {
+function buildRegisterData(): RegisterFormData {
   return {
-    email: email.value.trim() || undefined,
-    employee_no: userNo.value.trim(),
-    password: await hashPassword(password.value),
-    phone: phone.value.trim(),
-    user_name: userName.value.trim(),
+    email: email.value,
+    employeeNo: userNo.value,
+    password: password.value,
+    phone: phone.value,
+    userName: userName.value,
   }
 }
 
@@ -59,7 +51,7 @@ async function submitRegister() {
   successMessage.value = ''
 
   try {
-    await systemService.register(await buildRegisterData())
+    await systemService.register(buildRegisterData())
 
     successMessage.value = '注册成功'
     password.value = ''

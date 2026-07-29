@@ -2,11 +2,9 @@ export type MaterialBomStatus = 'archived' | 'draft' | 'released'
 
 export type MaterialBomComponentType = 'material' | 'semiFinished'
 
-export interface MaterialBomListQuery {
+export interface MaterialBomListQuery extends PageRequest {
   keyword?: string
   owner?: string
-  page: number
-  pageSize: number
   status?: MaterialBomStatus
 }
 
@@ -59,3 +57,4 @@ export interface MaterialBomDetail extends MaterialBomListItem {
   components: MaterialBomComponent[]
   description: string
 }
+import type { PageRequest } from '@/services/pagination'

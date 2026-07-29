@@ -1,3 +1,4 @@
+import { PERMISSIONS, type PermissionCode } from '@/constants/permissions'
 import { type RouteRecordRaw, createRouter, createWebHistory } from 'vue-router'
 import { pinia } from '@/stores/pinia'
 import { useAuthStore } from '@/stores/auth'
@@ -8,7 +9,7 @@ declare module 'vue-router' {
     isModule?: boolean
     module?: string
     pageOrder?: number
-    permission?: string
+    permission?: PermissionCode
     requiresAuth?: boolean
     showInMenu?: boolean
     title?: string
@@ -29,7 +30,7 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'materials',
       pageOrder: 1,
-      permission: 'material:view',
+      permission: PERMISSIONS.material.view,
       requiresAuth: true,
       showInMenu: true,
       title: '物料 BOM',
@@ -44,7 +45,7 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'inventory',
       pageOrder: 2,
-      permission: 'inventory:view',
+      permission: PERMISSIONS.inventory.view,
       requiresAuth: true,
       showInMenu: true,
       title: '库存管理',
@@ -58,7 +59,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'calc',
       module: 'inventory',
       pageOrder: 3,
-      permission: 'inventory:calc',
+      permission: PERMISSIONS.inventory.calc,
       requiresAuth: true,
       showInMenu: true,
       title: '物料缺口计算',
@@ -72,7 +73,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'monitor',
       module: 'inventory',
       pageOrder: 4,
-      permission: 'inventory:monitor',
+      permission: PERMISSIONS.inventory.monitor,
       requiresAuth: true,
       showInMenu: true,
       title: '库存监控',
@@ -86,7 +87,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'register',
       module: 'inventory',
       pageOrder: 5,
-      permission: 'inventory:register',
+      permission: PERMISSIONS.inventory.register,
       requiresAuth: true,
       showInMenu: true,
       title: '完工入库登记',
@@ -101,7 +102,7 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'purchase',
       pageOrder: 6,
-      permission: 'purchase:view',
+      permission: PERMISSIONS.purchase.view,
       requiresAuth: true,
       showInMenu: true,
       title: '采购管理',
@@ -116,7 +117,7 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'production',
       pageOrder: 7,
-      permission: 'production:view',
+      permission: PERMISSIONS.production.view,
       requiresAuth: true,
       showInMenu: true,
       title: '生产管理',
@@ -130,7 +131,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'capacity',
       module: 'production',
       pageOrder: 8,
-      permission: 'production:capacity',
+      permission: PERMISSIONS.production.capacity,
       requiresAuth: true,
       showInMenu: true,
       title: '产能配置',
@@ -144,7 +145,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'orders',
       module: 'production',
       pageOrder: 9,
-      permission: 'production:orders',
+      permission: PERMISSIONS.production.orders,
       requiresAuth: true,
       showInMenu: true,
       title: '生产订单',
@@ -158,7 +159,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'breakdown',
       module: 'production',
       pageOrder: 10,
-      permission: 'production:breakdown',
+      permission: PERMISSIONS.production.breakdown,
       requiresAuth: true,
       showInMenu: true,
       title: '故障反馈',
@@ -173,7 +174,7 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'trace',
       pageOrder: 11,
-      permission: 'trace:view',
+      permission: PERMISSIONS.trace.view,
       requiresAuth: true,
       showInMenu: true,
       title: '质量追溯',
@@ -188,7 +189,7 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'system',
       pageOrder: 12,
-      permission: 'system:view',
+      permission: PERMISSIONS.system.view,
       requiresAuth: true,
       showInMenu: true,
       title: '系统管理',
@@ -202,7 +203,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'users',
       module: 'system',
       pageOrder: 13,
-      permission: 'system:user:view',
+      permission: PERMISSIONS.system.userView,
       requiresAuth: true,
       showInMenu: true,
       title: '账号管理',
@@ -216,7 +217,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'audit',
       module: 'system',
       pageOrder: 15,
-      permission: 'system:audit:view',
+      permission: PERMISSIONS.system.auditView,
       requiresAuth: true,
       showInMenu: true,
       title: '操作审计',
@@ -230,7 +231,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'roles',
       module: 'system',
       pageOrder: 14,
-      permission: 'system:role:view',
+      permission: PERMISSIONS.system.roleView,
       requiresAuth: true,
       showInMenu: true,
       title: '角色管理',

@@ -1,8 +1,7 @@
 import {
   type ApiEnvelope,
   type PageResult,
-  getPageItems,
-  getPageMetadata,
+  mapPageResult,
   optionalText,
   unwrap,
 } from '@/services/pagination'
@@ -31,13 +30,14 @@ import type {
   StockLockQuery,
   StockLockResult,
 } from '@/types/inventory'
+import { cleanQuery } from '@/services/request'
 import { inventoryApi } from '@/api/client'
 import { inventoryMock } from '@/config/inventory-mock'
+import { isMockEnabled } from '@/config/mock'
 
 export type { PageResult }
 
-const useInventoryMock =
-  import.meta.env.DEV && import.meta.env.VITE_USE_INVENTORY_PURCHASE_MOCK === 'true'
+const useInventoryMock = isMockEnabled('inventory')
 
 interface ShortagePayload {
   calculation_time?: string
@@ -165,20 +165,6 @@ function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
   return parsed.toISOString()
 }
 
-function toPage<TSource, TResult>(
-  payload: unknown,
-  query: { page: number; pageSize: number },
-  mapper: (item: TSource) => TResult,
-): PageResult<TResult> {
-  const items = getPageItems<TSource>(payload).map(mapper)
-  const metadata = getPageMetadata(payload, {
-    page: query.page,
-    pageSize: query.pageSize,
-    total: items.length,
-  })
-  return { items, ...metadata }
-}
-
 export const inventoryService = {
   async addCompletionInbound(form: CompletionInboundFormData) {
     if (useInventoryMock) {
@@ -301,11 +287,11 @@ export const inventoryService = {
   },
 
   async listAlerts(query: InventoryAlertQuery) {
-    const normalizedQuery = {
+    const normalizedQuery = cleanQuery({
       ...query,
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
-    }
+    })
     if (useInventoryMock) {
       return inventoryMock.listAlerts(normalizedQuery)
     }
@@ -318,15 +304,15 @@ export const inventoryService = {
       status: normalizedQuery.status,
     })
     const payload = unwrap(response.data as ApiEnvelope<unknown>)
-    return toPage<InventoryAlertEvent, InventoryAlertItem>(payload, normalizedQuery, toAlert)
+    return mapPageResult<InventoryAlertEvent, InventoryAlertItem>(payload, normalizedQuery, toAlert)
   },
 
   async listCompletionInbound(query: CompletionInboundQuery) {
-    const normalizedQuery = {
+    const normalizedQuery = cleanQuery({
       ...query,
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
-    }
+    })
     if (useInventoryMock) {
       return inventoryMock.listCompletionInbound(normalizedQuery)
     }
@@ -339,7 +325,7 @@ export const inventoryService = {
       pageSize: normalizedQuery.pageSize,
     })
     const payload = unwrap(response.data as ApiEnvelope<unknown>)
-    return toPage<CompletionInboundOrder, CompletionInboundItem>(
+    return mapPageResult<CompletionInboundOrder, CompletionInboundItem>(
       payload,
       normalizedQuery,
       toInbound,
@@ -347,26 +333,27 @@ export const inventoryService = {
   },
 
   async listLocks(query: StockLockQuery) {
+    const normalizedQuery = cleanQuery(query)
     if (useInventoryMock) {
-      return inventoryMock.listLocks(query)
+      return inventoryMock.listLocks(normalizedQuery)
     }
     const response = await inventoryApi.listMaterialStockLock({
-      materialId: query.materialId,
-      orderId: query.orderId,
-      page: query.page,
-      pageSize: query.pageSize,
-      status: query.status,
+      materialId: normalizedQuery.materialId,
+      orderId: normalizedQuery.orderId,
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
+      status: normalizedQuery.status,
     })
     const payload = unwrap(response.data as ApiEnvelope<unknown>)
-    return toPage<StockLockRecord, StockLockItem>(payload, query, toLock)
+    return mapPageResult<StockLockRecord, StockLockItem>(payload, normalizedQuery, toLock)
   },
 
   async listObsolete(query: ObsoleteMaterialQuery) {
-    const normalizedQuery = {
+    const normalizedQuery = cleanQuery({
       ...query,
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
-    }
+    })
     if (useInventoryMock) {
       return inventoryMock.listObsolete(normalizedQuery)
     }
@@ -379,7 +366,7 @@ export const inventoryService = {
       status: normalizedQuery.status,
     })
     const payload = unwrap(response.data as ApiEnvelope<unknown>)
-    return toPage<ObsoleteMaterialDetection, ObsoleteMaterialItem>(
+    return mapPageResult<ObsoleteMaterialDetection, ObsoleteMaterialItem>(
       payload,
       normalizedQuery,
       toObsolete,

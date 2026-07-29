@@ -1,5 +1,6 @@
 import {
   type ApiEnvelope,
+  type PageRequest,
   type PageResult,
   getPageItems,
   getPageMetadata,
@@ -37,48 +38,36 @@ export type ExternalOrderStatusValue = 'accepted' | 'pending_review' | 'rejected
 /** 故障记录状态。 */
 export type FaultStatusValue = 'pending_repair' | 'recovered' | 'repairing'
 
-export interface ProductionOrderQuery {
+export interface ProductionOrderQuery extends PageRequest {
   materialId?: number
-  page: number
-  pageSize: number
   planEndEnd?: string
   planEndStart?: string
   status?: ProductionOrderStatus
 }
 
-export interface ProductionLineQuery {
-  page: number
-  pageSize: number
+export interface ProductionLineQuery extends PageRequest {
   status?: ProductionLineRunStatus
   typeId?: number
 }
 
-export interface CapacityConfigQuery {
+export interface CapacityConfigQuery extends PageRequest {
   materialId?: number
-  page: number
-  pageSize: number
   typeId?: number
 }
 
-export interface ProductionCalendarQuery {
+export interface ProductionCalendarQuery extends PageRequest {
   calendarDateEnd?: string
   calendarDateStart?: string
   configId?: number
   lineId?: number
-  page: number
-  pageSize: number
 }
 
-export interface LineTypeQuery {
-  page: number
-  pageSize: number
+export interface LineTypeQuery extends PageRequest {
   typeName?: string
 }
 
-export interface ExternalOrderQuery {
+export interface ExternalOrderQuery extends PageRequest {
   customerId?: number
-  page: number
-  pageSize: number
   status?: ExternalOrderStatusValue
 }
 

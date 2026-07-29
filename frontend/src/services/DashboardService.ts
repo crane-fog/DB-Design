@@ -1,17 +1,5 @@
-import type { DashboardMockScenario } from '@/types/dashboard'
+import { getDashboardMockScenario, isMockEnabled } from '@/config/mock'
 import { dashboardMock } from '@/config/dashboard-mock'
-
-function getMockScenario(): DashboardMockScenario {
-  const configuredScenario = import.meta.env.VITE_DASHBOARD_MOCK_SCENARIO
-  if (
-    configuredScenario === 'empty' ||
-    configuredScenario === 'error' ||
-    configuredScenario === 'success'
-  ) {
-    return configuredScenario
-  }
-  return 'success'
-}
 
 /**
  * 工作台数据的唯一入口。当前 OpenAPI 契约没有工作台接口，故使用集中 Mock；
@@ -19,9 +7,15 @@ function getMockScenario(): DashboardMockScenario {
  */
 export const dashboardService = {
   getHomeDashboard() {
-    return dashboardMock.getHomeDashboard(getMockScenario())
+    if (!isMockEnabled('dashboard')) {
+      throw new Error('工作台 API 尚未接入；开发环境请显式启用 VITE_USE_DASHBOARD_MOCK。')
+    }
+    return dashboardMock.getHomeDashboard(getDashboardMockScenario())
   },
   getSystemDashboard() {
-    return dashboardMock.getSystemDashboard(getMockScenario())
+    if (!isMockEnabled('dashboard')) {
+      throw new Error('工作台 API 尚未接入；开发环境请显式启用 VITE_USE_DASHBOARD_MOCK。')
+    }
+    return dashboardMock.getSystemDashboard(getDashboardMockScenario())
   },
 }

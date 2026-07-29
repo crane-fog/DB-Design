@@ -1,4 +1,7 @@
+import type { PageResult } from '@/services/pagination'
+
 export type DashboardMockScenario = 'empty' | 'error' | 'success'
+export type { PageResult }
 
 export type DashboardStatisticKey =
   | 'auditLogs'
@@ -51,13 +54,6 @@ export interface DashboardOperation {
   operatorName: string
   permission?: string
   result: DashboardOperationResult
-}
-
-export interface PageResult<TEntity> {
-  items: TEntity[]
-  page: number
-  pageSize: number
-  total: number
 }
 
 export interface HomeDashboardData {
