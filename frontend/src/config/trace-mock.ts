@@ -235,6 +235,34 @@ function delay<TResult>(factory: () => TResult): Promise<TResult> {
   })
 }
 
+export interface TraceMockState {
+  consumptionRecords: BatchConsumptionItem[]
+  materialTraceRecords: MaterialBatchTraceItem[]
+  productTraceRecords: ProductBatchTraceItem[]
+}
+
+export function snapshotTraceMock(): TraceMockState {
+  return structuredClone({ consumptionRecords, materialTraceRecords, productTraceRecords })
+}
+
+export function restoreTraceMock(state: TraceMockState) {
+  consumptionRecords.splice(
+    0,
+    consumptionRecords.length,
+    ...structuredClone(state.consumptionRecords),
+  )
+  materialTraceRecords.splice(
+    0,
+    materialTraceRecords.length,
+    ...structuredClone(state.materialTraceRecords),
+  )
+  productTraceRecords.splice(
+    0,
+    productTraceRecords.length,
+    ...structuredClone(state.productTraceRecords),
+  )
+}
+
 function paginate<TItem>(items: TItem[], page: number, pageSize: number): PageResult<TItem> {
   const safePage = Math.max(1, page)
   const safePageSize = Math.max(1, pageSize)

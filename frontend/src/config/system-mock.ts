@@ -24,6 +24,28 @@ interface MockUserRole {
   userId: number
 }
 
+export function snapshotSystemMock(): SystemMockState {
+  return structuredClone({
+    loginLogs,
+    operationLogs,
+    permissions,
+    rolePermissions,
+    roles,
+    userRoles,
+    users,
+  })
+}
+
+export function restoreSystemMock(state: SystemMockState) {
+  users.splice(0, users.length, ...structuredClone(state.users))
+  roles.splice(0, roles.length, ...structuredClone(state.roles))
+  permissions.splice(0, permissions.length, ...structuredClone(state.permissions))
+  userRoles.splice(0, userRoles.length, ...structuredClone(state.userRoles))
+  rolePermissions.splice(0, rolePermissions.length, ...structuredClone(state.rolePermissions))
+  loginLogs.splice(0, loginLogs.length, ...structuredClone(state.loginLogs))
+  operationLogs.splice(0, operationLogs.length, ...structuredClone(state.operationLogs))
+}
+
 interface MockRolePermission {
   permissionId: number
   roleId: number
@@ -41,6 +63,16 @@ interface MockLoginLog extends SystemLoginLog {
 
 interface MockOperationLog extends SystemOperationLog {
   operatorId: number
+}
+
+export interface SystemMockState {
+  loginLogs: MockLoginLog[]
+  operationLogs: MockOperationLog[]
+  permissions: MockPermission[]
+  rolePermissions: MockRolePermission[]
+  roles: SystemRole[]
+  userRoles: MockUserRole[]
+  users: SystemUser[]
 }
 
 let users: SystemUser[] = [

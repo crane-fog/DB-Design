@@ -733,6 +733,42 @@ function updateFault(form: FaultUpdateFormData) {
   })
 }
 
+export interface ProductionMockState {
+  calendars: ProductionCalendarItem[]
+  capacityConfigs: CapacityConfigItem[]
+  externalOrders: ExternalOrderItem[]
+  faultRecords: FaultRecordItem[]
+  lineTypes: LineTypeItem[]
+  lines: ProductionLineItem[]
+  productionOrders: ProductionOrderItem[]
+  typeNames: Record<number, string>
+}
+
+export function snapshotProductionMock(): ProductionMockState {
+  return structuredClone({
+    calendars,
+    capacityConfigs,
+    externalOrders,
+    faultRecords,
+    lineTypes,
+    lines,
+    productionOrders,
+    typeNames,
+  })
+}
+
+export function restoreProductionMock(state: ProductionMockState) {
+  Object.keys(typeNames).forEach((key) => delete typeNames[Number(key)])
+  Object.assign(typeNames, structuredClone(state.typeNames))
+  productionOrders.splice(0, productionOrders.length, ...structuredClone(state.productionOrders))
+  lineTypes.splice(0, lineTypes.length, ...structuredClone(state.lineTypes))
+  lines.splice(0, lines.length, ...structuredClone(state.lines))
+  capacityConfigs.splice(0, capacityConfigs.length, ...structuredClone(state.capacityConfigs))
+  calendars.splice(0, calendars.length, ...structuredClone(state.calendars))
+  externalOrders.splice(0, externalOrders.length, ...structuredClone(state.externalOrders))
+  faultRecords.splice(0, faultRecords.length, ...structuredClone(state.faultRecords))
+}
+
 function paginate<TItem>(items: TItem[], page: number, pageSize: number): PageResult<TItem> {
   const safePage = Math.max(1, page)
   const safePageSize = Math.max(1, pageSize)

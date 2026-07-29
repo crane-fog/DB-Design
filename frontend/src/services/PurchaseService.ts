@@ -28,7 +28,7 @@ import type {
 import { cleanQuery } from '@/services/request'
 import { isMockEnabled } from '@/config/mock'
 import { purchaseApi } from '@/api/client'
-import { purchaseMock } from '@/config/purchase-mock'
+import { purchaseRepository as purchaseMock } from '@/mock/repositories'
 
 export type { PageResult }
 

@@ -222,3 +222,11 @@ export const dashboardMock = {
     return delay(() => cloneSystemData(scenario), scenario)
   },
 }
+
+export function getHomeDashboardSeed() {
+  return cloneHomeData('success')
+}
+
+export function getSystemDashboardSeed() {
+  return cloneSystemData('success')
+}

@@ -189,6 +189,22 @@ function delay<TResult>(factory: () => TResult) {
   })
 }
 
+export interface PurchaseMockState {
+  orders: PurchaseOrderItem[]
+  receipts: PurchaseReceiptItem[]
+  reminders: PurchaseReminderItem[]
+}
+
+export function snapshotPurchaseMock(): PurchaseMockState {
+  return structuredClone({ orders, receipts, reminders })
+}
+
+export function restorePurchaseMock(state: PurchaseMockState) {
+  orders.splice(0, orders.length, ...structuredClone(state.orders))
+  receipts.splice(0, receipts.length, ...structuredClone(state.receipts))
+  reminders.splice(0, reminders.length, ...structuredClone(state.reminders))
+}
+
 function paginate<TItem>(items: TItem[], page: number, pageSize: number): PageResult<TItem> {
   const safePage = Math.max(1, page)
   const safePageSize = Math.max(1, pageSize)

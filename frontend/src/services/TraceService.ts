@@ -19,7 +19,7 @@ import {
 import type { ProductionOrderStatus } from '@/services/ProductionService'
 import { isMockEnabled } from '@/config/mock'
 import { qualityTraceabilityApi } from '@/api/client'
-import { traceMock } from '@/config/trace-mock'
+import { traceRepository as traceMock } from '@/mock/repositories'
 import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
