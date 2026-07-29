@@ -20,6 +20,7 @@ import type { ProductionOrderStatus } from '@/services/ProductionService'
 import { isMockEnabled } from '@/config/mock'
 import { qualityTraceabilityApi } from '@/api/client'
 import { traceMock } from '@/config/trace-mock'
+import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
 
@@ -191,6 +192,12 @@ function assertTraceMockIsReadOnly() {
   }
 }
 
+function assertMockPermission() {
+  if (isMockEnabled() && !useAuthStore().hasPermission('trace:manage')) {
+    throw new Error('当前账号没有执行追溯管理操作的权限')
+  }
+}
+
 /** 质量追溯接口的唯一入口；页面只允许通过此对象访问后端。 */
 export const traceService = {
   async analyzeQualityImpact(form: QualityImpactAnalyzeFormData) {
@@ -219,6 +226,10 @@ export const traceService = {
   api: qualityTraceabilityApi,
 
   async createBatchConsumption(form: BatchConsumptionCreateFormData) {
+    assertMockPermission()
+    if (isMockEnabled()) {
+      return traceMock.createBatchConsumption(form)
+    }
     assertTraceMockIsReadOnly()
     const response = await qualityTraceabilityApi.addBatchConsumption({
       batchConsumptionCreateRequest: {
@@ -235,6 +246,10 @@ export const traceService = {
   },
 
   async deleteBatchConsumption(consumptionId: number) {
+    assertMockPermission()
+    if (isMockEnabled()) {
+      return traceMock.deleteBatchConsumption(consumptionId)
+    }
     assertTraceMockIsReadOnly()
     const response = await qualityTraceabilityApi.deleteBatchConsumption({
       batchConsumptionDeleteRequest: { consumption_id: consumptionId },
@@ -296,6 +311,10 @@ export const traceService = {
   },
 
   async updateBatchConsumption(form: BatchConsumptionUpdateFormData) {
+    assertMockPermission()
+    if (isMockEnabled()) {
+      return traceMock.updateBatchConsumption(form)
+    }
     assertTraceMockIsReadOnly()
     const response = await qualityTraceabilityApi.updateBatchConsumption({
       batchConsumptionUpdateRequest: {

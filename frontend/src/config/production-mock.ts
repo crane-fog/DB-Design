@@ -1,14 +1,22 @@
 import type {
+  CapacityConfigFormData,
   CapacityConfigItem,
   CapacityConfigQuery,
   ExternalOrderItem,
   ExternalOrderQuery,
+  FaultRecordItem,
+  FaultReportFormData,
+  FaultUpdateFormData,
+  LineTypeFormData,
   LineTypeItem,
   LineTypeQuery,
+  ProductionCalendarFormData,
   ProductionCalendarItem,
   ProductionCalendarQuery,
+  ProductionLineFormData,
   ProductionLineItem,
   ProductionLineQuery,
+  ProductionOrderFormData,
   ProductionOrderItem,
   ProductionOrderQuery,
 } from '@/services/ProductionService'
@@ -377,6 +385,18 @@ const externalOrders: ExternalOrderItem[] = [
   },
 ]
 
+const faultRecords: FaultRecordItem[] = [
+  {
+    description: '生产线传感器信号异常',
+    faultId: 8001,
+    faultType: '设备异常',
+    lineId: 104,
+    occurTime: '2026-07-28T09:20:00',
+    reporterId: 1,
+    status: 'pending_repair',
+  },
+]
+
 function delay<TResult>(factory: () => TResult): Promise<TResult> {
   return new Promise((resolve, reject) => {
     globalThis.setTimeout(() => {
@@ -386,6 +406,330 @@ function delay<TResult>(factory: () => TResult): Promise<TResult> {
         reject(error)
       }
     }, 120)
+  })
+}
+
+function requirePositive(value: number, label: string) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label}必须是大于 0 的有效数值`)
+  }
+}
+
+function getOrderRecord(orderId: number) {
+  const order = productionOrders.find((item) => item.orderId === orderId)
+  if (!order) {
+    throw new Error('未找到生产订单')
+  }
+  return order
+}
+
+function getLineRecord(lineId: number) {
+  const line = lines.find((item) => item.lineId === lineId)
+  if (!line) {
+    throw new Error('未找到生产线')
+  }
+  return line
+}
+
+function getConfigRecord(configId: number) {
+  const config = capacityConfigs.find((item) => item.configId === configId)
+  if (!config) {
+    throw new Error('未找到产能配置')
+  }
+  return config
+}
+
+function timestamp() {
+  return new Date().toISOString()
+}
+
+function approveOrder(orderId: number, approved: boolean, reviewComment?: string) {
+  return delay(() => {
+    const order = getOrderRecord(orderId)
+    if (order.status !== 'pending_review') {
+      throw new Error('当前订单状态不可审核')
+    }
+    order.status = 'cancelled'
+    if (approved) {
+      order.status = 'pending_schedule'
+    }
+    order.reviewComment = reviewComment?.trim() || undefined
+    return structuredClone(order)
+  })
+}
+
+function cancelOrder(orderId: number, remark?: string) {
+  return delay(() => {
+    const order = getOrderRecord(orderId)
+    if (order.status === 'completed' || order.status === 'cancelled') {
+      throw new Error('当前订单不可取消')
+    }
+    order.status = 'cancelled'
+    order.reviewComment = remark?.trim() || order.reviewComment
+    return structuredClone(order)
+  })
+}
+
+function createOrder(form: ProductionOrderFormData) {
+  return delay(() => {
+    requirePositive(form.materialId, '物料 ID')
+    requirePositive(form.versionId, 'BOM 版本 ID')
+    requirePositive(form.planQty, '计划数量')
+    if (!materialNames[form.materialId]) {
+      throw new Error('物料不存在')
+    }
+    const order: ProductionOrderItem = {
+      actualEnd: undefined,
+      actualStart: undefined,
+      finishedQty: 0,
+      materialId: form.materialId,
+      materialName: materialNames[form.materialId],
+      orderId: Math.max(...productionOrders.map((item) => item.orderId), 5000) + 1,
+      planEnd: form.planEnd,
+      planQty: form.planQty,
+      planStart: form.planStart,
+      status: 'pending_review',
+      versionId: form.versionId,
+      versionNo: `V${form.versionId}`,
+    }
+    productionOrders.unshift(order)
+    return structuredClone(order)
+  })
+}
+
+function updateOrder(orderId: number, form: ProductionOrderFormData) {
+  return delay(() => {
+    const order = getOrderRecord(orderId)
+    if (order.status !== 'pending_review' && order.status !== 'pending_schedule') {
+      throw new Error('当前订单状态不可修改')
+    }
+    requirePositive(form.materialId, '物料 ID')
+    requirePositive(form.versionId, 'BOM 版本 ID')
+    requirePositive(form.planQty, '计划数量')
+    if (!materialNames[form.materialId]) {
+      throw new Error('物料不存在')
+    }
+    Object.assign(order, {
+      materialId: form.materialId,
+      materialName: materialNames[form.materialId],
+      planEnd: form.planEnd,
+      planQty: form.planQty,
+      planStart: form.planStart,
+      versionId: form.versionId,
+      versionNo: `V${form.versionId}`,
+    })
+    return structuredClone(order)
+  })
+}
+
+function startOrder(orderId: number) {
+  return delay(() => {
+    const order = getOrderRecord(orderId)
+    if (order.status !== 'pending_schedule') {
+      throw new Error('当前订单不可开工')
+    }
+    order.status = 'in_progress'
+    order.actualStart = timestamp()
+    return structuredClone(order)
+  })
+}
+
+function finishOrder(orderId: number, finishedQty: number) {
+  return delay(() => {
+    const order = getOrderRecord(orderId)
+    requirePositive(finishedQty, '完工数量')
+    if (order.status !== 'in_progress') {
+      throw new Error('当前订单不可完工')
+    }
+    if (finishedQty > order.planQty) {
+      throw new Error('完工数量不能超过计划数量')
+    }
+    order.finishedQty = finishedQty
+    order.status = 'completed'
+    order.actualEnd = timestamp()
+    return structuredClone(order)
+  })
+}
+
+function saveCapacityConfig(form: CapacityConfigFormData) {
+  return delay(() => {
+    requirePositive(form.materialId, '物料 ID')
+    requirePositive(form.typeId, '生产线类型 ID')
+    requirePositive(form.unitTime, '单位工时')
+    if (!materialNames[form.materialId]) {
+      throw new Error('物料不存在')
+    }
+    let existing = undefined as CapacityConfigItem | undefined
+    if (form.configId) {
+      existing = capacityConfigs.find((item) => item.configId === form.configId)
+    }
+    const config: CapacityConfigItem = existing ?? {
+      configId: Math.max(...capacityConfigs.map((item) => item.configId), 200) + 1,
+      materialId: form.materialId,
+      materialName: materialNames[form.materialId],
+      typeId: form.typeId,
+      typeName: typeNames[form.typeId] ?? `生产线类型 #${form.typeId}`,
+      unitTime: form.unitTime,
+    }
+    Object.assign(config, {
+      materialId: form.materialId,
+      materialName: materialNames[form.materialId],
+      typeId: form.typeId,
+      typeName: typeNames[form.typeId] ?? `生产线类型 #${form.typeId}`,
+      unitTime: form.unitTime,
+    })
+    if (!existing) {
+      capacityConfigs.push(config)
+    }
+    return structuredClone(config)
+  })
+}
+
+function createLine(form: ProductionLineFormData) {
+  return delay(() => {
+    requirePositive(form.managerId, '负责人 ID')
+    requirePositive(form.typeId, '生产线类型 ID')
+    const line: ProductionLineItem = {
+      lineId: Math.max(...lines.map((item) => item.lineId), 100) + 1,
+      managerId: form.managerId,
+      startDate: form.startDate,
+      status: 'idle',
+      typeId: form.typeId,
+      typeName: typeNames[form.typeId] ?? `生产线类型 #${form.typeId}`,
+    }
+    lines.push(line)
+    return structuredClone(line)
+  })
+}
+
+function updateLine(lineId: number, form: ProductionLineFormData) {
+  return delay(() => {
+    const line = getLineRecord(lineId)
+    requirePositive(form.managerId, '负责人 ID')
+    requirePositive(form.typeId, '生产线类型 ID')
+    Object.assign(line, {
+      ...form,
+      typeName: typeNames[form.typeId] ?? `生产线类型 #${form.typeId}`,
+    })
+    return structuredClone(line)
+  })
+}
+
+function saveLineType(form: LineTypeFormData) {
+  return delay(() => {
+    if (!form.typeName.trim()) {
+      throw new Error('生产线类型名称不能为空')
+    }
+    const typeId = form.typeId ?? Math.max(...lineTypes.map((item) => item.typeId), 0) + 1
+    const existing = lineTypes.find((item) => item.typeId === typeId)
+    if (existing) {
+      existing.typeName = form.typeName.trim()
+    } else {
+      lineTypes.push({ typeId, typeName: form.typeName.trim() })
+    }
+    typeNames[typeId] = form.typeName.trim()
+    return structuredClone({ typeId, typeName: form.typeName.trim() })
+  })
+}
+
+function saveCalendar(form: ProductionCalendarFormData) {
+  return delay(() => {
+    getLineRecord(form.lineId)
+    const config = getConfigRecord(form.configId)
+    const existing = calendars.find(
+      (item) => item.calendarDate === form.calendarDate && item.lineId === form.lineId,
+    )
+    const item: ProductionCalendarItem = existing ?? {
+      calendarDate: form.calendarDate,
+      configId: form.configId,
+      lineId: form.lineId,
+      lineName: `生产线 #${form.lineId}`,
+      materialId: config.materialId,
+      materialName: config.materialName,
+      typeId: config.typeId,
+      typeName: config.typeName,
+    }
+    Object.assign(item, {
+      configId: form.configId,
+      materialId: config.materialId,
+      materialName: config.materialName,
+      typeId: config.typeId,
+      typeName: config.typeName,
+    })
+    if (!existing) {
+      calendars.push(item)
+    }
+    return structuredClone(item)
+  })
+}
+
+function deleteCalendar(calendarDate: string, lineId: number) {
+  return delay(() => {
+    const index = calendars.findIndex(
+      (item) => item.calendarDate === calendarDate && item.lineId === lineId,
+    )
+    if (index === -1) {
+      throw new Error('未找到排产日历')
+    }
+    calendars.splice(index, 1)
+  })
+}
+
+function reviewExternalOrder(extOrderId: number, accepted: boolean, reviewComment?: string) {
+  return delay(() => {
+    const order = externalOrders.find((item) => item.extOrderId === extOrderId)
+    if (!order) {
+      throw new Error('未找到外部订单')
+    }
+    if (order.status !== 'pending_review') {
+      throw new Error('当前外部订单不可审核')
+    }
+    order.status = 'rejected'
+    if (accepted) {
+      order.status = 'accepted'
+    }
+    order.reviewComment = reviewComment?.trim() || undefined
+    return structuredClone(order)
+  })
+}
+
+function reportFault(form: FaultReportFormData) {
+  return delay(() => {
+    requirePositive(form.lineId, '生产线 ID')
+    getLineRecord(form.lineId)
+    if (!form.faultType.trim() || !form.description.trim()) {
+      throw new Error('故障类型和描述不能为空')
+    }
+    const record: FaultRecordItem = {
+      description: form.description.trim(),
+      faultId: Math.max(...faultRecords.map((item) => item.faultId), 8000) + 1,
+      faultType: form.faultType.trim(),
+      lineId: form.lineId,
+      occurTime: timestamp(),
+      reporterId: 1,
+      status: 'pending_repair',
+    }
+    faultRecords.unshift(record)
+    return structuredClone(record)
+  })
+}
+
+function updateFault(form: FaultUpdateFormData) {
+  return delay(() => {
+    const record = faultRecords.find((item) => item.faultId === form.faultId)
+    if (!record) {
+      throw new Error('未找到故障记录')
+    }
+    if (form.status === 'recovered' && !form.recoverTime) {
+      throw new Error('故障恢复时必须填写恢复时间')
+    }
+    record.status = form.status
+    record.repairerId = form.repairerId
+    record.recoverTime = undefined
+    if (form.status === 'recovered') {
+      record.recoverTime = form.recoverTime
+    }
+    return structuredClone(record)
   })
 }
 
@@ -478,6 +822,12 @@ function listCalendars(query: ProductionCalendarQuery) {
 }
 
 export const productionMock = {
+  approveOrder,
+  cancelOrder,
+  createLine,
+  createOrder,
+  deleteCalendar,
+  finishOrder,
   getOrder(orderId: number) {
     return delay(() => {
       const order = productionOrders.find((item) => item.orderId === orderId)
@@ -508,6 +858,15 @@ export const productionMock = {
   listLineTypes: listTypes,
   listLines,
   listOrders,
+  reportFault,
+  reviewExternalOrder,
+  saveCalendar,
+  saveCapacityConfig,
+  saveLineType,
+  startOrder,
+  updateFault,
+  updateLine,
+  updateOrder,
 }
 
 export type ProductionMockWrite =

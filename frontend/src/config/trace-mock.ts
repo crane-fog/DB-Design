@@ -1,7 +1,9 @@
 import type {
   AffectedProductItem,
+  BatchConsumptionCreateFormData,
   BatchConsumptionItem,
   BatchConsumptionQuery,
+  BatchConsumptionUpdateFormData,
   MaterialBatchTraceItem,
   MaterialBatchTraceQuery,
   ProductBatchTraceItem,
@@ -262,6 +264,68 @@ function listBatchConsumption(query: BatchConsumptionQuery) {
   )
 }
 
+function requirePositive(value: number, label: string) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label}必须是大于 0 的有效数值`)
+  }
+}
+
+function createBatchConsumption(form: BatchConsumptionCreateFormData) {
+  return delay(() => {
+    requirePositive(form.consumeQty, '领料数量')
+    if (!materialByItemId[form.itemId]) {
+      throw new Error('采购明细不存在')
+    }
+    if (!consumptionRecords.some((record) => record.orderId === form.orderId)) {
+      throw new Error('生产订单不存在')
+    }
+    const source = consumptionRecords.find((record) => record.itemId === form.itemId)
+    const record: BatchConsumptionItem = {
+      consumeQty: form.consumeQty,
+      consumptionId: Math.max(...consumptionRecords.map((item) => item.consumptionId), 7000) + 1,
+      itemId: form.itemId,
+      materialName: source?.materialName,
+      orderId: form.orderId,
+      productMaterialName: source?.productMaterialName,
+      productionStatus: source?.productionStatus,
+    }
+    consumptionRecords.unshift(record)
+    return structuredClone(record)
+  })
+}
+
+function updateBatchConsumption(form: BatchConsumptionUpdateFormData) {
+  return delay(() => {
+    requirePositive(form.consumeQty, '领料数量')
+    const record = consumptionRecords.find((item) => item.consumptionId === form.consumptionId)
+    if (!record) {
+      throw new Error('未找到领料记录')
+    }
+    if (!materialByItemId[form.itemId]) {
+      throw new Error('采购明细不存在')
+    }
+    if (!consumptionRecords.some((item) => item.orderId === form.orderId)) {
+      throw new Error('生产订单不存在')
+    }
+    Object.assign(record, {
+      consumeQty: form.consumeQty,
+      itemId: form.itemId,
+      orderId: form.orderId,
+    })
+    return structuredClone(record)
+  })
+}
+
+function deleteBatchConsumption(consumptionId: number) {
+  return delay(() => {
+    const index = consumptionRecords.findIndex((item) => item.consumptionId === consumptionId)
+    if (index === -1) {
+      throw new Error('未找到领料记录')
+    }
+    consumptionRecords.splice(index, 1)
+  })
+}
+
 function traceMaterialBatch(query: MaterialBatchTraceQuery) {
   return delay(() =>
     materialTraceRecords
@@ -325,7 +389,10 @@ function analyzeQualityImpact(form: QualityImpactAnalyzeFormData): Promise<Quali
 
 export const traceMock = {
   analyzeQualityImpact,
+  createBatchConsumption,
+  deleteBatchConsumption,
   listBatchConsumption,
   traceMaterialBatch,
   traceProductBatch,
+  updateBatchConsumption,
 }

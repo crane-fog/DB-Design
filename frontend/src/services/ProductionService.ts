@@ -20,6 +20,7 @@ import type {
 import { isMockEnabled } from '@/config/mock'
 import { productionApi } from '@/api/client'
 import { productionMock } from '@/config/production-mock'
+import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
 
@@ -294,10 +295,20 @@ function assertProductionMockIsReadOnly() {
   }
 }
 
+function assertMockPermission(permission: string) {
+  if (isMockEnabled() && !useAuthStore().hasPermission(permission)) {
+    throw new Error('当前账号没有执行该生产管理操作的权限')
+  }
+}
+
 export const productionService = {
   api: productionApi,
 
   async approveOrder(orderId: number, approved: boolean, reviewComment?: string) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.approveOrder(orderId, approved, reviewComment)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.approveProductionOrder({
       productionOrderApproveRequest: {
@@ -314,6 +325,10 @@ export const productionService = {
   },
 
   async cancelOrder(orderId: number, remark?: string) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.cancelOrder(orderId, remark)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.cancelProductionOrder({
       productionOrderActionRequest: { order_id: orderId, remark: nullableText(remark) },
@@ -326,6 +341,10 @@ export const productionService = {
   },
 
   async createLine(form: ProductionLineFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.createLine(form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.addProductionLine({
       productionLineCreateRequest: {
@@ -342,6 +361,10 @@ export const productionService = {
   },
 
   async createOrder(form: ProductionOrderFormData) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.createOrder(form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.addProductionOrder({
       productionOrderCreateRequest: {
@@ -360,6 +383,10 @@ export const productionService = {
   },
 
   async deleteCalendar(calendarDate: string, lineId: number) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.deleteCalendar(calendarDate, lineId)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.deleteProductionCalendar({
       productionCalendarDeleteRequest: { calendar_date: calendarDate, line_id: lineId },
@@ -368,6 +395,10 @@ export const productionService = {
   },
 
   async finishOrder(orderId: number, finishedQty: number, remark?: string) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.finishOrder(orderId, finishedQty)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.finishProductionOrder({
       productionOrderFinishRequest: {
@@ -528,6 +559,10 @@ export const productionService = {
   },
 
   async reportFault(form: FaultReportFormData) {
+    assertMockPermission('production:breakdown')
+    if (isMockEnabled()) {
+      return productionMock.reportFault(form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.reportProductionLineFault({
       faultRecordCreateRequest: {
@@ -544,6 +579,10 @@ export const productionService = {
   },
 
   async reviewExternalOrder(extOrderId: number, accepted: boolean, reviewComment?: string) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.reviewExternalOrder(extOrderId, accepted, reviewComment)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.reviewExternalOrder({
       externalOrderReviewRequest: {
@@ -560,6 +599,10 @@ export const productionService = {
   },
 
   async saveCalendar(form: ProductionCalendarFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.saveCalendar(form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.saveProductionCalendar({
       productionCalendarSaveRequest: {
@@ -576,6 +619,10 @@ export const productionService = {
   },
 
   async saveCapacityConfig(form: CapacityConfigFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.saveCapacityConfig(form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.saveCapacityConfig({
       capacityConfigSaveRequest: {
@@ -593,6 +640,10 @@ export const productionService = {
   },
 
   async saveLineType(form: LineTypeFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.saveLineType(form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.saveProductionLineType({
       lineTypeSaveRequest: { type_id: form.typeId ?? undefined, type_name: form.typeName.trim() },
@@ -605,6 +656,10 @@ export const productionService = {
   },
 
   async startOrder(orderId: number, remark?: string) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.startOrder(orderId)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.startProductionOrder({
       productionOrderActionRequest: { order_id: orderId, remark: nullableText(remark) },
@@ -617,6 +672,10 @@ export const productionService = {
   },
 
   async updateFault(form: FaultUpdateFormData) {
+    assertMockPermission('production:breakdown')
+    if (isMockEnabled()) {
+      return productionMock.updateFault(form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionLineFault({
       faultRecordUpdateRequest: {
@@ -634,6 +693,10 @@ export const productionService = {
   },
 
   async updateLine(lineId: number, form: ProductionLineFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.updateLine(lineId, form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionLine({
       productionLineUpdateRequest: {
@@ -651,6 +714,10 @@ export const productionService = {
   },
 
   async updateOrder(orderId: number, form: ProductionOrderFormData) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.updateOrder(orderId, form)
+    }
     assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionOrder({
       productionOrderUpdateRequest: {
