@@ -21,8 +21,9 @@ import type {
   UserRole,
 } from '@/api'
 import { getMockAccessProfile, getSystemAdministratorPermissions } from '@/config/mock-access'
+import { getMockScenario, isMockEnabled } from '@/config/mock'
 import { getRequestStatus } from '@/services/request'
-import { isMockEnabled } from '@/config/mock'
+import { systemMock } from '@/config/system-mock'
 
 export { getRequestStatus }
 export type { PageResult }
@@ -487,6 +488,10 @@ async function loadCurrentAccessFromApi(employeeNo: string): Promise<SystemAcces
 }
 
 async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContext> {
+  if (isMockEnabled()) {
+    return getMockAccessContext(employeeNo)
+  }
+
   try {
     return await loadCurrentAccessFromApi(employeeNo)
   } catch (error) {
@@ -497,8 +502,15 @@ async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContex
   }
 }
 
+function assertSystemWriteApi() {
+  if (isMockEnabled()) {
+    throw new Error('系统管理 Mock 当前为只读模式，暂不支持写操作。')
+  }
+}
+
 export const systemService = {
   async assignRolePermissions(roleId: number, permissionIds: number[]) {
+    assertSystemWriteApi()
     if (!permissionIds.length) {
       throw new Error('请至少选择一个权限')
     }
@@ -509,6 +521,7 @@ export const systemService = {
   },
 
   async assignUserRoles(userId: number, roleIds: number[]) {
+    assertSystemWriteApi()
     const response = await systemApi.addUserRole({
       userRoleAssignRequest: { role_ids: roleIds, user_id: userId },
     })
@@ -516,6 +529,7 @@ export const systemService = {
   },
 
   async createRole(form: RoleFormData) {
+    assertSystemWriteApi()
     const response = await systemApi.addRoleData({
       roleCreateRequest: {
         description: toNullableText(form.description),
@@ -531,6 +545,7 @@ export const systemService = {
   },
 
   async createUser(form: UserCreateFormData) {
+    assertSystemWriteApi()
     const response = await systemApi.addUserData({
       userCreateRequest: {
         email: toNullableText(form.email),
@@ -554,12 +569,18 @@ export const systemService = {
       .filter((permissionId): permissionId is number => permissionId !== undefined)
   },
 
-  getUserTest: () => Api.getUserTest(),
+  getUserTest: () => {
+    assertSystemWriteApi()
+    return Api.getUserTest()
+  },
 
   async listLoginLogs(
     query: LoginLogQuery,
     includeUserDirectory = false,
   ): Promise<PageResult<SystemLoginLog>> {
+    if (isMockEnabled()) {
+      return systemMock.listLoginLogs(query, includeUserDirectory, getMockScenario())
+    }
     const response = await systemApi.listLoginRecordData({
       endTime: query.endTime,
       page: query.page,
@@ -587,6 +608,9 @@ export const systemService = {
     query: OperationLogQuery,
     includeUserDirectory = false,
   ): Promise<PageResult<SystemOperationLog>> {
+    if (isMockEnabled()) {
+      return systemMock.listOperationLogs(query, includeUserDirectory, getMockScenario())
+    }
     const response = await systemApi.listOperationLogData({
       action: query.action || undefined,
       endTime: query.endTime,
@@ -612,6 +636,9 @@ export const systemService = {
   },
 
   async listRolePage(query: RoleQuery): Promise<PageResult<SystemRoleSummary>> {
+    if (isMockEnabled()) {
+      return systemMock.listRoles(query, getMockScenario())
+    }
     const response = await systemApi.listRoleData({
       page: query.page,
       pageSize: query.pageSize,
@@ -649,6 +676,9 @@ export const systemService = {
   },
 
   async listRoles(): Promise<SystemRole[]> {
+    if (isMockEnabled()) {
+      return systemMock.listRoleOptions(getMockScenario())
+    }
     const response = await systemApi.listRoleData({ page: 1, pageSize: 100 })
     const data = unwrap(response.data as ApiEnvelope<unknown>)
 
@@ -658,6 +688,9 @@ export const systemService = {
   },
 
   async listUserRoleIds(userId: number) {
+    if (isMockEnabled()) {
+      return systemMock.listUserRoleIds(userId, getMockScenario())
+    }
     const response = await systemApi.listUserRoleData({ page: 1, pageSize: 100, userId })
     const data = unwrap(response.data as ApiEnvelope<unknown>)
 
@@ -667,6 +700,9 @@ export const systemService = {
   },
 
   async listUsers(query: UserQuery): Promise<PageResult<SystemUser>> {
+    if (isMockEnabled()) {
+      return systemMock.listUsers(query, getMockScenario())
+    }
     const response = await systemApi.listUserData({
       employeeNo: query.employeeNo || undefined,
       page: query.page,
@@ -690,6 +726,9 @@ export const systemService = {
   loadCurrentAccess,
 
   async loadRolePermissionAssignment(roleId: number): Promise<RolePermissionAssignment> {
+    if (isMockEnabled()) {
+      return systemMock.loadRolePermissionAssignment(roleId, getMockScenario())
+    }
     const [permissions, rolePermissions] = await Promise.all([
       getAllPageItems<Permission>((page, pageSize) =>
         systemApi.listPermissionData({ page, pageSize }),
@@ -717,6 +756,7 @@ export const systemService = {
   },
 
   async register(form: RegisterFormData) {
+    assertSystemWriteApi()
     const request: RegisterRequest = {
       email: toNullableText(form.email),
       employee_no: form.employeeNo.trim(),
@@ -729,6 +769,7 @@ export const systemService = {
   },
 
   async resetUserPassword(userId: number, password: string) {
+    assertSystemWriteApi()
     const response = await systemApi.updateUserData({
       userUpdateRequest: { password: await hashPassword(password), user_id: userId },
     })
@@ -736,6 +777,7 @@ export const systemService = {
   },
 
   async updateRole(roleId: number, form: RoleFormData) {
+    assertSystemWriteApi()
     const response = await systemApi.updateRoleData({
       roleUpdateRequest: {
         description: toNullableText(form.description),
@@ -752,6 +794,7 @@ export const systemService = {
   },
 
   async updateRoleStatus(role: SystemRole, status: AccountStatus) {
+    assertSystemWriteApi()
     const response = await systemApi.updateRoleData({
       roleUpdateRequest: {
         description: toNullableText(role.description),
@@ -764,6 +807,7 @@ export const systemService = {
   },
 
   async updateUser(userId: number, form: UserFormData) {
+    assertSystemWriteApi()
     const response = await systemApi.updateUserData({
       userUpdateRequest: {
         email: toNullableText(form.email),
@@ -782,6 +826,7 @@ export const systemService = {
   },
 
   async updateUserStatus(userId: number, status: AccountStatus) {
+    assertSystemWriteApi()
     const response = await systemApi.updateUserData({
       userUpdateRequest: { status, user_id: userId },
     })

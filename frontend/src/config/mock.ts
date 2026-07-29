@@ -1,5 +1,6 @@
 export type DataMode = 'api' | 'mock'
-export type DashboardMockScenario = 'empty' | 'error' | 'success'
+export type MockScenario = 'empty' | 'error' | 'success'
+export type DashboardMockScenario = MockScenario
 
 export function getDataMode(): DataMode {
   if (import.meta.env.VITE_DATA_MODE === 'api') {
@@ -12,12 +13,16 @@ export function isMockEnabled() {
   return getDataMode() === 'mock'
 }
 
-export function getDashboardMockScenario(): DashboardMockScenario {
+export function getMockScenario(): MockScenario {
   const value = import.meta.env.VITE_MOCK_SCENARIO
   if (value === 'empty' || value === 'error' || value === 'success') {
     return value
   }
   return 'success'
+}
+
+export function getDashboardMockScenario(): DashboardMockScenario {
+  return getMockScenario()
 }
 
 export function isMockPersistenceEnabled() {
