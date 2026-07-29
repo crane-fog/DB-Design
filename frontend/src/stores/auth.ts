@@ -10,6 +10,7 @@ import {
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getMockAccessProfile } from '@/config/mock-access'
+import { setMockActor } from '@/services/SystemService'
 
 export interface CurrentUser {
   employeeNo?: string
@@ -70,6 +71,9 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser.value = session?.currentUser
     roles.value = session?.roles ?? []
     permissions.value = session?.permissions ?? []
+    if (currentUser.value?.employeeNo) {
+      setMockActor(currentUser.value.employeeNo)
+    }
     if (currentUser.value?.employeeNo && !roles.value.length && !permissions.value.length) {
       const fallbackAccess = getMockAccessProfile(currentUser.value.employeeNo)
       roles.value = fallbackAccess.roles

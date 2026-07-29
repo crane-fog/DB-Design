@@ -1,7 +1,9 @@
 import type {
+  AccountStatus,
   LoginLogQuery,
   OperationLogQuery,
   PermissionTreeNode,
+  RoleFormData,
   RolePermissionAssignment,
   RoleQuery,
   SystemLoginLog,
@@ -9,6 +11,8 @@ import type {
   SystemRole,
   SystemRoleSummary,
   SystemUser,
+  UserCreateFormData,
+  UserFormData,
   UserQuery,
 } from '@/services/SystemService'
 import type { PageResult } from '@/services/pagination'
@@ -39,7 +43,7 @@ interface MockOperationLog extends SystemOperationLog {
   operatorId: number
 }
 
-const users: SystemUser[] = [
+let users: SystemUser[] = [
   {
     createdTime: '2026-01-08T09:00:00',
     email: 'admin@example.test',
@@ -141,7 +145,7 @@ const users: SystemUser[] = [
   })),
 ]
 
-const roles: SystemRole[] = [
+let roles: SystemRole[] = [
   { description: '拥有系统全部管理权限', id: 1, name: '系统管理员', status: 'valid' },
   { description: '负责用户与角色维护', id: 2, name: '系统运维员', status: 'valid' },
   { description: '负责仓储业务处理', id: 3, name: '仓储主管', status: 'valid' },
@@ -173,7 +177,7 @@ const permissions: MockPermission[] = [
   { action: '查看追溯', id: 14, resource: '质量追溯' },
 ]
 
-const userRoles: MockUserRole[] = [
+let userRoles: MockUserRole[] = [
   { roleId: 1, userId: 1001 },
   { roleId: 1, userId: 1002 },
   { roleId: 2, userId: 1007 },
@@ -183,7 +187,7 @@ const userRoles: MockUserRole[] = [
   { roleId: 6, userId: 1008 },
 ]
 
-const rolePermissions: MockRolePermission[] = [
+let rolePermissions: MockRolePermission[] = [
   ...permissions.map(({ id: permissionId }) => ({ permissionId, roleId: 1 })),
   { permissionId: 1, roleId: 2 },
   { permissionId: 2, roleId: 2 },
@@ -384,6 +388,66 @@ const operationLogs: MockOperationLog[] = [
   },
 ]
 
+let nextUserId = Math.max(...users.map((user) => user.id)) + 1
+let nextRoleId = Math.max(...roles.map((role) => role.id)) + 1
+let nextOperationLogId = Math.max(...operationLogs.map((log) => log.id ?? 0)) + 1
+const userPasswords = new Map<number, string>()
+
+function requireUser(userId: number) {
+  const user = users.find((item) => item.id === userId)
+  if (!user) {
+    throw new Error('用户不存在。')
+  }
+  return user
+}
+
+function requireRole(roleId: number) {
+  const role = roles.find((item) => item.id === roleId)
+  if (!role) {
+    throw new Error('角色不存在。')
+  }
+  return role
+}
+
+function requireUniqueEmployeeNo(employeeNo: string, userId?: number) {
+  if (!employeeNo.trim()) {
+    throw new Error('工号不能为空。')
+  }
+  if (users.some((user) => user.id !== userId && user.employeeNo === employeeNo.trim())) {
+    throw new Error('工号已存在。')
+  }
+}
+
+function requireUniqueRoleName(name: string, roleId?: number) {
+  if (!name.trim()) {
+    throw new Error('角色名称不能为空。')
+  }
+  if (roles.some((role) => role.id !== roleId && role.name === name.trim())) {
+    throw new Error('角色名称已存在。')
+  }
+}
+
+function appendOperationLog(action: string, beforeData?: unknown, afterData?: unknown) {
+  let serializedAfterData: string | undefined = undefined
+  let serializedBeforeData: string | undefined = undefined
+  if (afterData !== undefined) {
+    serializedAfterData = JSON.stringify(afterData)
+  }
+  if (beforeData !== undefined) {
+    serializedBeforeData = JSON.stringify(beforeData)
+  }
+  operationLogs.unshift({
+    action,
+    afterData: serializedAfterData,
+    beforeData: serializedBeforeData,
+    id: nextOperationLogId++,
+    ipAddress: '127.0.0.1',
+    module: '系统管理',
+    operateTime: new Date().toISOString(),
+    operatorId: 1002,
+  })
+}
+
 function clone<TValue>(value: TValue): TValue {
   return structuredClone(value)
 }
@@ -506,6 +570,70 @@ function buildPermissionTree(scenario: MockScenario): PermissionTreeNode[] {
 // The service methods are grouped by page capability rather than alphabetically.
 // oxlint-disable-next-line sort-keys
 export const systemMock = {
+  assignRolePermissions(roleId: number, permissionIds: number[]) {
+    const role = requireRole(roleId)
+    const validPermissionIds = new Set(permissions.map((permission) => permission.id))
+    if (!permissionIds.length || permissionIds.some((id) => !validPermissionIds.has(id))) {
+      throw new Error('权限不存在或不能为空。')
+    }
+    const beforeData = rolePermissions.filter((item) => item.roleId === roleId)
+    rolePermissions = [
+      ...rolePermissions.filter((item) => item.roleId !== roleId),
+      ...permissionIds.map((permissionId) => ({ permissionId, roleId })),
+    ]
+    appendOperationLog('分配角色权限', beforeData, { permissionIds, roleId: role.id })
+  },
+
+  assignUserRoles(userId: number, roleIds: number[]) {
+    requireUser(userId)
+    const validRoleIds = new Set(
+      roles.filter((role) => role.status === 'valid').map((role) => role.id),
+    )
+    if (roleIds.some((roleId) => !validRoleIds.has(roleId))) {
+      throw new Error('只能分配有效角色。')
+    }
+    const beforeData = userRoles.filter((item) => item.userId === userId)
+    userRoles = [
+      ...userRoles.filter((item) => item.userId !== userId),
+      ...roleIds.map((roleId) => ({ roleId, userId })),
+    ]
+    appendOperationLog('分配用户角色', beforeData, { roleIds, userId })
+  },
+
+  createRole(form: RoleFormData) {
+    requireUniqueRoleName(form.name)
+    const role: SystemRole = {
+      description: form.description?.trim() || undefined,
+      id: nextRoleId++,
+      name: form.name.trim(),
+      status: form.status,
+    }
+    roles = [...roles, role]
+    appendOperationLog('新增角色', undefined, role)
+    return clone(role)
+  },
+
+  createUser(form: UserCreateFormData, passwordHash: string) {
+    requireUniqueEmployeeNo(form.employeeNo)
+    if (!form.name.trim() || !form.phone.trim() || !passwordHash) {
+      throw new Error('用户信息不完整。')
+    }
+    const user: SystemUser = {
+      createdTime: new Date().toISOString(),
+      email: form.email?.trim() || undefined,
+      employeeNo: form.employeeNo.trim(),
+      id: nextUserId++,
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      pwdUpdateTime: new Date().toISOString(),
+      status: form.status,
+    }
+    users = [...users, user]
+    userPasswords.set(user.id, passwordHash)
+    appendOperationLog('新增用户', undefined, user)
+    return clone(user)
+  },
+
   listUsers(query: UserQuery, scenario: MockScenario) {
     return withScenario(scenario, () => {
       const filtered = scenarioUsers(scenario).filter(
@@ -543,6 +671,58 @@ export const systemMock = {
         .filter((relation) => relation.userId === userId)
         .map((relation) => relation.roleId)
     })
+  },
+
+  resetUserPassword(userId: number, passwordHash: string) {
+    const user = requireUser(userId)
+    if (!passwordHash) {
+      throw new Error('密码不能为空。')
+    }
+    userPasswords.set(userId, passwordHash)
+    const beforeData = { pwdUpdateTime: user.pwdUpdateTime }
+    user.pwdUpdateTime = new Date().toISOString()
+    appendOperationLog('重置用户密码', beforeData, { pwdUpdateTime: user.pwdUpdateTime, userId })
+  },
+
+  updateRole(roleId: number, form: RoleFormData) {
+    const role = requireRole(roleId)
+    requireUniqueRoleName(form.name, roleId)
+    const beforeData = clone(role)
+    role.description = form.description?.trim() || undefined
+    role.name = form.name.trim()
+    role.status = form.status
+    appendOperationLog('编辑角色', beforeData, role)
+    return clone(role)
+  },
+
+  updateRoleStatus(roleId: number, status: AccountStatus) {
+    const role = requireRole(roleId)
+    const beforeData = clone(role)
+    role.status = status
+    appendOperationLog('更新角色状态', beforeData, role)
+  },
+
+  updateUser(userId: number, form: UserFormData) {
+    const user = requireUser(userId)
+    requireUniqueEmployeeNo(form.employeeNo, userId)
+    if (!form.name.trim() || !form.phone.trim()) {
+      throw new Error('用户信息不完整。')
+    }
+    const beforeData = clone(user)
+    user.email = form.email?.trim() || undefined
+    user.employeeNo = form.employeeNo.trim()
+    user.name = form.name.trim()
+    user.phone = form.phone.trim()
+    user.status = form.status
+    appendOperationLog('编辑用户', beforeData, user)
+    return clone(user)
+  },
+
+  updateUserStatus(userId: number, status: AccountStatus) {
+    const user = requireUser(userId)
+    const beforeData = clone(user)
+    user.status = status
+    appendOperationLog('更新用户状态', beforeData, user)
   },
 
   loadRolePermissionAssignment(

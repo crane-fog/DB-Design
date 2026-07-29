@@ -1,5 +1,5 @@
 import type { LoginData, LoginRequest } from '@/api'
-import { type SystemAccessContext, systemService } from '@/services/SystemService'
+import { type SystemAccessContext, setMockActor, systemService } from '@/services/SystemService'
 import { isMockAuthEnabled } from '@/config/mock'
 
 export { isMockAuthEnabled }
@@ -30,6 +30,7 @@ function isLoginData(data: unknown): data is LoginData {
 
 export const authService = {
   async initializeAccess(employeeNo: string, result: AuthLoginResult) {
+    setMockActor(employeeNo)
     if (result.access) {
       return result.access
     }
