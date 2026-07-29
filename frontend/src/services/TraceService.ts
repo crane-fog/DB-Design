@@ -8,6 +8,7 @@ import type {
 } from '@/api'
 import {
   type ApiEnvelope,
+  type PageRequest,
   type PageResult,
   getPageItems,
   getPageMetadata,
@@ -23,12 +24,10 @@ export type { PageResult }
 /** 质量影响分析建议处理动作。 */
 export type SuggestedActionValue = 'freeze' | 'observe' | 'recall'
 
-export interface BatchConsumptionQuery {
+export interface BatchConsumptionQuery extends PageRequest {
   itemId?: number
   materialId?: number
   orderId?: number
-  page: number
-  pageSize: number
 }
 
 export interface BatchConsumptionItem {

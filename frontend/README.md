@@ -38,6 +38,7 @@ copy .env.example .env
 - `VITE_API_BASE_URL`：生成 API 客户端的基址。默认留空，接口仍以同源 `/api` 路径访问。
 - `VITE_API_PROXY_TARGET`：Vite 开发代理的目标地址，默认 `http://localhost:5000`。
 - `VITE_USE_MOCK_AUTH`：只在 Vite 开发环境启用本地 Mock 登录；即使生产环境设为 `true`，生产构建也会禁用。
+- `VITE_USE_DASHBOARD_MOCK`、`VITE_USE_MATERIAL_MOCK`、`VITE_USE_INVENTORY_MOCK`、`VITE_USE_PURCHASE_MOCK`：独立的模块 Mock 开关，仅在开发环境有效。生产构建始终禁用；关闭后 Service 会调用真实 API，尚未接入 API 的工作台和物料模块会明确报错，不会伪装为成功。
 
 页面只能通过 Service 调用 API，禁止在页面中硬编码完整接口地址。新增环境变量时先补充 `.env.example` 和本节说明；不要提交 `.env`、Token、密码或个人本地配置。
 
@@ -63,6 +64,8 @@ DEV_USER / dev-user-123
 Mock 账号仅用于本地前端开发，密码属于可公开的测试数据，不能替代真实账号。Mock 登录要求同时满足 `import.meta.env.DEV` 和 `VITE_USE_MOCK_AUTH=true`；因此生产构建无法启用该入口，也不得将真实账号、密码、Token 或数据库连接写入仓库。
 
 ## Mock 与 Service 规范
+
+Mock 开关统一由 `src/config/mock.ts` 读取。库存和采购不再共用开关，方便后续按模块联调；Mock 仅作为显式开发数据源，API 网络或业务错误不会自动回退成 Mock。
 
 - 页面只能调用 `src/services/`，禁止直接调用 Axios、自动生成 API 或在模板中编写大型 Mock 数组。
 - 工作台 Mock 集中放在 `src/config/dashboard-mock.ts`，类型位于 `src/types/dashboard.ts`，唯一调用入口为 `DashboardService.ts`。

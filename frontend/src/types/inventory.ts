@@ -39,11 +39,9 @@ export interface InventoryAlertItem {
   threshold: number
 }
 
-export interface InventoryAlertQuery {
+export interface InventoryAlertQuery extends PageRequest {
   endTime?: string
   materialId?: number
-  page: number
-  pageSize: number
   startTime?: string
   status?: InventoryAlertStatus
 }
@@ -66,11 +64,9 @@ export interface StockLockItem {
   status: StockLockStatus
 }
 
-export interface StockLockQuery {
+export interface StockLockQuery extends PageRequest {
   materialId?: number
   orderId?: number
-  page: number
-  pageSize: number
   status?: StockLockStatus
 }
 
@@ -108,11 +104,9 @@ export interface ObsoleteDetectionResult {
   items: ObsoleteMaterialItem[]
 }
 
-export interface ObsoleteMaterialQuery {
+export interface ObsoleteMaterialQuery extends PageRequest {
   endTime?: string
   materialId?: number
-  page: number
-  pageSize: number
   startTime?: string
   status?: ObsoleteMaterialStatus
 }
@@ -131,12 +125,10 @@ export interface CompletionInboundItem {
   versionId: number
 }
 
-export interface CompletionInboundQuery {
+export interface CompletionInboundQuery extends PageRequest {
   endTime?: string
   materialId?: number
   orderId?: number
-  page: number
-  pageSize: number
   startTime?: string
 }
 
@@ -156,3 +148,4 @@ export interface InventoryOverviewSummary {
   obsoletePendingCount: number
   pendingAlertCount: number
 }
+import type { PageRequest } from '@/services/pagination'

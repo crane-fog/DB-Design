@@ -20,9 +20,8 @@ import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
 import { getErrorMessage } from '@/utils/error'
+import { materialBomStatuses } from '@/constants/status'
 import { materialService } from '@/services/MaterialService'
-
-type TagType = 'danger' | 'info' | 'primary' | 'success' | 'warning'
 
 const pageSize = 8
 const filters = reactive({ keyword: '', owner: '', status: '' })
@@ -50,17 +49,15 @@ let isUnmounted = false
 let listRequestId = 0
 let detailRequestId = 0
 
-const statusLabels: Record<MaterialBomStatus, string> = {
-  archived: '已归档',
-  draft: '草稿',
-  released: '已发布',
-}
-
-const statusTone: Record<MaterialBomStatus, TagType> = {
-  archived: 'info',
-  draft: 'warning',
-  released: 'success',
-}
+const statusLabels = Object.fromEntries(
+  Object.entries(materialBomStatuses).map(([status, presentation]) => [status, presentation.label]),
+) as Record<keyof typeof materialBomStatuses, string>
+const statusTone = Object.fromEntries(
+  Object.entries(materialBomStatuses).map(([status, presentation]) => [status, presentation.tone]),
+) as Record<
+  keyof typeof materialBomStatuses,
+  (typeof materialBomStatuses)[keyof typeof materialBomStatuses]['tone']
+>
 
 const componentTypeLabels = {
   material: '原材料',

@@ -4,7 +4,6 @@ import {
   type BatchConsumptionItem,
   type BatchConsumptionUpdateFormData,
   type MaterialBatchTraceItem,
-  type PageResult,
   type ProductBatchTraceItem,
   type QualityImpactResult,
   type SuggestedActionValue,
@@ -14,22 +13,17 @@ import { Delete, EditPen, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
+import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
+import { productionOrderStatusLabels as orderStatusLabels } from '@/constants/status'
 import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
 
 type TraceTab = 'consumption' | 'impact' | 'material' | 'product'
-
-const orderStatusLabels: Record<string, string> = {
-  cancelled: '已取消',
-  completed: '已完成',
-  in_progress: '生产中',
-  pending_review: '待审核',
-  pending_schedule: '待排产',
-}
 
 const suggestedActionLabels: Record<SuggestedActionValue, string> = {
   freeze: '冻结批次',
@@ -45,7 +39,7 @@ const suggestedActionTone: Record<SuggestedActionValue, 'danger' | 'info' | 'war
 
 const pageSize = 10
 const auth = useAuthStore()
-const canManage = computed(() => auth.hasPermission('trace:manage'))
+const canManage = computed(() => auth.hasPermission(PERMISSIONS.trace.manage))
 const activeTab = ref<TraceTab>('consumption')
 
 // ---------- 批次消耗关系 ----------

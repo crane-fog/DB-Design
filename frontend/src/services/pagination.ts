@@ -1,4 +1,9 @@
 /** 统一分页结果结构，供各业务 Service 复用。 */
+export interface PageRequest {
+  page: number
+  pageSize: number
+}
+
 export interface PageResult<TEntity> {
   items: TEntity[]
   page: number
@@ -28,19 +33,33 @@ interface RawPageResult {
 /** 接口业务错误，携带后端返回的状态码。 */
 export class ApiRequestError extends Error {
   readonly status: number | undefined
+  readonly responseData: unknown
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, responseData?: unknown) {
     super(message)
+    this.name = 'ApiRequestError'
     this.status = status
+    this.responseData = responseData
   }
 }
 
 /** 校验响应信封并返回业务数据，非成功码抛出 ApiRequestError。 */
-export function unwrap<TPayload>(payload: ApiEnvelope<TPayload>) {
+export function unwrap<TPayload>(payload: ApiEnvelope<TPayload>): TPayload | undefined {
   if (payload.code !== undefined && payload.code !== 200) {
     throw new ApiRequestError(payload.message || '接口请求失败', payload.code)
   }
   return payload.data
+}
+
+/** 将接口分页 DTO 转为页面唯一使用的分页结构。 */
+export function mapPageResult<TSource, TResult>(
+  payload: unknown,
+  fallback: PageRequest,
+  mapper: (item: TSource) => TResult,
+): PageResult<TResult> {
+  const items = getPageItems<TSource>(payload).map(mapper)
+  const metadata = getPageMetadata(payload, { ...fallback, total: items.length })
+  return { items, ...metadata }
 }
 
 /** 从多种分页负载形态中提取条目数组。 */
@@ -88,7 +107,7 @@ export function getPageMetadata(
 /** 非空字符串返回原值，否则返回 undefined。 */
 export function optionalText(value: unknown) {
   if (typeof value === 'string' && value.trim()) {
-    return value
+    return value.trim()
   }
   return undefined
 }

@@ -1,8 +1,7 @@
 import {
   type ApiEnvelope,
   type PageResult,
-  getPageItems,
-  getPageMetadata,
+  mapPageResult,
   nullableText,
   optionalText,
   unwrap,
@@ -26,13 +25,14 @@ import type {
   PurchaseReminderItem,
   PurchaseReminderQuery,
 } from '@/types/purchase'
+import { cleanQuery } from '@/services/request'
+import { isMockEnabled } from '@/config/mock'
 import { purchaseApi } from '@/api/client'
 import { purchaseMock } from '@/config/purchase-mock'
 
 export type { PageResult }
 
-const usePurchaseMock =
-  import.meta.env.DEV && import.meta.env.VITE_USE_INVENTORY_PURCHASE_MOCK === 'true'
+const usePurchaseMock = isMockEnabled('purchase')
 
 function toOrder(item: PurchaseOrder): PurchaseOrderItem {
   return {
@@ -97,20 +97,6 @@ function mapOptional<TSource, TResult>(
     return undefined
   }
   return mapper(value)
-}
-
-function toPage<TSource, TResult>(
-  payload: unknown,
-  query: { page: number; pageSize: number },
-  mapper: (item: TSource) => TResult,
-): PageResult<TResult> {
-  const items = getPageItems<TSource>(payload).map(mapper)
-  const metadata = getPageMetadata(payload, {
-    page: query.page,
-    pageSize: query.pageSize,
-    total: items.length,
-  })
-  return { items, ...metadata }
 }
 
 export const purchaseService = {
@@ -283,51 +269,58 @@ export const purchaseService = {
   },
 
   async listOrders(query: PurchaseOrderQuery) {
+    const normalizedQuery = cleanQuery(query)
     if (usePurchaseMock) {
-      return purchaseMock.listOrders(query)
+      return purchaseMock.listOrders(normalizedQuery)
     }
     const response = await purchaseApi.listPurchaseOrder({
-      buyerId: query.buyerId,
-      expectedDateEnd: query.expectedDateEnd,
-      expectedDateStart: query.expectedDateStart,
-      materialId: query.materialId,
-      orderDateEnd: query.orderDateEnd,
-      orderDateStart: query.orderDateStart,
-      page: query.page,
-      pageSize: query.pageSize,
-      status: query.status,
-      supplierId: query.supplierId,
+      buyerId: normalizedQuery.buyerId,
+      expectedDateEnd: normalizedQuery.expectedDateEnd,
+      expectedDateStart: normalizedQuery.expectedDateStart,
+      materialId: normalizedQuery.materialId,
+      orderDateEnd: normalizedQuery.orderDateEnd,
+      orderDateStart: normalizedQuery.orderDateStart,
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
+      status: normalizedQuery.status,
+      supplierId: normalizedQuery.supplierId,
     })
     const payload = unwrap(response.data as ApiEnvelope<unknown>)
-    return toPage<PurchaseOrder, PurchaseOrderItem>(payload, query, toOrder)
+    return mapPageResult<PurchaseOrder, PurchaseOrderItem>(payload, normalizedQuery, toOrder)
   },
 
   async listReceipts(query: PurchaseReceiptQuery) {
+    const normalizedQuery = cleanQuery(query)
     if (usePurchaseMock) {
-      return purchaseMock.listReceipts(query)
+      return purchaseMock.listReceipts(normalizedQuery)
     }
     const response = await purchaseApi.listPurchaseReceipt({
-      materialId: query.materialId,
-      orderId: query.orderId,
-      page: query.page,
-      pageSize: query.pageSize,
+      materialId: normalizedQuery.materialId,
+      orderId: normalizedQuery.orderId,
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
     })
     const payload = unwrap(response.data as ApiEnvelope<unknown>)
-    return toPage<PurchaseReceipt, PurchaseReceiptItem>(payload, query, toReceipt)
+    return mapPageResult<PurchaseReceipt, PurchaseReceiptItem>(payload, normalizedQuery, toReceipt)
   },
 
   async listReminders(query: PurchaseReminderQuery) {
+    const normalizedQuery = cleanQuery(query)
     if (usePurchaseMock) {
-      return purchaseMock.listReminders(query)
+      return purchaseMock.listReminders(normalizedQuery)
     }
     const response = await purchaseApi.listPurchaseOverdueReminder({
-      orderId: query.orderId,
-      page: query.page,
-      pageSize: query.pageSize,
-      status: query.status,
+      orderId: normalizedQuery.orderId,
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
+      status: normalizedQuery.status,
     })
     const payload = unwrap(response.data as ApiEnvelope<unknown>)
-    return toPage<PurchaseOverdueReminder, PurchaseReminderItem>(payload, query, toReminder)
+    return mapPageResult<PurchaseOverdueReminder, PurchaseReminderItem>(
+      payload,
+      normalizedQuery,
+      toReminder,
+    )
   },
 
   async submitOrder(orderId: number, operatorId: number) {

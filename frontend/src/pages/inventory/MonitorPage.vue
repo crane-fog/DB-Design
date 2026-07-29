@@ -18,18 +18,10 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
 import { inventoryService } from '@/services/InventoryService'
+import { inventoryMonitorStatusLabels as statusLabels } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
 
 type MonitorTab = 'alerts' | 'locks' | 'obsolete'
-
-const statusLabels = {
-  cancelled: '已释放',
-  consumed: '已消耗',
-  handled: '已处理',
-  ignored: '已忽略',
-  locked: '锁定中',
-  pending: '待处理',
-}
 
 const auth = useAuthStore()
 const operatorId = computed(() => auth.currentUser?.id)
