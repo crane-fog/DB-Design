@@ -42,13 +42,13 @@ ID 是内部关联主键，Code/No 是业务可读编号，Name 仅展示。`ord
 
 | 模块 | 数据源 | 开关 | 真实 API | 自动回退 |
 | --- | --- | --- | --- | --- |
-| 工作台 | 集中 Mock | `VITE_USE_DASHBOARD_MOCK` | 未接入 | 否 |
-| 物料 BOM | 集中 Mock | `VITE_USE_MATERIAL_MOCK` | 未接入 | 否，关闭时明确报错 |
-| 库存 | Mock 或 API | `VITE_USE_INVENTORY_MOCK` | 支持 | 否 |
-| 采购 | Mock 或 API | `VITE_USE_PURCHASE_MOCK` | 支持 | 否 |
+| 工作台 | 集中 Mock | `VITE_DATA_MODE=mock` | 未接入 | 否 |
+| 物料 BOM | 集中 Mock | `VITE_DATA_MODE=mock` | 未接入 | 否，`api` 模式明确报错 |
+| 库存 | Mock 或 API | `VITE_DATA_MODE` | 支持 | 否 |
+| 采购 | Mock 或 API | `VITE_DATA_MODE` | 支持 | 否 |
 | 生产、追溯 | API | 无 | 支持 | 否 |
 
-所有开关仅在 Vite 开发环境生效；生产构建不会启用 Mock。联调完成后关闭对应模块开关并删除该 Service 的 Mock 分支和配置数据。
+`VITE_USE_MOCK_AUTH` 仅在 Vite 开发环境生效；`VITE_DATA_MODE` 控制业务 Service 的全局数据源，生产构建不会因该模式自动回退 Mock。联调完成后删除已被真实 API 覆盖的 Service Mock 分支和配置数据。
 
 ## 待处理事项
 

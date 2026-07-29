@@ -1,14 +1,13 @@
 import type { LoginData, LoginRequest } from '@/api'
 import { type SystemAccessContext, systemService } from '@/services/SystemService'
+import { isMockAuthEnabled } from '@/config/mock'
+
+export { isMockAuthEnabled }
 
 export interface AuthLoginResult {
   access?: SystemAccessContext
   accessToken: string
   expiresInSeconds: number
-}
-
-export function isMockAuthEnabled() {
-  return import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_AUTH === 'true'
 }
 
 async function hashPassword(value: string) {

@@ -32,8 +32,6 @@ import { purchaseMock } from '@/config/purchase-mock'
 
 export type { PageResult }
 
-const usePurchaseMock = isMockEnabled('purchase')
-
 function toOrder(item: PurchaseOrder): PurchaseOrderItem {
   return {
     actualDate: optionalText(item.actual_date),
@@ -101,7 +99,7 @@ function mapOptional<TSource, TResult>(
 
 export const purchaseService = {
   async addReceipt(form: PurchaseReceiptFormData) {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.addReceipt(form)
     }
     const response = await purchaseApi.addPurchaseReceipt({
@@ -117,7 +115,7 @@ export const purchaseService = {
   },
 
   async cancelOrder(orderId: number, operatorId: number) {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.cancelOrder(orderId, operatorId)
     }
     const response = await purchaseApi.cancelPurchaseOrder({
@@ -132,7 +130,7 @@ export const purchaseService = {
     buyerId: number,
     expectedDate: string,
   ): Promise<PurchaseDraftResult> {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.createDrafts(items, buyerId, expectedDate)
     }
     const response = await purchaseApi.createPurchaseOrderDraftFromShortage({
@@ -163,7 +161,7 @@ export const purchaseService = {
   },
 
   async createOrder(form: PurchaseOrderFormData) {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.createOrder(form)
     }
     const response = await purchaseApi.addPurchaseOrder({
@@ -183,7 +181,7 @@ export const purchaseService = {
   },
 
   async generateReminders(orderId?: number) {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.generateReminders(orderId)
     }
     let request: { order_id: number } | undefined = undefined
@@ -209,7 +207,7 @@ export const purchaseService = {
   },
 
   async getOrder(orderId: number) {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.getOrder(orderId)
     }
     const response = await purchaseApi.getPurchaseOrder({ orderId })
@@ -254,7 +252,7 @@ export const purchaseService = {
   },
 
   async handleReminder(reminderId: number, status: 'received' | 'urged', remark?: string) {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.handleReminder(reminderId, status, remark)
     }
     const response = await purchaseApi.handlePurchaseOverdueReminder({
@@ -270,7 +268,7 @@ export const purchaseService = {
 
   async listOrders(query: PurchaseOrderQuery) {
     const normalizedQuery = cleanQuery(query)
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.listOrders(normalizedQuery)
     }
     const response = await purchaseApi.listPurchaseOrder({
@@ -291,7 +289,7 @@ export const purchaseService = {
 
   async listReceipts(query: PurchaseReceiptQuery) {
     const normalizedQuery = cleanQuery(query)
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.listReceipts(normalizedQuery)
     }
     const response = await purchaseApi.listPurchaseReceipt({
@@ -306,7 +304,7 @@ export const purchaseService = {
 
   async listReminders(query: PurchaseReminderQuery) {
     const normalizedQuery = cleanQuery(query)
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.listReminders(normalizedQuery)
     }
     const response = await purchaseApi.listPurchaseOverdueReminder({
@@ -324,7 +322,7 @@ export const purchaseService = {
   },
 
   async submitOrder(orderId: number, operatorId: number) {
-    if (usePurchaseMock) {
+    if (isMockEnabled()) {
       return purchaseMock.submitOrder(orderId, operatorId)
     }
     const response = await purchaseApi.submitPurchaseOrder({

@@ -3,8 +3,8 @@ import { isMockEnabled } from '@/config/mock'
 import { materialBomMock } from '@/config/material-bom-mock'
 
 function requireMaterialMock() {
-  if (!isMockEnabled('material')) {
-    throw new Error('物料 BOM API 尚未接入；开发环境请显式启用 VITE_USE_MATERIAL_MOCK。')
+  if (!isMockEnabled()) {
+    throw new Error('物料 BOM API 尚未接入；请将 VITE_DATA_MODE 设置为 mock 使用演示数据。')
   }
 }
 

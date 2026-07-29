@@ -22,6 +22,7 @@ import type {
 } from '@/api'
 import { getMockAccessProfile, getSystemAdministratorPermissions } from '@/config/mock-access'
 import { getRequestStatus } from '@/services/request'
+import { isMockEnabled } from '@/config/mock'
 
 export { getRequestStatus }
 export type { PageResult }
@@ -489,7 +490,7 @@ async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContex
   try {
     return await loadCurrentAccessFromApi(employeeNo)
   } catch (error) {
-    if (getRequestStatus(error) === 404) {
+    if (isMockEnabled() && getRequestStatus(error) === 404) {
       return getMockAccessContext(employeeNo)
     }
     throw error
