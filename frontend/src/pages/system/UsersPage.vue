@@ -246,12 +246,22 @@ async function submitPasswordReset() {
 
   passwordSubmitting.value = true
   try {
+    await ElMessageBox.confirm(
+      `确定要为“${passwordTarget.value.name || passwordTarget.value.employeeNo}”重置密码吗？`,
+      '重置密码',
+      {
+        confirmButtonText: '确定重置',
+        type: 'warning',
+      },
+    )
     await systemService.resetUserPassword(passwordTarget.value.id, passwordForm.password)
     passwordDialogVisible.value = false
     ElMessage.success('密码已重置')
     await loadUsers(page.value)
   } catch (requestError) {
-    ElMessage.error(getErrorMessage(requestError, '密码重置失败'))
+    if (requestError !== 'cancel' && requestError !== 'close') {
+      ElMessage.error(getErrorMessage(requestError, '密码重置失败'))
+    }
   } finally {
     passwordSubmitting.value = false
   }
@@ -289,12 +299,22 @@ async function submitRoleAssignment() {
 
   roleSubmitting.value = true
   try {
+    await ElMessageBox.confirm(
+      `确定要更新“${roleTarget.value.name || roleTarget.value.employeeNo}”所关联的角色吗？`,
+      '分配角色',
+      {
+        confirmButtonText: '确定保存',
+        type: 'warning',
+      },
+    )
     await systemService.assignUserRoles(roleTarget.value.id, roleIds.value)
     roleDialogVisible.value = false
     ElMessage.success('用户角色已更新')
     await loadUsers(page.value)
   } catch (requestError) {
-    ElMessage.error(getErrorMessage(requestError, '角色分配失败'))
+    if (requestError !== 'cancel' && requestError !== 'close') {
+      ElMessage.error(getErrorMessage(requestError, '角色分配失败'))
+    }
   } finally {
     roleSubmitting.value = false
   }

@@ -236,6 +236,14 @@ async function submitPermissionAssignment() {
 
   permissionSubmitting.value = true
   try {
+    await ElMessageBox.confirm(
+      `确定要更新“${permissionTarget.value.name}”所关联的权限吗？`,
+      '分配权限',
+      {
+        confirmButtonText: '确定保存',
+        type: 'warning',
+      },
+    )
     await systemService.assignRolePermissions(
       permissionTarget.value.id,
       selectedPermissionIds.value,
