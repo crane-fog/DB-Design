@@ -220,9 +220,19 @@ function getAlertThreshold(materialId: number) {
   return 40
 }
 
+function requirePositiveQuantity(value: number, fieldName: string) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${fieldName}必须是大于 0 的有效数量`)
+  }
+}
+
 export const inventoryMock = {
   addCompletionInbound(form: CompletionInboundFormData) {
     return delay(() => {
+      requirePositiveQuantity(form.finishQty, '完工数量')
+      if (!Number.isFinite(form.qualifiedQty) || form.qualifiedQty < 0) {
+        throw new Error('合格数量不能小于 0')
+      }
       if (form.qualifiedQty > form.finishQty) {
         throw new Error('合格数量不能大于完工数量')
       }
@@ -250,34 +260,50 @@ export const inventoryMock = {
   },
 
   calculateShortage(items: MaterialShortageRequestItem[]): Promise<MaterialShortageResult> {
-    return delay(() => ({
-      calculatedAt: new Date().toISOString(),
-      items: items.flatMap((request, requestIndex) => {
-        const componentIds = getShortageComponentIds(request.materialId)
-        return componentIds.map((materialId, index) => {
-          const grossRequirement = Number((request.productionQty * [2.4, 1, 12][index]!).toFixed(2))
-          const availableQty = stockByMaterial[materialId] ?? 0
-          const inTransitQty = getInTransitQty(materialId)
-          const safetyStock = getSafetyStock(materialId)
-          const netShortageQty = Math.max(
-            0,
-            Number((grossRequirement - availableQty - inTransitQty + safetyStock).toFixed(2)),
-          )
-          return {
-            availableQty,
-            grossRequirement,
-            inTransitQty,
-            level: requestIndex + 1,
-            materialId,
-            materialName: materialNames[materialId],
-            netShortageQty,
-            parentMaterialId: request.materialId,
-            safetyStock,
-            suggestedPurchaseQty: netShortageQty,
-          }
-        })
-      }),
-    }))
+    return delay(() => {
+      if (items.length === 0) {
+        throw new Error('至少需要一条生产需求')
+      }
+      items.forEach((item) => {
+        requirePositiveQuantity(item.productionQty, '生产数量')
+        if (!Number.isInteger(item.materialId) || item.materialId <= 0) {
+          throw new Error('生产物料不能为空')
+        }
+        if (!Number.isInteger(item.versionId) || item.versionId <= 0) {
+          throw new Error('BOM 版本不能为空')
+        }
+      })
+      return {
+        calculatedAt: new Date().toISOString(),
+        items: items.flatMap((request, requestIndex) => {
+          const componentIds = getShortageComponentIds(request.materialId)
+          return componentIds.map((materialId, index) => {
+            const grossRequirement = Number(
+              (request.productionQty * [2.4, 1, 12][index]!).toFixed(2),
+            )
+            const availableQty = stockByMaterial[materialId] ?? 0
+            const inTransitQty = getInTransitQty(materialId)
+            const safetyStock = getSafetyStock(materialId)
+            const netShortageQty = Math.max(
+              0,
+              Number((grossRequirement - availableQty - inTransitQty + safetyStock).toFixed(2)),
+            )
+            return {
+              availableQty,
+              grossRequirement,
+              inTransitQty,
+              level: requestIndex + 1,
+              materialId,
+              materialName: materialNames[materialId],
+              netShortageQty,
+              parentMaterialId: request.materialId,
+              safetyStock,
+              suggestedPurchaseQty: netShortageQty,
+            }
+          })
+        }),
+      }
+    })
   },
 
   detectObsolete(idleDaysThreshold: number, materialId?: number): Promise<ObsoleteDetectionResult> {
@@ -423,6 +449,10 @@ export const inventoryMock = {
 
   lockStock(form: StockLockFormData): Promise<StockLockResult> {
     return delay(() => {
+      if (!form.items.length) {
+        throw new Error('至少需要选择一条物料')
+      }
+      form.items.forEach((item) => requirePositiveQuantity(item.lockQty, '锁定数量'))
       const shortages = form.items
         .filter((item) => item.lockQty > (stockByMaterial[item.materialId] ?? 0))
         .map((item) => ({

@@ -97,15 +97,8 @@ function mapOptional<TSource, TResult>(
   return mapper(value)
 }
 
-function assertPurchaseMockIsReadOnly() {
-  if (isMockEnabled()) {
-    throw new Error('采购 Mock 当前为只读模式，暂不支持写操作。')
-  }
-}
-
 export const purchaseService = {
   async addReceipt(form: PurchaseReceiptFormData) {
-    assertPurchaseMockIsReadOnly()
     if (isMockEnabled()) {
       return purchaseMock.addReceipt(form)
     }
@@ -122,7 +115,6 @@ export const purchaseService = {
   },
 
   async cancelOrder(orderId: number, operatorId: number) {
-    assertPurchaseMockIsReadOnly()
     if (isMockEnabled()) {
       return purchaseMock.cancelOrder(orderId, operatorId)
     }
@@ -138,7 +130,6 @@ export const purchaseService = {
     buyerId: number,
     expectedDate: string,
   ): Promise<PurchaseDraftResult> {
-    assertPurchaseMockIsReadOnly()
     if (isMockEnabled()) {
       return purchaseMock.createDrafts(items, buyerId, expectedDate)
     }
@@ -170,7 +161,6 @@ export const purchaseService = {
   },
 
   async createOrder(form: PurchaseOrderFormData) {
-    assertPurchaseMockIsReadOnly()
     if (isMockEnabled()) {
       return purchaseMock.createOrder(form)
     }
@@ -191,7 +181,6 @@ export const purchaseService = {
   },
 
   async generateReminders(orderId?: number) {
-    assertPurchaseMockIsReadOnly()
     if (isMockEnabled()) {
       return purchaseMock.generateReminders(orderId)
     }
@@ -263,7 +252,6 @@ export const purchaseService = {
   },
 
   async handleReminder(reminderId: number, status: 'received' | 'urged', remark?: string) {
-    assertPurchaseMockIsReadOnly()
     if (isMockEnabled()) {
       return purchaseMock.handleReminder(reminderId, status, remark)
     }
@@ -334,7 +322,6 @@ export const purchaseService = {
   },
 
   async submitOrder(orderId: number, operatorId: number) {
-    assertPurchaseMockIsReadOnly()
     if (isMockEnabled()) {
       return purchaseMock.submitOrder(orderId, operatorId)
     }

@@ -270,9 +270,40 @@ function getDefaultUnitPrice(materialId: number) {
   return 20
 }
 
+function requirePositiveQuantity(value: number, fieldName: string) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${fieldName}必须是大于 0 的有效数量`)
+  }
+}
+
+function validateOrderForm(form: PurchaseOrderFormData) {
+  if (!Number.isInteger(form.buyerId) || form.buyerId <= 0) {
+    throw new Error('采购员不能为空')
+  }
+  if (!Number.isInteger(form.supplierId) || form.supplierId <= 0) {
+    throw new Error('供应商不能为空')
+  }
+  if (!form.expectedDate) {
+    throw new Error('预计到货日期不能为空')
+  }
+  if (!form.details.length) {
+    throw new Error('采购订单至少需要一条明细')
+  }
+  form.details.forEach((item) => {
+    requirePositiveQuantity(item.quantity, '采购数量')
+    if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
+      throw new Error('含税单价不能小于 0')
+    }
+    if (!Number.isInteger(item.materialId) || item.materialId <= 0) {
+      throw new Error('物料不能为空')
+    }
+  })
+}
+
 export const purchaseMock = {
   addReceipt(form: PurchaseReceiptFormData) {
     return delay(() => {
+      requirePositiveQuantity(form.quantity, '收货数量')
       const order = orders.find(({ orderId }) => orderId === form.orderId)
       const line = order?.details.find(({ materialId }) => materialId === form.materialId)
       if (!order || !line || !['partial_received', 'submitted'].includes(order.status)) {
@@ -312,9 +343,22 @@ export const purchaseMock = {
     expectedDate: string,
   ): Promise<PurchaseDraftResult> {
     return delay(() => {
+      if (items.length === 0) {
+        throw new Error('至少需要一条缺口物料')
+      }
+      if (!Number.isInteger(buyerId) || buyerId <= 0) {
+        throw new Error('采购员不能为空')
+      }
+      if (!expectedDate) {
+        throw new Error('预计到货日期不能为空')
+      }
       const grouped = new Map<number, PurchaseDraftItem[]>()
       const unassignedItems: { materialId: number; purchaseQty: number }[] = []
       for (const item of items) {
+        requirePositiveQuantity(item.purchaseQty, '建议采购数量')
+        if (!Number.isInteger(item.materialId) || item.materialId <= 0) {
+          throw new Error('物料不能为空')
+        }
         const supplierId = getDefaultSupplierId(item)
         if (supplierId === undefined) {
           unassignedItems.push({ materialId: item.materialId, purchaseQty: item.purchaseQty })
@@ -343,7 +387,10 @@ export const purchaseMock = {
   },
 
   createOrder(form: PurchaseOrderFormData) {
-    return delay(() => ({ ...createOrder(form) }))
+    return delay(() => {
+      validateOrderForm(form)
+      return { ...createOrder(form) }
+    })
   },
 
   generateReminders(orderId?: number) {
