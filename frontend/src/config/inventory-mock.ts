@@ -129,6 +129,30 @@ let obsoleteItems: ObsoleteMaterialItem[] = [
 
 let inbounds: CompletionInboundItem[] = [
   {
+    batchNo: 'AX100-20260724-C',
+    finishQty: 60,
+    inboundId: 903,
+    inboundTime: '2026-07-24T17:20:00',
+    materialId: 2001,
+    operatorId: 1,
+    orderId: 5005,
+    productName: materialNames[2001],
+    qualifiedQty: 59,
+    versionId: 32,
+  },
+  {
+    batchNo: 'MX200-20260721-C',
+    finishQty: 48,
+    inboundId: 904,
+    inboundTime: '2026-07-21T17:40:00',
+    materialId: 2002,
+    operatorId: 1,
+    orderId: 5010,
+    productName: materialNames[2002],
+    qualifiedQty: 48,
+    versionId: 22,
+  },
+  {
     batchNo: 'AX100-20260727-A',
     finishQty: 30,
     inboundId: 901,
