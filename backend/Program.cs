@@ -72,6 +72,10 @@ builder.Services.AddScoped(_ => new UserRoleService(connString));
 builder.Services.AddScoped(_ => new RolePermissionService(connString));
 builder.Services.AddScoped(_ => new LoginLogService(connString));
 builder.Services.AddScoped(_ => new OperationLogService(connString));
+builder.Services.AddScoped(sp => new MaterialCatalogService(
+    connString,
+    sp.GetRequiredService<IStockReadQuery>(),
+    sp.GetRequiredService<IStockInitialization>()));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
