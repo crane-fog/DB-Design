@@ -9,6 +9,19 @@ using Org.OpenAPITools.Models;
 
 namespace Backend.Services;
 
+/// <summary>完工入库操作结果，供 IStockOperationService 使用。</summary>
+public sealed record CompletionInboundResult(
+    bool Ok,
+    CompletionInboundOrder? Order,
+    int ErrorCode,
+    string? ErrorMessage)
+{
+    public static CompletionInboundResult Success(CompletionInboundOrder order) =>
+        new(true, order, 200, null);
+    public static CompletionInboundResult Fail(int code, string message) =>
+        new(false, null, code, message);
+}
+
 public sealed record InventoryAlertResult(
     bool Ok,
     InventoryAlertEvent? Alert,
@@ -213,8 +226,8 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 if (availableQty >= safetyStock) continue;
 
                 using var checkCmd = conn.CreateCommand();
-                checkCmd.CommandText = "SELECT COUNT(*) FROM STOCK_ALERT WHERE MATERIAL_ID = :matId AND STATUS = :pending";
-                checkCmd.Parameters.Add(new OracleParameter("matId", matId));
+                checkCmd.CommandText = "SELECT COUNT(*) FROM STOCK_ALERT WHERE MATERIAL_ID = :materialId AND STATUS = :pending";
+                checkCmd.Parameters.Add(new OracleParameter("materialId", matId));
                 checkCmd.Parameters.Add(new OracleParameter("pending", InventoryAlertStatusMap.Db.Pending));
                 if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                 {
@@ -228,9 +241,9 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 {
                     insCmd.CommandText = @"INSERT INTO STOCK_ALERT
                         (MATERIAL_ID, ALERT_TYPE, AVAILABLE_QTY, THRESHOLD, ALERT_TIME, STATUS)
-                        VALUES (:matId, 'low_stock', :avail, :threshold, :alertTime, :status)
+                        VALUES ( :materialId, 'low_stock', :avail, :threshold, :alertTime, :status)
                         RETURNING ALERT_ID INTO :newId";
-                    insCmd.Parameters.Add(new OracleParameter("matId", matId));
+                    insCmd.Parameters.Add(new OracleParameter("materialId", matId));
                     insCmd.Parameters.Add(new OracleParameter("avail", availableQty));
                     insCmd.Parameters.Add(new OracleParameter("threshold", safetyStock));
                     insCmd.Parameters.Add(new OracleParameter("alertTime", now));
@@ -359,8 +372,8 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = @"SELECT AVAILABLE_QTY FROM MATERIAL_STOCK
-                        WHERE MATERIAL_ID = :matId FOR UPDATE";
-                    cmd.Parameters.Add(new OracleParameter("matId", item.MaterialId));
+                        WHERE MATERIAL_ID = :materialId FOR UPDATE";
+                    cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
                     var result = cmd.ExecuteScalar();
                     availableQty = result is null or DBNull ? 0m : Convert.ToDecimal(result);
                 }
@@ -384,10 +397,10 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                         SET AVAILABLE_QTY = AVAILABLE_QTY - :qtyDeduct,
                             LOCKED_QTY = LOCKED_QTY + :qtyAdd,
                             LAST_OUT_DATE = SYSDATE
-                        WHERE MATERIAL_ID = :matId";
+                        WHERE MATERIAL_ID = :materialId";
                     cmd.Parameters.Add(new OracleParameter("qtyDeduct", item.LockQty));
                     cmd.Parameters.Add(new OracleParameter("qtyAdd", item.LockQty));
-                    cmd.Parameters.Add(new OracleParameter("matId", item.MaterialId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
                     cmd.ExecuteNonQuery();
                 }
 
@@ -398,10 +411,10 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO STOCK_LOCK
                         (ORDER_ID, MATERIAL_ID, LOCK_QTY, LOCK_TIME, STATUS, OPERATOR_ID)
-                        VALUES (:orderId, :matId, :qty, :lockTime, :status, :operatorId)
+                        VALUES (:orderId,  :materialId, :qty, :lockTime, :status, :operatorId)
                         RETURNING LOCK_ID INTO :newId";
                     cmd.Parameters.Add(new OracleParameter("orderId", orderId));
-                    cmd.Parameters.Add(new OracleParameter("matId", item.MaterialId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
                     cmd.Parameters.Add(new OracleParameter("qty", item.LockQty));
                     cmd.Parameters.Add(new OracleParameter("lockTime", now));
                     cmd.Parameters.Add(new OracleParameter("status", StockLockStatusMap.Db.Locked));
@@ -506,10 +519,10 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 cmd.CommandText = @"UPDATE MATERIAL_STOCK
                     SET AVAILABLE_QTY = AVAILABLE_QTY + :qtyToAdd,
                         LOCKED_QTY = LOCKED_QTY - :qtyToSub
-                    WHERE MATERIAL_ID = :matId";
+                    WHERE MATERIAL_ID = :materialId";
                 cmd.Parameters.Add(new OracleParameter("qtyToAdd", lockQty));
                 cmd.Parameters.Add(new OracleParameter("qtyToSub", lockQty));
-                cmd.Parameters.Add(new OracleParameter("matId", materialId));
+                cmd.Parameters.Add(new OracleParameter("materialId", materialId));
                 cmd.ExecuteNonQuery();
             }
 
@@ -624,9 +637,9 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 {
                     insCmd.CommandText = @"INSERT INTO WASTE_DETECTION
                         (MATERIAL_ID, DETECT_TIME, AVAILABLE_QTY, LAST_OUT_DATE, IDLE_DAYS, STATUS)
-                        VALUES (:matId, :dt, :avail, :lastOut, :idleDays, :status)
+                        VALUES ( :materialId, :dt, :avail, :lastOut, :idleDays, :status)
                         RETURNING DETECTION_ID INTO :newId";
-                    insCmd.Parameters.Add(new OracleParameter("matId", matId));
+                    insCmd.Parameters.Add(new OracleParameter("materialId", matId));
                     insCmd.Parameters.Add(new OracleParameter("dt", now));
                     insCmd.Parameters.Add(new OracleParameter("avail", availableQty));
                     insCmd.Parameters.Add(new OracleParameter("lastOut",
@@ -758,9 +771,9 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
 
         using var checkCmd = conn.CreateCommand();
         checkCmd.CommandText = @"SELECT COUNT(*) FROM FINISH_INBOUND
-            WHERE ORDER_ID = :orderId AND MATERIAL_ID = :matId";
+            WHERE ORDER_ID = :orderId AND MATERIAL_ID = :materialId";
         checkCmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-        checkCmd.Parameters.Add(new OracleParameter("matId", request.MaterialId));
+        checkCmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
             return CompletionInboundResult.Fail(409, "该订单已存在入库记录");
 
@@ -775,10 +788,10 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO FINISH_INBOUND
                         (ORDER_ID, MATERIAL_ID, VERSION_ID, FINISH_QTY, QUALIFIED_QTY, BATCH_NO, INBOUND_TIME, OPERATOR_ID)
-                        VALUES (:orderId, :matId, :versionId, :finishQty, :qualifiedQty, :batchNo, SYSDATE, :operatorId)
+                        VALUES (:orderId,  :materialId, :versionId, :finishQty, :qualifiedQty, :batchNo, SYSDATE, :operatorId)
                         RETURNING INBOUND_ID INTO :newId";
                     cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-                    cmd.Parameters.Add(new OracleParameter("matId", request.MaterialId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
                     cmd.Parameters.Add(new OracleParameter("versionId", request.VersionId));
                     cmd.Parameters.Add(new OracleParameter("finishQty", request.FinishQty));
                     cmd.Parameters.Add(new OracleParameter("qualifiedQty", request.QualifiedQty));
@@ -793,15 +806,15 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                     inboundId = Convert.ToInt64(idParam.Value.ToString());
                 }
 
-                decimal totalLockedQty = 0;
+                var lockQuantities = new Dictionary<long, decimal>();
                 using (var lockCmd = conn.CreateCommand())
                 {
                     lockCmd.Transaction = tx;
                     lockCmd.CommandText = @"SELECT LOCK_ID, MATERIAL_ID, LOCK_QTY
                         FROM STOCK_LOCK
-                        WHERE ORDER_ID = :orderId AND STATUS = :status";
+                        WHERE ORDER_ID = :orderId AND STATUS = :expected";
                     lockCmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-                    lockCmd.Parameters.Add(new OracleParameter("status", StockLockStatusMap.Db.Locked));
+                    lockCmd.Parameters.Add(new OracleParameter("expected", StockLockStatusMap.Db.Locked));
                     using var lr = lockCmd.ExecuteReader();
                     while (lr.Read())
                     {
@@ -819,7 +832,10 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                             ReleaseTime = DateTime.Now,
                             OperatorId = request.OperatorId,
                         });
-                        totalLockedQty += lockQty;
+
+                        if (!lockQuantities.ContainsKey(lockMatId))
+                            lockQuantities[lockMatId] = 0;
+                        lockQuantities[lockMatId] += lockQty;
                     }
                 }
 
@@ -827,24 +843,23 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 {
                     updCmd.Transaction = tx;
                     updCmd.CommandText = @"UPDATE STOCK_LOCK
-                        SET STATUS = :status, RELEASE_TIME = SYSDATE
+                        SET STATUS = :newStatus, RELEASE_TIME = SYSDATE
                         WHERE ORDER_ID = :orderId AND STATUS = :expected";
-                    updCmd.Parameters.Add(new OracleParameter("status", StockLockStatusMap.Db.Consumed));
+                    updCmd.Parameters.Add(new OracleParameter("newStatus", StockLockStatusMap.Db.Consumed));
                     updCmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
                     updCmd.Parameters.Add(new OracleParameter("expected", StockLockStatusMap.Db.Locked));
                     updCmd.ExecuteNonQuery();
                 }
 
-                if (totalLockedQty > 0)
+                foreach (var (materialId, qty) in lockQuantities)
                 {
                     using var stockCmd = conn.CreateCommand();
                     stockCmd.Transaction = tx;
                     stockCmd.CommandText = @"UPDATE MATERIAL_STOCK
-                        SET LOCKED_QTY = LOCKED_QTY - :totalLocked
-                        WHERE MATERIAL_ID IN (
-                            SELECT DISTINCT MATERIAL_ID FROM STOCK_LOCK WHERE ORDER_ID = :orderId)";
-                    stockCmd.Parameters.Add(new OracleParameter("totalLocked", totalLockedQty));
-                    stockCmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
+                        SET LOCKED_QTY = LOCKED_QTY - :lockQtyDeduct
+                        WHERE MATERIAL_ID = :materialId";
+                    stockCmd.Parameters.Add(new OracleParameter("lockQtyDeduct", qty));
+                    stockCmd.Parameters.Add(new OracleParameter("materialId", materialId));
                     stockCmd.ExecuteNonQuery();
                 }
 
@@ -852,7 +867,7 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 {
                     finCmd.Transaction = tx;
                     finCmd.CommandText = @"MERGE INTO MATERIAL_STOCK ms
-                        USING (SELECT :matId AS MAT_ID FROM DUAL) d
+                        USING (SELECT :materialId AS MAT_ID FROM DUAL) d
                         ON (ms.MATERIAL_ID = d.MAT_ID)
                         WHEN MATCHED THEN
                             UPDATE SET AVAILABLE_QTY = AVAILABLE_QTY + :qualifiedQty,
@@ -860,7 +875,7 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                         WHEN NOT MATCHED THEN
                             INSERT (MATERIAL_ID, AVAILABLE_QTY, LOCKED_QTY, LAST_IN_DATE)
                             VALUES (:matId2, :qualifiedQty2, 0, SYSDATE)";
-                    finCmd.Parameters.Add(new OracleParameter("matId", request.MaterialId));
+                    finCmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
                     finCmd.Parameters.Add(new OracleParameter("qualifiedQty", request.QualifiedQty));
                     finCmd.Parameters.Add(new OracleParameter("matId2", request.MaterialId));
                     finCmd.Parameters.Add(new OracleParameter("qualifiedQty2", request.QualifiedQty));
@@ -908,8 +923,8 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 decimal availableQty = 0;
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT AVAILABLE_QTY FROM MATERIAL_STOCK WHERE MATERIAL_ID = :matId";
-                    cmd.Parameters.Add(new OracleParameter("matId", node.MaterialId));
+                    cmd.CommandText = "SELECT AVAILABLE_QTY FROM MATERIAL_STOCK WHERE MATERIAL_ID = :materialId";
+                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
                     var r = cmd.ExecuteScalar();
                     if (r is not null and not DBNull) availableQty = Convert.ToDecimal(r);
                 }
@@ -921,9 +936,9 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                         SELECT COALESCE(SUM(poi.QUANTITY - NVL(poi.RECEIVED_QTY, 0)), 0)
                         FROM PURCHASE_ORDER_ITEM poi
                         JOIN PURCHASE_ORDER po ON po.ORDER_ID = poi.ORDER_ID
-                        WHERE poi.MATERIAL_ID = :matId
+                        WHERE poi.MATERIAL_ID =  :materialId
                           AND po.STATUS IN (:submitted, :partial)";
-                    cmd.Parameters.Add(new OracleParameter("matId", node.MaterialId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
                     cmd.Parameters.Add(new OracleParameter("submitted", PurchaseOrderStatusMap.Db.Submitted));
                     cmd.Parameters.Add(new OracleParameter("partial", PurchaseOrderStatusMap.Db.PartialReceived));
                     inTransitQty = Convert.ToDecimal(cmd.ExecuteScalar());
@@ -932,8 +947,8 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 decimal safetyStock = 0;
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT SAFETY_STOCK FROM MATERIAL WHERE MATERIAL_ID = :matId";
-                    cmd.Parameters.Add(new OracleParameter("matId", node.MaterialId));
+                    cmd.CommandText = "SELECT SAFETY_STOCK FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
                     var r = cmd.ExecuteScalar();
                     if (r is not null and not DBNull) safetyStock = Convert.ToDecimal(r);
                 }
@@ -945,8 +960,8 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
                 string? materialName = null;
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT MATERIAL_NAME FROM MATERIAL WHERE MATERIAL_ID = :matId";
-                    cmd.Parameters.Add(new OracleParameter("matId", node.MaterialId));
+                    cmd.CommandText = "SELECT MATERIAL_NAME FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
                     var r = cmd.ExecuteScalar();
                     if (r is not null and not DBNull) materialName = r.ToString();
                 }
@@ -982,12 +997,12 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT PRICE FROM SUPPLIER_PRICE
-            WHERE MATERIAL_ID = :matId
+            WHERE MATERIAL_ID =  :materialId
               AND VALID_FROM <= SYSDATE
               AND (VALID_TO IS NULL OR VALID_TO >= SYSDATE)
             ORDER BY VALID_FROM DESC
             FETCH FIRST 1 ROW ONLY";
-        cmd.Parameters.Add(new OracleParameter("matId", materialId));
+        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         var result = cmd.ExecuteScalar();
         return result is null or DBNull ? null : Convert.ToDecimal(result);
     }
@@ -1047,12 +1062,11 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         HandleTime = reader.IsDBNull(9) ? null : reader.GetDateTime(9),
     };
 
-    private InventoryAlertEvent MapAlertFromInsert(
-        long materialId, decimal availableQty, decimal safetyStock, DateTime now, long alertId)
+    private static InventoryAlertEvent MapAlertFromInsert(
+        long materialId, decimal availableQty,
+        decimal safetyStock, DateTime now, long alertId)
     {
-        using var conn = new OracleConnection(connString);
-        conn.Open();
-        return GetAlertInternal(conn, alertId) ?? new InventoryAlertEvent
+        return new InventoryAlertEvent
         {
             AlertId = alertId,
             MaterialId = materialId,
@@ -1089,7 +1103,7 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         HandlerId = reader.IsDBNull(8) ? null : Convert.ToInt64(reader.GetValue(8)),
     };
 
-    private CompletionInboundOrder MapInbound(OracleDataReader reader, OracleConnection conn)
+    private static CompletionInboundOrder MapInbound(OracleDataReader reader, OracleConnection conn)
     {
         var orderId = Convert.ToInt64(reader.GetValue(1));
         var consumedLocks = GetConsumedLocks(conn, orderId);
@@ -1136,7 +1150,7 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         return locks;
     }
 
-    private InventoryAlertEvent? GetAlertInternal(OracleConnection conn, long alertId)
+    private static InventoryAlertEvent? GetAlertInternal(OracleConnection conn, long alertId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = AlertColumns + " WHERE a.ALERT_ID = :alertId";
@@ -1145,7 +1159,7 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         return reader.Read() ? MapAlert(reader) : null;
     }
 
-    private StockLockRecord? GetLockInternal(OracleConnection conn, long lockId)
+    private static StockLockRecord? GetLockInternal(OracleConnection conn, long lockId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = LockColumns + " WHERE l.LOCK_ID = :lockId";
@@ -1154,7 +1168,7 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         return reader.Read() ? MapLock(reader) : null;
     }
 
-    private ObsoleteMaterialDetection? GetDetectionInternal(OracleConnection conn, long detectionId)
+    private static ObsoleteMaterialDetection? GetDetectionInternal(OracleConnection conn, long detectionId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = DetectionColumns + " WHERE d.DETECTION_ID = :detectionId";
@@ -1163,7 +1177,7 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         return reader.Read() ? MapDetection(reader) : null;
     }
 
-    private CompletionInboundOrder? GetInboundInternal(OracleConnection conn, long inboundId)
+    private static CompletionInboundOrder? GetInboundInternal(OracleConnection conn, long inboundId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = InboundColumns + " WHERE i.INBOUND_ID = :inboundId";
@@ -1211,13 +1225,13 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
             SELECT COUNT(*) FROM BOM b
             JOIN BOM_VERSION bv ON bv.VERSION_ID = b.VERSION_ID
             JOIN PRODUCTION_ORDER po ON po.VERSION_ID = bv.VERSION_ID
-            WHERE b.CHILD_MATERIAL_ID = :matId
+            WHERE b.CHILD_MATERIAL_ID =  :materialId
               AND bv.EXPIRE_DATE IS NULL
               AND po.STATUS IN (:inProgress, :pendingSchedule, :pendingReview)";
-        cmd.Parameters.Add(new OracleParameter("matId", materialId));
+        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         cmd.Parameters.Add(new OracleParameter("inProgress", ProductionStatusMap.Db.InProgress));
         cmd.Parameters.Add(new OracleParameter("pendingSchedule", ProductionStatusMap.Db.PendingSchedule));
         cmd.Parameters.Add(new OracleParameter("pendingReview", ProductionStatusMap.Db.PendingReview));
-        return Convert.ToInt32(cmd.ExecuteScalar()) == 0;
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 }

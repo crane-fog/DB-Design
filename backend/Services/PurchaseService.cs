@@ -210,9 +210,9 @@ public class PurchaseService(string connString)
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO PURCHASE_ORDER_ITEM
                         (ORDER_ID, MATERIAL_ID, QUANTITY, RECEIVED_QTY, UNIT_PRICE)
-                        VALUES (:orderId, :matId, :qty, 0, :price)";
+                        VALUES (:orderId,  :materialId, :qty, 0, :price)";
                     cmd.Parameters.Add(new OracleParameter("orderId", newOrderId));
-                    cmd.Parameters.Add(new OracleParameter("matId", d.MaterialId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", d.MaterialId));
                     cmd.Parameters.Add(new OracleParameter("qty", d.Quantity));
                     cmd.Parameters.Add(new OracleParameter("price", d.UnitPrice));
                     cmd.ExecuteNonQuery();
@@ -291,9 +291,9 @@ public class PurchaseService(string connString)
             try
             {
                 decimal totalAmount = 0;
-                foreach (var (matId, qty) in items)
+                foreach (var (materialId, qty) in items)
                 {
-                    var price = GetCurrentPriceForMaterial(conn, matId) ?? 0m;
+                    var price = GetCurrentPriceForMaterial(conn, materialId) ?? 0m;
                     totalAmount += qty * price;
                 }
 
@@ -319,16 +319,16 @@ public class PurchaseService(string connString)
                     newOrderId = Convert.ToInt64(idParam.Value.ToString());
                 }
 
-                foreach (var (matId, qty) in items)
+                foreach (var (materialId, qty) in items)
                 {
-                    var price = GetCurrentPriceForMaterial(conn, matId) ?? 0m;
+                    var price = GetCurrentPriceForMaterial(conn, materialId) ?? 0m;
                     using var cmd = conn.CreateCommand();
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO PURCHASE_ORDER_ITEM
                         (ORDER_ID, MATERIAL_ID, QUANTITY, RECEIVED_QTY, UNIT_PRICE)
-                        VALUES (:orderId, :matId, :qty, 0, :price)";
+                        VALUES (:orderId,  :materialId, :qty, 0, :price)";
                     cmd.Parameters.Add(new OracleParameter("orderId", newOrderId));
-                    cmd.Parameters.Add(new OracleParameter("matId", matId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", materialId));
                     cmd.Parameters.Add(new OracleParameter("qty", qty));
                     cmd.Parameters.Add(new OracleParameter("price", price));
                     cmd.ExecuteNonQuery();
@@ -475,9 +475,9 @@ public class PurchaseService(string connString)
         {
             cmd.CommandText = @"SELECT ITEM_ID, QUANTITY, COALESCE(RECEIVED_QTY, 0)
                 FROM PURCHASE_ORDER_ITEM
-                WHERE ORDER_ID = :orderId AND MATERIAL_ID = :matId";
+                WHERE ORDER_ID = :orderId AND MATERIAL_ID = :materialId";
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.Parameters.Add(new OracleParameter("matId", request.MaterialId));
+            cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
             using var r = cmd.ExecuteReader();
             if (!r.Read())
                 return PurchaseReceiptResult.Fail(400, "该订单不存在此物料明细");
@@ -499,10 +499,10 @@ public class PurchaseService(string connString)
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO RECEIVE_RECORD
                         (ORDER_ID, MATERIAL_ID, QUANTITY, RECEIVE_DATE)
-                        VALUES (:orderId, :matId, :qty, :receiveDate)
+                        VALUES (:orderId,  :materialId, :qty, :receiveDate)
                         RETURNING RECEIVE_ID INTO :newId";
                     cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-                    cmd.Parameters.Add(new OracleParameter("matId", request.MaterialId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
                     cmd.Parameters.Add(new OracleParameter("qty", request.Quantity));
                     cmd.Parameters.Add(new OracleParameter("receiveDate", request.ReceiveDate.ToDateTime(TimeOnly.MinValue)));
                     var idParam = new OracleParameter("newId", OracleDbType.Int64)
@@ -550,9 +550,9 @@ public class PurchaseService(string connString)
                     cmd.CommandText = @"UPDATE MATERIAL_STOCK
                         SET AVAILABLE_QTY = AVAILABLE_QTY + :qty,
                             LAST_IN_DATE = SYSDATE
-                        WHERE MATERIAL_ID = :matId";
+                        WHERE MATERIAL_ID = :materialId";
                     cmd.Parameters.Add(new OracleParameter("qty", request.Quantity));
-                    cmd.Parameters.Add(new OracleParameter("matId", request.MaterialId));
+                    cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
                     cmd.ExecuteNonQuery();
                 }
 
@@ -744,7 +744,7 @@ public class PurchaseService(string connString)
     //  Private helpers
     // ═══════════════════════════════════════════════════════════════
 
-    private PurchaseOrder MapOrder(OracleDataReader reader, OracleConnection conn)
+    private static PurchaseOrder MapOrder(OracleDataReader reader, OracleConnection conn)
     {
         var orderId = Convert.ToInt64(reader.GetValue(0));
         var statusDb = reader.GetString(1);
@@ -789,7 +789,7 @@ public class PurchaseService(string connString)
         };
     }
 
-    private List<PurchaseOrderDetailLine> GetOrderItems(OracleConnection conn, long orderId)
+    private static List<PurchaseOrderDetailLine> GetOrderItems(OracleConnection conn, long orderId)
     {
         var items = new List<PurchaseOrderDetailLine>();
         using var cmd = conn.CreateCommand();
@@ -841,7 +841,7 @@ public class PurchaseService(string connString)
         Remark = reader.IsDBNull(6) ? null! : reader.GetString(6),
     };
 
-    private PurchaseOrder? GetOrderInternal(OracleConnection conn, long orderId)
+    private static PurchaseOrder? GetOrderInternal(OracleConnection conn, long orderId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = OrderColumns + " WHERE o.ORDER_ID = :orderId";
@@ -851,7 +851,7 @@ public class PurchaseService(string connString)
         return reader.Read() ? MapOrder(reader, conn) : null;
     }
 
-    private PurchaseReceipt? GetReceiptInternal(OracleConnection conn, long receiptId)
+    private static PurchaseReceipt? GetReceiptInternal(OracleConnection conn, long receiptId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = ReceiptColumns + " WHERE r.RECEIVE_ID = :receiptId";
@@ -860,7 +860,7 @@ public class PurchaseService(string connString)
         return reader.Read() ? MapReceipt(reader) : null;
     }
 
-    private PurchaseOverdueReminder? GetReminderInternal(OracleConnection conn, long reminderId)
+    private static PurchaseOverdueReminder? GetReminderInternal(OracleConnection conn, long reminderId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = ReminderColumns + " WHERE r.REMINDER_ID = :reminderId";
@@ -890,8 +890,8 @@ public class PurchaseService(string connString)
     private static bool MaterialExists(OracleConnection conn, long materialId)
     {
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM MATERIAL WHERE MATERIAL_ID = :matId";
-        cmd.Parameters.Add(new OracleParameter("matId", materialId));
+        cmd.CommandText = "SELECT COUNT(*) FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
@@ -906,8 +906,8 @@ public class PurchaseService(string connString)
     private static long GetDefaultSupplier(OracleConnection conn, long materialId)
     {
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT DEFAULT_SUPPLIER_ID FROM MATERIAL WHERE MATERIAL_ID = :matId";
-        cmd.Parameters.Add(new OracleParameter("matId", materialId));
+        cmd.CommandText = "SELECT DEFAULT_SUPPLIER_ID FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         var result = cmd.ExecuteScalar();
         return result is null or DBNull ? 0 : Convert.ToInt64(result);
     }
@@ -917,12 +917,12 @@ public class PurchaseService(string connString)
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT PRICE FROM SUPPLIER_PRICE
-            WHERE MATERIAL_ID = :matId
+            WHERE MATERIAL_ID =  :materialId
               AND VALID_FROM <= SYSDATE
               AND (VALID_TO IS NULL OR VALID_TO >= SYSDATE)
             ORDER BY VALID_FROM DESC
             FETCH FIRST 1 ROW ONLY";
-        cmd.Parameters.Add(new OracleParameter("matId", materialId));
+        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         var result = cmd.ExecuteScalar();
         return result is null or DBNull ? null : Convert.ToDecimal(result);
     }
@@ -932,12 +932,12 @@ public class PurchaseService(string connString)
         using var cmd = conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = @"MERGE INTO MATERIAL_STOCK ms
-            USING (SELECT :matId AS MAT_ID FROM DUAL) d
+            USING (SELECT :materialId AS MAT_ID FROM DUAL) d
             ON (ms.MATERIAL_ID = d.MAT_ID)
             WHEN NOT MATCHED THEN
                 INSERT (MATERIAL_ID, AVAILABLE_QTY, LOCKED_QTY)
                 VALUES (:matId2, 0, 0)";
-        cmd.Parameters.Add(new OracleParameter("matId", materialId));
+        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         cmd.Parameters.Add(new OracleParameter("matId2", materialId));
         cmd.ExecuteNonQuery();
     }

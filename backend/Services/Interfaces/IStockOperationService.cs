@@ -1,3 +1,5 @@
+using Backend.Services;
+
 using Org.OpenAPITools.Models;
 
 namespace Backend.Services.Interfaces;
@@ -15,16 +17,4 @@ public interface IStockOperationService
         decimal qualifiedQty,
         string batchNo,
         long operatorId);
-}
-
-public sealed record CompletionInboundResult(
-    bool Ok,
-    CompletionInboundOrder? Order,
-    int ErrorCode,
-    string? ErrorMessage)
-{
-    public static CompletionInboundResult Success(CompletionInboundOrder order) =>
-        new(true, order, 200, null);
-    public static CompletionInboundResult Fail(int code, string message) =>
-        new(false, null, code, message);
 }
