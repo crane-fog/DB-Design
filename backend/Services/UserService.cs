@@ -4,7 +4,7 @@ using Org.OpenAPITools.Models;
 
 namespace Backend.Services;
 
-/// <summary>系统管理 — 用户 CRUD Service。</summary>
+/// <summary>系统管理 — 用户增删改查Service。</summary>
 public class UserService(string connString)
 {
     private const string SelectColumns = @"
