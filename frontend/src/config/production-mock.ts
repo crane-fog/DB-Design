@@ -773,7 +773,8 @@ function convertExternalOrder(form: ExternalOrderConvertFormData) {
     if (!form.productionOrders.length) {
       throw new Error('至少需要一个生产订单')
     }
-    const convertedOrders = form.productionOrders.map((orderForm) => {
+    const firstOrderId = Math.max(...productionOrders.map((item) => item.orderId), 5000) + 1
+    const convertedOrders = form.productionOrders.map((orderForm, index) => {
       requirePositive(orderForm.materialId, '产品物料 ID')
       requirePositive(orderForm.versionId, 'BOM 版本 ID')
       requirePositive(orderForm.planQty, '计划数量')
@@ -781,7 +782,7 @@ function convertExternalOrder(form: ExternalOrderConvertFormData) {
         finishedQty: 0,
         materialId: orderForm.materialId,
         materialName: materialNames[orderForm.materialId] ?? `物料 #${orderForm.materialId}`,
-        orderId: Math.max(...productionOrders.map((item) => item.orderId), 5000) + 1,
+        orderId: firstOrderId + index,
         planEnd: orderForm.planEnd,
         planQty: orderForm.planQty,
         planStart: orderForm.planStart,
@@ -987,10 +988,10 @@ function updateLineStatus(form: ProductionLineStatusFormData) {
       lineStatuses.push(status)
     }
     Object.assign(status, {
-      currentMaterialId: form.currentMaterialId,
-      currentOrderId: form.currentOrderId,
-      efficiency: form.efficiency ?? 0,
-      finishedQty: form.finishedQty ?? 0,
+      currentMaterialId: form.currentMaterialId ?? status.currentMaterialId,
+      currentOrderId: form.currentOrderId ?? status.currentOrderId,
+      efficiency: form.efficiency ?? status.efficiency,
+      finishedQty: form.finishedQty ?? status.finishedQty,
       status: form.status,
       updatedTime: timestamp(),
     })
