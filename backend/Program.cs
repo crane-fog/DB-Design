@@ -27,7 +27,7 @@ var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
 
 builder.Services.AddControllers().AddNewtonsoftJson();
 
-builder.Services.AddScoped(_ => new AuthService(connString, jwtSecret));
+builder.Services.AddScoped(sp => new AuthService(connString, jwtSecret, sp.GetRequiredService<LoginLogService>()));
 builder.Services.AddScoped<IUserTestService>(_ => new UserTestService(connString));
 builder.Services.AddScoped(_ => new UserContextService(connString));
 builder.Services.AddScoped(_ => new ProductionOrderService(connString));
@@ -39,6 +39,14 @@ builder.Services.AddScoped<IStockOperationService>(sp => sp.GetRequiredService<I
 builder.Services.AddScoped<IStockReadQuery>(_ => new StockQueryService(connString));
 builder.Services.AddScoped<IStockInitialization>(_ => new StockQueryService(connString));
 builder.Services.AddScoped<IPriceQuery>(_ => new PriceQueryService(connString));
+builder.Services.AddScoped<AuthorizationService>();
+builder.Services.AddScoped(_ => new UserService(connString));
+builder.Services.AddScoped(_ => new RoleService(connString));
+builder.Services.AddScoped(_ => new PermissionService(connString));
+builder.Services.AddScoped(_ => new UserRoleService(connString));
+builder.Services.AddScoped(_ => new RolePermissionService(connString));
+builder.Services.AddScoped(_ => new LoginLogService(connString));
+builder.Services.AddScoped(_ => new OperationLogService(connString));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
