@@ -9,16 +9,19 @@ import {
   type SuggestedActionValue,
   traceService,
 } from '@/services/TraceService'
-import { Delete, EditPen, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Delete, EditPen, Plus, Refresh, Search, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { type ProductionOrderItem, productionService } from '@/services/ProductionService'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
+import type { CompletionInboundItem } from '@/types/inventory'
 import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
+import { inventoryService } from '@/services/InventoryService'
 import { productionOrderStatusLabels as orderStatusLabels } from '@/constants/status'
 import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
@@ -59,6 +62,8 @@ const consumptionFormRef = ref<FormInstance>()
 const consumptionSubmitting = ref(false)
 const consumptionDeleting = ref(false)
 const editingConsumptionId = ref<number>()
+const consumptionDetail = ref<BatchConsumptionItem>()
+const consumptionDetailVisible = ref(false)
 const consumptionForm = reactive<BatchConsumptionCreateFormData>({
   consumeQty: 1,
   itemId: 0,
@@ -129,6 +134,11 @@ function openConsumptionEdit(record: BatchConsumptionItem) {
   consumptionDialogVisible.value = true
 }
 
+function openConsumptionDetail(record: BatchConsumptionItem) {
+  consumptionDetail.value = record
+  consumptionDetailVisible.value = true
+}
+
 async function submitConsumptionForm() {
   const valid = await consumptionFormRef.value?.validate().catch(() => false)
   if (!valid || consumptionSubmitting.value) {
@@ -184,6 +194,8 @@ const productLoading = ref(false)
 const productError = ref('')
 const productSearched = ref(false)
 const productResult = ref<ProductBatchTraceItem>()
+const productOrderDetail = ref<ProductionOrderItem>()
+const productInboundRecords = ref<CompletionInboundItem[]>([])
 
 async function traceProduct() {
   const orderId = parsePositiveInt(productFilters.orderId)
@@ -201,6 +213,26 @@ async function traceProduct() {
       includeSupplier: productFilters.includeSupplier,
       orderId,
     })
+    productOrderDetail.value = undefined
+    productInboundRecords.value = []
+    if (productResult.value) {
+      const [orderResult, inboundResult] = await Promise.allSettled([
+        productionService.getOrder(productResult.value.orderId),
+        inventoryService.listCompletionInbound({
+          orderId: productResult.value.orderId,
+          page: 1,
+          pageSize: 100,
+        }),
+      ])
+      if (orderResult.status === 'fulfilled') {
+        productOrderDetail.value = orderResult.value
+      }
+      if (inboundResult.status === 'fulfilled') {
+        productInboundRecords.value = inboundResult.value.items.filter(
+          (item) => !productResult.value?.batchNo || item.batchNo === productResult.value.batchNo,
+        )
+      }
+    }
   } catch (requestError) {
     productResult.value = undefined
     productError.value = getErrorMessage(requestError, '正向追溯失败')
@@ -212,12 +244,19 @@ async function traceProduct() {
 function resetProductFilters() {
   Object.assign(productFilters, { batchNo: '', includeSupplier: true, orderId: '' })
   productResult.value = undefined
+  productOrderDetail.value = undefined
+  productInboundRecords.value = []
   productSearched.value = false
   productError.value = ''
 }
 
 // ---------- 反向追溯（原材料 → 成品） ----------
-const materialFilters = reactive({ itemId: '', materialId: '', receiveRange: [] as string[] })
+const materialFilters = reactive({
+  itemId: '',
+  materialId: '',
+  receiveRange: [] as string[],
+  supplierName: '',
+})
 const materialLoading = ref(false)
 const materialError = ref('')
 const materialSearched = ref(false)
@@ -226,21 +265,26 @@ const materialResult = ref<MaterialBatchTraceItem[]>([])
 async function traceMaterial() {
   const itemId = parsePositiveInt(materialFilters.itemId)
   const materialId = parsePositiveInt(materialFilters.materialId)
+  const supplierName = materialFilters.supplierName.trim()
   const [receiveDateStart, receiveDateEnd] = materialFilters.receiveRange
   if (!itemId && !materialId && !(receiveDateStart && receiveDateEnd)) {
-    ElMessage.warning('请至少提供采购明细 ID、原材料 ID 或完整的到货日期范围')
+    ElMessage.warning('请至少提供采购明细、原材料或完整到货日期范围')
     return
   }
   materialLoading.value = true
   materialError.value = ''
   materialSearched.value = true
   try {
-    materialResult.value = await traceService.traceMaterialBatch({
+    const records = await traceService.traceMaterialBatch({
       itemId,
       materialId,
       receiveDateEnd,
       receiveDateStart,
     })
+    materialResult.value = records
+    if (supplierName) {
+      materialResult.value = records.filter((record) => record.supplierName?.includes(supplierName))
+    }
   } catch (requestError) {
     materialResult.value = []
     materialError.value = getErrorMessage(requestError, '反向追溯失败')
@@ -250,7 +294,12 @@ async function traceMaterial() {
 }
 
 function resetMaterialFilters() {
-  Object.assign(materialFilters, { itemId: '', materialId: '', receiveRange: [] })
+  Object.assign(materialFilters, {
+    itemId: '',
+    materialId: '',
+    receiveRange: [],
+    supplierName: '',
+  })
   materialResult.value = []
   materialSearched.value = false
   materialError.value = ''
@@ -262,6 +311,10 @@ const impactLoading = ref(false)
 const impactError = ref('')
 const impactSearched = ref(false)
 const impactResult = ref<QualityImpactResult>()
+const affectedQuantity = computed(
+  () =>
+    impactResult.value?.affectedProducts.reduce((total, item) => total + item.consumeQty, 0) ?? 0,
+)
 
 function parseItemIds(value: string) {
   return value
@@ -407,12 +460,22 @@ onMounted(() => void loadConsumption())
             <el-table-column label="消耗数量" min-width="110">
               <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
             </el-table-column>
-            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="140">
+            <el-table-column fixed="right" label="操作" min-width="190">
               <template #default="{ row }">
-                <el-button link type="primary" :icon="EditPen" @click="openConsumptionEdit(row)">
+                <el-button link type="primary" :icon="View" @click="openConsumptionDetail(row)">
+                  详情
+                </el-button>
+                <el-button
+                  v-if="canManage"
+                  link
+                  type="primary"
+                  :icon="EditPen"
+                  @click="openConsumptionEdit(row)"
+                >
                   修改
                 </el-button>
                 <el-button
+                  v-if="canManage"
                   link
                   type="danger"
                   :icon="Delete"
@@ -489,6 +552,15 @@ onMounted(() => void loadConsumption())
             type="error"
           />
           <template v-else-if="productResult">
+            <div class="trace-flow">
+              <span class="trace-node trace-node--product">
+                成品批次 {{ productResult.batchNo || `订单 #${productResult.orderId}` }}
+              </span>
+              <span class="trace-arrow">←</span>
+              <span class="trace-node">
+                {{ productResult.consumedBatches.length }} 个原材料来源批次
+              </span>
+            </div>
             <el-descriptions border :column="3" class="trace-summary" title="成品批次">
               <el-descriptions-item label="生产订单">{{
                 `#${productResult.orderId}`
@@ -499,6 +571,33 @@ onMounted(() => void loadConsumption())
               <el-descriptions-item label="批次号">{{
                 productResult.batchNo || '-'
               }}</el-descriptions-item>
+              <el-descriptions-item label="BOM 版本">
+                {{
+                  productOrderDetail?.versionNo ||
+                  (productOrderDetail ? `#${productOrderDetail.versionId}` : '-')
+                }}
+              </el-descriptions-item>
+              <el-descriptions-item label="完工数量">
+                {{ formatNumber(productOrderDetail?.finishedQty) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="生产状态">
+                <StatusTag
+                  v-if="productOrderDetail"
+                  :labels="orderStatusLabels"
+                  :value="productOrderDetail.status"
+                />
+                <span v-else>-</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="合格数量">
+                {{
+                  formatNumber(
+                    productInboundRecords.reduce((total, item) => total + item.qualifiedQty, 0),
+                  )
+                }}
+              </el-descriptions-item>
+              <el-descriptions-item label="入库时间">
+                {{ formatDateTime(productInboundRecords[0]?.inboundTime) }}
+              </el-descriptions-item>
             </el-descriptions>
             <el-table :data="productResult.consumedBatches" stripe>
               <el-table-column label="采购明细" min-width="100">
@@ -542,6 +641,13 @@ onMounted(() => void loadConsumption())
             <el-form-item label="原材料 ID">
               <el-input v-model.trim="materialFilters.materialId" clearable placeholder="可选" />
             </el-form-item>
+            <el-form-item label="供应商筛选">
+              <el-input
+                v-model.trim="materialFilters.supplierName"
+                clearable
+                placeholder="筛选当前查询结果"
+              />
+            </el-form-item>
             <el-form-item label="到货日期">
               <el-date-picker
                 v-model="materialFilters.receiveRange"
@@ -583,6 +689,15 @@ onMounted(() => void loadConsumption())
               class="material-batch-card"
               shadow="never"
             >
+              <div class="trace-flow trace-flow--compact">
+                <span class="trace-node">
+                  {{ batch.materialName || `原材料 #${batch.materialId}` }}
+                </span>
+                <span class="trace-arrow">→</span>
+                <span class="trace-node trace-node--product">
+                  {{ batch.affectedProducts.length }} 个受影响成品批次
+                </span>
+              </div>
               <template #header>
                 <div class="material-batch-header">
                   <span>{{ batch.materialName || `原材料 #${batch.materialId}` }}</span>
@@ -688,6 +803,10 @@ onMounted(() => void loadConsumption())
                 <strong>{{ formatNumber(impactResult.affectedBatchCount) }}</strong>
               </div>
               <div class="impact-metric">
+                <span>受影响数量</span>
+                <strong>{{ formatNumber(affectedQuantity) }}</strong>
+              </div>
+              <div class="impact-metric">
                 <span>建议动作</span>
                 <el-tag
                   v-if="impactResult.suggestedAction"
@@ -771,6 +890,37 @@ onMounted(() => void loadConsumption())
         </el-button>
       </template>
     </el-dialog>
+
+    <el-drawer v-model="consumptionDetailVisible" size="420px" title="批次消耗详情">
+      <el-descriptions v-if="consumptionDetail" border :column="1">
+        <el-descriptions-item label="消耗记录">
+          #{{ consumptionDetail.consumptionId }}
+        </el-descriptions-item>
+        <el-descriptions-item label="生产订单">
+          #{{ consumptionDetail.orderId }}
+        </el-descriptions-item>
+        <el-descriptions-item label="成品物料">
+          {{ consumptionDetail.productMaterialName || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="生产状态">
+          <StatusTag
+            v-if="consumptionDetail.productionStatus"
+            :labels="orderStatusLabels"
+            :value="consumptionDetail.productionStatus"
+          />
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="采购明细">
+          #{{ consumptionDetail.itemId }}
+        </el-descriptions-item>
+        <el-descriptions-item label="原材料">
+          {{ consumptionDetail.materialName || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="实际消耗数量">
+          {{ formatNumber(consumptionDetail.consumeQty) }}
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-drawer>
   </PageContainer>
 </template>
 
@@ -795,6 +945,31 @@ onMounted(() => void loadConsumption())
 }
 .trace-summary {
   margin-bottom: 16px;
+}
+.trace-flow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.trace-flow--compact {
+  margin-bottom: 12px;
+}
+.trace-node {
+  padding: 10px 14px;
+  border: 1px solid var(--el-color-warning-light-5);
+  border-radius: 999px;
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning-dark-2);
+}
+.trace-node--product {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary-dark-2);
+}
+.trace-arrow {
+  color: var(--el-text-color-secondary);
+  font-size: 20px;
 }
 .material-batch-card {
   margin-bottom: 16px;

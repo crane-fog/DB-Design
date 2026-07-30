@@ -31,6 +31,11 @@ export const mockAccessProfiles: Record<string, MockAccessProfile> = {
     permissions: ordinaryUserPermissions,
     roles: ['普通用户'],
   },
+  EXT_CUSTOMER: {
+    name: '本地外部客户',
+    permissions: [PERMISSIONS.production.view],
+    roles: ['外部客户'],
+  },
   GD0001: {
     name: '系统管理员',
     permissions: systemAdministratorPermissions,

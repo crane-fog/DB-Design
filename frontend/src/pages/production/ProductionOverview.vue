@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { type Component, computed, onMounted, ref } from 'vue'
-import { Odometer, Refresh, Tickets, Tools, TrendCharts } from '@element-plus/icons-vue'
+import { Odometer, Refresh, Tickets, Tools, TrendCharts, Van } from '@element-plus/icons-vue'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { formatNumber } from '@/utils/format'
@@ -56,6 +56,13 @@ const shortcuts: OverviewShortcut[] = [
     permission: 'production:breakdown',
     route: '/production/breakdown',
     title: '故障反馈',
+  },
+  {
+    description: '处理外部订单、交付评估、产能检测与产线实时状态。',
+    icon: Van,
+    permission: 'production:view',
+    route: '/production/operations',
+    title: '生产运营',
   },
 ]
 

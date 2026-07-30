@@ -9,12 +9,17 @@ import {
   unwrap,
 } from '@/services/pagination'
 import type {
+  CapacityBalance,
   CapacityConfig,
+  CapacityDetection,
   ExternalOrder,
+  ExternalOrderConvertResult,
   FaultRecord,
   LineType,
   ProductionCalendar,
+  ProductionCapacityEstimateResult,
   ProductionLine,
+  ProductionLineStatus,
   ProductionOrderDetail,
 } from '@/api'
 import { isMockEnabled } from '@/config/mock'
@@ -172,6 +177,107 @@ export interface ExternalOrderItem {
   submitTime: string
 }
 
+export interface ExternalOrderCreateFormData {
+  contactPerson: string
+  contactPhone: string
+  customerId?: number
+  expectedDate: string
+  materialId: number
+  quantity: number
+}
+
+export interface ExternalOrderConvertFormData {
+  extOrderId: number
+  productionOrders: ProductionOrderFormData[]
+}
+
+export interface ExternalOrderConvertItem {
+  associations: { extOrderId: number; orderId: number }[]
+  extOrderId: number
+  productionOrders: {
+    finishedQty?: number
+    materialId: number
+    materialName?: string
+    orderId: number
+    planQty: number
+    status: ProductionOrderStatus
+  }[]
+}
+
+export interface ProductionCapacityEstimateFormData {
+  expectedDate?: string
+  materialId?: number
+  orderId?: number
+  planQty?: number
+  versionId?: number
+}
+
+export interface ProductionCapacityEstimateItem {
+  availableWorkMinutes?: number
+  canDeliverOnTime?: boolean
+  capacityReady?: boolean
+  estimatedFinishDate?: string
+  latestMaterialReadyDate?: string
+  materialReady?: boolean
+  requiredWorkMinutes?: number
+  riskReason?: string
+}
+
+export interface CapacityDetectionFormData {
+  lineId: number
+  periodEnd: string
+  periodStart: string
+}
+
+export interface CapacityDetectionItem {
+  actualCapacity: number
+  actualWorkHours?: number
+  detectionId: number
+  diffQty: number
+  diffRate: number
+  downtimeMinutes?: number
+  efficiency?: number
+  lineId: number
+  periodEnd: string
+  periodStart: string
+  planCapacity: number
+  reasonType: string
+}
+
+export interface CapacityBalanceFormData {
+  affectedOrders: number[]
+  afterPlan: Record<string, unknown>
+  beforePlan: Record<string, unknown>
+}
+
+export interface CapacityBalanceItem {
+  adjustTime: string
+  affectedOrders: number[]
+  afterPlan: Record<string, unknown>
+  balanceId: number
+  beforePlan: Record<string, unknown>
+  operatorId: number
+}
+
+export interface ProductionLineStatusFormData {
+  currentMaterialId?: number
+  currentOrderId?: number
+  efficiency?: number
+  finishedQty?: number
+  lineId: number
+  status: ProductionLineRunStatus
+}
+
+export interface ProductionLineStatusItem {
+  currentMaterialId?: number
+  currentOrderId?: number
+  efficiency: number
+  finishedQty: number
+  lineId: number
+  status: ProductionLineRunStatus
+  updatedTime: string
+}
+
 export interface FaultRecordItem {
   description: string
   faultId: number
@@ -289,6 +395,79 @@ function toFaultRecord(record: FaultRecord): FaultRecordItem {
   }
 }
 
+function toCapacityEstimate(
+  result: ProductionCapacityEstimateResult,
+): ProductionCapacityEstimateItem {
+  return {
+    availableWorkMinutes: result.available_work_minutes,
+    canDeliverOnTime: result.can_deliver_on_time,
+    capacityReady: result.capacity_ready,
+    estimatedFinishDate: optionalText(result.estimated_finish_date),
+    latestMaterialReadyDate: optionalText(result.latest_material_ready_date),
+    materialReady: result.material_ready,
+    requiredWorkMinutes: result.required_work_minutes,
+    riskReason: optionalText(result.risk_reason),
+  }
+}
+
+function toCapacityDetection(result: CapacityDetection): CapacityDetectionItem {
+  return {
+    actualCapacity: result.actual_capacity,
+    actualWorkHours: result.actual_work_hours ?? undefined,
+    detectionId: result.detection_id,
+    diffQty: result.diff_qty,
+    diffRate: result.diff_rate,
+    downtimeMinutes: result.downtime_minutes ?? undefined,
+    efficiency: result.efficiency ?? undefined,
+    lineId: result.line_id,
+    periodEnd: result.period_end,
+    periodStart: result.period_start,
+    planCapacity: result.plan_capacity,
+    reasonType: result.reason_type,
+  }
+}
+
+function toCapacityBalance(result: CapacityBalance): CapacityBalanceItem {
+  return {
+    adjustTime: result.adjust_time,
+    affectedOrders: result.affected_orders,
+    afterPlan: result.after_plan,
+    balanceId: result.balance_id,
+    beforePlan: result.before_plan,
+    operatorId: result.operator_id,
+  }
+}
+
+function toProductionLineStatus(result: ProductionLineStatus): ProductionLineStatusItem {
+  return {
+    currentMaterialId: result.current_material_id ?? undefined,
+    currentOrderId: result.current_order_id ?? undefined,
+    efficiency: result.efficiency,
+    finishedQty: result.finished_qty,
+    lineId: result.line_id,
+    status: result.status,
+    updatedTime: result.updated_time,
+  }
+}
+
+function toExternalOrderConvert(result: ExternalOrderConvertResult): ExternalOrderConvertItem {
+  return {
+    associations: result.associations.map((association) => ({
+      extOrderId: association.ext_order_id,
+      orderId: association.order_id,
+    })),
+    extOrderId: result.ext_order_id,
+    productionOrders: result.production_orders.map((order) => ({
+      finishedQty: order.finished_qty,
+      materialId: order.material_id,
+      materialName: optionalText(order.material_name),
+      orderId: order.order_id,
+      planQty: order.plan_qty,
+      status: order.status,
+    })),
+  }
+}
+
 function assertProductionMockIsReadOnly() {
   if (isMockEnabled()) {
     throw new Error('生产 Mock 当前为只读模式，暂不支持写操作。')
@@ -302,6 +481,37 @@ function assertMockPermission(permission: string) {
 }
 
 export const productionService = {
+  async addExternalOrder(form: ExternalOrderCreateFormData) {
+    const auth = useAuthStore()
+    let { customerId } = form
+    if (auth.hasRole('外部客户')) {
+      customerId = undefined
+    }
+    if (isMockEnabled()) {
+      assertMockPermission('production:view')
+      if (auth.hasRole('外部客户')) {
+        customerId = auth.currentUser?.id
+      }
+      return productionMock.addExternalOrder({ ...form, customerId })
+    }
+    assertProductionMockIsReadOnly()
+    const response = await productionApi.addExternalOrder({
+      externalOrderCreateRequest: {
+        contact_person: form.contactPerson.trim(),
+        contact_phone: form.contactPhone.trim(),
+        customer_id: customerId,
+        expected_date: form.expectedDate,
+        material_id: form.materialId,
+        quantity: form.quantity,
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<ExternalOrder | undefined>)
+    if (data) {
+      return toExternalOrder(data)
+    }
+    return undefined
+  },
+
   api: productionApi,
 
   async approveOrder(orderId: number, approved: boolean, reviewComment?: string) {
@@ -336,6 +546,31 @@ export const productionService = {
     const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
     if (data) {
       return toProductionOrder(data)
+    }
+    return undefined
+  },
+
+  async convertExternalOrder(form: ExternalOrderConvertFormData) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.convertExternalOrder(form)
+    }
+    assertProductionMockIsReadOnly()
+    const response = await productionApi.convertExternalOrderToProductionOrder({
+      externalOrderConvertRequest: {
+        ext_order_id: form.extOrderId,
+        production_orders: form.productionOrders.map((order) => ({
+          material_id: order.materialId,
+          plan_end: order.planEnd,
+          plan_qty: order.planQty,
+          plan_start: order.planStart,
+          version_id: order.versionId,
+        })),
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<ExternalOrderConvertResult | undefined>)
+    if (data) {
+      return toExternalOrderConvert(data)
     }
     return undefined
   },
@@ -392,6 +627,27 @@ export const productionService = {
       productionCalendarDeleteRequest: { calendar_date: calendarDate, line_id: lineId },
     })
     return unwrap(response.data as ApiEnvelope<unknown>)
+  },
+
+  async estimateCapacity(form: ProductionCapacityEstimateFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.estimateCapacity(form)
+    }
+    const response = await productionApi.estimateProductionCapacity({
+      productionCapacityEstimateRequest: {
+        expected_date: form.expectedDate,
+        material_id: form.materialId,
+        order_id: form.orderId,
+        plan_qty: form.planQty,
+        version_id: form.versionId,
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<ProductionCapacityEstimateResult | undefined>)
+    if (data) {
+      return toCapacityEstimate(data)
+    }
+    return undefined
   },
 
   async finishOrder(orderId: number, finishedQty: number, remark?: string) {
@@ -479,6 +735,16 @@ export const productionService = {
 
   async listExternalOrders(query: ExternalOrderQuery): Promise<PageResult<ExternalOrderItem>> {
     if (isMockEnabled()) {
+      const auth = useAuthStore()
+      if (auth.hasRole('外部客户')) {
+        return productionMock.listExternalOrders({
+          ...query,
+          customerId: auth.currentUser?.id,
+        })
+      }
+      if (!auth.hasPermission('production:orders')) {
+        throw new Error('当前账号没有查看外部订单的权限')
+      }
       return productionMock.listExternalOrders(query)
     }
     const response = await productionApi.listExternalOrder({
@@ -598,6 +864,25 @@ export const productionService = {
     return undefined
   },
 
+  async runCapacityDetection(form: CapacityDetectionFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.runCapacityDetection(form)
+    }
+    const response = await productionApi.runCapacityDetection({
+      capacityDetectionRunRequest: {
+        line_id: form.lineId,
+        period_end: form.periodEnd,
+        period_start: form.periodStart,
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<CapacityDetection | undefined>)
+    if (data) {
+      return toCapacityDetection(data)
+    }
+    return undefined
+  },
+
   async saveCalendar(form: ProductionCalendarFormData) {
     assertMockPermission('production:capacity')
     if (isMockEnabled()) {
@@ -614,6 +899,25 @@ export const productionService = {
     const data = unwrap(response.data as ApiEnvelope<ProductionCalendar | undefined>)
     if (data) {
       return toProductionCalendar(data)
+    }
+    return undefined
+  },
+
+  async saveCapacityBalance(form: CapacityBalanceFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.saveCapacityBalance(form)
+    }
+    const response = await productionApi.saveCapacityBalance({
+      capacityBalanceSaveRequest: {
+        affected_orders: form.affectedOrders,
+        after_plan: form.afterPlan,
+        before_plan: form.beforePlan,
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<CapacityBalance | undefined>)
+    if (data) {
+      return toCapacityBalance(data)
     }
     return undefined
   },
@@ -709,6 +1013,28 @@ export const productionService = {
     const data = unwrap(response.data as ApiEnvelope<ProductionLine | undefined>)
     if (data) {
       return toProductionLine(data)
+    }
+    return undefined
+  },
+
+  async updateLineStatus(form: ProductionLineStatusFormData) {
+    assertMockPermission('production:capacity')
+    if (isMockEnabled()) {
+      return productionMock.updateLineStatus(form)
+    }
+    const response = await productionApi.updateProductionLineStatus({
+      productionLineStatusUpdateRequest: {
+        current_material_id: form.currentMaterialId,
+        current_order_id: form.currentOrderId,
+        efficiency: form.efficiency,
+        finished_qty: form.finishedQty,
+        line_id: form.lineId,
+        status: form.status,
+      },
+    })
+    const data = unwrap(response.data as ApiEnvelope<ProductionLineStatus | undefined>)
+    if (data) {
+      return toProductionLineStatus(data)
     }
     return undefined
   },

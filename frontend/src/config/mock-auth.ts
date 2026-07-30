@@ -17,6 +17,7 @@ export interface MockAuthSession {
 }
 
 const devAdminAccess = getMockAccessProfile('DEV_ADMIN')
+const externalCustomerAccess = getMockAccessProfile('EXT_CUSTOMER')
 const devUserAccess = getMockAccessProfile('DEV_USER')
 
 const mockAuthAccounts: MockAuthAccount[] = [
@@ -29,6 +30,16 @@ const mockAuthAccounts: MockAuthAccount[] = [
     roles: devAdminAccess.roles,
     status: 'valid',
     token: 'local-dev.mock.dev-admin.v1',
+  },
+  {
+    account: 'EXT_CUSTOMER',
+    id: 301,
+    name: '本地外部客户',
+    password: 'customer-123',
+    permissions: externalCustomerAccess.permissions,
+    roles: externalCustomerAccess.roles,
+    status: 'valid',
+    token: 'local-dev.mock.external-customer.v1',
   },
   {
     account: 'DEV_USER',

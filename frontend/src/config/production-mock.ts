@@ -1,7 +1,14 @@
 import type {
+  CapacityBalanceFormData,
+  CapacityBalanceItem,
   CapacityConfigFormData,
   CapacityConfigItem,
   CapacityConfigQuery,
+  CapacityDetectionFormData,
+  CapacityDetectionItem,
+  ExternalOrderConvertFormData,
+  ExternalOrderConvertItem,
+  ExternalOrderCreateFormData,
   ExternalOrderItem,
   ExternalOrderQuery,
   FaultRecordItem,
@@ -13,9 +20,13 @@ import type {
   ProductionCalendarFormData,
   ProductionCalendarItem,
   ProductionCalendarQuery,
+  ProductionCapacityEstimateFormData,
+  ProductionCapacityEstimateItem,
   ProductionLineFormData,
   ProductionLineItem,
   ProductionLineQuery,
+  ProductionLineStatusFormData,
+  ProductionLineStatusItem,
   ProductionOrderFormData,
   ProductionOrderItem,
   ProductionOrderQuery,
@@ -397,6 +408,32 @@ const faultRecords: FaultRecordItem[] = [
   },
 ]
 
+const capacityDetections: CapacityDetectionItem[] = []
+const capacityBalances: CapacityBalanceItem[] = []
+const lineStatuses: ProductionLineStatusItem[] = lines.map((line, index) => {
+  const order = productionOrders[index % productionOrders.length]
+  const isRunning = line.status === 'running'
+  let currentMaterialId = undefined as number | undefined
+  let currentOrderId = undefined as number | undefined
+  let efficiency = 0
+  let finishedQty = 0
+  if (isRunning) {
+    currentMaterialId = order?.materialId
+    currentOrderId = order?.orderId
+    efficiency = 0.82 + (index % 4) * 0.03
+    finishedQty = order?.finishedQty ?? 0
+  }
+  return {
+    currentMaterialId,
+    currentOrderId,
+    efficiency,
+    finishedQty,
+    lineId: line.lineId,
+    status: line.status ?? 'idle',
+    updatedTime: '2026-07-30T08:00:00',
+  }
+})
+
 function delay<TResult>(factory: () => TResult): Promise<TResult> {
   return new Promise((resolve, reject) => {
     globalThis.setTimeout(() => {
@@ -493,6 +530,37 @@ function createOrder(form: ProductionOrderFormData) {
       versionNo: `V${form.versionId}`,
     }
     productionOrders.unshift(order)
+    return structuredClone(order)
+  })
+}
+
+function addExternalOrder(form: ExternalOrderCreateFormData) {
+  return delay(() => {
+    requirePositive(form.materialId, '产品物料 ID')
+    requirePositive(form.quantity, '订单数量')
+    if (!materialNames[form.materialId]) {
+      throw new Error('产品不存在')
+    }
+    if (!form.contactPerson.trim() || !form.contactPhone.trim()) {
+      throw new Error('联系人和联系电话不能为空')
+    }
+    if (!form.customerId) {
+      throw new Error('当前 Mock 账号缺少外部客户身份')
+    }
+    const order: ExternalOrderItem = {
+      contactPerson: form.contactPerson.trim(),
+      contactPhone: form.contactPhone.trim(),
+      customerId: form.customerId,
+      customerName: `客户 #${form.customerId}`,
+      expectedDate: form.expectedDate,
+      extOrderId: Math.max(...externalOrders.map((item) => item.extOrderId), 9000) + 1,
+      materialId: form.materialId,
+      materialName: materialNames[form.materialId],
+      quantity: form.quantity,
+      status: 'pending_review',
+      submitTime: timestamp(),
+    }
+    externalOrders.unshift(order)
     return structuredClone(order)
   })
 }
@@ -693,6 +761,245 @@ function reviewExternalOrder(extOrderId: number, accepted: boolean, reviewCommen
   })
 }
 
+function convertExternalOrder(form: ExternalOrderConvertFormData) {
+  return delay(() => {
+    const externalOrder = externalOrders.find((item) => item.extOrderId === form.extOrderId)
+    if (!externalOrder) {
+      throw new Error('未找到外部订单')
+    }
+    if (externalOrder.status !== 'accepted') {
+      throw new Error('仅已接受的外部订单可转换')
+    }
+    if (!form.productionOrders.length) {
+      throw new Error('至少需要一个生产订单')
+    }
+    const firstOrderId = Math.max(...productionOrders.map((item) => item.orderId), 5000) + 1
+    const convertedOrders = form.productionOrders.map((orderForm, index) => {
+      requirePositive(orderForm.materialId, '产品物料 ID')
+      requirePositive(orderForm.versionId, 'BOM 版本 ID')
+      requirePositive(orderForm.planQty, '计划数量')
+      const order: ProductionOrderItem = {
+        finishedQty: 0,
+        materialId: orderForm.materialId,
+        materialName: materialNames[orderForm.materialId] ?? `物料 #${orderForm.materialId}`,
+        orderId: firstOrderId + index,
+        planEnd: orderForm.planEnd,
+        planQty: orderForm.planQty,
+        planStart: orderForm.planStart,
+        status: 'pending_review',
+        versionId: orderForm.versionId,
+        versionNo: `V${orderForm.versionId}`,
+      }
+      productionOrders.unshift(order)
+      return order
+    })
+    const result: ExternalOrderConvertItem = {
+      associations: convertedOrders.map((order) => ({
+        extOrderId: form.extOrderId,
+        orderId: order.orderId,
+      })),
+      extOrderId: form.extOrderId,
+      productionOrders: convertedOrders.map((order) => ({
+        finishedQty: order.finishedQty,
+        materialId: order.materialId,
+        materialName: order.materialName,
+        orderId: order.orderId,
+        planQty: order.planQty,
+        status: order.status,
+      })),
+    }
+    return structuredClone(result)
+  })
+}
+
+interface ResolvedCapacityEstimateInput {
+  expectedDate: string
+  materialId: number
+  planQty: number
+}
+
+function resolveCapacityEstimateInput(
+  form: ProductionCapacityEstimateFormData,
+): ResolvedCapacityEstimateInput {
+  if (form.orderId) {
+    const order = getOrderRecord(form.orderId)
+    return {
+      expectedDate: order.planEnd.slice(0, 10),
+      materialId: order.materialId,
+      planQty: order.planQty,
+    }
+  }
+  if (!form.materialId || !form.versionId || !form.planQty || !form.expectedDate) {
+    throw new Error('请提供生产订单，或完整填写产品、BOM、数量和期望日期')
+  }
+  return {
+    expectedDate: form.expectedDate,
+    materialId: form.materialId,
+    planQty: form.planQty,
+  }
+}
+
+function getCapacityRiskReasons(input: {
+  capacityReady: boolean
+  estimatedFinishDate: string
+  expectedDate: string
+  materialReady: boolean
+}) {
+  const { capacityReady, estimatedFinishDate, expectedDate, materialReady } = input
+  const risks: string[] = []
+  if (!materialReady) {
+    risks.push('关键物料预计延迟齐套')
+  }
+  if (!capacityReady) {
+    risks.push('可用产能不足')
+  }
+  if (estimatedFinishDate > expectedDate.slice(0, 10)) {
+    risks.push('预计完工晚于期望日期')
+  }
+  return risks
+}
+
+function estimateCapacity(
+  form: ProductionCapacityEstimateFormData,
+): Promise<ProductionCapacityEstimateItem> {
+  return delay(() => {
+    const { expectedDate, materialId, planQty } = resolveCapacityEstimateInput(form)
+    const config = capacityConfigs.find((item) => item.materialId === materialId)
+    if (!config) {
+      throw new Error('未找到该产品的产能配置')
+    }
+    const matchingLines = lines.filter(
+      (line) => line.typeId === config.typeId && line.status !== 'fault',
+    )
+    const requiredWorkMinutes = planQty * config.unitTime
+    const availableWorkMinutes = matchingLines.length * 8 * 60 * 5
+    const materialReady = materialId !== 2002 || planQty <= 90
+    const capacityReady = availableWorkMinutes >= requiredWorkMinutes
+    let readyDelay = 2
+    if (materialReady) {
+      readyDelay = 0
+    }
+    const dailyCapacity = Math.max(480, availableWorkMinutes / 5)
+    const requiredDays = Math.max(1, Math.ceil(requiredWorkMinutes / dailyCapacity))
+    const estimated = new Date('2026-07-30T00:00:00')
+    estimated.setDate(estimated.getDate() + readyDelay + requiredDays)
+    const estimatedFinishDate = estimated.toISOString().slice(0, 10)
+    const canDeliverOnTime =
+      materialReady && capacityReady && estimatedFinishDate <= expectedDate.slice(0, 10)
+    const risks = getCapacityRiskReasons({
+      capacityReady,
+      estimatedFinishDate,
+      expectedDate,
+      materialReady,
+    })
+    let latestMaterialReadyDate = undefined as string | undefined
+    if (!materialReady) {
+      latestMaterialReadyDate = '2026-08-01'
+    }
+    return {
+      availableWorkMinutes,
+      canDeliverOnTime,
+      capacityReady,
+      estimatedFinishDate,
+      latestMaterialReadyDate,
+      materialReady,
+      requiredWorkMinutes,
+      riskReason: risks.join('；') || undefined,
+    }
+  })
+}
+
+function runCapacityDetection(form: CapacityDetectionFormData) {
+  return delay(() => {
+    const line = getLineRecord(form.lineId)
+    const status = lineStatuses.find((item) => item.lineId === form.lineId)
+    const planCapacity = 100 + (form.lineId % 5) * 20
+    let efficiency = status?.efficiency
+    if (efficiency === undefined) {
+      efficiency = 0.85
+      if (line.status === 'fault') {
+        efficiency = 0.42
+      }
+    }
+    const actualCapacity = Math.round(planCapacity * efficiency)
+    const diffQty = actualCapacity - planCapacity
+    let downtimeMinutes = Math.round((1 - efficiency) * 240)
+    let reasonType = 'normal_fluctuation'
+    if (line.status === 'fault') {
+      downtimeMinutes = 180
+      reasonType = 'equipment_fault'
+    }
+    const detection: CapacityDetectionItem = {
+      actualCapacity,
+      actualWorkHours: Math.round(40 * efficiency * 10) / 10,
+      detectionId: Math.max(0, ...capacityDetections.map((item) => item.detectionId)) + 1,
+      diffQty,
+      diffRate: Math.round((diffQty / planCapacity) * 10_000) / 10_000,
+      downtimeMinutes,
+      efficiency,
+      lineId: form.lineId,
+      periodEnd: form.periodEnd,
+      periodStart: form.periodStart,
+      planCapacity,
+      reasonType,
+    }
+    capacityDetections.unshift(detection)
+    return structuredClone(detection)
+  })
+}
+
+function saveCapacityBalance(form: CapacityBalanceFormData) {
+  return delay(() => {
+    if (!form.affectedOrders.length) {
+      throw new Error('请至少选择一个受影响生产订单')
+    }
+    form.affectedOrders.forEach((orderId) => getOrderRecord(orderId))
+    const balance: CapacityBalanceItem = {
+      adjustTime: timestamp(),
+      affectedOrders: [...new Set(form.affectedOrders)],
+      afterPlan: structuredClone(form.afterPlan),
+      balanceId: Math.max(0, ...capacityBalances.map((item) => item.balanceId)) + 1,
+      beforePlan: structuredClone(form.beforePlan),
+      operatorId: 1,
+    }
+    capacityBalances.unshift(balance)
+    return structuredClone(balance)
+  })
+}
+
+function updateLineStatus(form: ProductionLineStatusFormData) {
+  return delay(() => {
+    const line = getLineRecord(form.lineId)
+    if (form.currentOrderId) {
+      getOrderRecord(form.currentOrderId)
+    }
+    if (form.efficiency !== undefined && (form.efficiency < 0 || form.efficiency > 1)) {
+      throw new Error('效率必须在 0 到 1 之间')
+    }
+    let status = lineStatuses.find((item) => item.lineId === form.lineId)
+    if (!status) {
+      status = {
+        efficiency: 0,
+        finishedQty: 0,
+        lineId: form.lineId,
+        status: 'idle',
+        updatedTime: timestamp(),
+      }
+      lineStatuses.push(status)
+    }
+    Object.assign(status, {
+      currentMaterialId: form.currentMaterialId ?? status.currentMaterialId,
+      currentOrderId: form.currentOrderId ?? status.currentOrderId,
+      efficiency: form.efficiency ?? status.efficiency,
+      finishedQty: form.finishedQty ?? status.finishedQty,
+      status: form.status,
+      updatedTime: timestamp(),
+    })
+    line.status = form.status
+    return structuredClone(status)
+  })
+}
+
 function reportFault(form: FaultReportFormData) {
   return delay(() => {
     requirePositive(form.lineId, '生产线 ID')
@@ -735,9 +1042,12 @@ function updateFault(form: FaultUpdateFormData) {
 
 export interface ProductionMockState {
   calendars: ProductionCalendarItem[]
+  capacityBalances?: CapacityBalanceItem[]
   capacityConfigs: CapacityConfigItem[]
+  capacityDetections?: CapacityDetectionItem[]
   externalOrders: ExternalOrderItem[]
   faultRecords: FaultRecordItem[]
+  lineStatuses?: ProductionLineStatusItem[]
   lineTypes: LineTypeItem[]
   lines: ProductionLineItem[]
   productionOrders: ProductionOrderItem[]
@@ -747,9 +1057,12 @@ export interface ProductionMockState {
 export function snapshotProductionMock(): ProductionMockState {
   return structuredClone({
     calendars,
+    capacityBalances,
     capacityConfigs,
+    capacityDetections,
     externalOrders,
     faultRecords,
+    lineStatuses,
     lineTypes,
     lines,
     productionOrders,
@@ -767,6 +1080,18 @@ export function restoreProductionMock(state: ProductionMockState) {
   calendars.splice(0, calendars.length, ...structuredClone(state.calendars))
   externalOrders.splice(0, externalOrders.length, ...structuredClone(state.externalOrders))
   faultRecords.splice(0, faultRecords.length, ...structuredClone(state.faultRecords))
+  capacityDetections.splice(
+    0,
+    capacityDetections.length,
+    ...structuredClone(state.capacityDetections ?? []),
+  )
+  capacityBalances.splice(
+    0,
+    capacityBalances.length,
+    ...structuredClone(state.capacityBalances ?? []),
+  )
+  const restoredLineStatuses = structuredClone(state.lineStatuses ?? lineStatuses)
+  lineStatuses.splice(0, lineStatuses.length, ...restoredLineStatuses)
 }
 
 function paginate<TItem>(items: TItem[], page: number, pageSize: number): PageResult<TItem> {
@@ -858,11 +1183,14 @@ function listCalendars(query: ProductionCalendarQuery) {
 }
 
 export const productionMock = {
+  addExternalOrder,
   approveOrder,
   cancelOrder,
+  convertExternalOrder,
   createLine,
   createOrder,
   deleteCalendar,
+  estimateCapacity,
   finishOrder,
   getOrder(orderId: number) {
     return delay(() => {
@@ -896,28 +1224,36 @@ export const productionMock = {
   listOrders,
   reportFault,
   reviewExternalOrder,
+  runCapacityDetection,
   saveCalendar,
+  saveCapacityBalance,
   saveCapacityConfig,
   saveLineType,
   startOrder,
   updateFault,
   updateLine,
+  updateLineStatus,
   updateOrder,
 }
 
 export type ProductionMockWrite =
+  | 'addExternalOrder'
   | 'approveOrder'
   | 'cancelOrder'
   | 'createLine'
   | 'createOrder'
+  | 'convertExternalOrder'
   | 'deleteCalendar'
   | 'finishOrder'
   | 'reportFault'
   | 'reviewExternalOrder'
+  | 'runCapacityDetection'
   | 'saveCalendar'
+  | 'saveCapacityBalance'
   | 'saveCapacityConfig'
   | 'saveLineType'
   | 'startOrder'
   | 'updateFault'
   | 'updateLine'
+  | 'updateLineStatus'
   | 'updateOrder'

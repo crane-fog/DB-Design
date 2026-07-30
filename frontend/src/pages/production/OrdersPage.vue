@@ -319,6 +319,13 @@ function canCancel(order: ProductionOrderItem) {
   return order.status !== 'completed' && order.status !== 'cancelled'
 }
 
+function progressPercentage(order: ProductionOrderItem) {
+  if (order.planQty <= 0) {
+    return 0
+  }
+  return Math.min(100, Math.round(((order.finishedQty ?? 0) / order.planQty) * 100))
+}
+
 onMounted(() => void loadOrders())
 </script>
 
@@ -396,6 +403,11 @@ onMounted(() => void loadOrders())
         <el-table-column label="计划数量" min-width="90" prop="planQty" />
         <el-table-column label="完工数量" min-width="90">
           <template #default="{ row }">{{ row.finishedQty ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column label="生产进度" min-width="150">
+          <template #default="{ row }">
+            <el-progress :percentage="progressPercentage(row)" :stroke-width="10" />
+          </template>
         </el-table-column>
         <el-table-column label="状态" min-width="90">
           <template #default="{ row }"
@@ -531,6 +543,9 @@ onMounted(() => void loadOrders())
         <el-descriptions-item label="完工数量">{{
           detail.finishedQty ?? '-'
         }}</el-descriptions-item>
+        <el-descriptions-item label="生产进度">
+          <el-progress :percentage="progressPercentage(detail)" />
+        </el-descriptions-item>
         <el-descriptions-item label="计划开工">{{ detail.planStart || '-' }}</el-descriptions-item>
         <el-descriptions-item label="计划完工">{{ detail.planEnd || '-' }}</el-descriptions-item>
         <el-descriptions-item label="实际开工">{{
