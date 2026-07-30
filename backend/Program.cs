@@ -76,6 +76,8 @@ builder.Services.AddScoped(sp => new MaterialCatalogService(
     connString,
     sp.GetRequiredService<IStockReadQuery>(),
     sp.GetRequiredService<IStockInitialization>()));
+builder.Services.AddScoped(_ => new BomVersionService(connString));
+builder.Services.AddScoped(_ => new BomService(connString));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
