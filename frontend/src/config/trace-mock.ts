@@ -166,6 +166,62 @@ const materialTraceRecords: MaterialBatchTraceItem[] = [
 
 const productTraceRecords: ProductBatchTraceItem[] = [
   {
+    batchNo: 'AX100-20260724-C',
+    consumedBatches: [
+      {
+        consumeQty: 60,
+        itemId: 1101,
+        materialId: 1001,
+        materialName: '铝合金型材 6061',
+        orderId: 5005,
+        receiveDate: '2026-07-20',
+        supplierId: 41,
+        supplierName: '华东精材供应链',
+      },
+      {
+        consumeQty: 30,
+        itemId: 1102,
+        materialId: 1002,
+        materialName: '控制板组件 C01',
+        orderId: 5005,
+        receiveDate: '2026-07-21',
+        supplierId: 42,
+        supplierName: '启航电子组件',
+      },
+    ],
+    materialId: 2001,
+    materialName: '智能控制终端 AX100',
+    orderId: 5005,
+  },
+  {
+    batchNo: 'MX200-20260721-C',
+    consumedBatches: [
+      {
+        consumeQty: 120,
+        itemId: 1103,
+        materialId: 1003,
+        materialName: '屏蔽线缆 0.25mm',
+        orderId: 5010,
+        receiveDate: '2026-07-17',
+        supplierId: 41,
+        supplierName: '华东精材供应链',
+      },
+      {
+        consumeQty: 360,
+        itemId: 1104,
+        materialId: 1004,
+        materialName: '内六角螺钉 M4',
+        orderId: 5010,
+        receiveDate: '2026-07-18',
+        supplierId: 42,
+        supplierName: '启航电子组件',
+      },
+    ],
+    materialId: 2002,
+    materialName: '模块化执行器 MX200',
+    orderId: 5010,
+  },
+  {
     batchNo: 'AX100-20260729-A',
     consumedBatches: [
       {

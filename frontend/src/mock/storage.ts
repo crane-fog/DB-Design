@@ -1,7 +1,7 @@
 import { isMockPersistenceEnabled } from '@/config/mock'
 
 export const MOCK_STORAGE_NAMESPACE = 'db-design:mock:'
-export const MOCK_SCHEMA_VERSION = 1
+export const MOCK_SCHEMA_VERSION = 2
 export const MOCK_DATA_KEY = `${MOCK_STORAGE_NAMESPACE}data`
 
 interface StoredValue<TValue> {

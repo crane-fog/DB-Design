@@ -14,20 +14,25 @@ const adapter = createPersistedMockAdapter({
 })
 
 const writeMethods = new Set<PropertyKey>([
+  'addExternalOrder',
   'approveOrder',
   'cancelOrder',
   'createLine',
   'createOrder',
+  'convertExternalOrder',
   'deleteCalendar',
   'finishOrder',
   'reportFault',
   'reviewExternalOrder',
+  'runCapacityDetection',
   'saveCalendar',
+  'saveCapacityBalance',
   'saveCapacityConfig',
   'saveLineType',
   'startOrder',
   'updateFault',
   'updateLine',
+  'updateLineStatus',
   'updateOrder',
 ])
 

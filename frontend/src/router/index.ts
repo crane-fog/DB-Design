@@ -168,12 +168,26 @@ const adminRoutes: RouteRecordRaw[] = [
     path: 'production/breakdown',
   },
   {
+    component: () => import('@/pages/production/ProductionOperationsPage.vue'),
+    meta: {
+      icon: 'monitor',
+      module: 'production',
+      pageOrder: 11,
+      permission: PERMISSIONS.production.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '生产运营',
+    },
+    name: 'production-operations',
+    path: 'production/operations',
+  },
+  {
     component: () => import('@/pages/trace/TraceOverview.vue'),
     meta: {
       icon: 'trace',
       isModule: true,
       module: 'trace',
-      pageOrder: 11,
+      pageOrder: 12,
       permission: PERMISSIONS.trace.view,
       requiresAuth: true,
       showInMenu: true,
@@ -188,7 +202,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'system',
       isModule: true,
       module: 'system',
-      pageOrder: 12,
+      pageOrder: 13,
       permission: PERMISSIONS.system.view,
       requiresAuth: true,
       showInMenu: true,
@@ -202,7 +216,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       icon: 'users',
       module: 'system',
-      pageOrder: 13,
+      pageOrder: 14,
       permission: PERMISSIONS.system.userView,
       requiresAuth: true,
       showInMenu: true,
@@ -216,7 +230,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       icon: 'audit',
       module: 'system',
-      pageOrder: 15,
+      pageOrder: 16,
       permission: PERMISSIONS.system.auditView,
       requiresAuth: true,
       showInMenu: true,
@@ -230,7 +244,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       icon: 'roles',
       module: 'system',
-      pageOrder: 14,
+      pageOrder: 15,
       permission: PERMISSIONS.system.roleView,
       requiresAuth: true,
       showInMenu: true,
