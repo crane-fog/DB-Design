@@ -91,6 +91,11 @@ builder.Services.AddScoped<DemandAnalysisService>(sp => new DemandAnalysisServic
     sp.GetRequiredService<IPriceQuery>(),
     sp.GetRequiredService<MaterialRequirementNettingService>()));
 builder.Services.AddScoped<IBomExpansionQuery>(sp => sp.GetRequiredService<DemandAnalysisService>());
+builder.Services.AddScoped(_ => new CapacityEstimationDataSource(connString));
+builder.Services.AddScoped<IProductionLineService>(_ => new ProductionLineService(connString));
+builder.Services.AddScoped<ICapacityService>(services => new CapacityService(
+    connString,
+    services.GetRequiredService<CapacityEstimationDataSource>()));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
