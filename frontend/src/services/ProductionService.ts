@@ -483,9 +483,12 @@ function assertMockPermission(permission: string) {
 export const productionService = {
   async addExternalOrder(form: ExternalOrderCreateFormData) {
     const auth = useAuthStore()
+    let { customerId } = form
+    if (auth.hasRole('外部客户')) {
+      customerId = undefined
+    }
     if (isMockEnabled()) {
       assertMockPermission('production:view')
-      let { customerId } = form
       if (auth.hasRole('外部客户')) {
         customerId = auth.currentUser?.id
       }
@@ -496,7 +499,7 @@ export const productionService = {
       externalOrderCreateRequest: {
         contact_person: form.contactPerson.trim(),
         contact_phone: form.contactPhone.trim(),
-        customer_id: form.customerId,
+        customer_id: customerId,
         expected_date: form.expectedDate,
         material_id: form.materialId,
         quantity: form.quantity,
