@@ -32,6 +32,11 @@ builder.Services.AddScoped(_ => new UserContextService(connString));
 builder.Services.AddScoped(_ => new ProductionOrderService(connString));
 builder.Services.AddScoped(sp => new ExternalOrderService(connString, sp.GetRequiredService<ILogger<ExternalOrderService>>()));
 builder.Services.AddScoped(_ => new QualityTraceService(connString));
+builder.Services.AddScoped(_ => new CapacityEstimationDataSource(connString));
+builder.Services.AddScoped<IProductionLineService>(_ => new ProductionLineService(connString));
+builder.Services.AddScoped<ICapacityService>(services => new CapacityService(
+    connString,
+    services.GetRequiredService<CapacityEstimationDataSource>()));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
