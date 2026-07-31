@@ -12,6 +12,8 @@ const adapter = createPersistedMockAdapter({
 const writeMethods = new Set<PropertyKey>([
   'createBatchConsumption',
   'deleteBatchConsumption',
+  'freezeBatch',
+  'recallBatch',
   'updateBatchConsumption',
 ])
 
