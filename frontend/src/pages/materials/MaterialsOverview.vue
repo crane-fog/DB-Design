@@ -819,6 +819,7 @@ onMounted(() => void refreshAll())
           ><el-tree
             v-if="treeData.length"
             :key="treeKey"
+            class="bom-tree"
             :data="treeData"
             :default-expand-all="treeExpanded"
             node-key="path"
@@ -1158,10 +1159,30 @@ small {
 .tree-meta {
   margin: 12px 0;
 }
+.bom-tree {
+  max-height: min(60vh, 720px);
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.bom-tree :deep(.el-tree-node__content) {
+  box-sizing: border-box;
+  height: auto;
+  min-height: 52px;
+  overflow: visible;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
 .tree-node {
   display: grid;
   gap: 2px;
+  line-height: 20px;
+  min-width: 0;
   padding: 4px 0;
+}
+.tree-node strong,
+.tree-node small {
+  line-height: 20px;
+  overflow-wrap: anywhere;
 }
 .input-unit {
   margin-left: 8px;
