@@ -89,13 +89,22 @@ public static class ClaimsPrincipalExtensions
 
 /// <summary>
 /// 分页参数归一化：契约默认 page=1、page_size=10，且均不小于 1。
+/// 同时封顶上限：page ≤ 1_000_000、page_size ≤ 200，防止超大分页导致
+/// (page-1)*pageSize 溢出为负值或拖垮数据库。
 /// </summary>
 public static class Paging
 {
+    private const int MaxPage = 1_000_000;
+    private const int MaxPageSize = 200;
+
     public static (int Page, int PageSize) Normalize(int? page, int? pageSize)
     {
         var normalizedPage = page is > 0 ? page.Value : 1;
+        if (normalizedPage > MaxPage) normalizedPage = MaxPage;
+
         var normalizedSize = pageSize is > 0 ? pageSize.Value : 10;
+        if (normalizedSize > MaxPageSize) normalizedSize = MaxPageSize;
+
         return (normalizedPage, normalizedSize);
     }
 }

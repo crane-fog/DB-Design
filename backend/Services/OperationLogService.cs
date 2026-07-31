@@ -26,9 +26,34 @@ public class OperationLogService(string connString)
             OperateTime = reader.GetDateTime(4),
             IpAddress = reader.IsDBNull(5) ? null! : reader.GetString(5),
         };
-        if (!reader.IsDBNull(6)) log.BeforeData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(reader.GetString(6))!;
-        if (!reader.IsDBNull(7)) log.AfterData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(reader.GetString(7))!;
+        if (!reader.IsDBNull(6)) log.BeforeData = ParseJsonObject(reader.GetString(6));
+        if (!reader.IsDBNull(7)) log.AfterData = ParseJsonObject(reader.GetString(7));
         return log;
+    }
+
+    /// <summary>
+    /// 安全解析 before/after 数据。
+    /// 表上仅有 IS JSON 约束（允许数组/标量），只有对象类型才能映射为字典；
+    /// 非对象或非法 JSON 一律跳过，避免一条异常数据导致整个日志列表查询失败。
+    /// </summary>
+    private static Dictionary<string, object>? ParseJsonObject(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            var token = Newtonsoft.Json.Linq.JToken.Parse(json);
+            return token.Type == Newtonsoft.Json.Linq.JTokenType.Object
+                ? token.ToObject<Dictionary<string, object>>()
+                : null;
+        }
+        catch (Newtonsoft.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     public (List<OperationLog> Records, int Total) List(
@@ -75,7 +100,8 @@ public class OperationLogService(string connString)
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
-        var offset = (page - 1) * pageSize;
+        // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
+        var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
         dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY OPERATE_TIME DESC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));

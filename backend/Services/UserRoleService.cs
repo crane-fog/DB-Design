@@ -33,7 +33,8 @@ public class UserRoleService(string connString)
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
-        var offset = (page - 1) * pageSize;
+        // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
+        var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
         dataCmd.CommandText = $@"SELECT UR.USER_ID, UR.ROLE_ID
                                  FROM SYS_USER_ROLE UR {where}
@@ -64,15 +65,24 @@ public class UserRoleService(string connString)
         using var conn = new OracleConnection(connString);
         conn.Open();
 
-        // 1. 检查用户存在
+        // 1. 检查用户存在且有效：disabled 用户不应再分配新角色（与 disabled 角色不参与授权对称）
+        string? userStatus;
         using (var userCheck = conn.CreateCommand())
         {
-            userCheck.CommandText = "SELECT COUNT(*) FROM SYS_USER WHERE USER_ID = :userId";
+            userCheck.CommandText = "SELECT STATUS FROM SYS_USER WHERE USER_ID = :userId";
             userCheck.Parameters.Add(new OracleParameter("userId", userId));
-            if (Convert.ToInt32(userCheck.ExecuteScalar()!) == 0)
+            var value = userCheck.ExecuteScalar();
+            if (value is null || value is DBNull)
             {
                 return (null, "用户不存在");
             }
+
+            userStatus = Convert.ToString(value);
+        }
+
+        if (!string.Equals(userStatus, "valid", StringComparison.OrdinalIgnoreCase))
+        {
+            return (null, "用户已停用，无法分配角色");
         }
 
         // 2. 写入前一次性校验所有角色：必须存在且为有效状态。

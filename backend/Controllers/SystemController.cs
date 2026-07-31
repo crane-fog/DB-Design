@@ -796,14 +796,21 @@ public class SystemController(
 
         // 审计日志的操作人与来源 IP 必须取服务端上下文，不能信任客户端声明，
         // 否则调用者可伪造“由其他用户、其他 IP 执行”的审计记录。
-        var operatorId = 0;
         var currentUser = userContext.Resolve(User.GetEmployeeNo());
-        if (currentUser is not null)
+        if (currentUser is null)
         {
-            operatorId = Convert.ToInt32(currentUser.UserId);
+            // 无法解析出有效操作人（用户已停用/不存在）：不写入日志。
+            // 若写入 operator_id=0，会因 OPERATION_LOG.OPERATOR_ID 外键引用
+            // sys_user(user_id)（且 0 号用户不存在）触发 ORA-02291 导致 HTTP 500。
+            return Ok(new OperationLogResponse
+            {
+                Code = OperationLogResponse.CodeEnum._401Enum,
+                Message = "登录状态无效，无法记录操作日志",
+                Data = null!,
+            });
         }
 
-        request.OperatorId = operatorId;
+        request.OperatorId = Convert.ToInt32(currentUser.UserId);
         request.IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
 
         var log = operationLogService.Write(request);

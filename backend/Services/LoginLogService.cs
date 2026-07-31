@@ -67,7 +67,8 @@ public class LoginLogService(string connString)
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
-        var offset = (page - 1) * pageSize;
+        // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
+        var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
         dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY LOGIN_TIME DESC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));

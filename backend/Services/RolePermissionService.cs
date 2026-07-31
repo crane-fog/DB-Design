@@ -33,7 +33,8 @@ public class RolePermissionService(string connString)
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
-        var offset = (page - 1) * pageSize;
+        // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
+        var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
         dataCmd.CommandText = $@"SELECT RP.ROLE_ID, RP.PERMISSION_ID
                                  FROM SYS_ROLE_PERMISSION RP {where}
@@ -64,15 +65,24 @@ public class RolePermissionService(string connString)
         using var conn = new OracleConnection(connString);
         conn.Open();
 
-        // 1. 检查角色存在
+        // 1. 检查角色存在且有效：disabled 角色不应再授予新权限（与 disabled 角色不参与授权一致）
+        string? roleStatus;
         using (var roleCheck = conn.CreateCommand())
         {
-            roleCheck.CommandText = "SELECT COUNT(*) FROM SYS_ROLE WHERE ROLE_ID = :roleId";
+            roleCheck.CommandText = "SELECT STATUS FROM SYS_ROLE WHERE ROLE_ID = :roleId";
             roleCheck.Parameters.Add(new OracleParameter("roleId", roleId));
-            if (Convert.ToInt32(roleCheck.ExecuteScalar()!) == 0)
+            var value = roleCheck.ExecuteScalar();
+            if (value is null || value is DBNull)
             {
                 return (null, "角色不存在");
             }
+
+            roleStatus = Convert.ToString(value);
+        }
+
+        if (!string.Equals(roleStatus, "valid", StringComparison.OrdinalIgnoreCase))
+        {
+            return (null, "角色已停用，无法分配权限");
         }
 
         // 2. 写入前一次性校验所有权限存在；任一项不通过则整体失败，不做任何写入
