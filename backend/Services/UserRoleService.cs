@@ -62,6 +62,12 @@ public class UserRoleService(string connString)
     {
         var distinctIds = roleIds.Distinct().ToList();
 
+        // Oracle IN 列表上限 1000 项，超限触发 ORA-01795；在写入前拦截为业务错误
+        if (distinctIds.Count > 1000)
+        {
+            return (null, "单次分配的角色数量不能超过 1000");
+        }
+
         using var conn = new OracleConnection(connString);
         conn.Open();
 

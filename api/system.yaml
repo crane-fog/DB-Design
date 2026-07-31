@@ -994,14 +994,27 @@ components:
           default: valid
 
     RoleUpdateRequest:
-      allOf:
-        - $ref: '#/components/schemas/RoleCreateRequest'
-        - type: object
-          required:
-            - role_id
-          properties:
-            role_id:
-              type: integer
+      type: object
+      required:
+        - role_id
+        - role_name
+      properties:
+        role_id:
+          type: integer
+          description: 角色编号。
+        role_name:
+          type: string
+          description: 角色名称。
+        description:
+          type: string
+          nullable: true
+          description: 角色描述。
+        status:
+          type: string
+          description: 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。更新时不传则保持原状态。
+          enum:
+            - valid
+            - disabled
 
     RoleDeleteRequest:
       type: object

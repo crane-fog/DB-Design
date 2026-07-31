@@ -125,8 +125,11 @@ public class OperationLogService(string connString)
         cmd.CommandText = @"INSERT INTO OPERATION_LOG (MODULE, ACTION, OPERATOR_ID, OPERATE_TIME, IP_ADDRESS, BEFORE_DATA, AFTER_DATA)
                             VALUES (:module, :action, :operatorId, SYSTIMESTAMP, :ipAddress, :beforeData, :afterData)
                             RETURNING LOG_ID INTO :logId";
-        cmd.Parameters.Add(new OracleParameter("module", request.Module.Trim()));
-        cmd.Parameters.Add(new OracleParameter("action", request.Action.Trim()));
+        // MODULE / ACTION 为 VARCHAR2(50)，超长会触发 ORA-12899；写入前截断防御
+        var module = Truncate(request.Module.Trim(), 50);
+        var action = Truncate(request.Action.Trim(), 50);
+        cmd.Parameters.Add(new OracleParameter("module", module));
+        cmd.Parameters.Add(new OracleParameter("action", action));
         cmd.Parameters.Add(new OracleParameter("operatorId", request.OperatorId));
         cmd.Parameters.Add(new OracleParameter("ipAddress", string.IsNullOrWhiteSpace(request.IpAddress) ? (object)DBNull.Value : request.IpAddress.Trim()));
         cmd.Parameters.Add(new OracleParameter("beforeData", request.BeforeData is null ? (object)DBNull.Value : Newtonsoft.Json.JsonConvert.SerializeObject(request.BeforeData)));
@@ -145,11 +148,15 @@ public class OperationLogService(string connString)
         return reader.Read() ? ReadOperationLog(reader) : new OperationLog
         {
             LogId = logId,
-            Module = request.Module,
-            Action = request.Action,
+            Module = module,
+            Action = action,
             OperatorId = request.OperatorId,
             OperateTime = DateTime.UtcNow,
             IpAddress = request.IpAddress ?? null!,
         };
     }
+
+    /// <summary>按字节/字符长度截断字符串，防止超长字段触发 ORA-12899。</summary>
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength];
 }

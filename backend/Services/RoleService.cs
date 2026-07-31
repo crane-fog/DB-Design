@@ -132,9 +132,16 @@ public class RoleService(string connString)
         parameters.Add(new OracleParameter("description",
             string.IsNullOrWhiteSpace(request.Description) ? (object)DBNull.Value : request.Description.Trim()));
 
-        var statusVal = request.Status == RoleUpdateRequest.StatusEnum.DisabledEnum ? "disabled" : "valid";
-        sets.Add("STATUS = :status");
-        parameters.Add(new OracleParameter("status", statusVal));
+        // Status 守卫与 UserService.Update 对称：当前生成的 RoleUpdateRequest.Status
+        // 因契约 default:valid 默认 ValidEnum(1)，此条件恒真、行为不变；
+        // 契约去除 default 并重新生成后默认 0，省略 status 时保持原状态，
+        // 避免“只改名称/描述却把 disabled 角色意外激活”的安全问题。
+        if ((int)request.Status == 1 || (int)request.Status == 2)
+        {
+            var statusVal = request.Status == RoleUpdateRequest.StatusEnum.DisabledEnum ? "disabled" : "valid";
+            sets.Add("STATUS = :status");
+            parameters.Add(new OracleParameter("status", statusVal));
+        }
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $"UPDATE SYS_ROLE SET {string.Join(", ", sets)} WHERE ROLE_ID = :roleId";
