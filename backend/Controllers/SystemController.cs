@@ -16,6 +16,7 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class SystemController(
     AuthorizationService authorization,
+    UserContextService userContext,
     UserService userService,
     RoleService roleService,
     PermissionService permissionService,
@@ -792,6 +793,18 @@ public class SystemController(
                 Data = null!,
             });
         }
+
+        // 审计日志的操作人与来源 IP 必须取服务端上下文，不能信任客户端声明，
+        // 否则调用者可伪造“由其他用户、其他 IP 执行”的审计记录。
+        var operatorId = 0;
+        var currentUser = userContext.Resolve(User.GetEmployeeNo());
+        if (currentUser is not null)
+        {
+            operatorId = Convert.ToInt32(currentUser.UserId);
+        }
+
+        request.OperatorId = operatorId;
+        request.IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
 
         var log = operationLogService.Write(request);
         return Ok(new OperationLogResponse
