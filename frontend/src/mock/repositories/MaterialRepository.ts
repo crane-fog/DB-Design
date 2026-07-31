@@ -13,7 +13,21 @@ const adapter = createPersistedMockAdapter({
   snapshot: snapshotMaterialBomMock,
 })
 
-export const materialRepository = createPersistedMockProxy(materialBomMock, adapter, new Set())
+const materialWriteMethods = new Set<PropertyKey>([
+  'addBomComponent',
+  'createBomVersion',
+  'createMaterial',
+  'removeBomComponent',
+  'setBomVersionReleased',
+  'updateBomComponent',
+  'updateMaterial',
+])
+
+export const materialRepository = createPersistedMockProxy(
+  materialBomMock,
+  adapter,
+  materialWriteMethods,
+)
 
 export function resetMaterialMockData() {
   return adapter.reset()
