@@ -87,8 +87,8 @@ public sealed record ShortageResult(
 /// 库存管理主责 Service（B 模块）。维护 material_stock、stock_alert、stock_lock、
 /// waste_detection、finish_inbound 表及供应商报价查询。
 /// </summary>
-public class InventoryService(string connString, IBomExpansionService? bomExpansion = null)
-    : IPriceQueryService, IStockOperationService
+public class InventoryService(string connString, IBomExpansionQuery? bomExpansionQuery = null)
+    : IStockOperationService
 {
     // ── material_stock ────────────────────────────────────────────
     private const string MaterialStockColumns = @"
@@ -902,8 +902,8 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
 
     public ShortageResult CalculateShortage(MaterialShortageCalculateRequest request)
     {
-        if (bomExpansion is null)
-            return ShortageResult.Fail(500, "BOM 展开服务尚未接入（等待 A 模块实现 IBomExpansionService）");
+        if (bomExpansionQuery is null)
+            return ShortageResult.Fail(500, "BOM 展开服务尚未接入（等待 A 模块注册 IBomExpansionQuery）");
 
         using var conn = new OracleConnection(connString);
         conn.Open();
@@ -911,108 +911,73 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         var allRecords = new List<MaterialShortageItem>();
         var calcTime = DateTime.Now;
 
-        foreach (var reqItem in request.Items)
+        try
         {
-            var nodes = bomExpansion.Expand(reqItem.MaterialId, reqItem.VersionId);
-            foreach (var node in nodes)
+            foreach (var reqItem in request.Items)
             {
-                decimal grossRequirement =
-                    reqItem.ProductionQty * node.Quantity / (1 - node.LossRate);
-                grossRequirement = Math.Ceiling(grossRequirement * 100) / 100;
-
-                decimal availableQty = 0;
-                using (var cmd = conn.CreateCommand())
+                var items = bomExpansionQuery.ExpandDemand(
+                    reqItem.MaterialId, reqItem.VersionId, reqItem.ProductionQty, conn);
+                foreach (var item in items)
                 {
-                    cmd.CommandText = "SELECT AVAILABLE_QTY FROM MATERIAL_STOCK WHERE MATERIAL_ID = :materialId";
-                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
-                    var r = cmd.ExecuteScalar();
-                    if (r is not null and not DBNull) availableQty = Convert.ToDecimal(r);
+                    decimal availableQty = 0;
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT AVAILABLE_QTY FROM MATERIAL_STOCK WHERE MATERIAL_ID = :materialId";
+                        cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
+                        var r = cmd.ExecuteScalar();
+                        if (r is not null and not DBNull) availableQty = Convert.ToDecimal(r);
+                    }
+
+                    decimal inTransitQty = 0;
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            SELECT COALESCE(SUM(poi.QUANTITY - NVL(poi.RECEIVED_QTY, 0)), 0)
+                            FROM PURCHASE_ORDER_ITEM poi
+                            JOIN PURCHASE_ORDER po ON po.ORDER_ID = poi.ORDER_ID
+                            WHERE poi.MATERIAL_ID =  :materialId
+                              AND po.STATUS IN (:submitted, :partial)";
+                        cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
+                        cmd.Parameters.Add(new OracleParameter("submitted", PurchaseOrderStatusMap.Db.Submitted));
+                        cmd.Parameters.Add(new OracleParameter("partial", PurchaseOrderStatusMap.Db.PartialReceived));
+                        inTransitQty = Convert.ToDecimal(cmd.ExecuteScalar());
+                    }
+
+                    decimal safetyStock = 0;
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT SAFETY_STOCK FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+                        cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
+                        var r = cmd.ExecuteScalar();
+                        if (r is not null and not DBNull) safetyStock = Convert.ToDecimal(r);
+                    }
+
+                    decimal netShortage = Math.Max(
+                        item.GrossQuantity - availableQty - inTransitQty + safetyStock, 0);
+                    netShortage = Math.Ceiling(netShortage * 100) / 100;
+
+                    allRecords.Add(new MaterialShortageItem
+                    {
+                        MaterialId = item.MaterialId,
+                        MaterialName = item.MaterialName,
+                        ParentMaterialId = ResolveParentId(item.Path),
+                        Level = item.Depth,
+                        GrossRequirement = item.GrossQuantity,
+                        AvailableQty = availableQty,
+                        InTransitQty = inTransitQty,
+                        SafetyStock = safetyStock,
+                        NetShortageQty = netShortage,
+                        SuggestedPurchaseQty = netShortage,
+                    });
                 }
-
-                decimal inTransitQty = 0;
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = @"
-                        SELECT COALESCE(SUM(poi.QUANTITY - NVL(poi.RECEIVED_QTY, 0)), 0)
-                        FROM PURCHASE_ORDER_ITEM poi
-                        JOIN PURCHASE_ORDER po ON po.ORDER_ID = poi.ORDER_ID
-                        WHERE poi.MATERIAL_ID =  :materialId
-                          AND po.STATUS IN (:submitted, :partial)";
-                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
-                    cmd.Parameters.Add(new OracleParameter("submitted", PurchaseOrderStatusMap.Db.Submitted));
-                    cmd.Parameters.Add(new OracleParameter("partial", PurchaseOrderStatusMap.Db.PartialReceived));
-                    inTransitQty = Convert.ToDecimal(cmd.ExecuteScalar());
-                }
-
-                decimal safetyStock = 0;
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = "SELECT SAFETY_STOCK FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
-                    var r = cmd.ExecuteScalar();
-                    if (r is not null and not DBNull) safetyStock = Convert.ToDecimal(r);
-                }
-
-                decimal netShortage = Math.Max(
-                    grossRequirement - availableQty - inTransitQty + safetyStock, 0);
-                netShortage = Math.Ceiling(netShortage * 100) / 100;
-
-                string? materialName = null;
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = "SELECT MATERIAL_NAME FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-                    cmd.Parameters.Add(new OracleParameter("materialId", node.MaterialId));
-                    var r = cmd.ExecuteScalar();
-                    if (r is not null and not DBNull) materialName = r.ToString();
-                }
-
-                allRecords.Add(new MaterialShortageItem
-                {
-                    MaterialId = node.MaterialId,
-                    MaterialName = materialName ?? string.Empty,
-                    ParentMaterialId = node.ParentMaterialId,
-                    Level = node.Level,
-                    GrossRequirement = grossRequirement,
-                    AvailableQty = availableQty,
-                    InTransitQty = inTransitQty,
-                    SafetyStock = safetyStock,
-                    NetShortageQty = netShortage,
-                    SuggestedPurchaseQty = netShortage,
-                });
             }
+        }
+        catch (Exception ex)
+        {
+            return ShortageResult.Fail(500, $"缺口计算失败: {ex.Message}");
         }
 
         return ShortageResult.Success(allRecords, calcTime);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    //  IPriceQueryService 实现
-    // ═══════════════════════════════════════════════════════════════
-
-    public decimal? GetCurrentPrice(long materialId)
-    {
-        using var conn = new OracleConnection(connString);
-        conn.Open();
-
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT PRICE FROM SUPPLIER_PRICE
-            WHERE MATERIAL_ID =  :materialId
-              AND VALID_FROM <= SYSDATE
-              AND (VALID_TO IS NULL OR VALID_TO >= SYSDATE)
-            ORDER BY VALID_FROM DESC
-            FETCH FIRST 1 ROW ONLY";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        var result = cmd.ExecuteScalar();
-        return result is null or DBNull ? null : Convert.ToDecimal(result);
-    }
-
-    public Dictionary<long, decimal?> GetCurrentPrices(IEnumerable<long> materialIds)
-    {
-        var result = new Dictionary<long, decimal?>();
-        foreach (var id in materialIds)
-            result[id] = GetCurrentPrice(id);
-        return result;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1212,6 +1177,22 @@ public class InventoryService(string connString, IBomExpansionService? bomExpans
         cmd.Parameters.Add(new OracleParameter("detectionId", detectionId));
         var value = cmd.ExecuteScalar();
         return value is null or DBNull ? null : value.ToString();
+    }
+
+    /// <summary>
+    /// 从 BOM 展开的装配路径（如 "101/402 | 101/403"）解析直接父物料；
+    /// 物料出现在多条路径且父不一致时返回 null。
+    /// </summary>
+    private static long? ResolveParentId(string path)
+    {
+        var parents = path.Split(" | ", StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => segment.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            .Select(parts => parts.Length >= 2 ? parts[^2] : null)
+            .Where(parent => parent is not null)
+            .Select(parent => parent!)
+            .Distinct()
+            .ToList();
+        return parents.Count == 1 && long.TryParse(parents[0], out var parentId) ? parentId : null;
     }
 
     /// <summary>

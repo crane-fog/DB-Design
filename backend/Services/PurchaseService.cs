@@ -293,7 +293,7 @@ public class PurchaseService(string connString)
                 decimal totalAmount = 0;
                 foreach (var (materialId, qty) in items)
                 {
-                    var price = GetCurrentPriceForMaterial(conn, materialId) ?? 0m;
+                    var price = GetCurrentPriceForMaterial(conn, materialId, supId) ?? 0m;
                     totalAmount += qty * price;
                 }
 
@@ -321,7 +321,7 @@ public class PurchaseService(string connString)
 
                 foreach (var (materialId, qty) in items)
                 {
-                    var price = GetCurrentPriceForMaterial(conn, materialId) ?? 0m;
+                    var price = GetCurrentPriceForMaterial(conn, materialId, supId) ?? 0m;
                     using var cmd = conn.CreateCommand();
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO PURCHASE_ORDER_ITEM
@@ -912,17 +912,19 @@ public class PurchaseService(string connString)
         return result is null or DBNull ? 0 : Convert.ToInt64(result);
     }
 
-    private static decimal? GetCurrentPriceForMaterial(OracleConnection conn, long materialId)
+    private static decimal? GetCurrentPriceForMaterial(OracleConnection conn, long materialId, long supplierId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT PRICE FROM SUPPLIER_PRICE
             WHERE MATERIAL_ID =  :materialId
+              AND SUPPLIER_ID = :supplierId
               AND VALID_FROM <= SYSDATE
               AND (VALID_TO IS NULL OR VALID_TO >= SYSDATE)
             ORDER BY VALID_FROM DESC
             FETCH FIRST 1 ROW ONLY";
         cmd.Parameters.Add(new OracleParameter("materialId", materialId));
+        cmd.Parameters.Add(new OracleParameter("supplierId", supplierId));
         var result = cmd.ExecuteScalar();
         return result is null or DBNull ? null : Convert.ToDecimal(result);
     }
