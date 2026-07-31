@@ -75,6 +75,13 @@ export const productionOrderStatuses = {
   'cancelled' | 'completed' | 'in_progress' | 'pending_review' | 'pending_schedule'
 >
 
+export const qualityDispositionStatuses = {
+  frozen: { label: '已冻结', tone: 'warning' },
+  pending: { label: '待处理', tone: 'info' },
+  recalled: { label: '已召回', tone: 'danger' },
+  released: { label: '已解除', tone: 'success' },
+} satisfies StatusMap<'frozen' | 'pending' | 'recalled' | 'released'>
+
 export const inventoryMonitorStatusLabels = labelsOf(inventoryMonitorStatuses)
 export const productionOrderStatusLabels = labelsOf(productionOrderStatuses)
 export const purchaseOrderStatusLabels = labelsOf(purchaseOrderStatuses)
