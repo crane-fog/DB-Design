@@ -6,6 +6,7 @@ using Backend.Services.Interfaces;
 using DotNetEnv;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
 Env.Load();
@@ -26,6 +27,30 @@ var builder = WebApplication.CreateBuilder(args);
 var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
 
 builder.Services.AddControllers().AddNewtonsoftJson();
+
+// 契约约定：HTTP 固定 200，业务状态通过响应体 code 表达。
+// [ApiController] 自动模型验证失败（缺 required 字段、枚举值非法等）默认返回 HTTP 400
+// ProblemDetails，响应体结构与 {code, message, data} 不一致；这里统一改写为业务响应体。
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var message = string.Join("; ", context.ModelState.Values
+            .SelectMany(v => v.Errors)
+            .Select(e => e.ErrorMessage));
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            message = "请求参数不合法";
+        }
+
+        return new OkObjectResult(new
+        {
+            code = 400,
+            message,
+            data = (object?)null,
+        });
+    };
+});
 
 builder.Services.AddScoped(sp => new AuthService(connString, jwtSecret, sp.GetRequiredService<LoginLogService>()));
 builder.Services.AddScoped<IUserTestService>(_ => new UserTestService(connString));
