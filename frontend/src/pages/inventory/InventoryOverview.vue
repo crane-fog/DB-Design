@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { Bell, Box, DataAnalysis, Refresh, TrendCharts, Van } from '@element-plus/icons-vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { InventoryOverviewSummary } from '@/types/inventory'
+import { Bell, Box, DataAnalysis, Refresh, Search, TrendCharts, Van } from '@element-plus/icons-vue'
+import type {
+  InventoryOverviewSummary,
+  InventoryStockItem,
+  InventoryStockQuery,
+  InventoryStockStatus,
+} from '@/types/inventory'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { formatNumber } from '@/utils/format'
@@ -16,26 +23,45 @@ const loading = ref(false)
 const error = ref('')
 const summary = ref<InventoryOverviewSummary>()
 let requestId = 0
+const stockLoading = ref(false)
+const stockError = ref('')
+const stockItems = ref<InventoryStockItem[]>([])
+const stockTotal = ref(0)
+const stockQuery = reactive<InventoryStockQuery>({ page: 1, pageSize: 10 })
+let stockRequestId = 0
+
+const materialTypeLabels = {
+  auxiliary: '辅料',
+  finished: '成品',
+  raw_material: '原材料',
+  semi_finished: '半成品',
+}
+const stockStatusLabels: Record<InventoryStockStatus, string> = {
+  locked: '已锁定',
+  low: '低库存',
+  normal: '正常',
+  zero: '零库存',
+}
 
 const shortcuts = [
   {
     description: '按 BOM 展开需求并核对可用、在途与安全库存。',
     icon: DataAnalysis,
-    permission: 'inventory:calc',
+    permission: PERMISSIONS.inventory.calc,
     route: '/inventory/calc',
     title: '物料缺口计算',
   },
   {
     description: '处理低库存预警、库存锁定与呆滞物料。',
     icon: Bell,
-    permission: 'inventory:monitor',
+    permission: PERMISSIONS.inventory.monitor,
     route: '/inventory/monitor',
     title: '库存监控',
   },
   {
     description: '登记生产订单完工批次并查询入库记录。',
     icon: Van,
-    permission: 'inventory:register',
+    permission: PERMISSIONS.inventory.register,
     route: '/inventory/register',
     title: '完工入库',
   },
@@ -47,14 +73,34 @@ const visibleShortcuts = computed(() =>
 
 const statistics = computed(() => [
   {
-    label: '待处理预警',
+    label: '物料总数',
     tone: 'blue',
-    value: summary.value?.pendingAlertCount,
+    value: summary.value?.materialCount,
   },
   {
-    label: '有效锁定记录',
+    label: '有库存物料',
     tone: 'pink',
-    value: summary.value?.lockedCount,
+    value: summary.value?.availableMaterialCount,
+  },
+  {
+    label: '已锁定物料',
+    tone: 'blue',
+    value: summary.value?.lockedMaterialCount,
+  },
+  {
+    label: '低库存物料',
+    tone: 'pink',
+    value: summary.value?.lowStockCount,
+  },
+  {
+    label: '零库存物料',
+    tone: 'blue',
+    value: summary.value?.zeroStockCount,
+  },
+  {
+    label: '待处理预警',
+    tone: 'pink',
+    value: summary.value?.pendingAlertCount,
   },
   {
     label: '待处理呆滞物料',
@@ -67,6 +113,28 @@ const statistics = computed(() => [
     value: summary.value?.inboundCount,
   },
 ])
+const refreshing = computed(() => loading.value || stockLoading.value)
+
+function getStockTagType(status: InventoryStockStatus) {
+  if (status === 'normal') {
+    return 'success'
+  }
+  if (status === 'low') {
+    return 'warning'
+  }
+  if (status === 'zero') {
+    return 'danger'
+  }
+  return 'info'
+}
+
+function getMaterialTypeLabel(item: InventoryStockItem) {
+  return materialTypeLabels[item.materialType]
+}
+
+function getStockStatusLabel(item: InventoryStockItem) {
+  return stockStatusLabels[item.status]
+}
 
 async function loadOverview() {
   const currentRequestId = ++requestId
@@ -88,12 +156,61 @@ async function loadOverview() {
   }
 }
 
+async function loadStocks() {
+  const currentRequestId = ++stockRequestId
+  stockLoading.value = true
+  stockError.value = ''
+  try {
+    const result = await inventoryService.listStocks({
+      ...stockQuery,
+      materialName: stockQuery.materialName?.trim() || undefined,
+    })
+    if (currentRequestId !== stockRequestId) {
+      return
+    }
+    stockItems.value = result.items
+    stockTotal.value = result.total
+  } catch (requestError) {
+    if (currentRequestId === stockRequestId) {
+      stockError.value = getErrorMessage(requestError, '库存台账加载失败')
+    }
+  } finally {
+    if (currentRequestId === stockRequestId) {
+      stockLoading.value = false
+    }
+  }
+}
+
+function refreshAll() {
+  inventoryService.refreshStockCatalog()
+  void Promise.all([loadOverview(), loadStocks()])
+}
+
+function searchStocks() {
+  stockQuery.page = 1
+  void loadStocks()
+}
+
+function resetStockQuery() {
+  Object.assign(stockQuery, {
+    materialId: undefined,
+    materialName: undefined,
+    materialType: undefined,
+    page: 1,
+    status: undefined,
+  })
+  void loadStocks()
+}
+
 function navigateTo(path: string) {
   void router.push(path)
 }
 
-onMounted(() => void loadOverview())
-onBeforeUnmount(() => void requestId++)
+onMounted(refreshAll)
+onBeforeUnmount(() => {
+  requestId += 1
+  stockRequestId += 1
+})
 </script>
 
 <template>
@@ -103,7 +220,7 @@ onBeforeUnmount(() => void requestId++)
       description="汇总库存风险与作业状态，快速进入缺口、监控和入库流程。"
     >
       <template #actions>
-        <el-button :icon="Refresh" :loading="loading" @click="loadOverview">刷新数据</el-button>
+        <el-button :icon="Refresh" :loading="refreshing" @click="refreshAll">刷新数据</el-button>
       </template>
     </PageHeader>
 
@@ -133,6 +250,105 @@ onBeforeUnmount(() => void requestId++)
         <strong>{{ formatNumber(statistic.value) }}</strong>
       </el-card>
     </section>
+
+    <el-card class="stock-query-card" shadow="never">
+      <div class="stock-filters">
+        <el-input-number v-model="stockQuery.materialId" :min="1" placeholder="物料编号" />
+        <el-input
+          v-model.trim="stockQuery.materialName"
+          clearable
+          placeholder="物料名称"
+          @keyup.enter="searchStocks"
+        />
+        <el-select v-model="stockQuery.materialType" clearable placeholder="物料类型">
+          <el-option
+            v-for="(label, value) in materialTypeLabels"
+            :key="value"
+            :label="label"
+            :value="value"
+          />
+        </el-select>
+        <el-select v-model="stockQuery.status" clearable placeholder="库存状态">
+          <el-option
+            v-for="(label, value) in stockStatusLabels"
+            :key="value"
+            :label="label"
+            :value="value"
+          />
+        </el-select>
+        <el-button :icon="Search" type="primary" @click="searchStocks">查询</el-button>
+        <el-button @click="resetStockQuery">重置</el-button>
+      </div>
+    </el-card>
+
+    <el-alert
+      v-if="stockError"
+      class="request-error"
+      :closable="false"
+      show-icon
+      :title="stockError"
+      type="error"
+    >
+      <template #default>
+        <el-button link type="primary" @click="loadStocks">重新加载台账</el-button>
+      </template>
+    </el-alert>
+
+    <el-card class="stock-card" shadow="never">
+      <template #header>
+        <div class="card-title">
+          <el-icon><Box /></el-icon><span>物料库存台账</span>
+        </div>
+      </template>
+      <div v-loading="stockLoading" class="stock-table-area">
+        <EmptyState
+          v-if="!stockLoading && !stockError && !stockItems.length"
+          description="当前查询条件下没有库存记录。"
+        />
+        <el-table v-else :data="stockItems" stripe>
+          <el-table-column label="物料" min-width="210">
+            <template #default="{ row }">
+              <div class="material-cell">
+                <strong>{{ row.materialName }}</strong>
+                <small>#{{ row.materialId }} · {{ getMaterialTypeLabel(row) }}</small>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="可用数量" min-width="110">
+            <template #default="{ row }"
+              ><strong>{{ formatNumber(row.availableQty) }}</strong> {{ row.unit || '' }}</template
+            >
+          </el-table-column>
+          <el-table-column label="锁定数量" min-width="110">
+            <template #default="{ row }"
+              >{{ formatNumber(row.lockedQty) }} {{ row.unit || '' }}</template
+            >
+          </el-table-column>
+          <el-table-column label="安全库存" min-width="110">
+            <template #default="{ row }"
+              >{{ formatNumber(row.safetyStock) }} {{ row.unit || '' }}</template
+            >
+          </el-table-column>
+          <el-table-column label="库存状态" min-width="105">
+            <template #default="{ row }">
+              <el-tag :type="getStockTagType(row.status)">{{ getStockStatusLabel(row) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="最后入库" min-width="120" prop="lastInDate" />
+          <el-table-column label="最后出库" min-width="120" prop="lastOutDate" />
+        </el-table>
+      </div>
+      <el-pagination
+        v-if="stockTotal"
+        v-model:current-page="stockQuery.page"
+        v-model:page-size="stockQuery.pageSize"
+        :page-sizes="[10, 20, 50]"
+        background
+        layout="total, sizes, prev, pager, next"
+        :total="stockTotal"
+        @change="loadStocks"
+      />
+    </el-card>
 
     <el-card class="operation-card" shadow="never">
       <template #header>
@@ -180,6 +396,8 @@ onBeforeUnmount(() => void requestId++)
 <style scoped>
 .request-error,
 .inventory-statistics,
+.stock-query-card,
+.stock-card,
 .operation-card {
   margin-bottom: 16px;
 }
@@ -187,6 +405,32 @@ onBeforeUnmount(() => void requestId++)
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+.stock-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.stock-filters :deep(.el-input),
+.stock-filters :deep(.el-input-number),
+.stock-filters :deep(.el-select) {
+  width: 150px;
+}
+.stock-table-area {
+  min-height: 260px;
+}
+.material-cell {
+  display: grid;
+  gap: 2px;
+}
+.material-cell small {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+:deep(.el-pagination) {
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 .inventory-statistic {
   min-width: 0;
@@ -274,6 +518,9 @@ onBeforeUnmount(() => void requestId++)
   .inventory-statistics,
   .operation-grid {
     grid-template-columns: 1fr;
+  }
+  .stock-filters > * {
+    flex: 1 1 150px;
   }
 }
 </style>

@@ -1,15 +1,21 @@
 import {
   type ApiEnvelope,
   type PageResult,
+  getPageItems,
+  getPageMetadata,
   mapPageResult,
   optionalText,
   unwrap,
 } from '@/services/pagination'
 import type {
   MaterialShortageItem as ApiMaterialShortageItem,
+  BomVersion,
   CompletionInboundOrder,
   InventoryAlertEvent,
+  Material,
+  MaterialStock,
   ObsoleteMaterialDetection,
+  ProductionOrderDetail,
   StockLockRecord,
 } from '@/api'
 import type {
@@ -20,6 +26,9 @@ import type {
   InventoryAlertItem,
   InventoryAlertQuery,
   InventoryOverviewSummary,
+  InventoryReferenceData,
+  InventoryStockItem,
+  InventoryStockQuery,
   MaterialShortageRequestItem,
   MaterialShortageResult,
   ObsoleteDetectionResult,
@@ -30,8 +39,8 @@ import type {
   StockLockQuery,
   StockLockResult,
 } from '@/types/inventory'
+import { inventoryApi, materialBomApi, productionApi } from '@/api/client'
 import { cleanQuery } from '@/services/request'
-import { inventoryApi } from '@/api/client'
 import { inventoryRepository as inventoryMock } from '@/mock/repositories'
 import { isMockEnabled } from '@/config/mock'
 
@@ -148,6 +157,52 @@ function toShortage(item: ApiMaterialShortageItem) {
   }
 }
 
+function toStockStatus(availableQty: number, lockedQty: number, safetyStock: number) {
+  if (availableQty <= 0) {
+    return 'zero' as const
+  }
+  if (availableQty < safetyStock) {
+    return 'low' as const
+  }
+  if (lockedQty > 0) {
+    return 'locked' as const
+  }
+  return 'normal' as const
+}
+
+function toStock(material: Material, stock?: MaterialStock): InventoryStockItem | undefined {
+  if (material.material_id === undefined || !material.material_name || !material.material_type) {
+    return undefined
+  }
+  const availableQty = stock?.available_qty ?? 0
+  const lockedQty = stock?.locked_qty ?? 0
+  const safetyStock = material.safety_stock ?? 0
+  return {
+    availableQty,
+    lastInDate: optionalText(stock?.last_in_date),
+    lastOutDate: optionalText(stock?.last_out_date),
+    lockedQty,
+    materialId: material.material_id,
+    materialName: material.material_name,
+    materialType: material.material_type,
+    safetyStock,
+    status: toStockStatus(availableQty, lockedQty, safetyStock),
+    unit: material.unit,
+  }
+}
+
+function paginateItems<TItem>(items: TItem[], page: number, pageSize: number): PageResult<TItem> {
+  const safePage = Math.max(1, page)
+  const safePageSize = Math.max(1, pageSize)
+  const start = (safePage - 1) * safePageSize
+  return {
+    items: items.slice(start, start + safePageSize),
+    page: safePage,
+    pageSize: safePageSize,
+    total: items.length,
+  }
+}
+
 function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
   if (!value || value.length > 10) {
     return value
@@ -163,10 +218,72 @@ function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
   return parsed.toISOString()
 }
 
+async function loadAllPageItems<TItem>(
+  loadPage: (page: number, pageSize: number) => Promise<{ data: unknown }>,
+) {
+  const pageSize = 100
+  const firstResponse = await loadPage(1, pageSize)
+  const firstPayload = unwrap(firstResponse.data as ApiEnvelope<unknown>)
+  const firstItems = getPageItems<TItem>(firstPayload)
+  const metadata = getPageMetadata(firstPayload, { page: 1, pageSize, total: firstItems.length })
+  const remainingPageCount = Math.ceil(metadata.total / metadata.pageSize) - 1
+  if (remainingPageCount <= 0) {
+    return firstItems
+  }
+  const remainingResponses = await Promise.all(
+    Array.from({ length: remainingPageCount }, (unusedValue, index) => {
+      void unusedValue
+      return loadPage(index + 2, metadata.pageSize)
+    }),
+  )
+  return [
+    ...firstItems,
+    ...remainingResponses.flatMap((response) => {
+      const payload = unwrap(response.data as ApiEnvelope<unknown>)
+      return getPageItems<TItem>(payload)
+    }),
+  ]
+}
+
+let stockCatalogPromise: Promise<InventoryStockItem[]> | undefined = undefined
+
+function invalidateStockCatalog() {
+  stockCatalogPromise = undefined
+}
+
+async function loadStockCatalog() {
+  if (!stockCatalogPromise) {
+    stockCatalogPromise = (async () => {
+      const materials = await loadAllPageItems<Material>((page, pageSize) =>
+        materialBomApi.listMaterialData({ page, pageSize }),
+      )
+      const stockResults = await Promise.all(
+        materials.map(async (material) => {
+          if (material.material_id === undefined) {
+            return undefined
+          }
+          const response = await materialBomApi.getMaterialStockData({
+            materialId: material.material_id,
+          })
+          const stock = unwrap(response.data as ApiEnvelope<MaterialStock | undefined>)
+          return toStock(material, stock)
+        }),
+      )
+      return stockResults.filter((item): item is InventoryStockItem => item !== undefined)
+    })().catch((error: unknown) => {
+      stockCatalogPromise = undefined
+      throw error
+    })
+  }
+  return stockCatalogPromise
+}
+
 export const inventoryService = {
   async addCompletionInbound(form: CompletionInboundFormData) {
     if (isMockEnabled()) {
-      return inventoryMock.addCompletionInbound(form)
+      const result = await inventoryMock.addCompletionInbound(form)
+      invalidateStockCatalog()
+      return result
     }
     const response = await inventoryApi.addCompletionInbound({
       completionInboundCreateRequest: {
@@ -180,6 +297,7 @@ export const inventoryService = {
       },
     })
     const data = unwrap(response.data as ApiEnvelope<CompletionInboundOrder | undefined>)
+    invalidateStockCatalog()
     return mapOptional(data, toInbound)
   },
 
@@ -244,18 +362,112 @@ export const inventoryService = {
   },
 
   async getOverview(): Promise<InventoryOverviewSummary> {
-    const [alerts, locks, obsolete, inbound] = await Promise.all([
+    const [alerts, locks, obsolete, inbound, firstStockPage] = await Promise.all([
       this.listAlerts({ page: 1, pageSize: 1, status: 'pending' }),
       this.listLocks({ page: 1, pageSize: 1, status: 'locked' }),
       this.listObsolete({ page: 1, pageSize: 1, status: 'pending' }),
       this.listCompletionInbound({ page: 1, pageSize: 1 }),
+      this.listStocks({ page: 1, pageSize: 100 }),
     ])
+    const remainingPageCount = Math.ceil(firstStockPage.total / firstStockPage.pageSize) - 1
+    let stocks = [...firstStockPage.items]
+    if (remainingPageCount > 0) {
+      const remainingPages = await Promise.all(
+        Array.from({ length: remainingPageCount }, (unusedValue, index) => {
+          void unusedValue
+          return this.listStocks({ page: index + 2, pageSize: firstStockPage.pageSize })
+        }),
+      )
+      stocks = [...stocks, ...remainingPages.flatMap((page) => page.items)]
+    }
     return {
+      availableMaterialCount: stocks.filter((item) => item.availableQty > 0).length,
       inboundCount: inbound.total,
       lockedCount: locks.total,
+      lockedMaterialCount: stocks.filter((item) => item.lockedQty > 0).length,
+      lowStockCount: stocks.filter((item) => item.status === 'low').length,
+      materialCount: firstStockPage.total,
       obsoletePendingCount: obsolete.total,
       pendingAlertCount: alerts.total,
+      zeroStockCount: stocks.filter((item) => item.status === 'zero').length,
     }
+  },
+
+  async getReferenceData(includeProductionOrders = true): Promise<InventoryReferenceData> {
+    if (isMockEnabled()) {
+      const data = await inventoryMock.getReferenceData()
+      if (includeProductionOrders) {
+        return data
+      }
+      return { ...data, productionOrders: [] }
+    }
+    let orderItemsPromise: Promise<ProductionOrderDetail[]> = Promise.resolve([])
+    if (includeProductionOrders) {
+      orderItemsPromise = loadAllPageItems<ProductionOrderDetail>((page, pageSize) =>
+        productionApi.listProductionOrder({ page, pageSize }),
+      )
+    }
+    const [materialItems, versionItems, orderItems] = await Promise.all([
+      loadAllPageItems<Material>((page, pageSize) =>
+        materialBomApi.listMaterialData({ page, pageSize }),
+      ),
+      loadAllPageItems<BomVersion>((page, pageSize) =>
+        materialBomApi.listBomVersionData({ effectiveOnly: true, page, pageSize }),
+      ),
+      orderItemsPromise,
+    ])
+    const materials = materialItems
+      .filter(
+        (
+          item,
+        ): item is Material & {
+          material_id: number
+          material_name: string
+          material_type: NonNullable<Material['material_type']>
+        } =>
+          item.material_id !== undefined &&
+          Boolean(item.material_name) &&
+          item.material_type !== undefined,
+      )
+      .map((item) => ({
+        materialId: item.material_id,
+        materialName: item.material_name,
+        materialType: item.material_type,
+        unit: item.unit,
+      }))
+    const bomVersions = versionItems
+      .filter(
+        (
+          item,
+        ): item is BomVersion & {
+          material_id: number
+          version_id: number
+          version_no: string
+        } =>
+          item.material_id !== undefined &&
+          item.version_id !== undefined &&
+          Boolean(item.version_no),
+      )
+      .map((item) => ({
+        materialId: item.material_id,
+        versionId: item.version_id,
+        versionNo: item.version_no,
+      }))
+    const productionOrders = orderItems.map((order) => {
+      const finishedQty = order.finished_qty ?? 0
+      return {
+        finishedQty,
+        materialId: order.material_id,
+        materialName: optionalText(order.material_name) ?? `物料 #${order.material_id}`,
+        orderId: order.order_id,
+        planQty: order.plan_qty,
+        remainingQty: Math.max(0, order.plan_qty - finishedQty),
+        status: order.status,
+        versionId: order.version_id,
+        versionNo: optionalText(order.version_no),
+      }
+    })
+    return { bomVersions, materials, productionOrders }
   },
 
   async handleAlert(alertId: number, status: 'handled' | 'ignored', handlerId: number) {
@@ -371,9 +583,27 @@ export const inventoryService = {
     )
   },
 
+  async listStocks(query: InventoryStockQuery): Promise<PageResult<InventoryStockItem>> {
+    if (isMockEnabled()) {
+      return inventoryMock.listStocks(query)
+    }
+    const items = await loadStockCatalog()
+    const materialName = query.materialName?.trim().toLowerCase()
+    const filteredItems = items.filter(
+      (item) =>
+        (!query.materialId || item.materialId === query.materialId) &&
+        (!materialName || item.materialName.toLowerCase().includes(materialName)) &&
+        (!query.materialType || item.materialType === query.materialType) &&
+        (!query.status || item.status === query.status),
+    )
+    return paginateItems(filteredItems, query.page, query.pageSize)
+  },
+
   async lockStock(form: StockLockFormData): Promise<StockLockResult> {
     if (isMockEnabled()) {
-      return inventoryMock.lockStock(form)
+      const result = await inventoryMock.lockStock(form)
+      invalidateStockCatalog()
+      return result
     }
     const response = await inventoryApi.lockMaterialStock({
       materialStockLockRequest: {
@@ -386,7 +616,7 @@ export const inventoryService = {
       },
     })
     const data = unwrap(response.data as ApiEnvelope<LockPayload | undefined>)
-    return {
+    const result = {
       items: (data?.records ?? []).map(toLock),
       shortages: (data?.shortages ?? []).map((item) => ({
         availableQty: item.available_qty,
@@ -396,16 +626,27 @@ export const inventoryService = {
       })),
       success: data?.success ?? false,
     }
+    if (result.success) {
+      invalidateStockCatalog()
+    }
+    return result
+  },
+
+  refreshStockCatalog() {
+    invalidateStockCatalog()
   },
 
   async releaseLock(lockId: number, operatorId: number) {
     if (isMockEnabled()) {
-      return inventoryMock.releaseLock(lockId, operatorId)
+      const result = await inventoryMock.releaseLock(lockId, operatorId)
+      invalidateStockCatalog()
+      return result
     }
     const response = await inventoryApi.releaseMaterialStock({
       materialStockReleaseRequest: { lock_id: lockId, operator_id: operatorId },
     })
     const data = unwrap(response.data as ApiEnvelope<StockLockRecord | undefined>)
+    invalidateStockCatalog()
     return mapOptional(data, toLock)
   },
 }
