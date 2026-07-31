@@ -60,6 +60,35 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ValidateLifetime = true
         };
+        // 契约约定：HTTP 固定 200，业务状态通过响应体 code 表达。
+        // 未携带/无效 JWT 或权限不足时，默认中间件会直接返回 HTTP 401/403，
+        // 与契约不一致；这里统一改写为 HTTP 200 + 业务响应体。
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = 401,
+                    message = "未登录或登录已失效",
+                    data = (object?)null,
+                });
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = 403,
+                    message = "没有权限访问该接口",
+                    data = (object?)null,
+                });
+            },
+        };
     });
 builder.Services.AddAuthorization();
 
