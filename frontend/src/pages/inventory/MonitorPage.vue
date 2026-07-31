@@ -2,8 +2,12 @@
 import { Bell, Lock, Plus, Refresh, Search, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import type {
+  InventoryAlertDetail,
   InventoryAlertItem,
   InventoryAlertQuery,
+  InventoryReferenceData,
+  InventoryStockItem,
+  ObsoleteMaterialDetail,
   ObsoleteMaterialItem,
   ObsoleteMaterialQuery,
   StockLockFormData,
@@ -27,6 +31,14 @@ const auth = useAuthStore()
 const operatorId = computed(() => auth.currentUser?.id)
 const activeTab = ref<MonitorTab>('alerts')
 let alive = true
+const referenceLoading = ref(false)
+const referenceError = ref('')
+const referenceData = ref<InventoryReferenceData>({
+  bomVersions: [],
+  materials: [],
+  productionOrders: [],
+})
+const lockMaterialOptions = ref<InventoryStockItem[]>([])
 
 // 库存预警
 const alertLoading = ref(false)
@@ -39,7 +51,9 @@ const generatingAlerts = ref(false)
 const generateDialogOpen = ref(false)
 const generateMaterialId = ref<number>()
 const handlingAlert = ref<{ alertId: number; status: 'handled' | 'ignored' }>()
-const alertDetail = ref<InventoryAlertItem>()
+const alertDetail = ref<InventoryAlertDetail>()
+const alertDetailError = ref('')
+const alertDetailLoading = ref(false)
 let alertRequestId = 0
 
 // 库存锁定
@@ -78,12 +92,44 @@ const handlingObsolete = ref<{
   detectionId: number
   status: 'handled' | 'ignored'
 }>()
-const obsoleteDetail = ref<ObsoleteMaterialItem>()
+const obsoleteDetail = ref<ObsoleteMaterialDetail>()
+const obsoleteDetailError = ref('')
+const obsoleteDetailLoading = ref(false)
 const detectionForm = reactive({
   idleDaysThreshold: 90,
   materialId: undefined as number | undefined,
 })
 let obsoleteRequestId = 0
+
+const lockOrderOptions = computed(() =>
+  referenceData.value.productionOrders.filter(
+    (item) => item.remainingQty > 0 && !['cancelled', 'completed'].includes(item.status),
+  ),
+)
+
+async function loadReferenceData() {
+  referenceLoading.value = true
+  referenceError.value = ''
+  try {
+    const [references, stocks] = await Promise.all([
+      inventoryService.getReferenceData(),
+      inventoryService.listStocks({ page: 1, pageSize: 100 }),
+    ])
+    if (!alive) {
+      return
+    }
+    referenceData.value = references
+    lockMaterialOptions.value = stocks.items.filter((item) => item.availableQty > 0)
+  } catch (error) {
+    if (alive) {
+      referenceError.value = getErrorMessage(error, '库存操作选项加载失败')
+    }
+  } finally {
+    if (alive) {
+      referenceLoading.value = false
+    }
+  }
+}
 
 async function loadAlerts() {
   const currentRequestId = ++alertRequestId
@@ -208,6 +254,42 @@ function searchObsolete() {
   void loadObsolete()
 }
 
+async function viewAlertDetail(alertId: number) {
+  alertDetail.value = undefined
+  alertDetailError.value = ''
+  alertDetailLoading.value = true
+  try {
+    alertDetail.value = await inventoryService.getAlertDetail(alertId)
+  } catch (error) {
+    alertDetailError.value = getErrorMessage(error, '库存预警详情加载失败')
+  } finally {
+    alertDetailLoading.value = false
+  }
+}
+
+async function viewObsoleteDetail(detectionId: number) {
+  obsoleteDetail.value = undefined
+  obsoleteDetailError.value = ''
+  obsoleteDetailLoading.value = true
+  try {
+    obsoleteDetail.value = await inventoryService.getObsoleteDetail(detectionId)
+  } catch (error) {
+    obsoleteDetailError.value = getErrorMessage(error, '呆滞物料详情加载失败')
+  } finally {
+    obsoleteDetailLoading.value = false
+  }
+}
+
+function closeAlertDetail() {
+  alertDetail.value = undefined
+  alertDetailError.value = ''
+}
+
+function closeObsoleteDetail() {
+  obsoleteDetail.value = undefined
+  obsoleteDetailError.value = ''
+}
+
 async function generateAlerts() {
   if (generatingAlerts.value) {
     return
@@ -314,7 +396,7 @@ async function submitLock() {
     }
     ElMessage.success(`已创建 ${result.items.length} 条库存锁定记录`)
     lockDialogOpen.value = false
-    await loadLocks()
+    await Promise.all([loadLocks(), loadReferenceData()])
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(getErrorMessage(error, '锁定库存失败'))
@@ -337,7 +419,7 @@ async function releaseLock(item: StockLockItem) {
     )
     await inventoryService.releaseLock(item.lockId, operatorId.value)
     ElMessage.success('库存锁定已释放')
-    await loadLocks()
+    await Promise.all([loadLocks(), loadReferenceData()])
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(getErrorMessage(error, '释放库存失败'))
@@ -400,7 +482,10 @@ async function handleObsolete(item: ObsoleteMaterialItem, status: 'handled' | 'i
 }
 
 watch(activeTab, loadActiveTab)
-onMounted(() => void loadAlerts())
+onMounted(() => {
+  void loadAlerts()
+  void loadReferenceData()
+})
 onBeforeUnmount(() => {
   alive = false
   alertRequestId += 1
@@ -416,6 +501,19 @@ onBeforeUnmount(() => {
         <el-button :icon="Refresh" @click="loadActiveTab">刷新当前列表</el-button>
       </template>
     </PageHeader>
+
+    <el-alert
+      v-if="referenceError"
+      class="list-error"
+      :closable="false"
+      show-icon
+      :title="referenceError"
+      type="error"
+    >
+      <template #default>
+        <el-button link type="primary" @click="loadReferenceData">重新加载操作选项</el-button>
+      </template>
+    </el-alert>
 
     <el-card class="monitor-card" shadow="never">
       <el-tabs v-model="activeTab">
@@ -491,7 +589,8 @@ onBeforeUnmount(() => {
               ></el-table-column>
               <el-table-column fixed="right" label="操作" min-width="190"
                 ><template #default="{ row }"
-                  ><el-button link type="primary" @click="alertDetail = row">详情</el-button
+                  ><el-button link type="primary" @click="viewAlertDetail(row.alertId)"
+                    >详情</el-button
                   ><template v-if="row.status === 'pending'"
                     ><el-button
                       :disabled="handlingAlert !== undefined"
@@ -695,7 +794,8 @@ onBeforeUnmount(() => {
               ></el-table-column>
               <el-table-column fixed="right" label="操作" min-width="190"
                 ><template #default="{ row }"
-                  ><el-button link type="primary" @click="obsoleteDetail = row">详情</el-button
+                  ><el-button link type="primary" @click="viewObsoleteDetail(row.detectionId)"
+                    >详情</el-button
                   ><template v-if="row.status === 'pending'"
                     ><el-button
                       :disabled="handlingObsolete !== undefined"
@@ -739,12 +839,19 @@ onBeforeUnmount(() => {
 
     <el-dialog v-model="generateDialogOpen" title="生成库存预警" width="min(92vw, 430px)"
       ><el-form label-width="90px"
-        ><el-form-item label="物料 ID"
-          ><el-input-number
+        ><el-form-item label="物料"
+          ><el-select
             v-model="generateMaterialId"
-            :min="1"
+            clearable
+            filterable
+            :loading="referenceLoading"
             placeholder="留空则扫描全部"
-            style="width: 100%" /></el-form-item></el-form
+            style="width: 100%"
+            ><el-option
+              v-for="material in referenceData.materials"
+              :key="material.materialId"
+              :label="'#' + material.materialId + ' · ' + material.materialName"
+              :value="material.materialId" /></el-select></el-form-item></el-form
       ><template #footer
         ><el-button @click="generateDialogOpen = false">取消</el-button
         ><el-button :loading="generatingAlerts" type="primary" @click="generateAlerts"
@@ -760,15 +867,49 @@ onBeforeUnmount(() => {
       @closed="lockFormRef?.resetFields()"
       ><el-form ref="lockFormRef" :model="lockForm" :rules="lockRules" label-width="100px"
         ><el-form-item label="生产订单" prop="orderId"
-          ><el-input-number v-model="lockForm.orderId" :min="1" style="width: 100%" /></el-form-item
+          ><el-select
+            v-model="lockForm.orderId"
+            filterable
+            :loading="referenceLoading"
+            placeholder="选择可执行订单"
+            style="width: 100%"
+            ><el-option
+              v-for="order in lockOrderOptions"
+              :key="order.orderId"
+              :label="
+                '#' +
+                order.orderId +
+                ' · ' +
+                order.materialName +
+                '（剩余 ' +
+                formatNumber(order.remainingQty) +
+                '）'
+              "
+              :value="order.orderId" /></el-select></el-form-item
         ><el-form-item label="锁定明细"
           ><div class="lock-lines">
             <div v-for="(item, index) in lockForm.items" :key="index" class="lock-line">
-              <el-input-number
+              <el-select
                 v-model="item.materialId"
-                :min="1"
-                placeholder="物料 ID"
-              /><el-input-number
+                filterable
+                :loading="referenceLoading"
+                placeholder="选择可用物料"
+                ><el-option
+                  v-for="material in lockMaterialOptions"
+                  :key="material.materialId"
+                  :label="
+                    '#' +
+                    material.materialId +
+                    ' · ' +
+                    material.materialName +
+                    '（可用 ' +
+                    formatNumber(material.availableQty) +
+                    ' ' +
+                    (material.unit || '') +
+                    '）'
+                  "
+                  :value="material.materialId" /></el-select
+              ><el-input-number
                 v-model="item.lockQty"
                 :min="0.01"
                 :precision="2"
@@ -799,12 +940,19 @@ onBeforeUnmount(() => {
             v-model="detectionForm.idleDaysThreshold"
             :min="1"
             style="width: 100%" /></el-form-item
-        ><el-form-item label="指定物料 ID"
-          ><el-input-number
+        ><el-form-item label="指定物料"
+          ><el-select
             v-model="detectionForm.materialId"
-            :min="1"
+            clearable
+            filterable
+            :loading="referenceLoading"
             placeholder="留空则扫描全部"
-            style="width: 100%" /></el-form-item></el-form
+            style="width: 100%"
+            ><el-option
+              v-for="material in referenceData.materials"
+              :key="material.materialId"
+              :label="'#' + material.materialId + ' · ' + material.materialName"
+              :value="material.materialId" /></el-select></el-form-item></el-form
       ><template #footer
         ><el-button @click="detectDialogOpen = false">取消</el-button
         ><el-button :loading="detecting" type="primary" @click="detectObsolete"
@@ -814,82 +962,123 @@ onBeforeUnmount(() => {
     >
 
     <el-drawer
-      :model-value="Boolean(alertDetail)"
+      :model-value="alertDetailLoading || Boolean(alertDetail) || Boolean(alertDetailError)"
       size="min(92vw, 520px)"
       title="库存预警详情"
-      @close="alertDetail = undefined"
+      @close="closeAlertDetail"
     >
-      <div v-if="alertDetail" class="detail-grid">
-        <div>
-          <span>预警编号</span><strong>#{{ alertDetail.alertId }}</strong>
-        </div>
-        <div>
-          <span>物料</span><strong>{{ alertDetail.materialName }}</strong>
-        </div>
-        <div>
-          <span>可用库存</span><strong>{{ formatNumber(alertDetail.availableQty) }}</strong>
-        </div>
-        <div>
-          <span>安全阈值</span><strong>{{ formatNumber(alertDetail.threshold) }}</strong>
-        </div>
-        <div>
-          <span>触发时间</span><strong>{{ formatDateTime(alertDetail.alertTime) }}</strong>
-        </div>
-        <div><span>状态</span><StatusTag :labels="statusLabels" :value="alertDetail.status" /></div>
-        <div>
-          <span>处理人</span
-          ><strong>{{ alertDetail.handlerId ? `#${alertDetail.handlerId}` : '-' }}</strong>
-        </div>
-        <div>
-          <span>处理时间</span><strong>{{ formatDateTime(alertDetail.handleTime) }}</strong>
+      <div v-loading="alertDetailLoading" class="detail-area">
+        <el-alert
+          v-if="alertDetailError"
+          :closable="false"
+          show-icon
+          :title="alertDetailError"
+          type="error"
+        />
+        <div v-else-if="alertDetail" class="detail-grid">
+          <div>
+            <span>预警编号</span><strong>#{{ alertDetail.alertId }}</strong>
+          </div>
+          <div>
+            <span>物料</span><strong>{{ alertDetail.materialName }}</strong>
+          </div>
+          <div>
+            <span>可用库存</span><strong>{{ formatNumber(alertDetail.availableQty) }}</strong>
+          </div>
+          <div>
+            <span>安全阈值</span><strong>{{ formatNumber(alertDetail.threshold) }}</strong>
+          </div>
+          <div>
+            <span>触发时间</span><strong>{{ formatDateTime(alertDetail.alertTime) }}</strong>
+          </div>
+          <div>
+            <span>状态</span><StatusTag :labels="statusLabels" :value="alertDetail.status" />
+          </div>
+          <div>
+            <span>处理人</span
+            ><strong>{{ alertDetail.handlerId ? `#${alertDetail.handlerId}` : '-' }}</strong>
+          </div>
+          <div>
+            <span>处理时间</span><strong>{{ formatDateTime(alertDetail.handleTime) }}</strong>
+          </div>
+          <div>
+            <span>锁定数量</span><strong>{{ formatNumber(alertDetail.stock.lockedQty) }}</strong>
+          </div>
+          <div>
+            <span>库存状态</span
+            ><StatusTag :labels="statusLabels" :value="alertDetail.stock.status" />
+          </div>
+          <div class="detail-grid__wide">
+            <span>建议处理方式</span><strong>{{ alertDetail.recommendedAction }}</strong>
+          </div>
         </div>
       </div>
     </el-drawer>
 
     <el-drawer
-      :model-value="Boolean(obsoleteDetail)"
+      :model-value="
+        obsoleteDetailLoading || Boolean(obsoleteDetail) || Boolean(obsoleteDetailError)
+      "
       size="min(92vw, 520px)"
       title="呆滞物料详情"
-      @close="obsoleteDetail = undefined"
+      @close="closeObsoleteDetail"
     >
-      <div v-if="obsoleteDetail" class="detail-grid">
-        <div>
-          <span>检测编号</span><strong>#{{ obsoleteDetail.detectionId }}</strong>
-        </div>
-        <div>
-          <span>物料</span><strong>{{ obsoleteDetail.materialName }}</strong>
-        </div>
-        <div>
-          <span>可用库存</span><strong>{{ formatNumber(obsoleteDetail.availableQty) }}</strong>
-        </div>
-        <div>
-          <span>闲置天数</span><strong>{{ obsoleteDetail.idleDays }} 天</strong>
-        </div>
-        <div>
-          <span>最后出库</span><strong>{{ obsoleteDetail.lastOutDate || '-' }}</strong>
-        </div>
-        <div>
-          <span>检测时间</span><strong>{{ formatDateTime(obsoleteDetail.detectTime) }}</strong>
-        </div>
-        <div>
-          <span>有效 BOM 引用</span>
-          <strong>{{
-            obsoleteDetail.bomVersionIds === undefined
-              ? '接口未返回'
-              : obsoleteDetail.bomVersionIds.length
-                ? obsoleteDetail.bomVersionIds.map((id) => `#${id}`).join('、')
-                : '无'
-          }}</strong>
-        </div>
-        <div>
-          <span>活跃生产订单</span>
-          <strong>{{
-            obsoleteDetail.activeOrderIds === undefined
-              ? '接口未返回'
-              : obsoleteDetail.activeOrderIds.length
-                ? obsoleteDetail.activeOrderIds.map((id) => `#${id}`).join('、')
-                : '无'
-          }}</strong>
+      <div v-loading="obsoleteDetailLoading" class="detail-area">
+        <el-alert
+          v-if="obsoleteDetailError"
+          :closable="false"
+          show-icon
+          :title="obsoleteDetailError"
+          type="error"
+        />
+        <div v-else-if="obsoleteDetail" class="detail-grid">
+          <div>
+            <span>检测编号</span><strong>#{{ obsoleteDetail.detectionId }}</strong>
+          </div>
+          <div>
+            <span>物料</span><strong>{{ obsoleteDetail.materialName }}</strong>
+          </div>
+          <div>
+            <span>可用库存</span><strong>{{ formatNumber(obsoleteDetail.availableQty) }}</strong>
+          </div>
+          <div>
+            <span>闲置天数</span><strong>{{ obsoleteDetail.idleDays }} 天</strong>
+          </div>
+          <div>
+            <span>最后出库</span><strong>{{ obsoleteDetail.lastOutDate || '-' }}</strong>
+          </div>
+          <div>
+            <span>检测时间</span><strong>{{ formatDateTime(obsoleteDetail.detectTime) }}</strong>
+          </div>
+          <div>
+            <span>有效 BOM 引用</span>
+            <strong>{{
+              obsoleteDetail.bomVersionIds === undefined
+                ? '接口未返回'
+                : obsoleteDetail.bomVersions.length
+                  ? obsoleteDetail.bomVersions.map((item) => item.versionNo).join('、')
+                  : '无'
+            }}</strong>
+          </div>
+          <div>
+            <span>活跃生产订单</span>
+            <strong>{{
+              obsoleteDetail.activeOrderIds === undefined
+                ? '接口未返回'
+                : obsoleteDetail.activeOrders.length
+                  ? obsoleteDetail.activeOrders
+                      .map((item) => '#' + item.orderId + ' · ' + item.materialName)
+                      .join('、')
+                  : '无'
+            }}</strong>
+          </div>
+          <div>
+            <span>锁定数量</span><strong>{{ formatNumber(obsoleteDetail.stock.lockedQty) }}</strong>
+          </div>
+          <div>
+            <span>库存状态</span
+            ><StatusTag :labels="statusLabels" :value="obsoleteDetail.stock.status" />
+          </div>
         </div>
       </div>
     </el-drawer>
@@ -971,6 +1160,9 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+.detail-area {
+  min-height: 180px;
+}
 .detail-grid > div {
   display: grid;
   gap: 4px;
@@ -981,6 +1173,9 @@ onBeforeUnmount(() => {
 .detail-grid span {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+.detail-grid__wide {
+  grid-column: 1 / -1;
 }
 @media (max-width: 720px) {
   .toolbar {

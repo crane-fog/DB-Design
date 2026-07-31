@@ -798,6 +798,29 @@ function componentTypeFor(material: MaterialRecord) {
   return 'material' as const
 }
 
+function assertMaterialForm(form: MaterialForm) {
+  if (!form.name.trim() || form.name.trim().length > 80) {
+    throw new Error('物料名称为必填项，且不得超过 80 个字符')
+  }
+  if (!form.model.trim() || form.model.trim().length > 80) {
+    throw new Error('型号为必填项，且不得超过 80 个字符')
+  }
+  if (!form.unit.trim() || form.unit.trim().length > 20) {
+    throw new Error('单位为必填项，且不得超过 20 个字符')
+  }
+  if (!['finished', 'raw', 'semiFinished'].includes(form.type)) {
+    throw new Error('物料类型无效')
+  }
+  if (!['active', 'disabled'].includes(form.status)) {
+    throw new Error('物料状态无效')
+  }
+  const category = materialCategories.find((item) => item.id === form.categoryId)
+  if (!category) {
+    throw new Error('请选择物料分类')
+  }
+  return category
+}
+
 function assertComponentCanBeSaved(
   detail: MaterialBomDetail,
   form: BomComponentForm,
@@ -1068,16 +1091,7 @@ export const materialBomMock = {
       if (materialRecords.some((material) => material.code === code)) {
         throw new Error('物料编号已存在')
       }
-      if (!form.name.trim() || form.name.trim().length > 80) {
-        throw new Error('物料名称为必填项，且不得超过 80 个字符')
-      }
-      if (!form.model.trim() || !form.unit.trim()) {
-        throw new Error('请填写型号和单位')
-      }
-      const category = materialCategories.find((item) => item.id === form.categoryId)
-      if (!category) {
-        throw new Error('请选择物料分类')
-      }
+      const category = assertMaterialForm(form)
       const now = new Date().toISOString()
       const material: MaterialRecord = {
         ...form,
@@ -1092,7 +1106,7 @@ export const materialBomMock = {
         updatedAt: now,
       }
       materialRecords.unshift(material)
-      return { ...material }
+      return materialWithCurrentBom(material)
     })
   },
   getBomDetail(bomId: string) {
@@ -1133,38 +1147,87 @@ export const materialBomMock = {
       }
       const results: BomReverseTraceResult[] = []
       interface TraceContext {
-        level: number
-        path: string[]
+        nodes: BomReverseTraceResult['pathNodes']
         quantity: number
+        versions: string[]
       }
-      function collect(childCode: string, context: TraceContext) {
-        bomDetails.forEach((bom) => {
-          bom.components
-            .filter((component) => component.materialCode === childCode)
-            .forEach((component) => {
-              const nextPath = [bom.materialCode, ...context.path]
-              results.push({
-                cumulativeQuantity: context.quantity * component.quantity,
-                finalMaterialCode: bom.materialCode,
-                level: context.level,
-                materialCode: childCode,
-                materialName: getMaterialByCode(bom.materialCode)?.name ?? bom.materialName,
-                parentMaterialCode: bom.materialCode,
-                path: nextPath.join(' / '),
-                unit: component.unit,
-                version: bom.version,
-              })
-              if (!context.path.includes(bom.materialCode)) {
-                collect(bom.materialCode, {
-                  level: context.level + 1,
-                  path: nextPath,
-                  quantity: context.quantity * component.quantity,
-                })
-              }
-            })
+      function appendCompletedPath(context: TraceContext) {
+        const [source, parent] = context.nodes
+        const [final] = context.nodes.slice(-1)
+        if (!source || !parent || !final) {
+          return
+        }
+        results.push({
+          cumulativeQuantity: context.quantity,
+          finalMaterialCode: final.materialCode,
+          finalMaterialName: final.materialName,
+          includesLoss: false,
+          level: final.level,
+          materialCode,
+          materialName: source.materialName,
+          parentMaterialCode: parent.materialCode,
+          parentMaterialName: parent.materialName,
+          path: context.nodes
+            .map((node) => `${node.materialCode} · ${node.materialName}`)
+            .join(' → '),
+          pathNodes: context.nodes.map((node) => ({ ...node })),
+          unit: source.unit,
+          versions: context.versions,
         })
       }
-      collect(materialCode, { level: 1, path: [materialCode], quantity: 1 })
+
+      function collect(childCode: string, context: TraceContext) {
+        const parents = bomDetails.flatMap((bom) =>
+          bom.components
+            .filter((component) => component.materialCode === childCode)
+            .map((component) => ({ bom, component })),
+        )
+        if (!parents.length) {
+          appendCompletedPath(context)
+          return
+        }
+        parents.forEach(({ bom, component }) => {
+          if (context.nodes.some((node) => node.materialCode === bom.materialCode)) {
+            return
+          }
+          const parentMaterial = getMaterialByCode(bom.materialCode)
+          const cumulativeQuantity = context.quantity * component.quantity
+          collect(bom.materialCode, {
+            nodes: [
+              ...context.nodes,
+              {
+                bomVersion: bom.version,
+                cumulativeQuantity,
+                level: context.nodes.length,
+                materialCode: bom.materialCode,
+                materialName: parentMaterial?.name ?? bom.materialName,
+                unit: component.unit,
+                unitQuantity: component.quantity,
+              },
+            ],
+            quantity: cumulativeQuantity,
+            versions: [...context.versions, bom.version],
+          })
+        })
+      }
+
+      const sourceMaterial = getMaterialByCode(materialCode)
+      if (!sourceMaterial) {
+        throw new Error('未找到所选物料')
+      }
+      collect(materialCode, {
+        nodes: [
+          {
+            cumulativeQuantity: 1,
+            level: 0,
+            materialCode,
+            materialName: sourceMaterial.name,
+            unit: sourceMaterial.unit,
+          },
+        ],
+        quantity: 1,
+        versions: [],
+      })
       return results
     })
   },
@@ -1211,7 +1274,7 @@ export const materialBomMock = {
     })
   },
   listCategories() {
-    return delay(() => materialCategories.map((category) => ({ ...category })))
+    return delay(() => structuredClone(materialCategories))
   },
   listMaterials(query: MaterialListQuery): Promise<PageResult<MaterialRecord>> {
     return delay(() => {
@@ -1337,6 +1400,9 @@ export const materialBomMock = {
       if (!target) {
         throw new Error('未找到对应的 BOM 版本')
       }
+      if (target.status === 'archived') {
+        throw new Error('历史归档版本不能重新设为生效版本，请先创建新的草稿版本')
+      }
       bomDetails
         .filter((item) => item.materialCode === target.materialCode && item.status === 'released')
         .forEach((item) => {
@@ -1393,13 +1459,7 @@ export const materialBomMock = {
       if (!material) {
         throw new Error('未找到对应物料')
       }
-      if (!form.name.trim() || form.name.trim().length > 80) {
-        throw new Error('物料名称为必填项，且不得超过 80 个字符')
-      }
-      const category = materialCategories.find((item) => item.id === form.categoryId)
-      if (!category) {
-        throw new Error('请选择物料分类')
-      }
+      const category = assertMaterialForm(form)
       Object.assign(material, {
         ...form,
         categoryName: category.name,
@@ -1409,7 +1469,7 @@ export const materialBomMock = {
         unit: form.unit.trim(),
         updatedAt: new Date().toISOString(),
       })
-      return { ...material }
+      return materialWithCurrentBom(material)
     })
   },
 }

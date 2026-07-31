@@ -19,9 +19,11 @@ import type {
   StockLockRecord,
 } from '@/api'
 import type {
+  CompletionInboundDetail,
   CompletionInboundFormData,
   CompletionInboundItem,
   CompletionInboundQuery,
+  InventoryAlertDetail,
   InventoryAlertGenerateResult,
   InventoryAlertItem,
   InventoryAlertQuery,
@@ -32,6 +34,7 @@ import type {
   MaterialShortageRequestItem,
   MaterialShortageResult,
   ObsoleteDetectionResult,
+  ObsoleteMaterialDetail,
   ObsoleteMaterialItem,
   ObsoleteMaterialQuery,
   StockLockFormData,
@@ -203,6 +206,33 @@ function paginateItems<TItem>(items: TItem[], page: number, pageSize: number): P
   }
 }
 
+async function findPagedRecord<TItem>(
+  loadPage: (page: number, pageSize: number) => Promise<PageResult<TItem>>,
+  matches: (item: TItem) => boolean,
+  notFoundMessage: string,
+) {
+  const pageSize = 100
+  const firstPage = await loadPage(1, pageSize)
+  const firstMatch = firstPage.items.find(matches)
+  if (firstMatch) {
+    return firstMatch
+  }
+  const pageCount = Math.ceil(firstPage.total / pageSize)
+  const pages = await Promise.all(
+    Array.from({ length: Math.max(0, pageCount - 1) }, (unusedValue, index) => {
+      void unusedValue
+      return loadPage(index + 2, pageSize)
+    }),
+  )
+  for (const result of pages) {
+    const match = result.items.find(matches)
+    if (match) {
+      return match
+    }
+  }
+  throw new Error(notFoundMessage)
+}
+
 function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
   if (!value || value.length > 10) {
     return value
@@ -361,6 +391,73 @@ export const inventoryService = {
     }
   },
 
+  async getAlertDetail(alertId: number): Promise<InventoryAlertDetail> {
+    const alert = await findPagedRecord(
+      (page, pageSize) => this.listAlerts({ page, pageSize }),
+      (item) => item.alertId === alertId,
+      '库存预警记录不存在或已删除',
+    )
+    const stock = await this.getStockDetail(alert.materialId)
+    let recommendedAction = '请复核可用库存与安全库存，并按实际情况补充或调整库存。'
+    if (stock.status === 'zero') {
+      recommendedAction = '当前库存为零，请优先补充库存并复核相关锁定。'
+    }
+    return {
+      ...alert,
+      recommendedAction,
+      stock,
+    }
+  },
+
+  async getCompletionInboundDetail(inboundId: number): Promise<CompletionInboundDetail> {
+    const item = await findPagedRecord(
+      (page, pageSize) => this.listCompletionInbound({ page, pageSize }),
+      (record) => record.inboundId === inboundId,
+      '完工入库记录不存在或已删除',
+    )
+    const references = await this.getReferenceData()
+    const version = references.bomVersions.find((record) => record.versionId === item.versionId)
+    const order = references.productionOrders.find((record) => record.orderId === item.orderId)
+    const detail: CompletionInboundDetail = {
+      ...item,
+      bomVersionNo: version?.versionNo,
+    }
+    if (order) {
+      detail.productionOrder = {
+        materialName: order.materialName,
+        orderId: order.orderId,
+        status: order.status,
+      }
+    }
+    return detail
+  },
+
+  async getObsoleteDetail(detectionId: number): Promise<ObsoleteMaterialDetail> {
+    const item = await findPagedRecord(
+      (page, pageSize) => this.listObsolete({ page, pageSize }),
+      (record) => record.detectionId === detectionId,
+      '呆滞物料检测记录不存在或已删除',
+    )
+    const [stock, references] = await Promise.all([
+      this.getStockDetail(item.materialId),
+      this.getReferenceData(),
+    ])
+    return {
+      ...item,
+      activeOrders: references.productionOrders
+        .filter((order) => item.activeOrderIds?.includes(order.orderId))
+        .map((order) => ({
+          materialName: order.materialName,
+          orderId: order.orderId,
+          status: order.status,
+        })),
+      bomVersions: references.bomVersions
+        .filter((version) => item.bomVersionIds?.includes(version.versionId))
+        .map((version) => ({ versionId: version.versionId, versionNo: version.versionNo })),
+      stock,
+    }
+  },
+
   async getOverview(): Promise<InventoryOverviewSummary> {
     const [alerts, locks, obsolete, inbound, firstStockPage] = await Promise.all([
       this.listAlerts({ page: 1, pageSize: 1, status: 'pending' }),
@@ -468,6 +565,14 @@ export const inventoryService = {
       }
     })
     return { bomVersions, materials, productionOrders }
+  },
+
+  async getStockDetail(materialId: number): Promise<InventoryStockItem> {
+    return findPagedRecord(
+      (page, pageSize) => this.listStocks({ materialId, page, pageSize }),
+      (item) => item.materialId === materialId,
+      '库存记录不存在或已删除',
+    )
   },
 
   async handleAlert(alertId: number, status: 'handled' | 'ignored', handlerId: number) {

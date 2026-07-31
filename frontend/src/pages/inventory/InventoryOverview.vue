@@ -29,6 +29,9 @@ const stockItems = ref<InventoryStockItem[]>([])
 const stockTotal = ref(0)
 const stockQuery = reactive<InventoryStockQuery>({ page: 1, pageSize: 10 })
 let stockRequestId = 0
+const stockDetail = ref<InventoryStockItem>()
+const stockDetailError = ref('')
+const stockDetailLoading = ref(false)
 
 const materialTypeLabels = {
   auxiliary: '辅料',
@@ -202,6 +205,24 @@ function resetStockQuery() {
   void loadStocks()
 }
 
+async function viewStockDetail(materialId: number) {
+  stockDetail.value = undefined
+  stockDetailError.value = ''
+  stockDetailLoading.value = true
+  try {
+    stockDetail.value = await inventoryService.getStockDetail(materialId)
+  } catch (requestError) {
+    stockDetailError.value = getErrorMessage(requestError, '库存详情加载失败')
+  } finally {
+    stockDetailLoading.value = false
+  }
+}
+
+function closeStockDetail() {
+  stockDetail.value = undefined
+  stockDetailError.value = ''
+}
+
 function navigateTo(path: string) {
   void router.push(path)
 }
@@ -336,6 +357,13 @@ onBeforeUnmount(() => {
           </el-table-column>
           <el-table-column label="最后入库" min-width="120" prop="lastInDate" />
           <el-table-column label="最后出库" min-width="120" prop="lastOutDate" />
+          <el-table-column fixed="right" label="操作" min-width="80">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="viewStockDetail(row.materialId)"
+                >详情</el-button
+              >
+            </template>
+          </el-table-column>
         </el-table>
       </div>
       <el-pagination
@@ -349,6 +377,65 @@ onBeforeUnmount(() => {
         @change="loadStocks"
       />
     </el-card>
+
+    <el-drawer
+      :model-value="stockDetailLoading || Boolean(stockDetail) || Boolean(stockDetailError)"
+      size="min(92vw, 520px)"
+      title="库存详情"
+      @close="closeStockDetail"
+    >
+      <div v-loading="stockDetailLoading" class="stock-detail-area">
+        <el-alert
+          v-if="stockDetailError"
+          :closable="false"
+          show-icon
+          :title="stockDetailError"
+          type="error"
+        />
+        <div v-else-if="stockDetail" class="stock-detail-grid">
+          <div>
+            <span>物料</span><strong>{{ stockDetail.materialName }}</strong>
+          </div>
+          <div>
+            <span>物料编号</span><strong>#{{ stockDetail.materialId }}</strong>
+          </div>
+          <div>
+            <span>类型</span><strong>{{ getMaterialTypeLabel(stockDetail) }}</strong>
+          </div>
+          <div>
+            <span>单位</span><strong>{{ stockDetail.unit || '-' }}</strong>
+          </div>
+          <div>
+            <span>可用数量</span
+            ><strong
+              >{{ formatNumber(stockDetail.availableQty) }} {{ stockDetail.unit || '' }}</strong
+            >
+          </div>
+          <div>
+            <span>锁定数量</span
+            ><strong>{{ formatNumber(stockDetail.lockedQty) }} {{ stockDetail.unit || '' }}</strong>
+          </div>
+          <div>
+            <span>安全库存</span
+            ><strong
+              >{{ formatNumber(stockDetail.safetyStock) }} {{ stockDetail.unit || '' }}</strong
+            >
+          </div>
+          <div>
+            <span>库存状态</span
+            ><el-tag :type="getStockTagType(stockDetail.status)">{{
+              getStockStatusLabel(stockDetail)
+            }}</el-tag>
+          </div>
+          <div>
+            <span>最后入库</span><strong>{{ stockDetail.lastInDate || '-' }}</strong>
+          </div>
+          <div>
+            <span>最后出库</span><strong>{{ stockDetail.lastOutDate || '-' }}</strong>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
 
     <el-card class="operation-card" shadow="never">
       <template #header>
@@ -419,6 +506,25 @@ onBeforeUnmount(() => {
 }
 .stock-table-area {
   min-height: 260px;
+}
+.stock-detail-area {
+  min-height: 180px;
+}
+.stock-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.stock-detail-grid > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 12px;
+}
+.stock-detail-grid span {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 .material-cell {
   display: grid;
@@ -521,6 +627,9 @@ onBeforeUnmount(() => {
   }
   .stock-filters > * {
     flex: 1 1 150px;
+  }
+  .stock-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

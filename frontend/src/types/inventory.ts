@@ -94,6 +94,11 @@ export interface InventoryAlertItem {
   threshold: number
 }
 
+export interface InventoryAlertDetail extends InventoryAlertItem {
+  recommendedAction: string
+  stock: InventoryStockItem
+}
+
 export interface InventoryAlertQuery extends PageRequest {
   endTime?: string
   materialId?: number
@@ -156,6 +161,19 @@ export interface ObsoleteMaterialItem {
   status: ObsoleteMaterialStatus
 }
 
+export interface ObsoleteMaterialDetail extends ObsoleteMaterialItem {
+  activeOrders: {
+    materialName: string
+    orderId: number
+    status: string
+  }[]
+  bomVersions: {
+    versionId: number
+    versionNo: string
+  }[]
+  stock: InventoryStockItem
+}
+
 export interface ObsoleteDetectionResult {
   detectedCount: number
   items: ObsoleteMaterialItem[]
@@ -180,6 +198,15 @@ export interface CompletionInboundItem {
   productName?: string
   qualifiedQty: number
   versionId: number
+}
+
+export interface CompletionInboundDetail extends CompletionInboundItem {
+  bomVersionNo?: string
+  productionOrder?: {
+    materialName: string
+    orderId: number
+    status: string
+  }
 }
 
 export interface CompletionInboundQuery extends PageRequest {

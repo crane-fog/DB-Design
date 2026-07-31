@@ -46,6 +46,9 @@ export type ExternalOrderStatusValue = 'accepted' | 'pending_review' | 'rejected
 /** 故障记录状态。 */
 export type FaultStatusValue = 'pending_repair' | 'recovered' | 'repairing'
 
+/** 生产阶段状态。 */
+export type ProductionStageStatus = 'completed' | 'in_progress' | 'pending' | 'paused'
+
 export interface ProductionOrderQuery extends PageRequest {
   materialId?: number
   planEndEnd?: string
@@ -83,6 +86,8 @@ export interface ProductionOrderItem {
   actualEnd?: string
   actualStart?: string
   finishedQty?: number
+  lastProgressRemark?: string
+  lastProgressReportedAt?: string
   materialId: number
   materialName?: string
   orderId: number
@@ -90,9 +95,40 @@ export interface ProductionOrderItem {
   planQty: number
   planStart: string
   reviewComment?: string
+  schedule?: ProductionScheduleItem
   status: ProductionOrderStatus
   versionId: number
   versionNo?: string
+}
+
+export interface ProductionProgressReportFormData {
+  completedQty: number
+  orderId: number
+  remark?: string
+  reportedAt?: string
+}
+
+export interface ProductionScheduleFormData {
+  lineId: number
+  orderId: number
+  plannedEnd: string
+  plannedStart: string
+}
+
+export interface ProductionScheduleItem {
+  lineId: number
+  lineName: string
+  orderId: number
+  plannedEnd: string
+  plannedStart: string
+  scheduleId: number
+}
+
+export interface ProductionStageItem {
+  completedAt?: string
+  name: string
+  startedAt?: string
+  status: ProductionStageStatus
 }
 
 export interface ProductionOrderFormData {
@@ -281,25 +317,41 @@ export interface ProductionLineStatusItem {
 export interface FaultRecordItem {
   description: string
   faultId: number
+  faultLevel: 'critical' | 'major' | 'minor'
   faultType: string
   lineId: number
+  lineName?: string
   occurTime: string
+  processingNote?: string
   recoverTime?: string
   repairerId?: number
+  repairerName?: string
   reporterId: number
+  reporterName?: string
   status: FaultStatusValue
+}
+
+export interface FaultRecordQuery extends PageRequest {
+  faultType?: string
+  lineId?: number
+  occurEnd?: string
+  occurStart?: string
+  status?: FaultStatusValue
 }
 
 export interface FaultReportFormData {
   description: string
+  faultLevel: FaultRecordItem['faultLevel']
   faultType: string
   lineId: number
+  occurTime?: string
 }
 
 export interface FaultUpdateFormData {
   faultId: number
   recoverTime?: string
   repairerId?: number
+  processingNote?: string
   status: FaultStatusValue
 }
 
@@ -385,6 +437,7 @@ function toFaultRecord(record: FaultRecord): FaultRecordItem {
   return {
     description: record.description,
     faultId: record.fault_id,
+    faultLevel: 'major',
     faultType: record.fault_type,
     lineId: record.line_id,
     occurTime: record.occur_time,
@@ -670,6 +723,13 @@ export const productionService = {
     return undefined
   },
 
+  async getFault(faultId: number): Promise<FaultRecordItem | undefined> {
+    if (isMockEnabled()) {
+      return productionMock.getFault(faultId)
+    }
+    throw new Error('当前后端暂未提供生产故障详情接口')
+  },
+
   async getOrder(orderId: number) {
     if (isMockEnabled()) {
       return productionMock.getOrder(orderId)
@@ -680,6 +740,13 @@ export const productionService = {
       return toProductionOrder(data)
     }
     return undefined
+  },
+
+  async getOrderStages(orderId: number): Promise<ProductionStageItem[]> {
+    if (isMockEnabled()) {
+      return productionMock.getOrderStages(orderId)
+    }
+    throw new Error('当前后端暂未提供生产阶段查询接口')
   },
 
   async listAllLineTypes(): Promise<LineTypeItem[]> {
@@ -763,6 +830,13 @@ export const productionService = {
     return { items, ...metadata }
   },
 
+  async listFaults(query: FaultRecordQuery): Promise<PageResult<FaultRecordItem>> {
+    if (isMockEnabled()) {
+      return productionMock.listFaults(query)
+    }
+    throw new Error('当前后端暂未提供生产故障列表接口')
+  },
+
   async listLineTypes(query: LineTypeQuery): Promise<PageResult<LineTypeItem>> {
     if (isMockEnabled()) {
       return productionMock.listLineTypes(query)
@@ -842,6 +916,14 @@ export const productionService = {
       return toFaultRecord(data)
     }
     return undefined
+  },
+
+  async reportOrderProgress(form: ProductionProgressReportFormData) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.reportOrderProgress(form)
+    }
+    throw new Error('当前后端暂未提供生产进度上报接口')
   },
 
   async reviewExternalOrder(extOrderId: number, accepted: boolean, reviewComment?: string) {
@@ -957,6 +1039,14 @@ export const productionService = {
       return toLineType(data)
     }
     return undefined
+  },
+
+  async saveOrderSchedule(form: ProductionScheduleFormData) {
+    assertMockPermission('production:orders')
+    if (isMockEnabled()) {
+      return productionMock.saveOrderSchedule(form)
+    }
+    throw new Error('当前后端暂未提供生产订单排产接口')
   },
 
   async startOrder(orderId: number, remark?: string) {

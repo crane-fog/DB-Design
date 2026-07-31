@@ -146,11 +146,23 @@ export interface BomAnalysisResult {
 export interface BomReverseTraceResult {
   cumulativeQuantity: number
   finalMaterialCode: string
+  finalMaterialName: string
+  includesLoss: false
   level: number
   materialCode: string
   materialName: string
   parentMaterialCode: string
+  parentMaterialName: string
   path: string
+  pathNodes: {
+    bomVersion?: string
+    cumulativeQuantity: number
+    level: number
+    materialCode: string
+    materialName: string
+    unit: string
+    unitQuantity?: number
+  }[]
   unit: string
-  version: string
+  versions: string[]
 }

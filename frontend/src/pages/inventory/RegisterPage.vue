@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  CompletionInboundDetail,
   CompletionInboundFormData,
   CompletionInboundItem,
   CompletionInboundQuery,
@@ -31,7 +32,9 @@ const dateRange = ref<[string, string]>()
 const query = reactive<CompletionInboundQuery>({ page: 1, pageSize: 10 })
 const dialogOpen = ref(false)
 const detailDrawerOpen = ref(false)
-const selectedInbound = ref<CompletionInboundItem>()
+const detailLoading = ref(false)
+const detailError = ref('')
+const selectedInbound = ref<CompletionInboundDetail>()
 const formRef = ref<FormInstance>()
 const form = reactive<CompletionInboundFormData>({
   batchNo: '',
@@ -182,9 +185,18 @@ function handleProductionOrderChange(orderId: number) {
   formRef.value?.clearValidate()
 }
 
-function viewInbound(item: CompletionInboundItem) {
-  selectedInbound.value = item
+async function viewInbound(item: CompletionInboundItem) {
+  selectedInbound.value = undefined
+  detailError.value = ''
   detailDrawerOpen.value = true
+  detailLoading.value = true
+  try {
+    selectedInbound.value = await inventoryService.getCompletionInboundDetail(item.inboundId)
+  } catch (requestError) {
+    detailError.value = getErrorMessage(requestError, '完工入库详情加载失败')
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 function openBatchTrace() {
@@ -196,6 +208,11 @@ function openBatchTrace() {
     path: '/trace',
     query: { batchNo: inbound.batchNo, orderId: String(inbound.orderId), tab: 'product' },
   })
+}
+
+function closeInboundDetail() {
+  selectedInbound.value = undefined
+  detailError.value = ''
 }
 
 async function submitInbound() {
@@ -471,54 +488,79 @@ onBeforeUnmount(() => {
       >
     </el-dialog>
 
-    <el-drawer v-model="detailDrawerOpen" size="min(94vw, 680px)" title="完工入库详情">
-      <template v-if="selectedInbound">
-        <div class="inbound-detail-grid">
-          <div>
-            <span>入库单</span><strong>#{{ selectedInbound.inboundId }}</strong>
-          </div>
-          <div>
-            <span>生产订单</span><strong>#{{ selectedInbound.orderId }}</strong>
-          </div>
-          <div>
-            <span>成品</span><strong>{{ selectedInbound.productName }}</strong>
-          </div>
-          <div>
-            <span>批次号</span><strong>{{ selectedInbound.batchNo }}</strong>
-          </div>
-          <div>
-            <span>完工数量</span><strong>{{ formatNumber(selectedInbound.finishQty) }}</strong>
-          </div>
-          <div>
-            <span>合格数量</span><strong>{{ formatNumber(selectedInbound.qualifiedQty) }}</strong>
-          </div>
-          <div>
-            <span>BOM 版本</span><strong>#{{ selectedInbound.versionId }}</strong>
-          </div>
-          <div>
-            <span>操作人</span><strong>#{{ selectedInbound.operatorId }}</strong>
-          </div>
-        </div>
-        <div v-if="canViewTrace" class="detail-actions">
-          <el-button :icon="Search" type="primary" @click="openBatchTrace">批次追溯</el-button>
-        </div>
-        <el-divider content-position="left">原料锁定消耗</el-divider>
-        <EmptyState
-          v-if="!selectedInbound.consumedLockRecords?.length"
-          description="该入库记录没有返回原料锁定消耗明细。"
+    <el-drawer
+      v-model="detailDrawerOpen"
+      size="min(94vw, 680px)"
+      title="完工入库详情"
+      @closed="closeInboundDetail"
+    >
+      <div v-loading="detailLoading" class="inbound-detail-area">
+        <el-alert
+          v-if="detailError"
+          :closable="false"
+          show-icon
+          :title="detailError"
+          type="error"
         />
-        <el-table v-else :data="selectedInbound.consumedLockRecords" stripe>
-          <el-table-column label="锁定 ID" prop="lockId" min-width="90" />
-          <el-table-column label="物料" min-width="180">
-            <template #default="{ row }">{{
-              row.materialName || `物料 #${row.materialId}`
-            }}</template>
-          </el-table-column>
-          <el-table-column label="消耗数量" min-width="110">
-            <template #default="{ row }">{{ formatNumber(row.lockQty) }}</template>
-          </el-table-column>
-        </el-table>
-      </template>
+        <template v-else-if="selectedInbound">
+          <div class="inbound-detail-grid">
+            <div>
+              <span>入库单</span><strong>#{{ selectedInbound.inboundId }}</strong>
+            </div>
+            <div>
+              <span>生产订单</span
+              ><strong>{{
+                selectedInbound.productionOrder
+                  ? '#' +
+                    selectedInbound.productionOrder.orderId +
+                    ' · ' +
+                    selectedInbound.productionOrder.materialName
+                  : '#' + selectedInbound.orderId
+              }}</strong>
+            </div>
+            <div>
+              <span>成品</span><strong>{{ selectedInbound.productName }}</strong>
+            </div>
+            <div>
+              <span>批次号</span><strong>{{ selectedInbound.batchNo }}</strong>
+            </div>
+            <div>
+              <span>完工数量</span><strong>{{ formatNumber(selectedInbound.finishQty) }}</strong>
+            </div>
+            <div>
+              <span>合格数量</span><strong>{{ formatNumber(selectedInbound.qualifiedQty) }}</strong>
+            </div>
+            <div>
+              <span>BOM 版本</span
+              ><strong>{{
+                selectedInbound.bomVersionNo || '#' + selectedInbound.versionId
+              }}</strong>
+            </div>
+            <div>
+              <span>操作人</span><strong>#{{ selectedInbound.operatorId }}</strong>
+            </div>
+          </div>
+          <div v-if="canViewTrace" class="detail-actions">
+            <el-button :icon="Search" type="primary" @click="openBatchTrace">批次追溯</el-button>
+          </div>
+          <el-divider content-position="left">原料锁定消耗</el-divider>
+          <EmptyState
+            v-if="!selectedInbound.consumedLockRecords?.length"
+            description="该入库记录没有返回原料锁定消耗明细。"
+          />
+          <el-table v-else :data="selectedInbound.consumedLockRecords" stripe>
+            <el-table-column label="锁定 ID" prop="lockId" min-width="90" />
+            <el-table-column label="物料" min-width="180">
+              <template #default="{ row }">{{
+                row.materialName || `物料 #${row.materialId}`
+              }}</template>
+            </el-table-column>
+            <el-table-column label="消耗数量" min-width="110">
+              <template #default="{ row }">{{ formatNumber(row.lockQty) }}</template>
+            </el-table-column>
+          </el-table>
+        </template>
+      </div>
     </el-drawer>
   </PageContainer>
 </template>
@@ -533,6 +575,9 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+.inbound-detail-area {
+  min-height: 180px;
 }
 .query-card {
   border-top: 3px solid var(--primary-color);
