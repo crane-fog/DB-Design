@@ -140,9 +140,12 @@ public class SystemController(
         var (user, error) = userService.Update(request);
         if (error is not null)
         {
-            var code = error == "用户不存在"
-                ? UserResponse.CodeEnum._404Enum
-                : UserResponse.CodeEnum._400Enum;
+            var code = error switch
+            {
+                "用户不存在" => UserResponse.CodeEnum._404Enum,
+                "工号已存在" => UserResponse.CodeEnum._409Enum,
+                _ => UserResponse.CodeEnum._400Enum,
+            };
             return Ok(new UserResponse { Code = code, Message = error, Data = null! });
         }
 
@@ -172,7 +175,17 @@ public class SystemController(
             });
         }
 
-        var ok = userService.Delete(request.UserId);
+        var (ok, error) = userService.Delete(request.UserId);
+        if (error is not null)
+        {
+            return Ok(new ApiResponse
+            {
+                Code = ApiResponse.CodeEnum._409Enum,
+                Message = error,
+                Data = null!,
+            });
+        }
+
         return Ok(new ApiResponse
         {
             Code = ok ? ApiResponse.CodeEnum._200Enum : ApiResponse.CodeEnum._404Enum,
@@ -328,7 +341,17 @@ public class SystemController(
             });
         }
 
-        var ok = roleService.Delete(request.RoleId);
+        var (ok, error) = roleService.Delete(request.RoleId);
+        if (error is not null)
+        {
+            return Ok(new ApiResponse
+            {
+                Code = ApiResponse.CodeEnum._409Enum,
+                Message = error,
+                Data = null!,
+            });
+        }
+
         return Ok(new ApiResponse
         {
             Code = ok ? ApiResponse.CodeEnum._200Enum : ApiResponse.CodeEnum._404Enum,
@@ -484,7 +507,17 @@ public class SystemController(
             });
         }
 
-        var ok = permissionService.Delete(request.PermissionId);
+        var (ok, error) = permissionService.Delete(request.PermissionId);
+        if (error is not null)
+        {
+            return Ok(new ApiResponse
+            {
+                Code = ApiResponse.CodeEnum._409Enum,
+                Message = error,
+                Data = null!,
+            });
+        }
+
         return Ok(new ApiResponse
         {
             Code = ok ? ApiResponse.CodeEnum._200Enum : ApiResponse.CodeEnum._404Enum,

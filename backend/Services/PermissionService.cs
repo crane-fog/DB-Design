@@ -133,7 +133,7 @@ public class PermissionService(string connString)
         }
     }
 
-    public bool Delete(int permissionId)
+    public (bool Ok, string? ErrorMessage) Delete(int permissionId)
     {
         using var conn = new OracleConnection(connString);
         conn.Open();
@@ -142,6 +142,14 @@ public class PermissionService(string connString)
         cmd.CommandText = "DELETE FROM SYS_PERMISSION WHERE PERMISSION_ID = :permissionId";
         cmd.Parameters.Add(new OracleParameter("permissionId", permissionId));
 
-        return cmd.ExecuteNonQuery() > 0;
+        try
+        {
+            return (cmd.ExecuteNonQuery() > 0, null);
+        }
+        catch (OracleException ex) when (ex.Number == 2292)
+        {
+            // ORA-02292：子记录存在（角色权限），转换为业务错误
+            return (false, "该权限仍被角色关联，无法删除；请先移除关联");
+        }
     }
 }

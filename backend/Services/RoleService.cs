@@ -150,7 +150,7 @@ public class RoleService(string connString)
         }
     }
 
-    public bool Delete(int roleId)
+    public (bool Ok, string? ErrorMessage) Delete(int roleId)
     {
         using var conn = new OracleConnection(connString);
         conn.Open();
@@ -159,6 +159,14 @@ public class RoleService(string connString)
         cmd.CommandText = "DELETE FROM SYS_ROLE WHERE ROLE_ID = :roleId";
         cmd.Parameters.Add(new OracleParameter("roleId", roleId));
 
-        return cmd.ExecuteNonQuery() > 0;
+        try
+        {
+            return (cmd.ExecuteNonQuery() > 0, null);
+        }
+        catch (OracleException ex) when (ex.Number == 2292)
+        {
+            // ORA-02292：子记录存在（用户角色、角色权限），转换为业务错误
+            return (false, "该角色仍被用户或权限关联，无法删除；请先移除关联");
+        }
     }
 }

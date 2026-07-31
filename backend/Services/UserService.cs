@@ -188,13 +188,22 @@ public class UserService(string connString)
 
         cmd.CommandText = $"UPDATE SYS_USER SET {string.Join(", ", sets)} WHERE USER_ID = :userId";
         foreach (var p in parameters) cmd.Parameters.Add(p);
-        cmd.ExecuteNonQuery();
+
+        try
+        {
+            cmd.ExecuteNonQuery();
+        }
+        catch (OracleException ex) when (ex.Number == 1)
+        {
+            // ORA-00001：唯一约束冲突，工号已被其他用户使用
+            return (null, "工号已存在");
+        }
 
         var updated = Get(request.UserId);
         return (updated, null);
     }
 
-    public bool Delete(int userId)
+    public (bool Ok, string? ErrorMessage) Delete(int userId)
     {
         using var conn = new OracleConnection(connString);
         conn.Open();
@@ -203,6 +212,14 @@ public class UserService(string connString)
         cmd.CommandText = "DELETE FROM SYS_USER WHERE USER_ID = :userId";
         cmd.Parameters.Add(new OracleParameter("userId", userId));
 
-        return cmd.ExecuteNonQuery() > 0;
+        try
+        {
+            return (cmd.ExecuteNonQuery() > 0, null);
+        }
+        catch (OracleException ex) when (ex.Number == 2292)
+        {
+            // ORA-02292：子记录存在（角色关系、登录日志、操作日志、业务单据等），转换为业务错误
+            return (false, "该用户存在关联数据（角色、日志或业务单据），无法删除；建议改为停用");
+        }
     }
 }
