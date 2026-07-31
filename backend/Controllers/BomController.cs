@@ -150,6 +150,44 @@ public class BomController(
         return Ok(Cycle(BomCycleCheckResponse.CodeEnum._200Enum, "检查成功", bomService.CheckCycle(request)));
     }
 
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("getBomTreeData")]
+    public IActionResult GetBomTree(
+        [FromQuery(Name = "material_id")] long materialId,
+        [FromQuery(Name = "version_id")] long versionId)
+    {
+        if (ResolveTreeReaderOrForbidden() is { } forbidden)
+        {
+            return forbidden;
+        }
+
+        var result = bomService.GetBomTree(materialId, versionId);
+        return Ok(Tree(
+            result.Ok ? BomTreeResponse.CodeEnum._200Enum : (BomTreeResponse.CodeEnum)(int)result.Error,
+            result.Ok ? "查询成功" : result.ErrorMessage ?? "查询失败",
+            result.Data));
+    }
+
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("getReverseTraceData")]
+    public IActionResult GetReverseTrace(
+        [FromQuery(Name = "material_id")] long materialId,
+        [FromQuery(Name = "include_history")] bool includeHistory = false)
+    {
+        if (ResolveReverseReaderOrForbidden() is { } forbidden)
+        {
+            return forbidden;
+        }
+
+        var result = bomService.GetReverseTrace(materialId, includeHistory);
+        return Ok(Reverse(
+            result.Ok ? ReverseTraceResponse.CodeEnum._200Enum : (ReverseTraceResponse.CodeEnum)(int)result.Error,
+            result.Ok ? "查询成功" : result.ErrorMessage ?? "查询失败",
+            result.Data));
+    }
+
     private IActionResult? ResolveReaderOrForbidden()
     {
         var user = userContext.Resolve(User.GetEmployeeNo());
@@ -161,6 +199,38 @@ public class BomController(
         if (!user.IsMaterialReader)
         {
             return Ok(Bom(BomResponse.CodeEnum._403Enum, "无权访问 BOM 明细", null));
+        }
+
+        return null;
+    }
+
+    private IActionResult? ResolveTreeReaderOrForbidden()
+    {
+        var user = userContext.Resolve(User.GetEmployeeNo());
+        if (user is null)
+        {
+            return Ok(Tree(BomTreeResponse.CodeEnum._401Enum, "登录状态无效", null));
+        }
+
+        if (!user.IsMaterialReader)
+        {
+            return Ok(Tree(BomTreeResponse.CodeEnum._403Enum, "无权查询 BOM 层级树", null));
+        }
+
+        return null;
+    }
+
+    private IActionResult? ResolveReverseReaderOrForbidden()
+    {
+        var user = userContext.Resolve(User.GetEmployeeNo());
+        if (user is null)
+        {
+            return Ok(Reverse(ReverseTraceResponse.CodeEnum._401Enum, "登录状态无效", null));
+        }
+
+        if (!user.IsMaterialReader)
+        {
+            return Ok(Reverse(ReverseTraceResponse.CodeEnum._403Enum, "无权查询反向追溯", null));
         }
 
         return null;
@@ -264,6 +334,26 @@ public class BomController(
         BomCycleCheckResponse.CodeEnum code,
         string message,
         BomCycleCheckResult? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static BomTreeResponse Tree(
+        BomTreeResponse.CodeEnum code,
+        string message,
+        List<BomTreeNode>? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static ReverseTraceResponse Reverse(
+        ReverseTraceResponse.CodeEnum code,
+        string message,
+        List<ReverseTraceItem>? data) => new()
         {
             Code = code,
             Message = message,

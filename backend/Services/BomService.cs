@@ -218,10 +218,277 @@ public class BomService(string connString)
         return CheckCycleInternal(conn, null, request.ParentMaterialId, request.ChildMaterialId, request.VersionId, null);
     }
 
+    public BomBusinessResult<List<BomTreeNode>> GetBomTree(long materialId, long versionId)
+    {
+        if (materialId <= 0 || versionId <= 0)
+        {
+            return BomBusinessResult<List<BomTreeNode>>.Fail(BomBusinessError.BadRequest, "物料和版本编号不能为空");
+        }
+
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+        var graph = LoadBomQueryGraph(conn);
+
+        if (!graph.Materials.TryGetValue(materialId, out var rootMaterial))
+        {
+            return BomBusinessResult<List<BomTreeNode>>.Fail(BomBusinessError.NotFound, "物料不存在");
+        }
+
+        if (!graph.Versions.TryGetValue(versionId, out var rootVersion) || rootVersion.MaterialId != materialId)
+        {
+            return BomBusinessResult<List<BomTreeNode>>.Fail(BomBusinessError.BadRequest, "BOM 版本不属于指定物料");
+        }
+
+        var nodes = new List<BomTreeNode>();
+        var rootPath = materialId.ToString();
+        var rootChildren = GetChildren(graph, versionId);
+        nodes.Add(ToBomTreeNode(rootMaterial, 1, 1, 0, null, rootPath, rootChildren.Count == 0));
+
+        ExpandBomTree(graph, materialId, versionId, 0, 1, rootPath, new HashSet<long> { materialId }, nodes);
+        return BomBusinessResult<List<BomTreeNode>>.Success(nodes);
+    }
+
+    public BomBusinessResult<List<ReverseTraceItem>> GetReverseTrace(long materialId, bool includeHistory)
+    {
+        if (materialId <= 0)
+        {
+            return BomBusinessResult<List<ReverseTraceItem>>.Fail(BomBusinessError.BadRequest, "物料编号不能为空");
+        }
+
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+        var graph = LoadBomQueryGraph(conn);
+        if (!graph.Materials.ContainsKey(materialId))
+        {
+            return BomBusinessResult<List<ReverseTraceItem>>.Fail(BomBusinessError.NotFound, "物料不存在");
+        }
+
+        var incomingEdges = graph.Edges
+            .Where(edge => includeHistory || graph.Materials[edge.ParentMaterialId].CurrentVersionId == edge.VersionId)
+            .GroupBy(edge => edge.ChildMaterialId)
+            .ToDictionary(group => group.Key, group => group.OrderBy(edge => edge.BomId).ToList());
+        var items = new List<ReverseTraceItem>();
+        ExpandReverseTrace(
+            graph,
+            incomingEdges,
+            materialId,
+            0,
+            1,
+            materialId.ToString(),
+            new HashSet<long> { materialId },
+            items);
+        return BomBusinessResult<List<ReverseTraceItem>>.Success(items);
+    }
+
     private const string SelectColumns = @"
         SELECT b.BOM_ID, b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID,
                b.VERSION_ID, b.QUANTITY, b.LOSS_RATE
         FROM BOM b";
+
+    private static BomQueryGraph LoadBomQueryGraph(OracleConnection conn)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MODEL, m.MATERIAL_TYPE, m.UNIT,
+                                   m.CURRENT_VERSION_ID, bv.VERSION_ID, bv.VERSION_NO,
+                                   b.BOM_ID, b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID, b.QUANTITY
+                            FROM MATERIAL m
+                            LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
+                            LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
+                            ORDER BY m.MATERIAL_ID, bv.VERSION_ID, b.BOM_ID";
+
+        var materials = new Dictionary<long, BomQueryMaterial>();
+        var versions = new Dictionary<long, BomQueryVersion>();
+        var edges = new List<BomQueryEdge>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var materialId = Convert.ToInt64(reader.GetValue(0));
+            if (!materials.ContainsKey(materialId))
+            {
+                materials[materialId] = new BomQueryMaterial(
+                    materialId,
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.GetString(3),
+                    reader.GetString(4),
+                    reader.IsDBNull(5) ? null : Convert.ToInt64(reader.GetValue(5)));
+            }
+
+            if (reader.IsDBNull(6))
+            {
+                continue;
+            }
+
+            var versionId = Convert.ToInt64(reader.GetValue(6));
+            versions.TryAdd(versionId, new BomQueryVersion(versionId, materialId, reader.GetString(7)));
+            if (!reader.IsDBNull(8))
+            {
+                edges.Add(new BomQueryEdge(
+                    Convert.ToInt64(reader.GetValue(8)),
+                    Convert.ToInt64(reader.GetValue(9)),
+                    Convert.ToInt64(reader.GetValue(10)),
+                    versionId,
+                    reader.GetDecimal(11)));
+            }
+        }
+
+        var childrenByVersion = edges
+            .GroupBy(edge => edge.VersionId)
+            .ToDictionary(group => group.Key, group => group.OrderBy(edge => edge.BomId).ToList());
+        return new BomQueryGraph(materials, versions, edges, childrenByVersion);
+    }
+
+    private static List<BomQueryEdge> GetChildren(BomQueryGraph graph, long versionId) =>
+        graph.ChildrenByVersion.TryGetValue(versionId, out var children) ? children : [];
+
+    private static void ExpandBomTree(
+        BomQueryGraph graph,
+        long parentMaterialId,
+        long versionId,
+        int parentDepth,
+        decimal parentAccumulatedQuantity,
+        string parentPath,
+        IReadOnlySet<long> pathMaterials,
+        List<BomTreeNode> nodes)
+    {
+        foreach (var edge in GetChildren(graph, versionId).Where(edge => edge.ParentMaterialId == parentMaterialId))
+        {
+            if (!graph.Materials.TryGetValue(edge.ChildMaterialId, out var childMaterial) || pathMaterials.Contains(edge.ChildMaterialId))
+            {
+                continue;
+            }
+
+            var childPath = $"{parentPath}/{edge.ChildMaterialId}";
+            var childDepth = parentDepth + 1;
+            var childAccumulatedQuantity = parentAccumulatedQuantity * edge.Quantity;
+            var childVersionId = childMaterial.CurrentVersionId;
+            var childChildren = childVersionId.HasValue ? GetChildren(graph, childVersionId.Value) : [];
+            nodes.Add(ToBomTreeNode(
+                childMaterial,
+                edge.Quantity,
+                childAccumulatedQuantity,
+                childDepth,
+                parentMaterialId,
+                childPath,
+                childChildren.Count == 0));
+
+            if (!childVersionId.HasValue || childChildren.Count == 0)
+            {
+                continue;
+            }
+
+            var nextPathMaterials = new HashSet<long>(pathMaterials) { edge.ChildMaterialId };
+            ExpandBomTree(
+                graph,
+                edge.ChildMaterialId,
+                childVersionId.Value,
+                childDepth,
+                childAccumulatedQuantity,
+                childPath,
+                nextPathMaterials,
+                nodes);
+        }
+    }
+
+    private static BomTreeNode ToBomTreeNode(
+        BomQueryMaterial material,
+        decimal quantity,
+        decimal accumulatedQuantity,
+        int depth,
+        long? parentMaterialId,
+        string path,
+        bool isLeaf) => new()
+        {
+            MaterialId = Convert.ToInt32(material.MaterialId),
+            MaterialName = material.MaterialName,
+            Model = material.Model!,
+            MaterialType = material.MaterialType,
+            Unit = material.Unit,
+            Quantity = decimal.ToDouble(quantity),
+            AccumulatedQuantity = decimal.ToDouble(accumulatedQuantity),
+            Depth = depth,
+            ParentMaterialId = parentMaterialId.HasValue ? Convert.ToInt32(parentMaterialId.Value) : null,
+            Path = path,
+            IsLeaf = isLeaf,
+        };
+
+    private static void ExpandReverseTrace(
+        BomQueryGraph graph,
+        IReadOnlyDictionary<long, List<BomQueryEdge>> incomingEdges,
+        long childMaterialId,
+        int childDepth,
+        decimal childAccumulatedQuantity,
+        string childPath,
+        IReadOnlySet<long> pathMaterials,
+        List<ReverseTraceItem> items)
+    {
+        if (!incomingEdges.TryGetValue(childMaterialId, out var edges))
+        {
+            return;
+        }
+
+        foreach (var edge in edges)
+        {
+            if (!graph.Materials.TryGetValue(edge.ParentMaterialId, out var parentMaterial)
+                || !graph.Versions.TryGetValue(edge.VersionId, out var version)
+                || pathMaterials.Contains(edge.ParentMaterialId))
+            {
+                continue;
+            }
+
+            var parentPath = $"{childPath}/{edge.ParentMaterialId}";
+            var parentDepth = childDepth + 1;
+            var parentAccumulatedQuantity = childAccumulatedQuantity * edge.Quantity;
+            items.Add(new ReverseTraceItem
+            {
+                ProductMaterialId = Convert.ToInt32(parentMaterial.MaterialId),
+                ProductMaterialName = parentMaterial.MaterialName,
+                VersionId = Convert.ToInt32(version.VersionId),
+                VersionNo = version.VersionNo,
+                VersionStatus = parentMaterial.CurrentVersionId == version.VersionId
+                    ? ReverseTraceItem.VersionStatusEnum.EffectiveEnum
+                    : ReverseTraceItem.VersionStatusEnum.HistoryEnum,
+                Path = parentPath,
+                Depth = parentDepth,
+                Quantity = decimal.ToDouble(edge.Quantity),
+                AccumulatedQuantity = decimal.ToDouble(parentAccumulatedQuantity),
+            });
+
+            var nextPathMaterials = new HashSet<long>(pathMaterials) { edge.ParentMaterialId };
+            ExpandReverseTrace(
+                graph,
+                incomingEdges,
+                edge.ParentMaterialId,
+                parentDepth,
+                parentAccumulatedQuantity,
+                parentPath,
+                nextPathMaterials,
+                items);
+        }
+    }
+
+    private sealed record BomQueryGraph(
+        Dictionary<long, BomQueryMaterial> Materials,
+        Dictionary<long, BomQueryVersion> Versions,
+        List<BomQueryEdge> Edges,
+        Dictionary<long, List<BomQueryEdge>> ChildrenByVersion);
+
+    private sealed record BomQueryMaterial(
+        long MaterialId,
+        string MaterialName,
+        string? Model,
+        string MaterialType,
+        string Unit,
+        long? CurrentVersionId);
+
+    private sealed record BomQueryVersion(long VersionId, long MaterialId, string VersionNo);
+
+    private sealed record BomQueryEdge(
+        long BomId,
+        long ParentMaterialId,
+        long ChildMaterialId,
+        long VersionId,
+        decimal Quantity);
 
     private static List<string> BuildBomWhere(long versionId, long? parentMaterialId, long? childMaterialId)
     {
