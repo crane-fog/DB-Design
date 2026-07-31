@@ -32,29 +32,29 @@ public class RoleService(string connString)
         conn.Open();
 
         var conditions = new List<string>();
-        var parameters = new List<OracleParameter>();
+        var filters = new List<SqlFilter>();
 
         if (roleId.HasValue)
         {
             conditions.Add("ROLE_ID = :roleId");
-            parameters.Add(new OracleParameter("roleId", roleId.Value));
+            filters.Add(new SqlFilter("roleId", roleId.Value));
         }
         if (!string.IsNullOrWhiteSpace(roleName))
         {
             conditions.Add("ROLE_NAME LIKE :roleName");
-            parameters.Add(new OracleParameter("roleName", $"%{roleName.Trim()}%"));
+            filters.Add(new SqlFilter("roleName", $"%{roleName.Trim()}%"));
         }
         if (!string.IsNullOrWhiteSpace(status))
         {
             conditions.Add("STATUS = :status");
-            parameters.Add(new OracleParameter("status", status.Trim()));
+            filters.Add(new SqlFilter("status", status.Trim()));
         }
 
         var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         using var countCmd = conn.CreateCommand();
         countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_ROLE {where}";
-        foreach (var p in parameters) countCmd.Parameters.Add(p);
+        OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         var offset = (page - 1) * pageSize;
@@ -62,7 +62,7 @@ public class RoleService(string connString)
         dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY ROLE_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
-        foreach (var p in parameters) dataCmd.Parameters.Add(p);
+        OracleSql.AddFilters(dataCmd, filters);
 
         var records = new List<Role>();
         using var reader = dataCmd.ExecuteReader();

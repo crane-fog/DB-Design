@@ -28,29 +28,29 @@ public class PermissionService(string connString)
         conn.Open();
 
         var conditions = new List<string>();
-        var parameters = new List<OracleParameter>();
+        var filters = new List<SqlFilter>();
 
         if (permissionId.HasValue)
         {
             conditions.Add("PERMISSION_ID = :permissionId");
-            parameters.Add(new OracleParameter("permissionId", permissionId.Value));
+            filters.Add(new SqlFilter("permissionId", permissionId.Value));
         }
         if (!string.IsNullOrWhiteSpace(resource))
         {
             conditions.Add("\"resource\" LIKE :resource");
-            parameters.Add(new OracleParameter("resource", $"%{resource.Trim()}%"));
+            filters.Add(new SqlFilter("resource", $"%{resource.Trim()}%"));
         }
         if (!string.IsNullOrWhiteSpace(action))
         {
             conditions.Add("ACTION LIKE :action");
-            parameters.Add(new OracleParameter("action", $"%{action.Trim()}%"));
+            filters.Add(new SqlFilter("action", $"%{action.Trim()}%"));
         }
 
         var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         using var countCmd = conn.CreateCommand();
         countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_PERMISSION {where}";
-        foreach (var p in parameters) countCmd.Parameters.Add(p);
+        OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         var offset = (page - 1) * pageSize;
@@ -58,7 +58,7 @@ public class PermissionService(string connString)
         dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY PERMISSION_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
-        foreach (var p in parameters) dataCmd.Parameters.Add(p);
+        OracleSql.AddFilters(dataCmd, filters);
 
         var records = new List<PermissionBrief>();
         using var reader = dataCmd.ExecuteReader();

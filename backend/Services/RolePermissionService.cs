@@ -13,24 +13,24 @@ public class RolePermissionService(string connString)
         conn.Open();
 
         var conditions = new List<string>();
-        var parameters = new List<OracleParameter>();
+        var filters = new List<SqlFilter>();
 
         if (roleId.HasValue)
         {
             conditions.Add("RP.ROLE_ID = :roleId");
-            parameters.Add(new OracleParameter("roleId", roleId.Value));
+            filters.Add(new SqlFilter("roleId", roleId.Value));
         }
         if (permissionId.HasValue)
         {
             conditions.Add("RP.PERMISSION_ID = :permissionId");
-            parameters.Add(new OracleParameter("permissionId", permissionId.Value));
+            filters.Add(new SqlFilter("permissionId", permissionId.Value));
         }
 
         var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         using var countCmd = conn.CreateCommand();
         countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_ROLE_PERMISSION RP {where}";
-        foreach (var p in parameters) countCmd.Parameters.Add(p);
+        OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         var offset = (page - 1) * pageSize;
@@ -41,7 +41,7 @@ public class RolePermissionService(string connString)
                                  OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
-        foreach (var p in parameters) dataCmd.Parameters.Add(p);
+        OracleSql.AddFilters(dataCmd, filters);
 
         var records = new List<RolePermission>();
         using var reader = dataCmd.ExecuteReader();

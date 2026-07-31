@@ -41,35 +41,35 @@ public class UserService(string connString)
         conn.Open();
 
         var conditions = new List<string>();
-        var parameters = new List<OracleParameter>();
+        var filters = new List<SqlFilter>();
 
         if (userId.HasValue)
         {
             conditions.Add("USER_ID = :userId");
-            parameters.Add(new OracleParameter("userId", userId.Value));
+            filters.Add(new SqlFilter("userId", userId.Value));
         }
         if (!string.IsNullOrWhiteSpace(employeeNo))
         {
             conditions.Add("EMPLOYEE_NO LIKE :employeeNo");
-            parameters.Add(new OracleParameter("employeeNo", $"%{employeeNo.Trim()}%"));
+            filters.Add(new SqlFilter("employeeNo", $"%{employeeNo.Trim()}%"));
         }
         if (!string.IsNullOrWhiteSpace(userName))
         {
             conditions.Add("USER_NAME LIKE :userName");
-            parameters.Add(new OracleParameter("userName", $"%{userName.Trim()}%"));
+            filters.Add(new SqlFilter("userName", $"%{userName.Trim()}%"));
         }
         if (!string.IsNullOrWhiteSpace(status))
         {
             conditions.Add("STATUS = :status");
-            parameters.Add(new OracleParameter("status", status.Trim()));
+            filters.Add(new SqlFilter("status", status.Trim()));
         }
 
         var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
-        // 总数
+        // 总数（每次绑定创建新的 OracleParameter 实例，避免跨命令复用触发 ORA-50030）
         using var countCmd = conn.CreateCommand();
         countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_USER {where}";
-        foreach (var p in parameters) countCmd.Parameters.Add(p);
+        OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         // 分页数据
@@ -78,7 +78,7 @@ public class UserService(string connString)
         dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY USER_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
-        foreach (var p in parameters) dataCmd.Parameters.Add(p);
+        OracleSql.AddFilters(dataCmd, filters);
 
         var records = new List<User>();
         using var reader = dataCmd.ExecuteReader();

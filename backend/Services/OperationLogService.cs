@@ -40,39 +40,39 @@ public class OperationLogService(string connString)
         conn.Open();
 
         var conditions = new List<string>();
-        var parameters = new List<OracleParameter>();
+        var filters = new List<SqlFilter>();
 
         if (!string.IsNullOrWhiteSpace(module))
         {
             conditions.Add("MODULE LIKE :module");
-            parameters.Add(new OracleParameter("module", $"%{module.Trim()}%"));
+            filters.Add(new SqlFilter("module", $"%{module.Trim()}%"));
         }
         if (!string.IsNullOrWhiteSpace(action))
         {
             conditions.Add("ACTION LIKE :action");
-            parameters.Add(new OracleParameter("action", $"%{action.Trim()}%"));
+            filters.Add(new SqlFilter("action", $"%{action.Trim()}%"));
         }
         if (operatorId.HasValue)
         {
             conditions.Add("OPERATOR_ID = :operatorId");
-            parameters.Add(new OracleParameter("operatorId", operatorId.Value));
+            filters.Add(new SqlFilter("operatorId", operatorId.Value));
         }
         if (startTime.HasValue)
         {
             conditions.Add("OPERATE_TIME >= :startTime");
-            parameters.Add(new OracleParameter("startTime", startTime.Value));
+            filters.Add(new SqlFilter("startTime", startTime.Value));
         }
         if (endTime.HasValue)
         {
             conditions.Add("OPERATE_TIME <= :endTime");
-            parameters.Add(new OracleParameter("endTime", endTime.Value));
+            filters.Add(new SqlFilter("endTime", endTime.Value));
         }
 
         var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         using var countCmd = conn.CreateCommand();
         countCmd.CommandText = $"SELECT COUNT(*) FROM OPERATION_LOG {where}";
-        foreach (var p in parameters) countCmd.Parameters.Add(p);
+        OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         var offset = (page - 1) * pageSize;
@@ -80,7 +80,7 @@ public class OperationLogService(string connString)
         dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY OPERATE_TIME DESC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
-        foreach (var p in parameters) dataCmd.Parameters.Add(p);
+        OracleSql.AddFilters(dataCmd, filters);
 
         var records = new List<OperationLog>();
         using var reader = dataCmd.ExecuteReader();

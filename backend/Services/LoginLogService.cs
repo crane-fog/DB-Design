@@ -32,35 +32,35 @@ public class LoginLogService(string connString)
         conn.Open();
 
         var conditions = new List<string>();
-        var parameters = new List<OracleParameter>();
+        var filters = new List<SqlFilter>();
 
         if (userId.HasValue)
         {
             conditions.Add("USER_ID = :userId");
-            parameters.Add(new OracleParameter("userId", userId.Value));
+            filters.Add(new SqlFilter("userId", userId.Value));
         }
         if (!string.IsNullOrWhiteSpace(result))
         {
             var dbResult = result.Trim() == "success" ? "成功" : "失败";
             conditions.Add("RESULT = :result");
-            parameters.Add(new OracleParameter("result", dbResult));
+            filters.Add(new SqlFilter("result", dbResult));
         }
         if (startTime.HasValue)
         {
             conditions.Add("LOGIN_TIME >= :startTime");
-            parameters.Add(new OracleParameter("startTime", startTime.Value));
+            filters.Add(new SqlFilter("startTime", startTime.Value));
         }
         if (endTime.HasValue)
         {
             conditions.Add("LOGIN_TIME <= :endTime");
-            parameters.Add(new OracleParameter("endTime", endTime.Value));
+            filters.Add(new SqlFilter("endTime", endTime.Value));
         }
 
         var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         using var countCmd = conn.CreateCommand();
         countCmd.CommandText = $"SELECT COUNT(*) FROM LOGIN_LOG {where}";
-        foreach (var p in parameters) countCmd.Parameters.Add(p);
+        OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         var offset = (page - 1) * pageSize;
@@ -68,7 +68,7 @@ public class LoginLogService(string connString)
         dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY LOGIN_TIME DESC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
-        foreach (var p in parameters) dataCmd.Parameters.Add(p);
+        OracleSql.AddFilters(dataCmd, filters);
 
         var records = new List<LoginLog>();
         using var reader = dataCmd.ExecuteReader();
