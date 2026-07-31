@@ -1,12 +1,16 @@
 import {
   type ApiEnvelope,
   type PageResult,
+  getPageItems,
+  getPageMetadata,
   mapPageResult,
   nullableText,
   optionalText,
   unwrap,
 } from '@/services/pagination'
 import type {
+  Material,
+  MaterialDetail,
   PurchaseDraftFromShortageResponseAllOfData,
   PurchaseOrder,
   PurchaseOverdueReminder,
@@ -22,12 +26,13 @@ import type {
   PurchaseReceiptFormData,
   PurchaseReceiptItem,
   PurchaseReceiptQuery,
+  PurchaseReferenceData,
   PurchaseReminderItem,
   PurchaseReminderQuery,
 } from '@/types/purchase'
+import { materialBomApi, purchaseApi } from '@/api/client'
 import { cleanQuery } from '@/services/request'
 import { isMockEnabled } from '@/config/mock'
-import { purchaseApi } from '@/api/client'
 import { purchaseRepository as purchaseMock } from '@/mock/repositories'
 
 export type { PageResult }
@@ -97,6 +102,34 @@ function mapOptional<TSource, TResult>(
   return mapper(value)
 }
 
+async function loadAllMaterials() {
+  const pageSize = 100
+  const firstResponse = await materialBomApi.listMaterialData({ page: 1, pageSize })
+  const firstPayload = unwrap(firstResponse.data as ApiEnvelope<unknown>)
+  const firstItems = getPageItems<Material>(firstPayload)
+  const metadata = getPageMetadata(firstPayload, { page: 1, pageSize, total: firstItems.length })
+  const remainingPageCount = Math.ceil(metadata.total / metadata.pageSize) - 1
+  if (remainingPageCount <= 0) {
+    return firstItems
+  }
+  const remainingResponses = await Promise.all(
+    Array.from({ length: remainingPageCount }, (unusedValue, index) => {
+      void unusedValue
+      return materialBomApi.listMaterialData({
+        page: index + 2,
+        pageSize: metadata.pageSize,
+      })
+    }),
+  )
+  return [
+    ...firstItems,
+    ...remainingResponses.flatMap((response) => {
+      const payload = unwrap(response.data as ApiEnvelope<unknown>)
+      return getPageItems<Material>(payload)
+    }),
+  ]
+}
+
 export const purchaseService = {
   async addReceipt(form: PurchaseReceiptFormData) {
     if (isMockEnabled()) {
@@ -112,6 +145,10 @@ export const purchaseService = {
     })
     const data = unwrap(response.data as ApiEnvelope<PurchaseReceipt | undefined>)
     return mapOptional(data, toReceipt)
+  },
+
+  canUpdateDraft() {
+    return isMockEnabled()
   },
 
   async cancelOrder(orderId: number, operatorId: number) {
@@ -251,6 +288,66 @@ export const purchaseService = {
     }
   },
 
+  async getReferenceData(): Promise<PurchaseReferenceData> {
+    if (isMockEnabled()) {
+      return purchaseMock.getReferenceData()
+    }
+    const [materialItems, firstOrderPage] = await Promise.all([
+      loadAllMaterials(),
+      this.listOrders({ page: 1, pageSize: 100 }),
+    ])
+    const remainingPageCount = Math.ceil(firstOrderPage.total / firstOrderPage.pageSize) - 1
+    let orders = [...firstOrderPage.items]
+    if (remainingPageCount > 0) {
+      const pages = await Promise.all(
+        Array.from({ length: remainingPageCount }, (unusedValue, index) => {
+          void unusedValue
+          return this.listOrders({ page: index + 2, pageSize: firstOrderPage.pageSize })
+        }),
+      )
+      orders = [...orders, ...pages.flatMap((page) => page.items)]
+    }
+    const materials = materialItems
+      .filter(
+        (item): item is Material & { material_id: number; material_name: string } =>
+          item.material_id !== undefined && Boolean(item.material_name),
+      )
+      .map((item) => ({
+        defaultSupplierId: item.default_supplier_id ?? undefined,
+        materialId: item.material_id,
+        materialName: item.material_name,
+        unit: item.unit,
+      }))
+    const supplierMap = new Map(
+      orders.map((order) => [order.supplier.supplierId, order.supplier] as const),
+    )
+    const representativeMaterialBySupplier = new Map<number, number>()
+    for (const material of materials) {
+      if (material.defaultSupplierId && !supplierMap.has(material.defaultSupplierId)) {
+        representativeMaterialBySupplier.set(material.defaultSupplierId, material.materialId)
+      }
+    }
+    const supplierDetails = await Promise.all(
+      [...representativeMaterialBySupplier.entries()].map(async ([supplierId, materialId]) => {
+        const response = await materialBomApi.getMaterialData({ materialId })
+        const detail = unwrap(response.data as ApiEnvelope<MaterialDetail | undefined>)
+        return {
+          supplierId,
+          supplierName: optionalText(detail?.supplier_name) ?? `供应商 #${supplierId}`,
+        }
+      }),
+    )
+    for (const supplier of supplierDetails) {
+      supplierMap.set(supplier.supplierId, supplier)
+    }
+    const suppliers = [...supplierMap.values()]
+    const buyers = [...new Set(orders.map((order) => order.buyerId))].map((buyerId) => ({
+      buyerId,
+      buyerName: `采购员 #${buyerId}`,
+    }))
+    return { buyers, materials, orders, suppliers }
+  },
+
   async handleReminder(reminderId: number, status: 'received' | 'urged', remark?: string) {
     if (isMockEnabled()) {
       return purchaseMock.handleReminder(reminderId, status, remark)
@@ -330,5 +427,12 @@ export const purchaseService = {
     })
     const data = unwrap(response.data as ApiEnvelope<PurchaseOrder | undefined>)
     return mapOptional(data, toOrder)
+  },
+
+  async updateOrder(orderId: number, form: PurchaseOrderFormData) {
+    if (isMockEnabled()) {
+      return purchaseMock.updateOrder(orderId, form)
+    }
+    throw new Error('当前 OpenAPI 契约尚未提供采购草稿更新接口')
   },
 }

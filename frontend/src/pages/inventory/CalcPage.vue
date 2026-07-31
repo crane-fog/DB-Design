@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import { Delete, Plus, ShoppingCart } from '@element-plus/icons-vue'
-import type { MaterialShortageRequestItem, MaterialShortageResult } from '@/types/inventory'
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type {
+  InventoryReferenceData,
+  MaterialShortageRequestItem,
+  MaterialShortageResult,
+} from '@/types/inventory'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
-import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getErrorMessage } from '@/utils/error'
 import { inventoryService } from '@/services/InventoryService'
 import { purchaseService } from '@/services/PurchaseService'
 import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 
 interface CalculationRow extends MaterialShortageRequestItem {
   key: number
 }
 
 const auth = useAuthStore()
+const router = useRouter()
 const calculating = ref(false)
 const creatingDrafts = ref(false)
 const error = ref('')
@@ -28,9 +35,17 @@ const purchaseQuantities = reactive<Record<number, number>>({})
 const draftExpectedDate = ref(new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10))
 let nextKey = 2
 let requestId = 0
+const referenceLoading = ref(false)
+const referenceError = ref('')
+const referenceData = ref<InventoryReferenceData>({
+  bomVersions: [],
+  materials: [],
+  productionOrders: [],
+})
+let referenceRequestId = 0
 
 const canCreatePurchaseDraft = computed(
-  () => auth.hasPermission('purchase:view') && Boolean(auth.currentUser?.id),
+  () => auth.hasPermission(PERMISSIONS.purchase.manage) && Boolean(auth.currentUser?.id),
 )
 const shortageItems = computed(
   () => result.value?.items.filter((item) => item.netShortageQty > 0) ?? [],
@@ -38,6 +53,37 @@ const shortageItems = computed(
 const totalShortage = computed(() =>
   shortageItems.value.reduce((sum, item) => sum + item.netShortageQty, 0),
 )
+const productOptions = computed(() =>
+  referenceData.value.materials.filter((item) => item.materialType === 'finished'),
+)
+
+function getVersionOptions(materialId: number) {
+  return referenceData.value.bomVersions.filter((item) => item.materialId === materialId)
+}
+
+function handleProductChange(row: CalculationRow) {
+  row.versionId = getVersionOptions(row.materialId)[0]?.versionId ?? 0
+}
+
+async function loadReferenceData() {
+  const currentRequestId = ++referenceRequestId
+  referenceLoading.value = true
+  referenceError.value = ''
+  try {
+    const data = await inventoryService.getReferenceData(false)
+    if (currentRequestId === referenceRequestId) {
+      referenceData.value = data
+    }
+  } catch (requestError) {
+    if (currentRequestId === referenceRequestId) {
+      referenceError.value = getErrorMessage(requestError, '产品与 BOM 版本加载失败')
+    }
+  } finally {
+    if (currentRequestId === referenceRequestId) {
+      referenceLoading.value = false
+    }
+  }
+}
 
 function addRow() {
   rows.push({ key: nextKey++, materialId: 0, productionQty: 1, versionId: 0 })
@@ -54,7 +100,7 @@ function removeRow(key: number) {
 
 function validateRows() {
   if (rows.some((row) => row.materialId <= 0 || row.productionQty <= 0 || row.versionId <= 0)) {
-    ElMessage.warning('请完整填写物料 ID、生产数量和 BOM 版本 ID')
+    ElMessage.warning('请完整选择成品、BOM 版本并填写生产数量')
     return false
   }
   return true
@@ -121,6 +167,20 @@ async function createPurchaseDrafts() {
       message = `已生成 ${draftResult.createdCount} 张草稿，${skipped} 项缺少供应商`
     }
     ElMessage.success(message)
+    if (draftResult.createdCount > 0) {
+      try {
+        await ElMessageBox.confirm('采购草稿已生成，是否立即进入采购管理查看？', '生成成功', {
+          cancelButtonText: '继续计算',
+          confirmButtonText: '查看采购草稿',
+          type: 'success',
+        })
+        await router.push('/purchase')
+      } catch (action) {
+        if (action !== 'cancel' && action !== 'close') {
+          throw action
+        }
+      }
+    }
   } catch (requestError) {
     ElMessage.error(getErrorMessage(requestError, '生成采购草稿失败'))
   } finally {
@@ -128,7 +188,11 @@ async function createPurchaseDrafts() {
   }
 }
 
-onBeforeUnmount(() => void requestId++)
+onMounted(() => void loadReferenceData())
+onBeforeUnmount(() => {
+  requestId += 1
+  referenceRequestId += 1
+})
 </script>
 
 <template>
@@ -137,6 +201,21 @@ onBeforeUnmount(() => void requestId++)
       title="物料缺口计算"
       description="按产品、产量与 BOM 版本展开需求，并生成可执行的采购建议。"
     />
+
+    <el-alert
+      v-if="referenceError"
+      class="request-error"
+      :closable="false"
+      :title="referenceError"
+      type="error"
+      show-icon
+    >
+      <template #default
+        ><el-button link type="primary" @click="loadReferenceData"
+          >重新加载选项</el-button
+        ></template
+      >
+    </el-alert>
 
     <el-card class="calculation-card" shadow="never">
       <template #header>
@@ -149,15 +228,32 @@ onBeforeUnmount(() => void requestId++)
         <div v-for="(row, index) in rows" :key="row.key" class="calculation-row">
           <span class="row-index">{{ index + 1 }}</span>
           <label
-            ><span>成品物料 ID</span><el-input-number v-model="row.materialId" :min="1"
-          /></label>
+            ><span>成品物料</span
+            ><el-select
+              v-model="row.materialId"
+              filterable
+              :loading="referenceLoading"
+              placeholder="选择成品"
+              @change="handleProductChange(row)"
+              ><el-option
+                v-for="product in productOptions"
+                :key="product.materialId"
+                :label="product.materialName"
+                :value="product.materialId" /></el-select
+          ></label>
           <label
             ><span>生产数量</span
             ><el-input-number v-model="row.productionQty" :min="0.01" :precision="2"
           /></label>
           <label
-            ><span>BOM 版本 ID</span><el-input-number v-model="row.versionId" :min="1"
-          /></label>
+            ><span>BOM 版本</span
+            ><el-select v-model="row.versionId" placeholder="选择版本"
+              ><el-option
+                v-for="version in getVersionOptions(row.materialId)"
+                :key="version.versionId"
+                :label="version.versionNo"
+                :value="version.versionId" /></el-select
+          ></label>
           <el-tooltip content="移除此产品" placement="top">
             <el-button
               :disabled="rows.length === 1"
@@ -333,7 +429,8 @@ onBeforeUnmount(() => void requestId++)
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
-.calculation-row :deep(.el-input-number) {
+.calculation-row :deep(.el-input-number),
+.calculation-row :deep(.el-select) {
   width: 100%;
 }
 .calculation-actions {

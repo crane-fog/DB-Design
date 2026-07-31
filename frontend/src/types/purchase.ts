@@ -5,6 +5,8 @@ export type PurchaseOrderStatus =
   | 'partial_received'
   | 'submitted'
 
+import type { PageRequest } from '@/services/pagination'
+
 export type PurchaseReminderStatus = 'pending_urge' | 'received' | 'urged'
 
 export interface SupplierInfo {
@@ -12,6 +14,18 @@ export interface SupplierInfo {
   contactPhone?: string
   supplierId: number
   supplierName: string
+}
+
+export interface PurchaseMaterialOption {
+  defaultSupplierId?: number
+  materialId: number
+  materialName: string
+  unit?: string
+}
+
+export interface PurchaseBuyerOption {
+  buyerId: number
+  buyerName: string
 }
 
 export interface PurchaseOrderLine {
@@ -113,4 +127,10 @@ export interface PurchaseOverviewSummary {
   receivingOrderCount: number
   totalOrderCount: number
 }
-import type { PageRequest } from '@/services/pagination'
+
+export interface PurchaseReferenceData {
+  buyers: PurchaseBuyerOption[]
+  materials: PurchaseMaterialOption[]
+  orders: PurchaseOrderItem[]
+  suppliers: SupplierInfo[]
+}
