@@ -16,7 +16,11 @@ public class LoginLogService(string connString)
         var log = new LoginLog
         {
             LogId = Convert.ToInt32(reader.GetValue(0)),
-            UserId = Convert.ToInt32(reader.GetValue(1)),
+            // 工号不存在等失败登录场景会写入 NULL user_id，读取时必须判空，
+            // 否则 Convert.ToInt32(DBNull.Value) 抛异常导致整个日志列表查询失败。
+            // 当前生成的 LoginLog.UserId 为非空 int，用 0 表示“未知用户”；
+            // 待契约 nullable:true 重新生成后应改为 null。
+            UserId = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1)),
             LoginTime = reader.GetDateTime(2),
             IpAddress = reader.GetString(3),
             Result = reader.GetString(4) == "成功" ? LoginLog.ResultEnum.SuccessEnum : LoginLog.ResultEnum.FailureEnum,

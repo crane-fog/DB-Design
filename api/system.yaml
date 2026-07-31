@@ -1127,6 +1127,8 @@ components:
           type: integer
         user_id:
           type: integer
+          nullable: true
+          description: 登录用户 ID；工号不存在等失败登录场景下为空
         login_time:
           type: string
           format: date-time
