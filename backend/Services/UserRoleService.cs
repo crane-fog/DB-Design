@@ -59,49 +59,104 @@ public class UserRoleService(string connString)
 
     public (List<UserRole>? UserRoles, string? ErrorMessage) Assign(int userId, List<int> roleIds)
     {
+        var distinctIds = roleIds.Distinct().ToList();
+
         using var conn = new OracleConnection(connString);
         conn.Open();
 
-        // 检查用户存在
-        using var userCheck = conn.CreateCommand();
-        userCheck.CommandText = "SELECT COUNT(*) FROM SYS_USER WHERE USER_ID = :userId";
-        userCheck.Parameters.Add(new OracleParameter("userId", userId));
-        if (Convert.ToInt32(userCheck.ExecuteScalar()!) == 0)
+        // 1. 检查用户存在
+        using (var userCheck = conn.CreateCommand())
         {
-            return (null, "用户不存在");
+            userCheck.CommandText = "SELECT COUNT(*) FROM SYS_USER WHERE USER_ID = :userId";
+            userCheck.Parameters.Add(new OracleParameter("userId", userId));
+            if (Convert.ToInt32(userCheck.ExecuteScalar()!) == 0)
+            {
+                return (null, "用户不存在");
+            }
         }
 
+        // 2. 写入前一次性校验所有角色：必须存在且为有效状态。
+        //    任一项不通过则整体失败，不做任何写入，保证批量分配原子性。
+        if (distinctIds.Count > 0)
+        {
+            var statuses = LoadRoleStatuses(conn, distinctIds);
+            foreach (var roleId in distinctIds)
+            {
+                if (!statuses.TryGetValue(roleId, out var status))
+                {
+                    return (null, $"角色 {roleId} 不存在");
+                }
+
+                if (status != "valid")
+                {
+                    return (null, $"角色 {roleId} 已停用，无法分配");
+                }
+            }
+        }
+
+        // 3. 事务内批量插入；任一项失败回滚全部修改
+        using var tx = conn.BeginTransaction();
         var assigned = new List<UserRole>();
-
-        foreach (var roleId in roleIds)
+        try
         {
-            // 检查角色存在
-            using var roleCheck = conn.CreateCommand();
-            roleCheck.CommandText = "SELECT COUNT(*) FROM SYS_ROLE WHERE ROLE_ID = :roleId";
-            roleCheck.Parameters.Add(new OracleParameter("roleId", roleId));
-            if (Convert.ToInt32(roleCheck.ExecuteScalar()!) == 0)
+            foreach (var roleId in distinctIds)
             {
-                return (null, $"角色 {roleId} 不存在");
+                using var insertCmd = conn.CreateCommand();
+                insertCmd.Transaction = tx;
+                insertCmd.CommandText = @"INSERT INTO SYS_USER_ROLE (USER_ID, ROLE_ID)
+                                          VALUES (:userId, :roleId)";
+                insertCmd.Parameters.Add(new OracleParameter("userId", userId));
+                insertCmd.Parameters.Add(new OracleParameter("roleId", roleId));
+
+                try
+                {
+                    insertCmd.ExecuteNonQuery();
+                    assigned.Add(new UserRole { UserId = userId, RoleId = roleId });
+                }
+                catch (OracleException ex) when (ex.Number == 1)
+                {
+                    // 已存在的关联，跳过
+                }
             }
 
-            using var insertCmd = conn.CreateCommand();
-            insertCmd.CommandText = @"INSERT INTO SYS_USER_ROLE (USER_ID, ROLE_ID)
-                                      VALUES (:userId, :roleId)";
-            insertCmd.Parameters.Add(new OracleParameter("userId", userId));
-            insertCmd.Parameters.Add(new OracleParameter("roleId", roleId));
+            tx.Commit();
+            return (assigned, null);
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
 
-            try
-            {
-                insertCmd.ExecuteNonQuery();
-                assigned.Add(new UserRole { UserId = userId, RoleId = roleId });
-            }
-            catch (OracleException ex) when (ex.Number == 1)
-            {
-                // 已存在的关联，跳过
-            }
+    /// <summary>一次查询所有目标角色的状态（角色 ID → status），避免逐项查询的 N+1 模式。</summary>
+    private static Dictionary<int, string> LoadRoleStatuses(OracleConnection conn, List<int> roleIds)
+    {
+        var result = new Dictionary<int, string>();
+        if (roleIds.Count == 0)
+        {
+            return result;
         }
 
-        return (assigned, null);
+        using var cmd = conn.CreateCommand();
+        var binds = new List<string>();
+        for (var i = 0; i < roleIds.Count; i++)
+        {
+            var name = $":rid{i}";
+            binds.Add(name);
+            cmd.Parameters.Add(new OracleParameter(name, roleIds[i]));
+        }
+
+        // 注意：Oracle IN 列表上限为 1000 项，角色分配场景远小于该限制。
+        cmd.CommandText = $"SELECT ROLE_ID, STATUS FROM SYS_ROLE WHERE ROLE_ID IN ({string.Join(", ", binds)})";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result[Convert.ToInt32(reader.GetValue(0))] = reader.GetString(1);
+        }
+
+        return result;
     }
 
     public bool Delete(int userId, int roleId)

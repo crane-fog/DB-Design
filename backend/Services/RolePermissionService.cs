@@ -59,49 +59,98 @@ public class RolePermissionService(string connString)
 
     public (List<RolePermission>? RolePermissions, string? ErrorMessage) Assign(int roleId, List<int> permissionIds)
     {
+        var distinctIds = permissionIds.Distinct().ToList();
+
         using var conn = new OracleConnection(connString);
         conn.Open();
 
-        // 检查角色存在
-        using var roleCheck = conn.CreateCommand();
-        roleCheck.CommandText = "SELECT COUNT(*) FROM SYS_ROLE WHERE ROLE_ID = :roleId";
-        roleCheck.Parameters.Add(new OracleParameter("roleId", roleId));
-        if (Convert.ToInt32(roleCheck.ExecuteScalar()!) == 0)
+        // 1. 检查角色存在
+        using (var roleCheck = conn.CreateCommand())
         {
-            return (null, "角色不存在");
+            roleCheck.CommandText = "SELECT COUNT(*) FROM SYS_ROLE WHERE ROLE_ID = :roleId";
+            roleCheck.Parameters.Add(new OracleParameter("roleId", roleId));
+            if (Convert.ToInt32(roleCheck.ExecuteScalar()!) == 0)
+            {
+                return (null, "角色不存在");
+            }
         }
 
+        // 2. 写入前一次性校验所有权限存在；任一项不通过则整体失败，不做任何写入
+        if (distinctIds.Count > 0)
+        {
+            var existing = LoadExistingPermissionIds(conn, distinctIds);
+            foreach (var permissionId in distinctIds)
+            {
+                if (!existing.Contains(permissionId))
+                {
+                    return (null, $"权限 {permissionId} 不存在");
+                }
+            }
+        }
+
+        // 3. 事务内批量插入；任一项失败回滚全部修改
+        using var tx = conn.BeginTransaction();
         var assigned = new List<RolePermission>();
-
-        foreach (var permissionId in permissionIds)
+        try
         {
-            // 检查权限存在
-            using var permCheck = conn.CreateCommand();
-            permCheck.CommandText = "SELECT COUNT(*) FROM SYS_PERMISSION WHERE PERMISSION_ID = :permissionId";
-            permCheck.Parameters.Add(new OracleParameter("permissionId", permissionId));
-            if (Convert.ToInt32(permCheck.ExecuteScalar()!) == 0)
+            foreach (var permissionId in distinctIds)
             {
-                return (null, $"权限 {permissionId} 不存在");
+                using var insertCmd = conn.CreateCommand();
+                insertCmd.Transaction = tx;
+                insertCmd.CommandText = @"INSERT INTO SYS_ROLE_PERMISSION (ROLE_ID, PERMISSION_ID)
+                                          VALUES (:roleId, :permissionId)";
+                insertCmd.Parameters.Add(new OracleParameter("roleId", roleId));
+                insertCmd.Parameters.Add(new OracleParameter("permissionId", permissionId));
+
+                try
+                {
+                    insertCmd.ExecuteNonQuery();
+                    assigned.Add(new RolePermission { RoleId = roleId, PermissionId = permissionId });
+                }
+                catch (OracleException ex) when (ex.Number == 1)
+                {
+                    // 已存在的关联，跳过
+                }
             }
 
-            using var insertCmd = conn.CreateCommand();
-            insertCmd.CommandText = @"INSERT INTO SYS_ROLE_PERMISSION (ROLE_ID, PERMISSION_ID)
-                                      VALUES (:roleId, :permissionId)";
-            insertCmd.Parameters.Add(new OracleParameter("roleId", roleId));
-            insertCmd.Parameters.Add(new OracleParameter("permissionId", permissionId));
+            tx.Commit();
+            return (assigned, null);
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
 
-            try
-            {
-                insertCmd.ExecuteNonQuery();
-                assigned.Add(new RolePermission { RoleId = roleId, PermissionId = permissionId });
-            }
-            catch (OracleException ex) when (ex.Number == 1)
-            {
-                // 已存在的关联，跳过
-            }
+    /// <summary>一次查询所有目标权限 ID，避免逐项查询的 N+1 模式。</summary>
+    private static HashSet<int> LoadExistingPermissionIds(OracleConnection conn, List<int> permissionIds)
+    {
+        var result = new HashSet<int>();
+        if (permissionIds.Count == 0)
+        {
+            return result;
         }
 
-        return (assigned, null);
+        using var cmd = conn.CreateCommand();
+        var binds = new List<string>();
+        for (var i = 0; i < permissionIds.Count; i++)
+        {
+            var name = $":pid{i}";
+            binds.Add(name);
+            cmd.Parameters.Add(new OracleParameter(name, permissionIds[i]));
+        }
+
+        // 注意：Oracle IN 列表上限为 1000 项，权限分配场景远小于该限制。
+        cmd.CommandText = $"SELECT PERMISSION_ID FROM SYS_PERMISSION WHERE PERMISSION_ID IN ({string.Join(", ", binds)})";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(Convert.ToInt32(reader.GetValue(0)));
+        }
+
+        return result;
     }
 
     public bool Delete(int roleId, int permissionId)
