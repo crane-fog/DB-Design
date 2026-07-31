@@ -78,6 +78,12 @@ builder.Services.AddScoped(sp => new MaterialCatalogService(
     sp.GetRequiredService<IStockInitialization>()));
 builder.Services.AddScoped(_ => new BomVersionService(connString));
 builder.Services.AddScoped(_ => new BomService(connString));
+builder.Services.AddScoped<SupplierPriceIntegrationService>(_ => new SupplierPriceIntegrationService(connString));
+builder.Services.AddScoped<IPriceQuery>(sp => sp.GetRequiredService<SupplierPriceIntegrationService>());
+builder.Services.AddScoped<DemandAnalysisService>(sp => new DemandAnalysisService(
+    connString,
+    sp.GetRequiredService<IPriceQuery>()));
+builder.Services.AddScoped<IBomExpansionQuery>(sp => sp.GetRequiredService<DemandAnalysisService>());
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
