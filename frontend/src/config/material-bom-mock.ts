@@ -945,8 +945,12 @@ export function snapshotMaterialBomMock() {
 
 export function restoreMaterialBomMock(state: ReturnType<typeof snapshotMaterialBomMock>) {
   bomDetails.splice(0, bomDetails.length, ...structuredClone(state.bomDetails))
-  materialRecords.splice(0, materialRecords.length, ...structuredClone(state.materialRecords))
-  analysisHistory.splice(0, analysisHistory.length, ...structuredClone(state.analysisHistory))
+  if (Array.isArray(state.materialRecords)) {
+    materialRecords.splice(0, materialRecords.length, ...structuredClone(state.materialRecords))
+  }
+  if (Array.isArray(state.analysisHistory)) {
+    analysisHistory.splice(0, analysisHistory.length, ...structuredClone(state.analysisHistory))
+  }
 }
 
 function delay<TResult>(factory: () => TResult): Promise<TResult> {
