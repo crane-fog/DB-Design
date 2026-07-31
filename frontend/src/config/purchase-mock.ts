@@ -49,18 +49,21 @@ const suppliers: Record<number, SupplierInfo> = {
   41: {
     contactPerson: '陈敏',
     contactPhone: '138****3201',
+    isActive: true,
     supplierId: 41,
     supplierName: '华东精材供应链',
   },
   42: {
     contactPerson: '周宇',
     contactPhone: '139****6840',
+    isActive: true,
     supplierId: 42,
     supplierName: '启航电子组件',
   },
   43: {
     contactPerson: '林静',
     contactPhone: '137****1582',
+    isActive: false,
     supplierId: 43,
     supplierName: '南方工业辅料',
   },
@@ -296,11 +299,22 @@ function getTodayDayNumber() {
 }
 
 function getDateDayNumber(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
-  if (!year || !month || !day) {
+  const matched = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!matched) {
     return undefined
   }
-  return Date.UTC(year, month - 1, day) / 86_400_000
+  const year = Number(matched[1])
+  const month = Number(matched[2])
+  const day = Number(matched[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return undefined
+  }
+  return date.getTime() / 86_400_000
 }
 
 function refreshOrderOverdue(order: PurchaseOrderItem) {
@@ -383,7 +397,7 @@ function createOrder(form: PurchaseOrderFormData) {
 
 function getDefaultSupplierId(item: PurchaseDraftItem) {
   if (item.supplierId !== undefined) {
-    if (suppliers[item.supplierId]) {
+    if (suppliers[item.supplierId]?.isActive !== false) {
       return item.supplierId
     }
     return undefined
@@ -408,14 +422,19 @@ function requirePositiveQuantity(value: number, fieldName: string) {
 }
 
 function validateOrderForm(form: PurchaseOrderFormData) {
-  if (!Number.isInteger(form.buyerId) || form.buyerId <= 0) {
-    throw new Error('采购员不能为空')
+  if (!buyers.some(({ buyerId }) => buyerId === form.buyerId)) {
+    throw new Error('请选择有效采购员')
   }
-  if (!Number.isInteger(form.supplierId) || !suppliers[form.supplierId]) {
+  const supplier = suppliers[form.supplierId]
+  if (!Number.isInteger(form.supplierId) || !supplier || supplier.isActive === false) {
     throw new Error('请选择有效供应商')
   }
-  if (!form.expectedDate) {
-    throw new Error('预计到货日期不能为空')
+  const expectedDateDayNumber = getDateDayNumber(form.expectedDate)
+  if (expectedDateDayNumber === undefined) {
+    throw new Error('预计到货日期格式无效')
+  }
+  if (expectedDateDayNumber < getTodayDayNumber()) {
+    throw new Error('预计到货日期不能早于当前日期')
   }
   if (!form.details.length) {
     throw new Error('采购订单至少需要一条明细')
@@ -599,6 +618,7 @@ export const purchaseMock = {
         orders.filter(
           (item) =>
             (!query.supplierId || item.supplier.supplierId === query.supplierId) &&
+            (!query.orderId || item.orderId === query.orderId) &&
             (!query.materialId ||
               item.details.some(({ materialId }) => materialId === query.materialId)) &&
             (!query.status || item.status === query.status) &&

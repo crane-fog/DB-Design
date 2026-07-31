@@ -94,6 +94,8 @@ const analysisHistory = ref<BomAnalysisRecord[]>([])
 const reverseMaterialCode = ref('')
 const reverseLoading = ref(false)
 const reverseResult = ref<BomReverseTraceResult[]>([])
+const reverseError = ref('')
+const reverseQueried = ref(false)
 
 const canManage = computed(
   () => auth.hasPermission('material:manage') || auth.hasRole('系统管理员'),
@@ -159,6 +161,15 @@ const summarizedAnalysis = computed(() => {
     }
   })
   return [...groups.values()]
+})
+const reverseQuantitySummary = computed(() => {
+  const totals = new Map<string, number>()
+  reverseResult.value.forEach((item) => {
+    totals.set(item.unit, (totals.get(item.unit) ?? 0) + item.cumulativeQuantity)
+  })
+  return [...totals.entries()]
+    .map(([unit, quantity]) => `${formatNumber(quantity)} ${unit}`)
+    .join('；')
 })
 
 function makeMaterialQuery(): MaterialListQuery {
@@ -452,13 +463,22 @@ async function loadAnalysisHistory() {
 
 async function loadReverseTrace() {
   reverseLoading.value = true
+  reverseError.value = ''
+  reverseQueried.value = true
   try {
     reverseResult.value = await materialService.getReverseTrace(reverseMaterialCode.value)
   } catch (requestError) {
-    ElMessage.error(getErrorMessage(requestError, '反向追溯加载失败'))
+    reverseResult.value = []
+    reverseError.value = getErrorMessage(requestError, '反向追溯加载失败')
   } finally {
     reverseLoading.value = false
   }
+}
+
+function resetReverseTrace() {
+  reverseError.value = ''
+  reverseQueried.value = false
+  reverseResult.value = []
 }
 
 onMounted(() => void refreshAll())
@@ -696,7 +716,7 @@ onMounted(() => void refreshAll())
                   ><template #default="{ row }"
                     ><el-button link type="primary" @click="selectBom(row.bomId)">查看</el-button
                     ><el-popconfirm
-                      v-if="canManage && row.status !== 'released'"
+                      v-if="canManage && row.status === 'draft'"
                       title="设置后当前已发布版本将归档，是否继续？"
                       confirm-button-text="确认生效"
                       @confirm="releaseBom(row.bomId)"
@@ -904,6 +924,7 @@ onMounted(() => void refreshAll())
                 filterable
                 placeholder="选择物料"
                 style="width: 360px"
+                @change="resetReverseTrace"
                 ><el-option
                   v-for="material in materialOptions"
                   :key="material.id"
@@ -918,26 +939,51 @@ onMounted(() => void refreshAll())
                 >查询使用关系</el-button
               ></el-form-item
             ></el-form
-          ><el-table v-if="reverseResult.length" :data="reverseResult" stripe
-            ><el-table-column
-              label="上级物料"
-              min-width="160"
-              prop="parentMaterialCode" /><el-table-column
-              label="最终产品"
-              min-width="160"
-              prop="finalMaterialCode" /><el-table-column
-              label="BOM 版本"
-              prop="version" /><el-table-column label="层级" prop="level" /><el-table-column
-              label="累计用量"
-              min-width="120"
-              ><template #default="{ row }"
-                >{{ formatNumber(row.cumulativeQuantity) }} {{ row.unit }}</template
-              ></el-table-column
-            ><el-table-column label="依赖路径" min-width="260" prop="path" /></el-table
+          ><el-alert v-if="reverseError" :closable="false" :title="reverseError" type="error"
+            ><template #default
+              ><el-button link type="primary" @click="loadReverseTrace"
+                >重新查询</el-button
+              ></template
+            ></el-alert
+          ><template v-else-if="reverseResult.length"
+            ><div class="section-heading">
+              <h3>完整上层路径</h3>
+              <span
+                >累计理论用量不含损耗；按路径分别展示，所有路径合计：{{
+                  reverseQuantitySummary
+                }}</span
+              >
+            </div>
+            <el-table :data="reverseResult" stripe
+              ><el-table-column label="直接父项" min-width="190"
+                ><template #default="{ row }"
+                  >{{ row.parentMaterialName }}<small>{{ row.parentMaterialCode }}</small></template
+                ></el-table-column
+              ><el-table-column label="最终产品" min-width="190"
+                ><template #default="{ row }"
+                  >{{ row.finalMaterialName }}<small>{{ row.finalMaterialCode }}</small></template
+                ></el-table-column
+              ><el-table-column label="BOM 版本路径" min-width="160"
+                ><template #default="{ row }">{{
+                  row.versions.join(' → ')
+                }}</template></el-table-column
+              ><el-table-column label="上溯层级" min-width="100"
+                ><template #default="{ row }">第 {{ row.level }} 层</template></el-table-column
+              ><el-table-column label="累计理论用量" min-width="140"
+                ><template #default="{ row }"
+                  >{{ formatNumber(row.cumulativeQuantity) }} {{ row.unit }}</template
+                ></el-table-column
+              ><el-table-column
+                label="完整依赖路径"
+                min-width="360"
+                prop="path" /></el-table></template
           ><EmptyState
+            v-else-if="!reverseLoading && reverseQueried"
+            title="暂无上层 BOM 引用"
+            description="所选物料当前没有被任何 BOM 版本使用。" /><EmptyState
             v-else-if="!reverseLoading"
-            title="暂无使用关系"
-            description="选择物料后查询其被哪些 BOM 版本引用。"
+            title="选择物料后查询"
+            description="结果会展示完整上层路径、层级与累计理论用量。"
         /></el-card>
       </el-tab-pane>
     </el-tabs>

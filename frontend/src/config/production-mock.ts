@@ -12,6 +12,7 @@ import type {
   ExternalOrderItem,
   ExternalOrderQuery,
   FaultRecordItem,
+  FaultRecordQuery,
   FaultReportFormData,
   FaultUpdateFormData,
   LineTypeFormData,
@@ -30,6 +31,11 @@ import type {
   ProductionOrderFormData,
   ProductionOrderItem,
   ProductionOrderQuery,
+  ProductionProgressReportFormData,
+  ProductionScheduleFormData,
+  ProductionScheduleItem,
+  ProductionStageItem,
+  ProductionStageStatus,
 } from '@/services/ProductionService'
 import type { PageResult } from '@/services/pagination'
 
@@ -229,7 +235,7 @@ const lines: ProductionLineItem[] = [
     managerId: 1,
     managerName: '张伟',
     startDate: '2025-01-10',
-    status: 'running',
+    status: 'fault',
     typeId: 1,
     typeName: typeNames[1],
   },
@@ -400,13 +406,96 @@ const faultRecords: FaultRecordItem[] = [
   {
     description: '生产线传感器信号异常',
     faultId: 8001,
+    faultLevel: 'major',
     faultType: '设备异常',
     lineId: 104,
+    lineName: '生产线 104',
     occurTime: '2026-07-28T09:20:00',
     reporterId: 1,
+    reporterName: '张伟',
     status: 'pending_repair',
   },
+  {
+    description: '治具定位偏差，已完成校准。',
+    faultId: 8002,
+    faultLevel: 'minor',
+    faultType: '工装异常',
+    lineId: 102,
+    lineName: '生产线 102',
+    occurTime: '2026-07-26T11:10:00',
+    processingNote: '更换定位销并完成首件确认。',
+    recoverTime: '2026-07-26T13:20:00',
+    repairerId: 2,
+    repairerName: '李娜',
+    reporterId: 5,
+    reporterName: '陈晨',
+    status: 'recovered',
+  },
+  {
+    description: '总装工位电机温度持续偏高。',
+    faultId: 8003,
+    faultLevel: 'critical',
+    faultType: '设备异常',
+    lineId: 101,
+    lineName: '生产线 101',
+    occurTime: '2026-07-29T15:05:00',
+    processingNote: '正在更换散热风机。',
+    repairerId: 3,
+    repairerName: '王强',
+    reporterId: 7,
+    reporterName: '吴越',
+    status: 'repairing',
+  },
 ]
+
+const orderSchedules: ProductionScheduleItem[] = [
+  {
+    lineId: 103,
+    lineName: '生产线 103',
+    orderId: 5002,
+    plannedEnd: '2026-07-30T18:00:00',
+    plannedStart: '2026-07-29T08:00:00',
+    scheduleId: 6001,
+  },
+  {
+    lineId: 106,
+    lineName: '生产线 106',
+    orderId: 5008,
+    plannedEnd: '2026-08-05T18:00:00',
+    plannedStart: '2026-08-03T08:00:00',
+    scheduleId: 6002,
+  },
+]
+
+function createOrderStages(order: ProductionOrderItem): ProductionStageItem[] {
+  const stages: ProductionStageItem[] = [
+    { name: '备料', status: 'pending' },
+    { name: '装配生产', status: 'pending' },
+    { name: '质量检验', status: 'pending' },
+    { name: '完工入库', status: 'pending' },
+  ]
+  if (order.status === 'pending_schedule') {
+    stages[0] = { completedAt: order.planStart, name: '备料', status: 'completed' }
+  }
+  if (order.status === 'in_progress') {
+    stages[0] = { completedAt: order.actualStart, name: '备料', status: 'completed' }
+    stages[1] = { name: '装配生产', startedAt: order.actualStart, status: 'in_progress' }
+  }
+  if (order.status === 'completed') {
+    stages[0] = { completedAt: order.actualStart, name: '备料', status: 'completed' }
+    stages[1] = { completedAt: order.actualEnd, name: '装配生产', status: 'completed' }
+    stages[2] = { completedAt: order.actualEnd, name: '质量检验', status: 'completed' }
+    stages[3] = { completedAt: order.actualEnd, name: '完工入库', status: 'completed' }
+  }
+  if (order.status === 'cancelled') {
+    stages[0] = { name: '备料', status: 'paused' }
+  }
+  return stages
+}
+
+const orderStages: Record<number, ProductionStageItem[]> = Object.fromEntries(
+  productionOrders.map((order) => [order.orderId, createOrderStages(order)]),
+)
 
 const capacityDetections: CapacityDetectionItem[] = []
 const capacityBalances: CapacityBalanceItem[] = []
@@ -480,6 +569,30 @@ function timestamp() {
   return new Date().toISOString()
 }
 
+function getOrderStagesRecord(order: ProductionOrderItem) {
+  const stages = orderStages[order.orderId]
+  if (stages) {
+    return stages
+  }
+  const generated = createOrderStages(order)
+  orderStages[order.orderId] = generated
+  return generated
+}
+
+function toOrderWithSchedule(order: ProductionOrderItem) {
+  const schedule = orderSchedules.find((item) => item.orderId === order.orderId)
+  return structuredClone({ ...order, schedule })
+}
+
+function requireValidScheduleRange(plannedStart: string, plannedEnd: string) {
+  const start = Date.parse(plannedStart)
+  const end = Date.parse(plannedEnd)
+  if (Number.isNaN(start) || Number.isNaN(end) || start >= end) {
+    throw new Error('计划开始时间必须早于计划结束时间')
+  }
+  return { end, start }
+}
+
 function approveOrder(orderId: number, approved: boolean, reviewComment?: string) {
   return delay(() => {
     const order = getOrderRecord(orderId)
@@ -491,7 +604,8 @@ function approveOrder(orderId: number, approved: boolean, reviewComment?: string
       order.status = 'pending_schedule'
     }
     order.reviewComment = reviewComment?.trim() || undefined
-    return structuredClone(order)
+    getOrderStagesRecord(order).splice(0, 4, ...createOrderStages(order))
+    return toOrderWithSchedule(order)
   })
 }
 
@@ -503,7 +617,8 @@ function cancelOrder(orderId: number, remark?: string) {
     }
     order.status = 'cancelled'
     order.reviewComment = remark?.trim() || order.reviewComment
-    return structuredClone(order)
+    getOrderStagesRecord(order).splice(0, 4, ...createOrderStages(order))
+    return toOrderWithSchedule(order)
   })
 }
 
@@ -530,7 +645,8 @@ function createOrder(form: ProductionOrderFormData) {
       versionNo: `V${form.versionId}`,
     }
     productionOrders.unshift(order)
-    return structuredClone(order)
+    orderStages[order.orderId] = createOrderStages(order)
+    return toOrderWithSchedule(order)
   })
 }
 
@@ -590,15 +706,47 @@ function updateOrder(orderId: number, form: ProductionOrderFormData) {
   })
 }
 
+function setLineStatusIdle(lineId: number, finishedQty: number, updatedTime: string) {
+  getLineRecord(lineId).status = 'idle'
+  const lineStatus = lineStatuses.find((item) => item.lineId === lineId)
+  if (!lineStatus) {
+    return
+  }
+  lineStatus.currentMaterialId = undefined
+  lineStatus.currentOrderId = undefined
+  lineStatus.efficiency = 0
+  lineStatus.finishedQty = finishedQty
+  lineStatus.status = 'idle'
+  lineStatus.updatedTime = updatedTime
+}
+
 function startOrder(orderId: number) {
   return delay(() => {
     const order = getOrderRecord(orderId)
     if (order.status !== 'pending_schedule') {
       throw new Error('当前订单不可开工')
     }
+    const schedule = orderSchedules.find((item) => item.orderId === orderId)
+    if (!schedule) {
+      throw new Error('请先为订单分配生产线并保存排产信息')
+    }
     order.status = 'in_progress'
     order.actualStart = timestamp()
-    return structuredClone(order)
+    const stages = getOrderStagesRecord(order)
+    stages[0] = { completedAt: order.actualStart, name: '备料', status: 'completed' }
+    stages[1] = { name: '装配生产', startedAt: order.actualStart, status: 'in_progress' }
+    const line = getLineRecord(schedule.lineId)
+    line.status = 'running'
+    const lineStatus = lineStatuses.find((item) => item.lineId === schedule.lineId)
+    if (lineStatus) {
+      lineStatus.currentMaterialId = order.materialId
+      lineStatus.currentOrderId = order.orderId
+      lineStatus.efficiency = lineStatus.efficiency || 0.85
+      lineStatus.finishedQty = order.finishedQty ?? 0
+      lineStatus.status = 'running'
+      lineStatus.updatedTime = order.actualStart
+    }
+    return toOrderWithSchedule(order)
   })
 }
 
@@ -615,7 +763,96 @@ function finishOrder(orderId: number, finishedQty: number) {
     order.finishedQty = finishedQty
     order.status = 'completed'
     order.actualEnd = timestamp()
-    return structuredClone(order)
+    getOrderStagesRecord(order).splice(0, 4, ...createOrderStages(order))
+    const schedule = orderSchedules.find((item) => item.orderId === orderId)
+    if (schedule) {
+      setLineStatusIdle(schedule.lineId, order.finishedQty, order.actualEnd)
+    }
+    return toOrderWithSchedule(order)
+  })
+}
+
+function reportOrderProgress(form: ProductionProgressReportFormData) {
+  return delay(() => {
+    const order = getOrderRecord(form.orderId)
+    requirePositive(form.completedQty, '本次完成数量')
+    if (order.status !== 'in_progress') {
+      throw new Error('仅生产中的订单可以上报进度')
+    }
+    const finishedQty = (order.finishedQty ?? 0) + form.completedQty
+    if (finishedQty > order.planQty) {
+      throw new Error(`本次上报后累计完成数量 ${finishedQty} 超过计划数量 ${order.planQty}`)
+    }
+    order.finishedQty = finishedQty
+    order.lastProgressRemark = form.remark?.trim() || undefined
+    order.lastProgressReportedAt = form.reportedAt || timestamp()
+    const stages = getOrderStagesRecord(order)
+    let stageStatus: ProductionStageStatus = 'in_progress'
+    if (finishedQty === order.planQty) {
+      stageStatus = 'completed'
+    }
+    stages[1] = {
+      name: '装配生产',
+      startedAt: order.actualStart,
+      status: stageStatus,
+    }
+    if (finishedQty === order.planQty) {
+      order.status = 'completed'
+      order.actualEnd = form.reportedAt || timestamp()
+      stages.splice(0, 4, ...createOrderStages(order))
+      const schedule = orderSchedules.find((item) => item.orderId === order.orderId)
+      if (schedule) {
+        setLineStatusIdle(schedule.lineId, order.finishedQty, order.actualEnd)
+      }
+    }
+    return toOrderWithSchedule(order)
+  })
+}
+
+function saveOrderSchedule(form: ProductionScheduleFormData) {
+  return delay(() => {
+    const order = getOrderRecord(form.orderId)
+    if (order.status !== 'pending_schedule') {
+      throw new Error('仅待排产的生产订单可以进行排产')
+    }
+    const line = getLineRecord(form.lineId)
+    if (line.status === 'fault') {
+      throw new Error(`生产线 ${line.lineId} 当前故障，不能用于排产`)
+    }
+    const { end, start } = requireValidScheduleRange(form.plannedStart, form.plannedEnd)
+    const existing = orderSchedules.find((item) => item.orderId === form.orderId)
+    const conflict = orderSchedules.find(
+      (item) =>
+        item.lineId === form.lineId &&
+        item.orderId !== form.orderId &&
+        start < Date.parse(item.plannedEnd) &&
+        end > Date.parse(item.plannedStart),
+    )
+    if (conflict) {
+      throw new Error(
+        `生产线 ${line.lineId} 在该时段已安排订单 #${conflict.orderId}（${conflict.plannedStart} 至 ${conflict.plannedEnd}）`,
+      )
+    }
+    const schedule: ProductionScheduleItem = existing ?? {
+      lineId: form.lineId,
+      lineName: `生产线 ${line.lineId}`,
+      orderId: form.orderId,
+      plannedEnd: form.plannedEnd,
+      plannedStart: form.plannedStart,
+      scheduleId: Math.max(...orderSchedules.map((item) => item.scheduleId), 6000) + 1,
+    }
+    Object.assign(schedule, {
+      lineId: form.lineId,
+      lineName: `生产线 ${line.lineId}`,
+      plannedEnd: form.plannedEnd,
+      plannedStart: form.plannedStart,
+    })
+    if (!existing) {
+      orderSchedules.push(schedule)
+    }
+    order.planStart = form.plannedStart
+    order.planEnd = form.plannedEnd
+    return structuredClone(schedule)
   })
 }
 
@@ -1010,13 +1247,23 @@ function reportFault(form: FaultReportFormData) {
     const record: FaultRecordItem = {
       description: form.description.trim(),
       faultId: Math.max(...faultRecords.map((item) => item.faultId), 8000) + 1,
+      faultLevel: form.faultLevel,
       faultType: form.faultType.trim(),
       lineId: form.lineId,
-      occurTime: timestamp(),
+      lineName: `生产线 ${form.lineId}（${getLineRecord(form.lineId).typeName || '未分类'}）`,
+      occurTime: form.occurTime || timestamp(),
       reporterId: 1,
+      reporterName: '当前操作员',
       status: 'pending_repair',
     }
     faultRecords.unshift(record)
+    getLineRecord(form.lineId).status = 'fault'
+    const lineStatus = lineStatuses.find((item) => item.lineId === form.lineId)
+    if (lineStatus) {
+      lineStatus.currentOrderId = undefined
+      lineStatus.efficiency = 0
+      lineStatus.status = 'fault'
+    }
     return structuredClone(record)
   })
 }
@@ -1032,9 +1279,27 @@ function updateFault(form: FaultUpdateFormData) {
     }
     record.status = form.status
     record.repairerId = form.repairerId
+    record.repairerName = undefined
+    if (form.repairerId) {
+      record.repairerName = `维修员 ${form.repairerId}`
+    }
+    record.processingNote = form.processingNote?.trim() || undefined
     record.recoverTime = undefined
     if (form.status === 'recovered') {
       record.recoverTime = form.recoverTime
+      getLineRecord(record.lineId).status = 'idle'
+      const lineStatus = lineStatuses.find((item) => item.lineId === record.lineId)
+      if (lineStatus) {
+        lineStatus.currentOrderId = undefined
+        lineStatus.efficiency = 0
+        lineStatus.status = 'idle'
+      }
+    } else if (form.status === 'repairing') {
+      getLineRecord(record.lineId).status = 'fault'
+      const lineStatus = lineStatuses.find((item) => item.lineId === record.lineId)
+      if (lineStatus) {
+        lineStatus.status = 'fault'
+      }
     }
     return structuredClone(record)
   })
@@ -1051,6 +1316,8 @@ export interface ProductionMockState {
   lineTypes: LineTypeItem[]
   lines: ProductionLineItem[]
   productionOrders: ProductionOrderItem[]
+  orderSchedules?: ProductionScheduleItem[]
+  orderStages?: Record<number, ProductionStageItem[]>
   typeNames: Record<number, string>
 }
 
@@ -1065,6 +1332,8 @@ export function snapshotProductionMock(): ProductionMockState {
     lineStatuses,
     lineTypes,
     lines,
+    orderSchedules,
+    orderStages,
     productionOrders,
     typeNames,
   })
@@ -1074,12 +1343,27 @@ export function restoreProductionMock(state: ProductionMockState) {
   Object.keys(typeNames).forEach((key) => delete typeNames[Number(key)])
   Object.assign(typeNames, structuredClone(state.typeNames))
   productionOrders.splice(0, productionOrders.length, ...structuredClone(state.productionOrders))
+  if (Array.isArray(state.orderSchedules)) {
+    orderSchedules.splice(0, orderSchedules.length, ...structuredClone(state.orderSchedules))
+  }
+  if (state.orderStages) {
+    Object.keys(orderStages).forEach((key) => delete orderStages[Number(key)])
+    Object.assign(orderStages, structuredClone(state.orderStages))
+  }
+  productionOrders.forEach((order) => {
+    orderStages[order.orderId] = orderStages[order.orderId] ?? createOrderStages(order)
+  })
   lineTypes.splice(0, lineTypes.length, ...structuredClone(state.lineTypes))
   lines.splice(0, lines.length, ...structuredClone(state.lines))
   capacityConfigs.splice(0, capacityConfigs.length, ...structuredClone(state.capacityConfigs))
   calendars.splice(0, calendars.length, ...structuredClone(state.calendars))
   externalOrders.splice(0, externalOrders.length, ...structuredClone(state.externalOrders))
-  faultRecords.splice(0, faultRecords.length, ...structuredClone(state.faultRecords))
+  const restoredFaultRecords = structuredClone(state.faultRecords)
+  restoredFaultRecords.forEach((record) => {
+    record.faultLevel = record.faultLevel ?? 'major'
+    record.lineName = record.lineName ?? `生产线 ${record.lineId}`
+  })
+  faultRecords.splice(0, faultRecords.length, ...restoredFaultRecords)
   capacityDetections.splice(
     0,
     capacityDetections.length,
@@ -1110,14 +1394,27 @@ function includesDate(value: string, start?: string, end?: string) {
   return (!start || value >= start) && (!end || value <= `${end}T23:59:59`)
 }
 
-function listOrders(query: ProductionOrderQuery) {
+function listOrdersWithSchedules(query: ProductionOrderQuery) {
+  return delay(() => {
+    const filtered = productionOrders.filter(
+      (order) =>
+        (!query.materialId || order.materialId === query.materialId) &&
+        (!query.status || order.status === query.status) &&
+        includesDate(order.planEnd, query.planEndStart, query.planEndEnd),
+    )
+    return paginate(filtered.map(toOrderWithSchedule), query.page, query.pageSize)
+  })
+}
+
+function listFaults(query: FaultRecordQuery) {
   return delay(() =>
     paginate(
-      productionOrders.filter(
-        (order) =>
-          (!query.materialId || order.materialId === query.materialId) &&
-          (!query.status || order.status === query.status) &&
-          includesDate(order.planEnd, query.planEndStart, query.planEndEnd),
+      faultRecords.filter(
+        (record) =>
+          (!query.lineId || record.lineId === query.lineId) &&
+          (!query.status || record.status === query.status) &&
+          (!query.faultType || record.faultType.includes(query.faultType.trim())) &&
+          includesDate(record.occurTime, query.occurStart, query.occurEnd),
       ),
       query.page,
       query.pageSize,
@@ -1192,14 +1489,26 @@ export const productionMock = {
   deleteCalendar,
   estimateCapacity,
   finishOrder,
+  getFault(faultId: number) {
+    return delay(() => {
+      const record = faultRecords.find((item) => item.faultId === faultId)
+      if (!record) {
+        throw new Error('未找到故障记录')
+      }
+      return structuredClone(record)
+    })
+  },
   getOrder(orderId: number) {
     return delay(() => {
       const order = productionOrders.find((item) => item.orderId === orderId)
       if (!order) {
         throw new Error('未找到生产订单')
       }
-      return structuredClone(order)
+      return toOrderWithSchedule(order)
     })
+  },
+  getOrderStages(orderId: number) {
+    return delay(() => structuredClone(getOrderStagesRecord(getOrderRecord(orderId))))
   },
   listAllLineTypes() {
     return delay(() => structuredClone(lineTypes))
@@ -1219,16 +1528,19 @@ export const productionMock = {
       ),
     )
   },
+  listFaults,
   listLineTypes: listTypes,
   listLines,
-  listOrders,
+  listOrders: listOrdersWithSchedules,
   reportFault,
+  reportOrderProgress,
   reviewExternalOrder,
   runCapacityDetection,
   saveCalendar,
   saveCapacityBalance,
   saveCapacityConfig,
   saveLineType,
+  saveOrderSchedule,
   startOrder,
   updateFault,
   updateLine,
@@ -1246,12 +1558,14 @@ export type ProductionMockWrite =
   | 'deleteCalendar'
   | 'finishOrder'
   | 'reportFault'
+  | 'reportOrderProgress'
   | 'reviewExternalOrder'
   | 'runCapacityDetection'
   | 'saveCalendar'
   | 'saveCapacityBalance'
   | 'saveCapacityConfig'
   | 'saveLineType'
+  | 'saveOrderSchedule'
   | 'startOrder'
   | 'updateFault'
   | 'updateLine'

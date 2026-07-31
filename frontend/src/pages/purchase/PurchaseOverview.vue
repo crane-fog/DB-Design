@@ -92,6 +92,7 @@ const orderForm = reactive<PurchaseOrderFormData>({
   supplierId: 0,
 })
 const orderRules: FormRules<PurchaseOrderFormData> = {
+  buyerId: [{ message: '请选择采购员', required: true, trigger: 'change', type: 'number' }],
   expectedDate: [{ message: '请选择预计交货日期', required: true, trigger: 'change' }],
   supplierId: [{ message: '请选择供应商', required: true, trigger: 'change', type: 'number' }],
 }
@@ -99,6 +100,8 @@ const actingOrderId = ref<number>()
 const detailDrawerOpen = ref(false)
 const detailLoading = ref(false)
 const selectedOrder = ref<PurchaseOrderItem>()
+const detailReceipts = ref<PurchaseReceiptItem[]>([])
+const detailReminders = ref<PurchaseReminderItem[]>([])
 let detailRequestId = 0
 let orderRequestId = 0
 
@@ -181,6 +184,9 @@ const receivableOrders = computed(() =>
   referenceData.value.orders.filter((order) =>
     ['partial_received', 'submitted'].includes(order.status),
   ),
+)
+const activeSuppliers = computed(() =>
+  referenceData.value.suppliers.filter((supplier) => supplier.isActive !== false),
 )
 const selectedReceiptOrder = computed(() =>
   receivableOrders.value.find((order) => order.orderId === receiptForm.orderId),
@@ -345,6 +351,7 @@ function resetOrderQuery() {
   Object.assign(orderQuery, {
     buyerId: undefined,
     materialId: undefined,
+    orderId: undefined,
     page: 1,
     status: undefined,
     supplierId: undefined,
@@ -394,7 +401,7 @@ function openOrderDialog(order?: PurchaseOrderItem) {
     })
   } else {
     Object.assign(orderForm, {
-      buyerId: operatorId.value ?? 0,
+      buyerId: referenceData.value.buyers[0]?.buyerId ?? 0,
       details: [{ materialId: 0, quantity: 1, unitPrice: 0 }],
       expectedDate: '',
       supplierId: 0,
@@ -426,7 +433,29 @@ function handleOrderMaterialChange(index: number) {
   }
 }
 
+function getBuyerName(buyerId: number) {
+  return (
+    referenceData.value.buyers.find((buyer) => buyer.buyerId === buyerId)?.buyerName ??
+    `采购员 #${buyerId}`
+  )
+}
+
+function getMaterialUnit(materialId: number) {
+  return referenceData.value.materials.find((material) => material.materialId === materialId)?.unit
+}
+
+function getOverdueLabel(order: PurchaseOrderItem) {
+  if (order.isOverdue) {
+    return `已逾期 ${order.overdueDays} 天`
+  }
+  return '正常'
+}
+
 function validateOrderSelections() {
+  if (!referenceData.value.buyers.some((item) => item.buyerId === orderForm.buyerId)) {
+    ElMessage.warning('请选择有效采购员')
+    return false
+  }
   if (
     orderForm.details.some(
       (item) => item.materialId <= 0 || item.quantity <= 0 || item.unitPrice < 0,
@@ -435,7 +464,7 @@ function validateOrderSelections() {
     ElMessage.warning('请完整填写采购物料、数量和单价')
     return false
   }
-  if (!referenceData.value.suppliers.some((item) => item.supplierId === orderForm.supplierId)) {
+  if (!activeSuppliers.value.some((item) => item.supplierId === orderForm.supplierId)) {
     ElMessage.warning('请选择有效供应商')
     return false
   }
@@ -472,14 +501,7 @@ async function saveOrderForm(buyerId: number) {
 }
 
 async function submitOrderForm() {
-  let buyerId = operatorId.value
-  if (editingOrderId.value) {
-    ;({ buyerId } = orderForm)
-  }
-  if (!buyerId) {
-    ElMessage.error('当前会话缺少采购人信息，请重新登录')
-    return
-  }
+  const { buyerId } = orderForm
   const valid = await orderFormRef.value?.validate().catch(() => false)
   if (!valid || orderSubmitting.value || !validateOrderSelections()) {
     return
@@ -490,6 +512,7 @@ async function submitOrderForm() {
     orderDialogOpen.value = false
     orderQuery.page = 1
     await Promise.all([loadOrders(), loadSummary(), loadReferenceData()])
+    await refreshDetailIfOpen()
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '保存采购订单失败'))
   } finally {
@@ -502,10 +525,18 @@ async function viewOrder(orderId: number) {
   detailDrawerOpen.value = true
   detailLoading.value = true
   selectedOrder.value = undefined
+  detailReceipts.value = []
+  detailReminders.value = []
   try {
-    const result = await purchaseService.getOrder(orderId)
+    const [result, receiptResult, reminderResult] = await Promise.all([
+      purchaseService.getOrder(orderId),
+      purchaseService.listReceipts({ orderId, page: 1, pageSize: 50 }),
+      purchaseService.listReminders({ orderId, page: 1, pageSize: 50 }),
+    ])
     if (alive && currentRequestId === detailRequestId) {
       selectedOrder.value = result
+      detailReceipts.value = receiptResult.items
+      detailReminders.value = reminderResult.items
     }
   } catch (error) {
     if (alive && currentRequestId === detailRequestId) {
@@ -516,6 +547,12 @@ async function viewOrder(orderId: number) {
     if (alive && currentRequestId === detailRequestId) {
       detailLoading.value = false
     }
+  }
+}
+
+async function refreshDetailIfOpen() {
+  if (detailDrawerOpen.value && selectedOrder.value) {
+    await viewOrder(selectedOrder.value.orderId)
   }
 }
 
@@ -533,6 +570,7 @@ async function changeOrderStatus(item: PurchaseOrderItem, action: 'cancel' | 'su
     await config.request(item.orderId, operatorId.value)
     ElMessage.success(config.successMessage)
     await Promise.all([loadOrders(), loadSummary(), loadReferenceData()])
+    await refreshDetailIfOpen()
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(getErrorMessage(error, config.errorMessage))
@@ -574,6 +612,7 @@ async function submitReceipt() {
       loadList = loadReceipts
     }
     await Promise.all([loadSummary(), loadList(), loadReferenceData(), loadReminders()])
+    await refreshDetailIfOpen()
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '采购收货登记失败'))
   } finally {
@@ -594,6 +633,7 @@ async function generateReminders() {
     }
     ElMessage.success(message)
     await Promise.all([loadReminders(), loadSummary()])
+    await refreshDetailIfOpen()
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '生成逾期提醒失败'))
   } finally {
@@ -628,6 +668,7 @@ async function submitReminder() {
     ElMessage.success('逾期提醒状态已更新')
     reminderDialogOpen.value = false
     await Promise.all([loadReminders(), loadSummary()])
+    await refreshDetailIfOpen()
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '逾期提醒处理失败'))
   } finally {
@@ -719,6 +760,13 @@ onBeforeUnmount(() => {
           >
           <div class="toolbar">
             <div class="filters">
+              <el-input-number
+                v-model="orderQuery.orderId"
+                clearable
+                :min="1"
+                placeholder="订单编号"
+                :precision="0"
+              />
               <el-select
                 v-model="orderQuery.supplierId"
                 clearable
@@ -823,8 +871,10 @@ onBeforeUnmount(() => {
                   formatAmount(row.totalAmount)
                 }}</template></el-table-column
               >
-              <el-table-column label="采购员" min-width="100"
-                ><template #default="{ row }">#{{ row.buyerId }}</template></el-table-column
+              <el-table-column label="采购员" min-width="120"
+                ><template #default="{ row }">{{
+                  getBuyerName(row.buyerId)
+                }}</template></el-table-column
               >
               <el-table-column label="到货进度" min-width="150"
                 ><template #default="{ row }"
@@ -1078,24 +1128,44 @@ onBeforeUnmount(() => {
       @closed="orderFormRef?.resetFields()"
       ><el-form ref="orderFormRef" :model="orderForm" :rules="orderRules" label-width="100px"
         ><div class="order-form-grid">
-          <el-form-item label="供应商" prop="supplierId"
-            ><el-select
+          <el-form-item label="采购员" prop="buyerId">
+            <el-select
+              v-model="orderForm.buyerId"
+              filterable
+              :loading="referenceLoading"
+              placeholder="选择采购员"
+            >
+              <el-option
+                v-for="buyer in referenceData.buyers"
+                :key="buyer.buyerId"
+                :label="buyer.buyerName"
+                :value="buyer.buyerId"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="供应商" prop="supplierId">
+            <el-select
               v-model="orderForm.supplierId"
               filterable
               :loading="referenceLoading"
               placeholder="选择供应商"
-              ><el-option
-                v-for="supplier in referenceData.suppliers"
+            >
+              <el-option
+                v-for="supplier in activeSuppliers"
                 :key="supplier.supplierId"
                 :label="`${supplier.supplierName} · ${supplier.contactPerson || '暂无联系人'}`"
-                :value="supplier.supplierId" /></el-select></el-form-item
-          ><el-form-item label="预计交期" prop="expectedDate"
-            ><el-date-picker
+                :value="supplier.supplierId"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="预计交期" prop="expectedDate">
+            <el-date-picker
               v-model="orderForm.expectedDate"
               placeholder="选择日期"
               type="date"
               value-format="YYYY-MM-DD"
-          /></el-form-item>
+            />
+          </el-form-item>
         </div>
         <el-form-item label="采购明细"
           ><div class="order-lines">
@@ -1233,6 +1303,13 @@ onBeforeUnmount(() => {
               <span>供应商</span><strong>{{ selectedOrder.supplier.supplierName }}</strong>
             </div>
             <div>
+              <span>供应商联系人</span
+              ><strong>{{ selectedOrder.supplier.contactPerson || '-' }}</strong>
+            </div>
+            <div>
+              <span>采购员</span><strong>{{ getBuyerName(selectedOrder.buyerId) }}</strong>
+            </div>
+            <div>
               <span>订单状态</span
               ><StatusTag :labels="orderStatusLabels" :value="selectedOrder.status" />
             </div>
@@ -1248,6 +1325,19 @@ onBeforeUnmount(() => {
                 selectedOrder.expectedDate
               }}</strong>
             </div>
+            <div>
+              <span>逾期状态</span
+              ><strong :class="{ overdue: selectedOrder.isOverdue }">{{
+                getOverdueLabel(selectedOrder)
+              }}</strong>
+            </div>
+            <div>
+              <span>收货进度</span
+              ><el-progress :percentage="Math.round(selectedOrder.receiveProgress * 100)" />
+            </div>
+            <div>
+              <span>实际完成日期</span><strong>{{ selectedOrder.actualDate || '-' }}</strong>
+            </div>
           </div>
           <el-divider content-position="left">采购明细</el-divider
           ><el-table :data="selectedOrder.details" stripe
@@ -1255,7 +1345,10 @@ onBeforeUnmount(() => {
               ><template #default="{ row }"
                 ><div class="primary-cell">
                   <strong>{{ row.materialName || `物料 #${row.materialId}` }}</strong
-                  ><small>ID {{ row.materialId }}</small>
+                  ><small
+                    >ID {{ row.materialId }} · 单位
+                    {{ getMaterialUnit(row.materialId) || '-' }}</small
+                  >
                 </div></template
               ></el-table-column
             ><el-table-column label="采购 / 已收" min-width="130"
@@ -1275,6 +1368,32 @@ onBeforeUnmount(() => {
                 ><el-progress
                   :percentage="Math.round(row.receiveProgress * 100)"
                   :stroke-width="7" /></template></el-table-column></el-table
+          ><el-divider content-position="left">收货记录</el-divider
+          ><EmptyState
+            v-if="!detailReceipts.length"
+            description="该采购订单暂无收货记录。" /><el-table v-else :data="detailReceipts" stripe
+            ><el-table-column label="物料" min-width="180"
+              ><template #default="{ row }">{{
+                row.materialName || `物料 #${row.materialId}`
+              }}</template></el-table-column
+            ><el-table-column label="本次数量" min-width="110" prop="quantity" /><el-table-column
+              label="收货日期"
+              min-width="130"
+              prop="receiveDate" /></el-table
+          ><el-divider content-position="left">催交信息</el-divider
+          ><EmptyState
+            v-if="!detailReminders.length"
+            description="该采购订单暂无催交记录。" /><el-table v-else :data="detailReminders" stripe
+            ><el-table-column label="提醒时间" min-width="160"
+              ><template #default="{ row }">{{
+                formatDateTime(row.remindTime)
+              }}</template></el-table-column
+            ><el-table-column label="状态" min-width="110"
+              ><template #default="{ row }"
+                ><StatusTag
+                  :labels="reminderStatusLabels"
+                  :value="row.status" /></template></el-table-column
+            ><el-table-column label="处理备注" min-width="180" prop="remark" /></el-table
         ></template></div
     ></el-drawer>
   </PageContainer>

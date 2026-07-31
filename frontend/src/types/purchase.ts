@@ -12,6 +12,7 @@ export type PurchaseReminderStatus = 'pending_urge' | 'received' | 'urged'
 export interface SupplierInfo {
   contactPerson?: string
   contactPhone?: string
+  isActive?: boolean
   supplierId: number
   supplierName: string
 }
@@ -60,6 +61,7 @@ export interface PurchaseOrderQuery extends PageRequest {
   expectedDateEnd?: string
   expectedDateStart?: string
   materialId?: number
+  orderId?: number
   orderDateEnd?: string
   orderDateStart?: string
   status?: PurchaseOrderStatus

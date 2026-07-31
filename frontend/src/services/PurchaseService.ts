@@ -102,6 +102,55 @@ function mapOptional<TSource, TResult>(
   return mapper(value)
 }
 
+function validateOrderForm(form: PurchaseOrderFormData) {
+  if (!Number.isInteger(form.buyerId) || form.buyerId <= 0) {
+    throw new Error('请选择有效采购员')
+  }
+  if (!Number.isInteger(form.supplierId) || form.supplierId <= 0) {
+    throw new Error('请选择有效供应商')
+  }
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(form.expectedDate)
+  if (!dateParts) {
+    throw new Error('预计到货日期格式无效')
+  }
+  const expectedDate = new Date(
+    Number(dateParts[1]),
+    Number(dateParts[2]) - 1,
+    Number(dateParts[3]),
+  )
+  if (
+    expectedDate.getFullYear() !== Number(dateParts[1]) ||
+    expectedDate.getMonth() !== Number(dateParts[2]) - 1 ||
+    expectedDate.getDate() !== Number(dateParts[3])
+  ) {
+    throw new Error('预计到货日期格式无效')
+  }
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (expectedDate < today) {
+    throw new Error('预计到货日期不能早于当前日期')
+  }
+  if (!form.details.length) {
+    throw new Error('采购订单至少需要一条明细')
+  }
+  const materialIds = new Set<number>()
+  for (const item of form.details) {
+    if (!Number.isInteger(item.materialId) || item.materialId <= 0) {
+      throw new Error('请选择有效采购物料')
+    }
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+      throw new Error('采购数量必须大于 0')
+    }
+    if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
+      throw new Error('含税单价不能小于 0')
+    }
+    if (materialIds.has(item.materialId)) {
+      throw new Error('同一物料不能重复添加')
+    }
+    materialIds.add(item.materialId)
+  }
+}
+
 async function loadAllMaterials() {
   const pageSize = 100
   const firstResponse = await materialBomApi.listMaterialData({ page: 1, pageSize })
@@ -198,6 +247,7 @@ export const purchaseService = {
   },
 
   async createOrder(form: PurchaseOrderFormData) {
+    validateOrderForm(form)
     if (isMockEnabled()) {
       return purchaseMock.createOrder(form)
     }
@@ -368,6 +418,9 @@ export const purchaseService = {
     if (isMockEnabled()) {
       return purchaseMock.listOrders(normalizedQuery)
     }
+    if (normalizedQuery.orderId !== undefined) {
+      throw new Error('当前后端接口暂不支持按采购订单编号查询')
+    }
     const response = await purchaseApi.listPurchaseOrder({
       buyerId: normalizedQuery.buyerId,
       expectedDateEnd: normalizedQuery.expectedDateEnd,
@@ -430,6 +483,7 @@ export const purchaseService = {
   },
 
   async updateOrder(orderId: number, form: PurchaseOrderFormData) {
+    validateOrderForm(form)
     if (isMockEnabled()) {
       return purchaseMock.updateOrder(orderId, form)
     }
