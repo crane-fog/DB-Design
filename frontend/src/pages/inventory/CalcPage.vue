@@ -22,6 +22,11 @@ interface CalculationRow extends MaterialShortageRequestItem {
   key: number
 }
 
+interface BuyerOption {
+  buyerId: number
+  buyerName: string
+}
+
 const auth = useAuthStore()
 const router = useRouter()
 const calculating = ref(false)
@@ -33,6 +38,10 @@ const rows = reactive<CalculationRow[]>([
 ])
 const purchaseQuantities = reactive<Record<number, number>>({})
 const draftExpectedDate = ref(new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10))
+const selectedBuyerId = ref<number>()
+const buyerOptions = ref<BuyerOption[]>([])
+const buyerLoading = ref(false)
+const buyerError = ref('')
 let nextKey = 2
 let requestId = 0
 const referenceLoading = ref(false)
@@ -44,9 +53,7 @@ const referenceData = ref<InventoryReferenceData>({
 })
 let referenceRequestId = 0
 
-const canCreatePurchaseDraft = computed(
-  () => auth.hasPermission(PERMISSIONS.purchase.manage) && Boolean(auth.currentUser?.id),
-)
+const canCreatePurchaseDraft = computed(() => auth.hasPermission(PERMISSIONS.purchase.manage))
 const shortageItems = computed(
   () => result.value?.items.filter((item) => item.netShortageQty > 0) ?? [],
 )
@@ -140,10 +147,14 @@ async function calculate() {
 }
 
 async function createPurchaseDrafts() {
-  const buyerId = auth.currentUser?.id
-  if (!buyerId || creatingDrafts.value) {
+  if (creatingDrafts.value) {
     return
   }
+  if (!selectedBuyerId.value) {
+    ElMessage.warning('请选择采购员')
+    return
+  }
+  const buyerId = selectedBuyerId.value
   const items = shortageItems.value
     .map((item) => ({
       materialId: item.materialId,
@@ -188,7 +199,23 @@ async function createPurchaseDrafts() {
   }
 }
 
-onMounted(() => void loadReferenceData())
+async function loadBuyerOptions() {
+  buyerLoading.value = true
+  buyerError.value = ''
+  try {
+    const purchaseReferences = await purchaseService.getReferenceData()
+    buyerOptions.value = purchaseReferences.buyers
+  } catch (requestError) {
+    buyerError.value = getErrorMessage(requestError, '采购员列表加载失败')
+  } finally {
+    buyerLoading.value = false
+  }
+}
+
+onMounted(() => {
+  void loadReferenceData()
+  void loadBuyerOptions()
+})
 onBeforeUnmount(() => {
   requestId += 1
   referenceRequestId += 1
@@ -305,10 +332,26 @@ onBeforeUnmount(() => {
               type="date"
               value-format="YYYY-MM-DD"
             />
+            <el-select
+              v-if="canCreatePurchaseDraft"
+              v-model="selectedBuyerId"
+              :disabled="buyerLoading || !buyerOptions.length"
+              :loading="buyerLoading"
+              placeholder="请选择采购员"
+              style="width: 180px"
+            >
+              <el-option
+                v-for="buyer in buyerOptions"
+                :key="buyer.buyerId"
+                :label="buyer.buyerName"
+                :value="buyer.buyerId"
+              />
+            </el-select>
             <el-button
               v-if="canCreatePurchaseDraft"
               :icon="ShoppingCart"
               :loading="creatingDrafts"
+              :disabled="buyerLoading || !buyerOptions.length"
               type="primary"
               @click="createPurchaseDrafts"
             >
@@ -317,6 +360,8 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </template>
+
+      <el-alert v-if="buyerError" :closable="false" :title="buyerError" type="error" />
 
       <div v-loading="calculating" class="result-table-wrap">
         <EmptyState
