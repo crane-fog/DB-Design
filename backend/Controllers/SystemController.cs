@@ -580,7 +580,9 @@ public class SystemController(
         {
             var code = error.Contains("不存在")
                 ? UserRoleAssignResponse.CodeEnum._404Enum
-                : UserRoleAssignResponse.CodeEnum._400Enum;
+                : error.Contains("已停用")
+                    ? UserRoleAssignResponse.CodeEnum._409Enum
+                    : UserRoleAssignResponse.CodeEnum._400Enum;
             return Ok(new UserRoleAssignResponse { Code = code, Message = error, Data = null! });
         }
 
@@ -672,7 +674,9 @@ public class SystemController(
         {
             var code = error.Contains("不存在")
                 ? RolePermissionAssignResponse.CodeEnum._404Enum
-                : RolePermissionAssignResponse.CodeEnum._400Enum;
+                : error.Contains("已停用")
+                    ? RolePermissionAssignResponse.CodeEnum._409Enum
+                    : RolePermissionAssignResponse.CodeEnum._400Enum;
             return Ok(new RolePermissionAssignResponse { Code = code, Message = error, Data = null! });
         }
 

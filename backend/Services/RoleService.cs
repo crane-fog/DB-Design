@@ -87,6 +87,17 @@ public class RoleService(string connString)
 
     public (Role? Role, string? ErrorMessage) Create(RoleCreateRequest request)
     {
+        // 契约未声明 maxLength，超长输入会触发 ORA-12899（值过大）；
+        // 服务层统一拦截（列定义见 database/01_schema_forklift.sql）。
+        // 注意：直接传模型属性（CheckMaxLength 内部判空），不要对属性使用 ?.Trim()，
+        // 否则编译器会将属性标记为可能为 null，导致后续解引用触发 CS8602。
+        var lengthError = InputGuard.CheckMaxLength(request.RoleName, 50, "角色名称")
+            ?? InputGuard.CheckMaxLength(request.Description, 200, "角色描述");
+        if (lengthError is not null)
+        {
+            return (null, lengthError);
+        }
+
         using var conn = new OracleConnection(connString);
         conn.Open();
 
@@ -128,9 +139,14 @@ public class RoleService(string connString)
         sets.Add("ROLE_NAME = :roleName");
         parameters.Add(new OracleParameter("roleName", request.RoleName.Trim()));
 
-        sets.Add("DESCRIPTION = :description");
-        parameters.Add(new OracleParameter("description",
-            string.IsNullOrWhiteSpace(request.Description) ? (object)DBNull.Value : request.Description.Trim()));
+        // 与 UserService.Update 的 email 处理对称：省略 description 时保持原值，
+        // 避免“只改名称/状态却清空已有描述”；显式传空串才清空。
+        if (request.Description is not null)
+        {
+            sets.Add("DESCRIPTION = :description");
+            parameters.Add(new OracleParameter("description",
+                string.IsNullOrWhiteSpace(request.Description) ? (object)DBNull.Value : request.Description.Trim()));
+        }
 
         // Status 守卫与 UserService.Update 对称：当前生成的 RoleUpdateRequest.Status
         // 因契约 default:valid 默认 ValidEnum(1)，此条件恒真、行为不变；

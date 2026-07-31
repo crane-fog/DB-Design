@@ -83,6 +83,17 @@ public class PermissionService(string connString)
 
     public (PermissionBrief? Permission, string? ErrorMessage) Create(PermissionCreateRequest request)
     {
+        // 契约未声明 maxLength，超长输入会触发 ORA-12899（值过大）；
+        // 服务层统一拦截（列定义见 database/01_schema_forklift.sql）。
+        // 注意：直接传模型属性（CheckMaxLength 内部判空），不要对属性使用 ?.Trim()，
+        // 否则编译器会将属性标记为可能为 null，导致后续解引用触发 CS8602。
+        var lengthError = InputGuard.CheckMaxLength(request.Resource, 100, "资源")
+            ?? InputGuard.CheckMaxLength(request.Action, 50, "操作");
+        if (lengthError is not null)
+        {
+            return (null, lengthError);
+        }
+
         using var conn = new OracleConnection(connString);
         conn.Open();
 

@@ -80,6 +80,18 @@ public class AuthService(string connString, string jwtSecret, LoginLogService lo
         string phone,
         string? email)
     {
+        // 契约未声明 maxLength，超长输入会触发 ORA-12899（值过大）；
+        // 服务层统一拦截（列定义见 database/01_schema_forklift.sql）
+        var lengthError = InputGuard.CheckMaxLength(employeeNo, 20, "工号")
+            ?? InputGuard.CheckMaxLength(passwordHash, 128, "密码")
+            ?? InputGuard.CheckMaxLength(userName, 50, "姓名")
+            ?? InputGuard.CheckMaxLength(phone, 20, "电话")
+            ?? InputGuard.CheckMaxLength(email, 100, "邮箱");
+        if (lengthError is not null)
+        {
+            return new RegisterResult(null, lengthError);
+        }
+
         using var conn = new OracleConnection(connString);
         conn.Open();
 
