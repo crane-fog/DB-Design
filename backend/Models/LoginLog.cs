@@ -33,10 +33,11 @@ namespace Org.OpenAPITools.Models
         public int LogId { get; set; }
 
         /// <summary>
-        /// Gets or Sets UserId
+        /// 登录用户 ID；工号不存在等失败登录场景下为空
         /// </summary>
+        /// <value>登录用户 ID；工号不存在等失败登录场景下为空</value>
         [DataMember(Name="user_id", EmitDefaultValue=true)]
-        public int UserId { get; set; }
+        public int? UserId { get; set; }
 
         /// <summary>
         /// Gets or Sets LoginTime
@@ -141,7 +142,7 @@ namespace Org.OpenAPITools.Models
                 ) && 
                 (
                     UserId == other.UserId ||
-                    
+                    UserId != null &&
                     UserId.Equals(other.UserId)
                 ) && 
                 (
@@ -178,7 +179,7 @@ namespace Org.OpenAPITools.Models
                 // Suitable nullity checks etc, of course :)
                     
                     hashCode = hashCode * 59 + LogId.GetHashCode();
-                    
+                    if (UserId != null)
                     hashCode = hashCode * 59 + UserId.GetHashCode();
                     
                     hashCode = hashCode * 59 + LoginTime.GetHashCode();

@@ -27,23 +27,33 @@ namespace Org.OpenAPITools.Models
     public partial class RoleUpdateRequest : IEquatable<RoleUpdateRequest>
     {
         /// <summary>
-        /// Gets or Sets RoleName
+        /// 角色编号。
         /// </summary>
+        /// <value>角色编号。</value>
+        [Required]
+        [DataMember(Name="role_id", EmitDefaultValue=true)]
+        public int RoleId { get; set; }
+
+        /// <summary>
+        /// 角色名称。
+        /// </summary>
+        /// <value>角色名称。</value>
         [Required]
         [DataMember(Name="role_name", EmitDefaultValue=false)]
         public string RoleName { get; set; }
 
         /// <summary>
-        /// Gets or Sets Description
+        /// 角色描述。
         /// </summary>
+        /// <value>角色描述。</value>
         [DataMember(Name="description", EmitDefaultValue=true)]
         public string Description { get; set; }
 
 
         /// <summary>
-        /// 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
+        /// 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。更新时不传则保持原状态。
         /// </summary>
-        /// <value>角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。</value>
+        /// <value>角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。更新时不传则保持原状态。</value>
         [TypeConverter(typeof(CustomEnumConverter<StatusEnum>))]
         [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public enum StatusEnum
@@ -63,18 +73,11 @@ namespace Org.OpenAPITools.Models
         }
 
         /// <summary>
-        /// 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
+        /// 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。更新时不传则保持原状态。
         /// </summary>
-        /// <value>角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。</value>
+        /// <value>角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。更新时不传则保持原状态。</value>
         [DataMember(Name="status", EmitDefaultValue=true)]
-        public StatusEnum Status { get; set; } = StatusEnum.ValidEnum;
-
-        /// <summary>
-        /// Gets or Sets RoleId
-        /// </summary>
-        [Required]
-        [DataMember(Name="role_id", EmitDefaultValue=true)]
-        public int RoleId { get; set; }
+        public StatusEnum Status { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -84,10 +87,10 @@ namespace Org.OpenAPITools.Models
         {
             var sb = new StringBuilder();
             sb.Append("class RoleUpdateRequest {\n");
+            sb.Append("  RoleId: ").Append(RoleId).Append("\n");
             sb.Append("  RoleName: ").Append(RoleName).Append("\n");
             sb.Append("  Description: ").Append(Description).Append("\n");
             sb.Append("  Status: ").Append(Status).Append("\n");
-            sb.Append("  RoleId: ").Append(RoleId).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -125,6 +128,11 @@ namespace Org.OpenAPITools.Models
 
             return 
                 (
+                    RoleId == other.RoleId ||
+                    
+                    RoleId.Equals(other.RoleId)
+                ) && 
+                (
                     RoleName == other.RoleName ||
                     RoleName != null &&
                     RoleName.Equals(other.RoleName)
@@ -138,11 +146,6 @@ namespace Org.OpenAPITools.Models
                     Status == other.Status ||
                     
                     Status.Equals(other.Status)
-                ) && 
-                (
-                    RoleId == other.RoleId ||
-                    
-                    RoleId.Equals(other.RoleId)
                 );
         }
 
@@ -156,14 +159,14 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
+                    
+                    hashCode = hashCode * 59 + RoleId.GetHashCode();
                     if (RoleName != null)
                     hashCode = hashCode * 59 + RoleName.GetHashCode();
                     if (Description != null)
                     hashCode = hashCode * 59 + Description.GetHashCode();
                     
                     hashCode = hashCode * 59 + Status.GetHashCode();
-                    
-                    hashCode = hashCode * 59 + RoleId.GetHashCode();
                 return hashCode;
             }
         }
