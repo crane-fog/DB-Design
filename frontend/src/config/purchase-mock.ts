@@ -1,6 +1,7 @@
 import type {
   PurchaseDraftItem,
   PurchaseDraftResult,
+  PurchaseMaterialOption,
   PurchaseOrderFormData,
   PurchaseOrderItem,
   PurchaseOrderQuery,
@@ -9,17 +10,42 @@ import type {
   PurchaseReceiptQuery,
   PurchaseReminderItem,
   PurchaseReminderQuery,
+  SupplierInfo,
 } from '@/types/purchase'
 import type { PageResult } from '@/services/pagination'
 
-const materialNames: Record<number, string> = {
-  1001: '铝合金型材 6061',
-  1002: '控制板组件 C01',
-  1003: '屏蔽线缆 0.25mm',
-  1004: '内六角螺钉 M4',
-}
+const materials: PurchaseMaterialOption[] = [
+  {
+    defaultSupplierId: 41,
+    materialId: 1001,
+    materialName: '铝合金型材 6061',
+    unit: 'kg',
+  },
+  {
+    defaultSupplierId: 42,
+    materialId: 1002,
+    materialName: '控制板组件 C01',
+    unit: '件',
+  },
+  {
+    defaultSupplierId: 41,
+    materialId: 1003,
+    materialName: '屏蔽线缆 0.25mm',
+    unit: 'm',
+  },
+  {
+    defaultSupplierId: 42,
+    materialId: 1004,
+    materialName: '内六角螺钉 M4',
+    unit: '件',
+  },
+]
 
-const suppliers = {
+const materialNames = Object.fromEntries(
+  materials.map((item) => [item.materialId, item.materialName]),
+) as Record<number, string>
+
+const suppliers: Record<number, SupplierInfo> = {
   41: {
     contactPerson: '陈敏',
     contactPhone: '138****3201',
@@ -32,7 +58,18 @@ const suppliers = {
     supplierId: 42,
     supplierName: '启航电子组件',
   },
+  43: {
+    contactPerson: '林静',
+    contactPhone: '137****1582',
+    supplierId: 43,
+    supplierName: '南方工业辅料',
+  },
 }
+
+const buyers = [
+  { buyerId: 1, buyerName: '采购员 陈晓' },
+  { buyerId: 2, buyerName: '采购员 周瑜' },
+]
 
 let orders: PurchaseOrderItem[] = [
   {
@@ -57,7 +94,7 @@ let orders: PurchaseOrderItem[] = [
     overdueDays: 2,
     receiveProgress: 0.5,
     status: 'partial_received',
-    supplier: suppliers[41],
+    supplier: suppliers[41]!,
     totalAmount: 9600,
   },
   {
@@ -82,7 +119,7 @@ let orders: PurchaseOrderItem[] = [
     overdueDays: 1,
     receiveProgress: 0,
     status: 'submitted',
-    supplier: suppliers[42],
+    supplier: suppliers[42]!,
     totalAmount: 18_000,
   },
   {
@@ -107,7 +144,7 @@ let orders: PurchaseOrderItem[] = [
     overdueDays: 0,
     receiveProgress: 0,
     status: 'draft',
-    supplier: suppliers[41],
+    supplier: suppliers[41]!,
     totalAmount: 3600,
   },
   {
@@ -133,8 +170,44 @@ let orders: PurchaseOrderItem[] = [
     overdueDays: 0,
     receiveProgress: 1,
     status: 'completed',
-    supplier: suppliers[42],
+    supplier: suppliers[42]!,
     totalAmount: 1800,
+  },
+  {
+    buyerId: 2,
+    details: [
+      {
+        itemId: 1105,
+        lineAmount: 1200,
+        materialId: 1003,
+        materialName: materialNames[1003],
+        orderId: 10_005,
+        quantity: 80,
+        receiveProgress: 0,
+        receivedQty: 0,
+        unitPrice: 15,
+      },
+      {
+        itemId: 1106,
+        lineAmount: 900,
+        materialId: 1004,
+        materialName: materialNames[1004],
+        orderId: 10_005,
+        quantity: 300,
+        receiveProgress: 0,
+        receivedQty: 0,
+        unitPrice: 3,
+      },
+    ],
+    expectedDate: '2026-07-20',
+    isOverdue: false,
+    orderDate: '2026-07-08',
+    orderId: 10_005,
+    overdueDays: 0,
+    receiveProgress: 0,
+    status: 'cancelled',
+    supplier: suppliers[43]!,
+    totalAmount: 2100,
   },
 ]
 
@@ -217,6 +290,47 @@ function paginate<TItem>(items: TItem[], page: number, pageSize: number): PageRe
   }
 }
 
+function getTodayDayNumber() {
+  const today = new Date()
+  return Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) / 86_400_000
+}
+
+function getDateDayNumber(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) {
+    return undefined
+  }
+  return Date.UTC(year, month - 1, day) / 86_400_000
+}
+
+function refreshOrderOverdue(order: PurchaseOrderItem) {
+  const expectedDay = getDateDayNumber(order.expectedDate)
+  const inactive = order.status === 'cancelled' || order.status === 'completed'
+  let overdueDays = 0
+  if (expectedDay !== undefined) {
+    overdueDays = Math.max(0, getTodayDayNumber() - expectedDay)
+  }
+  order.isOverdue = !inactive && overdueDays > 0
+  order.overdueDays = 0
+  if (order.isOverdue) {
+    order.overdueDays = overdueDays
+  }
+}
+
+function refreshAllOrders() {
+  orders.forEach(refreshOrderOverdue)
+  for (const reminder of reminders) {
+    const order = orders.find((item) => item.orderId === reminder.orderId)
+    if (order) {
+      reminder.expectedDate = order.expectedDate
+      reminder.overdueDays = order.overdueDays
+      if (order.status === 'completed') {
+        reminder.status = 'received'
+      }
+    }
+  }
+}
+
 function recalculateOrder(order: PurchaseOrderItem) {
   const ordered = order.details.reduce((sum, item) => sum + item.quantity, 0)
   const received = order.details.reduce((sum, item) => sum + item.receivedQty, 0)
@@ -232,9 +346,12 @@ function recalculateOrder(order: PurchaseOrderItem) {
   } else if (received > 0) {
     order.status = 'partial_received'
   }
+  refreshOrderOverdue(order)
+  refreshAllOrders()
 }
 
 function createOrder(form: PurchaseOrderFormData) {
+  validateOrderForm(form)
   const newOrderId =
     Math.max(10_000, ...orders.map(({ orderId: existingOrderId }) => existingOrderId)) + 1
   const details = form.details.map((item, index) => ({
@@ -256,27 +373,25 @@ function createOrder(form: PurchaseOrderFormData) {
     overdueDays: 0,
     receiveProgress: 0,
     status: 'draft',
-    supplier: suppliers[form.supplierId as keyof typeof suppliers] ?? {
-      supplierId: form.supplierId,
-      supplierName: `供应商 #${form.supplierId}`,
-    },
+    supplier: suppliers[form.supplierId]!,
     totalAmount: details.reduce((sum, item) => sum + item.lineAmount, 0),
   }
   orders = [order, ...orders]
+  refreshOrderOverdue(order)
   return order
 }
 
 function getDefaultSupplierId(item: PurchaseDraftItem) {
   if (item.supplierId !== undefined) {
-    return item.supplierId
+    if (suppliers[item.supplierId]) {
+      return item.supplierId
+    }
+    return undefined
   }
   if (item.materialId === 1002) {
     return 42
   }
-  if (materialNames[item.materialId]) {
-    return 41
-  }
-  return undefined
+  return materials.find(({ materialId }) => materialId === item.materialId)?.defaultSupplierId
 }
 
 function getDefaultUnitPrice(materialId: number) {
@@ -296,8 +411,8 @@ function validateOrderForm(form: PurchaseOrderFormData) {
   if (!Number.isInteger(form.buyerId) || form.buyerId <= 0) {
     throw new Error('采购员不能为空')
   }
-  if (!Number.isInteger(form.supplierId) || form.supplierId <= 0) {
-    throw new Error('供应商不能为空')
+  if (!Number.isInteger(form.supplierId) || !suppliers[form.supplierId]) {
+    throw new Error('请选择有效供应商')
   }
   if (!form.expectedDate) {
     throw new Error('预计到货日期不能为空')
@@ -305,21 +420,27 @@ function validateOrderForm(form: PurchaseOrderFormData) {
   if (!form.details.length) {
     throw new Error('采购订单至少需要一条明细')
   }
-  form.details.forEach((item) => {
+  const materialIds = new Set<number>()
+  for (const item of form.details) {
     requirePositiveQuantity(item.quantity, '采购数量')
     if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
       throw new Error('含税单价不能小于 0')
     }
-    if (!Number.isInteger(item.materialId) || item.materialId <= 0) {
-      throw new Error('物料不能为空')
+    if (!materials.some(({ materialId }) => materialId === item.materialId)) {
+      throw new Error(`物料 #${item.materialId} 不存在`)
     }
-  })
+    if (materialIds.has(item.materialId)) {
+      throw new Error('同一物料不能重复添加')
+    }
+    materialIds.add(item.materialId)
+  }
 }
 
 export const purchaseMock = {
   addReceipt(form: PurchaseReceiptFormData) {
     return delay(() => {
       requirePositiveQuantity(form.quantity, '收货数量')
+      refreshAllOrders()
       const order = orders.find(({ orderId }) => orderId === form.orderId)
       const line = order?.details.find(({ materialId }) => materialId === form.materialId)
       if (!order || !line || !['partial_received', 'submitted'].includes(order.status)) {
@@ -343,12 +464,13 @@ export const purchaseMock = {
 
   cancelOrder(orderId: number, _operatorId: number) {
     return delay(() => {
+      refreshAllOrders()
       const order = orders.find((item) => item.orderId === orderId)
       if (!order || !['draft', 'submitted'].includes(order.status)) {
         throw new Error('该采购订单当前不可取消')
       }
       order.status = 'cancelled'
-      order.isOverdue = false
+      refreshOrderOverdue(order)
       return { ...order }
     })
   },
@@ -411,6 +533,7 @@ export const purchaseMock = {
 
   generateReminders(orderId?: number) {
     return delay(() => {
+      refreshAllOrders()
       const candidates = orders.filter(
         (order) =>
           order.isOverdue &&
@@ -434,11 +557,24 @@ export const purchaseMock = {
 
   getOrder(orderId: number) {
     return delay(() => {
+      refreshAllOrders()
       const order = orders.find((item) => item.orderId === orderId)
       if (!order) {
         throw new Error('未找到该采购订单')
       }
       return structuredClone(order)
+    })
+  },
+
+  getReferenceData() {
+    return delay(() => {
+      refreshAllOrders()
+      return {
+        buyers: structuredClone(buyers),
+        materials: structuredClone(materials),
+        orders: structuredClone(orders),
+        suppliers: structuredClone(Object.values(suppliers)),
+      }
     })
   },
 
@@ -457,8 +593,9 @@ export const purchaseMock = {
   },
 
   listOrders(query: PurchaseOrderQuery) {
-    return delay(() =>
-      paginate(
+    return delay(() => {
+      refreshAllOrders()
+      return paginate(
         orders.filter(
           (item) =>
             (!query.supplierId || item.supplier.supplierId === query.supplierId) &&
@@ -473,8 +610,8 @@ export const purchaseMock = {
         ),
         query.page,
         query.pageSize,
-      ),
-    )
+      )
+    })
   },
 
   listReceipts(query: PurchaseReceiptQuery) {
@@ -492,8 +629,9 @@ export const purchaseMock = {
   },
 
   listReminders(query: PurchaseReminderQuery) {
-    return delay(() =>
-      paginate(
+    return delay(() => {
+      refreshAllOrders()
+      return paginate(
         reminders.filter(
           (item) =>
             (!query.orderId || item.orderId === query.orderId) &&
@@ -501,8 +639,8 @@ export const purchaseMock = {
         ),
         query.page,
         query.pageSize,
-      ),
-    )
+      )
+    })
   },
 
   submitOrder(orderId: number, _operatorId: number) {
@@ -512,7 +650,39 @@ export const purchaseMock = {
         throw new Error('仅草稿采购订单可提交')
       }
       order.status = 'submitted'
+      refreshOrderOverdue(order)
       return { ...order }
+    })
+  },
+
+  updateOrder(orderId: number, form: PurchaseOrderFormData) {
+    return delay(() => {
+      validateOrderForm(form)
+      const order = orders.find((item) => item.orderId === orderId)
+      if (!order || order.status !== 'draft') {
+        throw new Error('仅草稿采购订单可编辑')
+      }
+      const details = form.details.map((item, index) => {
+        const existing = order.details.find((detail) => detail.materialId === item.materialId)
+        return {
+          ...item,
+          itemId: existing?.itemId ?? orderId * 10 + index + 1,
+          lineAmount: item.quantity * item.unitPrice,
+          materialName: materialNames[item.materialId],
+          orderId,
+          receiveProgress: 0,
+          receivedQty: 0,
+        }
+      })
+      Object.assign(order, {
+        buyerId: form.buyerId,
+        details,
+        expectedDate: form.expectedDate,
+        supplier: suppliers[form.supplierId]!,
+        totalAmount: details.reduce((sum, item) => sum + item.lineAmount, 0),
+      })
+      refreshOrderOverdue(order)
+      return structuredClone(order)
     })
   },
 }

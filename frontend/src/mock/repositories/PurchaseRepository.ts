@@ -17,6 +17,7 @@ const writeMethods = new Set<PropertyKey>([
   'generateReminders',
   'handleReminder',
   'submitOrder',
+  'updateOrder',
 ])
 
 export const purchaseRepository = createPersistedMockProxy(purchaseMock, adapter, writeMethods)

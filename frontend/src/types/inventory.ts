@@ -1,6 +1,61 @@
 export type InventoryAlertStatus = 'handled' | 'ignored' | 'pending'
 export type StockLockStatus = 'cancelled' | 'consumed' | 'locked'
 export type ObsoleteMaterialStatus = 'handled' | 'ignored' | 'pending'
+export type InventoryMaterialType = 'auxiliary' | 'finished' | 'raw_material' | 'semi_finished'
+export type InventoryStockStatus = 'locked' | 'low' | 'normal' | 'zero'
+
+export interface InventoryStockItem {
+  availableQty: number
+  lastInDate?: string
+  lastOutDate?: string
+  lockedQty: number
+  materialId: number
+  materialName: string
+  materialType: InventoryMaterialType
+  safetyStock: number
+  status: InventoryStockStatus
+  unit?: string
+}
+
+export interface InventoryStockQuery {
+  materialId?: number
+  materialName?: string
+  materialType?: InventoryMaterialType
+  page: number
+  pageSize: number
+  status?: InventoryStockStatus
+}
+
+export interface InventoryMaterialOption {
+  materialId: number
+  materialName: string
+  materialType: InventoryMaterialType
+  unit?: string
+}
+
+export interface InventoryBomVersionOption {
+  materialId: number
+  versionId: number
+  versionNo: string
+}
+
+export interface InventoryProductionOrderOption {
+  finishedQty: number
+  materialId: number
+  materialName: string
+  orderId: number
+  planQty: number
+  remainingQty: number
+  status: string
+  versionId: number
+  versionNo?: string
+}
+
+export interface InventoryReferenceData {
+  bomVersions: InventoryBomVersionOption[]
+  materials: InventoryMaterialOption[]
+  productionOrders: InventoryProductionOrderOption[]
+}
 
 export interface MaterialShortageRequestItem {
   materialId: number
@@ -88,7 +143,9 @@ export interface StockLockResult {
 }
 
 export interface ObsoleteMaterialItem {
+  activeOrderIds?: number[]
   availableQty: number
+  bomVersionIds?: number[]
   detectTime: string
   detectionId: number
   handlerId?: number
@@ -143,9 +200,14 @@ export interface CompletionInboundFormData {
 }
 
 export interface InventoryOverviewSummary {
+  availableMaterialCount: number
   inboundCount: number
+  lowStockCount: number
   lockedCount: number
+  lockedMaterialCount: number
+  materialCount: number
   obsoletePendingCount: number
   pendingAlertCount: number
+  zeroStockCount: number
 }
 import type { PageRequest } from '@/services/pagination'
