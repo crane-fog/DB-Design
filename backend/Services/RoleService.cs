@@ -50,17 +50,17 @@ public class RoleService(string connString)
             filters.Add(new SqlFilter("status", status.Trim()));
         }
 
-        var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
         using var countCmd = conn.CreateCommand();
-        countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_ROLE {where}";
+        countCmd.CommandText = string.Concat("SELECT COUNT(*) FROM SYS_ROLE ", where);
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
         var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY ROLE_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
+        dataCmd.CommandText = string.Concat(SelectColumns, " ", where, " ORDER BY ROLE_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
         OracleSql.AddFilters(dataCmd, filters);
@@ -78,7 +78,7 @@ public class RoleService(string connString)
         conn.Open();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"{SelectColumns} WHERE ROLE_ID = :roleId";
+        cmd.CommandText = SelectColumns + " WHERE ROLE_ID = :roleId";
         cmd.Parameters.Add(new OracleParameter("roleId", roleId));
 
         using var reader = cmd.ExecuteReader();
@@ -160,7 +160,7 @@ public class RoleService(string connString)
         }
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"UPDATE SYS_ROLE SET {string.Join(", ", sets)} WHERE ROLE_ID = :roleId";
+        cmd.CommandText = "UPDATE SYS_ROLE SET " + string.Join(", ", sets) + " WHERE ROLE_ID = :roleId";
         foreach (var p in parameters) cmd.Parameters.Add(p);
 
         try

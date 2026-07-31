@@ -46,17 +46,17 @@ public class PermissionService(string connString)
             filters.Add(new SqlFilter("action", $"%{action.Trim()}%"));
         }
 
-        var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
         using var countCmd = conn.CreateCommand();
-        countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_PERMISSION {where}";
+        countCmd.CommandText = string.Concat("SELECT COUNT(*) FROM SYS_PERMISSION ", where);
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
         var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY PERMISSION_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
+        dataCmd.CommandText = string.Concat(SelectColumns, " ", where, " ORDER BY PERMISSION_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
         OracleSql.AddFilters(dataCmd, filters);
@@ -74,7 +74,7 @@ public class PermissionService(string connString)
         conn.Open();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"{SelectColumns} WHERE PERMISSION_ID = :permissionId";
+        cmd.CommandText = SelectColumns + " WHERE PERMISSION_ID = :permissionId";
         cmd.Parameters.Add(new OracleParameter("permissionId", permissionId));
 
         using var reader = cmd.ExecuteReader();

@@ -26,20 +26,18 @@ public class RolePermissionService(string connString)
             filters.Add(new SqlFilter("permissionId", permissionId.Value));
         }
 
-        var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
         using var countCmd = conn.CreateCommand();
-        countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_ROLE_PERMISSION RP {where}";
+        countCmd.CommandText = string.Concat("SELECT COUNT(*) FROM SYS_ROLE_PERMISSION RP ", where);
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
         var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = $@"SELECT RP.ROLE_ID, RP.PERMISSION_ID
-                                 FROM SYS_ROLE_PERMISSION RP {where}
-                                 ORDER BY RP.ROLE_ID, RP.PERMISSION_ID
-                                 OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
+        dataCmd.CommandText = string.Concat("SELECT RP.ROLE_ID, RP.PERMISSION_ID FROM SYS_ROLE_PERMISSION RP ", where,
+            " ORDER BY RP.ROLE_ID, RP.PERMISSION_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
         OracleSql.AddFilters(dataCmd, filters);
@@ -158,7 +156,8 @@ public class RolePermissionService(string connString)
         }
 
         // 注意：Oracle IN 列表上限为 1000 项，权限分配场景远小于该限制。
-        cmd.CommandText = $"SELECT PERMISSION_ID FROM SYS_PERMISSION WHERE PERMISSION_ID IN ({string.Join(", ", binds)})";
+        // 参数名由循环生成的绑定变量名组成（:pid0、:pid1…），非用户输入。
+        cmd.CommandText = "SELECT PERMISSION_ID FROM SYS_PERMISSION WHERE PERMISSION_ID IN (" + string.Join(", ", binds) + ")";
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())

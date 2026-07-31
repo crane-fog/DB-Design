@@ -64,18 +64,18 @@ public class UserService(string connString)
             filters.Add(new SqlFilter("status", status.Trim()));
         }
 
-        var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
         // 总数（每次绑定创建新的 OracleParameter 实例，避免跨命令复用触发 ORA-50030）
         using var countCmd = conn.CreateCommand();
-        countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_USER {where}";
+        countCmd.CommandText = string.Concat("SELECT COUNT(*) FROM SYS_USER ", where);
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
         var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = $"{SelectColumns} {where} ORDER BY USER_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
+        dataCmd.CommandText = string.Concat(SelectColumns, " ", where, " ORDER BY USER_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
         OracleSql.AddFilters(dataCmd, filters);
@@ -93,7 +93,7 @@ public class UserService(string connString)
         conn.Open();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"{SelectColumns} WHERE USER_ID = :userId";
+        cmd.CommandText = SelectColumns + " WHERE USER_ID = :userId";
         cmd.Parameters.Add(new OracleParameter("userId", userId));
 
         using var reader = cmd.ExecuteReader();
@@ -200,7 +200,7 @@ public class UserService(string connString)
 
         if (sets.Count == 0) return (existing, null); // 无变更
 
-        cmd.CommandText = $"UPDATE SYS_USER SET {string.Join(", ", sets)} WHERE USER_ID = :userId";
+        cmd.CommandText = "UPDATE SYS_USER SET " + string.Join(", ", sets) + " WHERE USER_ID = :userId";
         foreach (var p in parameters) cmd.Parameters.Add(p);
 
         try

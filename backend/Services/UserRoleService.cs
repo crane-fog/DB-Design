@@ -26,20 +26,18 @@ public class UserRoleService(string connString)
             filters.Add(new SqlFilter("roleId", roleId.Value));
         }
 
-        var where = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
         using var countCmd = conn.CreateCommand();
-        countCmd.CommandText = $"SELECT COUNT(*) FROM SYS_USER_ROLE UR {where}";
+        countCmd.CommandText = string.Concat("SELECT COUNT(*) FROM SYS_USER_ROLE UR ", where);
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
         var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = $@"SELECT UR.USER_ID, UR.ROLE_ID
-                                 FROM SYS_USER_ROLE UR {where}
-                                 ORDER BY UR.USER_ID, UR.ROLE_ID
-                                 OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY";
+        dataCmd.CommandText = string.Concat("SELECT UR.USER_ID, UR.ROLE_ID FROM SYS_USER_ROLE UR ", where,
+            " ORDER BY UR.USER_ID, UR.ROLE_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
         OracleSql.AddFilters(dataCmd, filters);
@@ -164,7 +162,8 @@ public class UserRoleService(string connString)
         }
 
         // 注意：Oracle IN 列表上限为 1000 项，角色分配场景远小于该限制。
-        cmd.CommandText = $"SELECT ROLE_ID, STATUS FROM SYS_ROLE WHERE ROLE_ID IN ({string.Join(", ", binds)})";
+        // 参数名由循环生成的绑定变量名组成（:rid0、:rid1…），非用户输入。
+        cmd.CommandText = "SELECT ROLE_ID, STATUS FROM SYS_ROLE WHERE ROLE_ID IN (" + string.Join(", ", binds) + ")";
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
