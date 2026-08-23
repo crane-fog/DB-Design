@@ -34,7 +34,7 @@ INSERT INTO sys_user VALUES (10,'GD0103','8d969eef6ecad3c29a3a629280e686cf0c3f5d
 INSERT INTO sys_role VALUES (1,'系统管理员','拥有全部资源的管理权限','valid');
 INSERT INTO sys_role VALUES (2,'生产管理员','生产订单、产能、生产线管理','valid');
 INSERT INTO sys_role VALUES (3,'采购员','采购订单全生命周期管理','valid');
-INSERT INTO sys_role VALUES (4,'库管员','库存、锁定、入库、预警处理','valid');
+INSERT INTO sys_role VALUES (4,'库存管理员','库存、锁定、入库、预警处理','valid');
 INSERT INTO sys_role VALUES (5,'质检员','质量追溯与批次管理','valid');
 INSERT INTO sys_role VALUES (6,'设备管理员','生产线故障维修与状态维护','valid');
 INSERT INTO sys_role VALUES (7,'外部客户','仅可提交和查看自身外部订单','valid');
