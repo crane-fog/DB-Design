@@ -626,7 +626,7 @@ public class InventoryService(string connString, IBomExpansionQuery? bomExpansio
 
             foreach (var (matId, availableQty, lastOutDate) in candidates)
             {
-                if (!IsMaterialActive(conn, matId)) continue;
+                if (IsMaterialActive(conn, matId)) continue;
 
                 int idleDays = lastOutDate.HasValue
                     ? (int)(now - lastOutDate.Value).TotalDays
