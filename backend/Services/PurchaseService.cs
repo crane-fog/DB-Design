@@ -525,10 +525,9 @@ public class PurchaseService(string connString)
                     cmd.ExecuteNonQuery();
                 }
 
-                var newReceived = alreadyReceived + request.Quantity;
-                var newStatus = newReceived >= orderedQty
+                var newStatus = IsOrderFullyReceived(conn, tx, request.OrderId)
                     ? PurchaseOrderStatusMap.Db.Completed
-                    : (newReceived > 0 ? PurchaseOrderStatusMap.Db.PartialReceived : PurchaseOrderStatusMap.Db.Submitted);
+                    : PurchaseOrderStatusMap.Db.PartialReceived;
 
                 using (var cmd = conn.CreateCommand())
                 {
@@ -876,6 +875,21 @@ public class PurchaseService(string connString)
         cmd.Parameters.Add(new OracleParameter("orderId", orderId));
         var value = cmd.ExecuteScalar();
         return value is null or DBNull ? null : value.ToString();
+    }
+
+    private static bool IsOrderFullyReceived(
+        OracleConnection conn,
+        OracleTransaction tx,
+        long orderId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = @"SELECT COUNT(*)
+            FROM PURCHASE_ORDER_ITEM
+            WHERE ORDER_ID = :orderId
+              AND NVL(RECEIVED_QTY, 0) < QUANTITY";
+        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
+        return Convert.ToInt32(cmd.ExecuteScalar()) == 0;
     }
 
     private static string? GetRawReminderStatus(OracleConnection conn, long reminderId)
