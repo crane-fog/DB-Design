@@ -265,7 +265,7 @@ function toSystemLoginLog(log: LoginLog, users: Map<number, SystemUser>): System
     ipAddress: optionalText(log.ip_address),
     loginTime: optionalText(log.login_time),
     result: toLoginResult(log.result),
-    userId: log.user_id,
+    userId: log.user_id ?? undefined,
     userName: user?.name,
   }
 }
