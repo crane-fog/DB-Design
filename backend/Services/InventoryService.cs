@@ -909,67 +909,92 @@ public class InventoryService(string connString, IBomExpansionQuery? bomExpansio
         conn.Open();
 
         var allRecords = new List<MaterialShortageItem>();
+        var expandedItems = new List<BomDemandExpansionItem>();
         var calcTime = DateTime.Now;
 
         try
         {
             foreach (var reqItem in request.Items)
             {
-                var items = bomExpansionQuery.ExpandDemand(
-                    reqItem.MaterialId, reqItem.VersionId, reqItem.ProductionQty, conn);
-                foreach (var item in items)
+                expandedItems.AddRange(bomExpansionQuery.ExpandDemand(
+                    reqItem.MaterialId, reqItem.VersionId, reqItem.ProductionQty, conn));
+            }
+
+            // 库存、在途量和安全库存均是物料级共享数据。必须先合并所有生产需求中
+            // 相同物料的毛需求，再应用一次共享供给，否则同一份库存会被重复抵扣。
+            var demandGroups = expandedItems
+                .GroupBy(item => item.MaterialId)
+                .OrderBy(group => group.Min(item => item.Depth))
+                .ThenBy(group => group.Key);
+
+            foreach (var demandGroup in demandGroups)
+            {
+                var representative = demandGroup
+                    .OrderBy(item => item.Depth)
+                    .ThenBy(item => item.Path, StringComparer.Ordinal)
+                    .First();
+                var grossRequirement = demandGroup.Sum(item => item.GrossQuantity);
+                var combinedPath = string.Join(
+                    " | ",
+                    demandGroup
+                        .SelectMany(item => item.Path.Split(
+                            " | ",
+                            StringSplitOptions.RemoveEmptyEntries))
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(path => path, StringComparer.Ordinal));
+
+                decimal availableQty = 0;
+                using (var cmd = conn.CreateCommand())
                 {
-                    decimal availableQty = 0;
-                    using (var cmd = conn.CreateCommand())
-                    {
-                        cmd.CommandText = "SELECT AVAILABLE_QTY FROM MATERIAL_STOCK WHERE MATERIAL_ID = :materialId";
-                        cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
-                        var r = cmd.ExecuteScalar();
-                        if (r is not null and not DBNull) availableQty = Convert.ToDecimal(r);
-                    }
-
-                    decimal inTransitQty = 0;
-                    using (var cmd = conn.CreateCommand())
-                    {
-                        cmd.CommandText = @"
-                            SELECT COALESCE(SUM(poi.QUANTITY - NVL(poi.RECEIVED_QTY, 0)), 0)
-                            FROM PURCHASE_ORDER_ITEM poi
-                            JOIN PURCHASE_ORDER po ON po.ORDER_ID = poi.ORDER_ID
-                            WHERE poi.MATERIAL_ID =  :materialId
-                              AND po.STATUS IN (:submitted, :partial)";
-                        cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
-                        cmd.Parameters.Add(new OracleParameter("submitted", PurchaseOrderStatusMap.Db.Submitted));
-                        cmd.Parameters.Add(new OracleParameter("partial", PurchaseOrderStatusMap.Db.PartialReceived));
-                        inTransitQty = Convert.ToDecimal(cmd.ExecuteScalar());
-                    }
-
-                    decimal safetyStock = 0;
-                    using (var cmd = conn.CreateCommand())
-                    {
-                        cmd.CommandText = "SELECT SAFETY_STOCK FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-                        cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
-                        var r = cmd.ExecuteScalar();
-                        if (r is not null and not DBNull) safetyStock = Convert.ToDecimal(r);
-                    }
-
-                    decimal netShortage = Math.Max(
-                        item.GrossQuantity - availableQty - inTransitQty + safetyStock, 0);
-                    netShortage = Math.Ceiling(netShortage * 100) / 100;
-
-                    allRecords.Add(new MaterialShortageItem
-                    {
-                        MaterialId = item.MaterialId,
-                        MaterialName = item.MaterialName,
-                        ParentMaterialId = ResolveParentId(item.Path),
-                        Level = item.Depth,
-                        GrossRequirement = item.GrossQuantity,
-                        AvailableQty = availableQty,
-                        InTransitQty = inTransitQty,
-                        SafetyStock = safetyStock,
-                        NetShortageQty = netShortage,
-                        SuggestedPurchaseQty = netShortage,
-                    });
+                    cmd.CommandText = "SELECT AVAILABLE_QTY FROM MATERIAL_STOCK WHERE MATERIAL_ID = :materialId";
+                    cmd.Parameters.Add(new OracleParameter("materialId", demandGroup.Key));
+                    var r = cmd.ExecuteScalar();
+                    if (r is not null and not DBNull) availableQty = Convert.ToDecimal(r);
                 }
+
+                decimal inTransitQty = 0;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT COALESCE(SUM(poi.QUANTITY - NVL(poi.RECEIVED_QTY, 0)), 0)
+                        FROM PURCHASE_ORDER_ITEM poi
+                        JOIN PURCHASE_ORDER po ON po.ORDER_ID = poi.ORDER_ID
+                        WHERE poi.MATERIAL_ID =  :materialId
+                          AND po.STATUS IN (:submitted, :partial)";
+                    cmd.Parameters.Add(new OracleParameter("materialId", demandGroup.Key));
+                    cmd.Parameters.Add(new OracleParameter("submitted", PurchaseOrderStatusMap.Db.Submitted));
+                    cmd.Parameters.Add(new OracleParameter("partial", PurchaseOrderStatusMap.Db.PartialReceived));
+                    inTransitQty = Convert.ToDecimal(cmd.ExecuteScalar());
+                }
+
+                decimal safetyStock = 0;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT SAFETY_STOCK FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+                    cmd.Parameters.Add(new OracleParameter("materialId", demandGroup.Key));
+                    var r = cmd.ExecuteScalar();
+                    if (r is not null and not DBNull) safetyStock = Convert.ToDecimal(r);
+                }
+
+                decimal netShortage = Math.Max(
+                    grossRequirement - availableQty - inTransitQty + safetyStock, 0);
+                netShortage = Math.Ceiling(netShortage * 100) / 100;
+
+                allRecords.Add(new MaterialShortageItem
+                {
+                    MaterialId = demandGroup.Key,
+                    MaterialName = representative.MaterialName,
+                    ParentMaterialId = demandGroup.Any(item => item.Depth == 0)
+                        ? null
+                        : ResolveParentId(combinedPath),
+                    Level = demandGroup.Min(item => item.Depth),
+                    GrossRequirement = grossRequirement,
+                    AvailableQty = availableQty,
+                    InTransitQty = inTransitQty,
+                    SafetyStock = safetyStock,
+                    NetShortageQty = netShortage,
+                    SuggestedPurchaseQty = netShortage,
+                });
             }
         }
         catch (Exception ex)
