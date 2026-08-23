@@ -468,12 +468,10 @@ public class PurchaseService(string connString)
         if (orderStatus is not (PurchaseOrderStatusMap.Db.Submitted or PurchaseOrderStatusMap.Db.PartialReceived))
             return PurchaseReceiptResult.Fail(409, "仅已提交或部分到货订单可收货");
 
-        decimal orderedQty;
-        decimal alreadyReceived;
         long itemId = 0;
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = @"SELECT ITEM_ID, QUANTITY, COALESCE(RECEIVED_QTY, 0)
+            cmd.CommandText = @"SELECT ITEM_ID
                 FROM PURCHASE_ORDER_ITEM
                 WHERE ORDER_ID = :orderId AND MATERIAL_ID = :materialId";
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
@@ -482,18 +480,33 @@ public class PurchaseService(string connString)
             if (!r.Read())
                 return PurchaseReceiptResult.Fail(400, "该订单不存在此物料明细");
             itemId = Convert.ToInt64(r.GetValue(0));
-            orderedQty = r.GetDecimal(1);
-            alreadyReceived = r.GetDecimal(2);
         }
-
-        if (alreadyReceived + request.Quantity > orderedQty)
-            return PurchaseReceiptResult.Fail(409, $"收货数量超限：已收 {alreadyReceived}，本次 {request.Quantity}，订购 {orderedQty}");
 
         long newReceiptId;
         using (var tx = conn.BeginTransaction())
         {
             try
             {
+                int affected;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"UPDATE PURCHASE_ORDER_ITEM
+                        SET RECEIVED_QTY = RECEIVED_QTY + :incrementQty
+                        WHERE ITEM_ID = :itemId
+                          AND RECEIVED_QTY + :limitQty <= QUANTITY";
+                    cmd.Parameters.Add(new OracleParameter("incrementQty", request.Quantity));
+                    cmd.Parameters.Add(new OracleParameter("itemId", itemId));
+                    cmd.Parameters.Add(new OracleParameter("limitQty", request.Quantity));
+                    affected = cmd.ExecuteNonQuery();
+                }
+
+                if (affected == 0)
+                {
+                    tx.Rollback();
+                    return PurchaseReceiptResult.Fail(409, "收货数量超限或采购明细已变更，请刷新后重试");
+                }
+
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.Transaction = tx;
@@ -512,17 +525,6 @@ public class PurchaseService(string connString)
                     cmd.Parameters.Add(idParam);
                     cmd.ExecuteNonQuery();
                     newReceiptId = Convert.ToInt64(idParam.Value.ToString());
-                }
-
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.Transaction = tx;
-                    cmd.CommandText = @"UPDATE PURCHASE_ORDER_ITEM
-                        SET RECEIVED_QTY = RECEIVED_QTY + :qty
-                        WHERE ITEM_ID = :itemId";
-                    cmd.Parameters.Add(new OracleParameter("qty", request.Quantity));
-                    cmd.Parameters.Add(new OracleParameter("itemId", itemId));
-                    cmd.ExecuteNonQuery();
                 }
 
                 var newStatus = IsOrderFullyReceived(conn, tx, request.OrderId)
