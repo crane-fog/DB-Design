@@ -89,7 +89,7 @@ public sealed record ShortageResult(
 /// 库存管理主责 Service（B 模块）。维护 material_stock、stock_alert、stock_lock、
 /// waste_detection、finish_inbound 表及供应商报价查询。
 /// </summary>
-public class InventoryService(string connString, IBomExpansionQuery? bomExpansionQuery = null)
+public class InventoryService(string connString, IBomExpansionQuery bomExpansionQuery)
     : IStockOperationService
 {
     // ── material_stock ────────────────────────────────────────────
@@ -921,9 +921,6 @@ public class InventoryService(string connString, IBomExpansionQuery? bomExpansio
 
     public ShortageResult CalculateShortage(MaterialShortageCalculateRequest request)
     {
-        if (bomExpansionQuery is null)
-            return ShortageResult.Fail(500, "BOM 展开服务尚未接入（等待 A 模块注册 IBomExpansionQuery）");
-
         using var conn = new OracleConnection(connString);
         conn.Open();
 
