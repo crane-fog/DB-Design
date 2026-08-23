@@ -44,11 +44,34 @@ public sealed record ReminderResult(
         new(false, null, code, message);
 }
 
+public sealed record PurchaseDraftResult(
+    bool Ok,
+    int CreatedCount,
+    List<PurchaseOrder> Records,
+    List<PurchaseDraftFromShortageResponseAllOfDataUnassignedItems> UnassignedItems,
+    int ErrorCode,
+    string? ErrorMessage)
+{
+    public static PurchaseDraftResult Success(
+        List<PurchaseOrder> records,
+        List<PurchaseDraftFromShortageResponseAllOfDataUnassignedItems> unassignedItems) =>
+        new(true, records.Count, records, unassignedItems, 200, null);
+
+    public static PurchaseDraftResult Fail(int code, string message) =>
+        new(
+            false,
+            0,
+            new List<PurchaseOrder>(),
+            new List<PurchaseDraftFromShortageResponseAllOfDataUnassignedItems>(),
+            code,
+            message);
+}
+
 /// <summary>
 /// 采购管理主责 Service（B 模块）。维护 purchase_order、purchase_order_item、
 /// receive_record、overdue_reminder 表。
 /// </summary>
-public class PurchaseService(string connString)
+public class PurchaseService(string connString, ILogger<PurchaseService> logger)
 {
     // ── purchase_order (master) ───────────────────────────────────
     private const string OrderColumns = @"
@@ -234,66 +257,66 @@ public class PurchaseService(string connString)
     //  按缺料生成采购订单草稿
     // ═══════════════════════════════════════════════════════════════
 
-    public (int CreatedCount, List<PurchaseOrder> Records, List<PurchaseDraftFromShortageResponseAllOfDataUnassignedItems> UnassignedItems)
-        CreateDraftsFromShortage(PurchaseDraftFromShortageRequest request)
+    public PurchaseDraftResult CreateDraftsFromShortage(PurchaseDraftFromShortageRequest request)
     {
         using var conn = new OracleConnection(connString);
-        conn.Open();
-
         var unassigned = new List<PurchaseDraftFromShortageResponseAllOfDataUnassignedItems>();
         var supplierGroups = new Dictionary<long, List<(long MaterialId, decimal PurchaseQty)>>();
+        OracleTransaction? tx = null;
 
-        foreach (var item in request.Items)
+        try
         {
-            long supplierId;
-            if (item.SupplierId.HasValue && item.SupplierId.Value > 0)
-            {
-                supplierId = item.SupplierId.Value;
-            }
-            else
-            {
-                supplierId = GetDefaultSupplier(conn, item.MaterialId);
-            }
+            conn.Open();
 
-            if (supplierId == 0)
+            foreach (var item in request.Items)
             {
-                unassigned.Add(new PurchaseDraftFromShortageResponseAllOfDataUnassignedItems
+                if (item.PurchaseQty <= 0)
+                    return PurchaseDraftResult.Fail(400, $"物料 {item.MaterialId} 采购数量必须大于 0");
+
+                if (!MaterialExists(conn, item.MaterialId))
+                    return PurchaseDraftResult.Fail(400, $"物料 {item.MaterialId} 不存在");
+
+                long supplierId;
+                if (item.SupplierId.HasValue && item.SupplierId.Value > 0)
                 {
-                    MaterialId = item.MaterialId,
-                    PurchaseQty = item.PurchaseQty,
-                });
-                continue;
-            }
+                    supplierId = item.SupplierId.Value;
+                }
+                else
+                {
+                    supplierId = GetDefaultSupplier(conn, item.MaterialId);
+                }
 
-            if (!supplierGroups.ContainsKey(supplierId))
-                supplierGroups[supplierId] = new List<(long, decimal)>();
-
-            supplierGroups[supplierId].Add((item.MaterialId, item.PurchaseQty));
-        }
-
-        var createdOrders = new List<PurchaseOrder>();
-        foreach (var (supId, items) in supplierGroups)
-        {
-            if (!SupplierExists(conn, supId))
-            {
-                foreach (var item in items)
+                if (supplierId == 0 || !SupplierExists(conn, supplierId))
                 {
                     unassigned.Add(new PurchaseDraftFromShortageResponseAllOfDataUnassignedItems
                     {
                         MaterialId = item.MaterialId,
                         PurchaseQty = item.PurchaseQty,
                     });
+                    continue;
                 }
-                continue;
+
+                if (!supplierGroups.ContainsKey(supplierId))
+                    supplierGroups[supplierId] = new List<(long, decimal)>();
+
+                supplierGroups[supplierId].Add((item.MaterialId, item.PurchaseQty));
             }
 
-            using var tx = conn.BeginTransaction();
-            try
+            if (supplierGroups.Count == 0)
+                return PurchaseDraftResult.Success(new List<PurchaseOrder>(), unassigned);
+
+            var createdOrders = new List<PurchaseOrder>();
+            tx = conn.BeginTransaction();
+
+            foreach (var (supId, items) in supplierGroups)
             {
+                var pricedItems = new List<(long MaterialId, decimal PurchaseQty, decimal UnitPrice)>();
                 decimal totalAmount = 0;
+
                 foreach (var (materialId, qty) in items)
                 {
-                    var price = GetCurrentPriceForMaterial(conn, materialId, supId) ?? 0m;
+                    var price = GetCurrentPriceForMaterial(conn, tx, materialId, supId) ?? 0m;
+                    pricedItems.Add((materialId, qty, price));
                     totalAmount += qty * price;
                 }
 
@@ -319,9 +342,8 @@ public class PurchaseService(string connString)
                     newOrderId = Convert.ToInt64(idParam.Value.ToString());
                 }
 
-                foreach (var (materialId, qty) in items)
+                foreach (var (materialId, qty, price) in pricedItems)
                 {
-                    var price = GetCurrentPriceForMaterial(conn, materialId, supId) ?? 0m;
                     using var cmd = conn.CreateCommand();
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO PURCHASE_ORDER_ITEM
@@ -334,16 +356,40 @@ public class PurchaseService(string connString)
                     cmd.ExecuteNonQuery();
                 }
 
-                tx.Commit();
-                createdOrders.Add(GetOrderInternal(conn, newOrderId)!);
-            }
-            catch (OracleException)
-            {
-                tx.Rollback();
-            }
-        }
+                var createdOrder = GetOrderInternal(conn, newOrderId, tx);
+                if (createdOrder is null)
+                {
+                    tx.Rollback();
+                    return PurchaseDraftResult.Fail(500, "生成采购订单草稿失败，请稍后重试");
+                }
 
-        return (createdOrders.Count, createdOrders, unassigned);
+                createdOrders.Add(createdOrder);
+            }
+
+            tx.Commit();
+            return PurchaseDraftResult.Success(createdOrders, unassigned);
+        }
+        catch (OracleException ex)
+        {
+            if (tx is not null)
+            {
+                try
+                {
+                    tx.Rollback();
+                }
+                catch (OracleException rollbackException)
+                {
+                    logger.LogError(rollbackException, "回滚采购订单草稿事务失败");
+                }
+            }
+
+            logger.LogError(ex, "按缺料生成采购订单草稿失败");
+            return PurchaseDraftResult.Fail(500, "生成采购订单草稿失败，请稍后重试");
+        }
+        finally
+        {
+            tx?.Dispose();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -745,7 +791,10 @@ public class PurchaseService(string connString)
     //  Private helpers
     // ═══════════════════════════════════════════════════════════════
 
-    private static PurchaseOrder MapOrder(OracleDataReader reader, OracleConnection conn)
+    private static PurchaseOrder MapOrder(
+        OracleDataReader reader,
+        OracleConnection conn,
+        OracleTransaction? tx = null)
     {
         var orderId = Convert.ToInt64(reader.GetValue(0));
         var statusDb = reader.GetString(1);
@@ -759,7 +808,7 @@ public class PurchaseService(string connString)
             ContactPhone = reader.IsDBNull(5) ? null! : reader.GetString(5),
         };
 
-        var details = GetOrderItems(conn, orderId);
+        var details = GetOrderItems(conn, orderId, tx);
         decimal totalReceived = details.Sum(d => d.ReceivedQty);
         decimal totalOrdered = details.Sum(d => d.Quantity);
         decimal receiveProgress = totalOrdered > 0 ? totalReceived / totalOrdered : 0;
@@ -790,10 +839,14 @@ public class PurchaseService(string connString)
         };
     }
 
-    private static List<PurchaseOrderDetailLine> GetOrderItems(OracleConnection conn, long orderId)
+    private static List<PurchaseOrderDetailLine> GetOrderItems(
+        OracleConnection conn,
+        long orderId,
+        OracleTransaction? tx = null)
     {
         var items = new List<PurchaseOrderDetailLine>();
         using var cmd = conn.CreateCommand();
+        if (tx is not null) cmd.Transaction = tx;
         cmd.CommandText = ItemColumns + " WHERE i.ORDER_ID = :orderId ORDER BY i.ITEM_ID";
         cmd.Parameters.Add(new OracleParameter("orderId", orderId));
 
@@ -842,14 +895,18 @@ public class PurchaseService(string connString)
         Remark = reader.IsDBNull(6) ? null! : reader.GetString(6),
     };
 
-    private static PurchaseOrder? GetOrderInternal(OracleConnection conn, long orderId)
+    private static PurchaseOrder? GetOrderInternal(
+        OracleConnection conn,
+        long orderId,
+        OracleTransaction? tx = null)
     {
         using var cmd = conn.CreateCommand();
+        if (tx is not null) cmd.Transaction = tx;
         cmd.CommandText = OrderColumns + " WHERE o.ORDER_ID = :orderId";
         cmd.Parameters.Add(new OracleParameter("orderId", orderId));
 
         using var reader = cmd.ExecuteReader();
-        return reader.Read() ? MapOrder(reader, conn) : null;
+        return reader.Read() ? MapOrder(reader, conn, tx) : null;
     }
 
     private static PurchaseReceipt? GetReceiptInternal(OracleConnection conn, long receiptId)
@@ -928,9 +985,14 @@ public class PurchaseService(string connString)
         return result is null or DBNull ? 0 : Convert.ToInt64(result);
     }
 
-    private static decimal? GetCurrentPriceForMaterial(OracleConnection conn, long materialId, long supplierId)
+    private static decimal? GetCurrentPriceForMaterial(
+        OracleConnection conn,
+        OracleTransaction tx,
+        long materialId,
+        long supplierId)
     {
         using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
         cmd.CommandText = @"
             SELECT PRICE FROM SUPPLIER_PRICE
             WHERE MATERIAL_ID =  :materialId

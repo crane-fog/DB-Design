@@ -42,6 +42,8 @@ public sealed record LockStockResult(
 {
     public static LockStockResult Success(MaterialStockLockData data) =>
         new(true, data, 200, null);
+    public static LockStockResult Rejected(int code, string message, MaterialStockLockData data) =>
+        new(false, data, code, message);
     public static LockStockResult Fail(int code, string message) =>
         new(false, null, code, message);
 }
@@ -350,23 +352,35 @@ public class InventoryService(string connString, IBomExpansionQuery? bomExpansio
     public LockStockResult LockStock(long orderId, long operatorId,
         List<MaterialStockLockRequestItemsInner> items)
     {
+        foreach (var item in items)
+        {
+            if (item.LockQty <= 0)
+                return LockStockResult.Fail(400, $"物料 {item.MaterialId} 锁定数量必须大于 0");
+        }
+
+        // 同一物料可能在请求中出现多次，先汇总后再校验库存。
+        // 按物料 ID 固定加锁顺序，降低并发锁定时发生死锁的风险。
+        var lockItems = items
+            .GroupBy(item => item.MaterialId)
+            .Select(group => new
+            {
+                MaterialId = group.Key,
+                LockQty = group.Sum(item => item.LockQty),
+            })
+            .OrderBy(item => item.MaterialId)
+            .ToList();
+
         using var conn = new OracleConnection(connString);
         conn.Open();
         using var tx = conn.BeginTransaction();
 
         try
         {
-            var lockRecords = new List<StockLockRecord>();
             var shortages = new List<MaterialStockLockDataShortagesInner>();
 
-            foreach (var item in items)
+            // 第一阶段只锁行并校验全部物料，不修改库存，也不创建锁记录。
+            foreach (var item in lockItems)
             {
-                if (item.LockQty <= 0)
-                {
-                    tx.Rollback();
-                    return LockStockResult.Fail(400, $"物料 {item.MaterialId} 锁定数量必须大于 0");
-                }
-
                 decimal availableQty;
                 using (var cmd = conn.CreateCommand())
                 {
@@ -387,8 +401,24 @@ public class InventoryService(string connString, IBomExpansionQuery? bomExpansio
                         AvailableQty = availableQty,
                         ShortageQty = item.LockQty - availableQty,
                     });
-                    continue;
                 }
+            }
+
+            if (shortages.Count > 0)
+            {
+                tx.Rollback();
+                return LockStockResult.Rejected(409, "库存不足，未执行锁定", new MaterialStockLockData
+                {
+                    Success = false,
+                    Records = new List<StockLockRecord>(),
+                    Shortages = shortages,
+                });
+            }
+
+            // 第二阶段仅在所有物料都充足时写入；行锁保证校验值仍然有效。
+            var lockRecords = new List<StockLockRecord>();
+            foreach (var item in lockItems)
+            {
 
                 using (var cmd = conn.CreateCommand())
                 {
@@ -438,17 +468,6 @@ public class InventoryService(string connString, IBomExpansionQuery? bomExpansio
                     LockTime = now,
                     ReleaseTime = null,
                     OperatorId = operatorId,
-                });
-            }
-
-            if (shortages.Count > 0)
-            {
-                tx.Rollback();
-                return LockStockResult.Success(new MaterialStockLockData
-                {
-                    Success = false,
-                    Records = lockRecords,
-                    Shortages = shortages,
                 });
             }
 

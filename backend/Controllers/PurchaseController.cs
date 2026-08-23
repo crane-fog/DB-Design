@@ -113,18 +113,21 @@ public class PurchaseController(
                 Data = null!,
             });
 
-        var (createdCount, records, unassigned) = purchaseService.CreateDraftsFromShortage(request);
+        var result = purchaseService.CreateDraftsFromShortage(request);
+        var code = (PurchaseDraftFromShortageResponse.CodeEnum)result.ErrorCode;
 
         return Ok(new PurchaseDraftFromShortageResponse
         {
-            Code = PurchaseDraftFromShortageResponse.CodeEnum._200Enum,
-            Message = "生成完成",
-            Data = new PurchaseDraftFromShortageResponseAllOfData
-            {
-                CreatedCount = createdCount,
-                Records = records,
-                UnassignedItems = unassigned,
-            },
+            Code = code,
+            Message = result.Ok ? "生成完成" : result.ErrorMessage ?? "生成失败",
+            Data = result.Ok
+                ? new PurchaseDraftFromShortageResponseAllOfData
+                {
+                    CreatedCount = result.CreatedCount,
+                    Records = result.Records,
+                    UnassignedItems = result.UnassignedItems,
+                }
+                : null!,
         });
     }
 
