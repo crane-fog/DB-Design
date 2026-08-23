@@ -19,28 +19,6 @@ public sealed record DemandAnalysisResult<T>(bool Ok, T? Data, DemandAnalysisErr
     public static DemandAnalysisResult<T> Fail(DemandAnalysisError error, string message) => new(false, default, error, message);
 }
 
-/// <summary>B module price-query contract. Missing prices must not fall back to the lowest price.</summary>
-public interface IPriceQuery
-{
-    IReadOnlyDictionary<long, EffectivePriceResult> GetEffectivePrices(
-        IReadOnlyCollection<long> materialIds, DateOnly pricingDate);
-}
-
-public sealed record EffectivePriceResult(
-    long MaterialId, long? SupplierId, decimal? Price, DateOnly? ValidFrom, DateOnly? ValidTo, bool Missing, string? MissingReason);
-
-/// <summary>A module's BOM demand-expansion contract for B/C; supplied transactions remain caller-owned.</summary>
-public interface IBomExpansionQuery
-{
-    IReadOnlyList<BomDemandExpansionItem> ExpandDemand(
-        long materialId, long versionId, decimal quantity,
-        OracleConnection? connection = null, OracleTransaction? transaction = null);
-}
-
-public sealed record BomDemandExpansionItem(
-    long MaterialId, string MaterialName, string MaterialType, decimal NetQuantity, decimal GrossQuantity,
-    decimal LossRate, int Depth, string Path, bool IsLeaf);
-
 /// <summary>Temporary A-side price implementation, replaceable by B through DI.</summary>
 public sealed class SupplierPriceIntegrationService(string connString) : IPriceQuery
 {
