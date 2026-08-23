@@ -41,7 +41,7 @@ export type ProductionOrderStatus =
 export type ProductionLineRunStatus = 'fault' | 'idle' | 'running'
 
 /** 外部订单状态。 */
-export type ExternalOrderStatusValue = 'accepted' | 'pending_review' | 'rejected'
+export type ExternalOrderStatusValue = ExternalOrder['status']
 
 /** 故障记录状态。 */
 export type FaultStatusValue = 'pending_repair' | 'recovered' | 'repairing'
