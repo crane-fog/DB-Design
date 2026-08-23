@@ -33,7 +33,8 @@ public class DefaultApiController(
             });
         }
 
-        var user = authService.Authenticate(request.EmployeeNo.Trim(), request.Password);
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var user = authService.Authenticate(request.EmployeeNo.Trim(), request.Password, ipAddress);
         if (user is null)
         {
             return Ok(new LoginResponse

@@ -75,10 +75,12 @@ public class UserContextService(string connString)
         var roleNames = new List<string>();
         using (var roleCmd = conn.CreateCommand())
         {
+            // 只加载有效角色：disabled 角色不应继续用于新的授权或权限生效。
             roleCmd.CommandText = @"SELECT R.ROLE_NAME
                                     FROM SYS_USER_ROLE UR
                                     JOIN SYS_ROLE R ON R.ROLE_ID = UR.ROLE_ID
-                                    WHERE UR.USER_ID = :userId";
+                                    WHERE UR.USER_ID = :userId
+                                      AND R.STATUS = 'valid'";
             roleCmd.Parameters.Add(new OracleParameter("userId", userId));
 
             using var roleReader = roleCmd.ExecuteReader();

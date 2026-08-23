@@ -9,7 +9,7 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace Backend.Services;
 
-public sealed record AuthenticatedUser(long UserId, string EmployeeNo, string UserName);
+public sealed record AuthenticatedUser(long UserId, string EmployeeNo, string UserName, string RawStatus);
 public sealed record RegisteredUser(
     long UserId,
     string EmployeeNo,
@@ -20,9 +20,9 @@ public sealed record RegisteredUser(
 
 public sealed record RegisterResult(RegisteredUser? User, string? ErrorMessage);
 
-public class AuthService(string connString, string jwtSecret)
+public class AuthService(string connString, string jwtSecret, LoginLogService loginLogService)
 {
-    public AuthenticatedUser? Authenticate(string employeeNo, string inputPasswordHash)
+    public AuthenticatedUser? Authenticate(string employeeNo, string inputPasswordHash, string ipAddress)
     {
         using var conn = new OracleConnection(connString);
         conn.Open();
@@ -43,6 +43,8 @@ public class AuthService(string connString, string jwtSecret)
         {
             if (!reader.Read())
             {
+                // 工号不存在，记录失败日志
+                loginLogService.Write(0, ipAddress, false, "工号不存在");
                 return null;
             }
 
@@ -53,14 +55,22 @@ public class AuthService(string connString, string jwtSecret)
             status = reader.GetString(4);
         }
 
-        if (!CanLogin(status) || !VerifyPasswordHash(inputPasswordHash, storedPasswordHash))
+        if (!CanLogin(status))
         {
+            loginLogService.Write(userId, ipAddress, false, "账号已停用");
+            return null;
+        }
+
+        if (!VerifyPasswordHash(inputPasswordHash, storedPasswordHash))
+        {
+            loginLogService.Write(userId, ipAddress, false, "密码错误");
             return null;
         }
 
         UpdateLastLoginTime(conn, userId);
+        loginLogService.Write(userId, ipAddress, true, null);
 
-        return new AuthenticatedUser(userId, storedEmployeeNo, userName);
+        return new AuthenticatedUser(userId, storedEmployeeNo, userName, status);
     }
 
     public RegisterResult Register(
@@ -70,6 +80,18 @@ public class AuthService(string connString, string jwtSecret)
         string phone,
         string? email)
     {
+        // 契约未声明 maxLength，超长输入会触发 ORA-12899（值过大）；
+        // 服务层统一拦截（列定义见 database/01_schema_forklift.sql）
+        var lengthError = InputGuard.CheckMaxLength(employeeNo, 20, "工号")
+            ?? InputGuard.CheckMaxLength(passwordHash, 128, "密码")
+            ?? InputGuard.CheckMaxLength(userName, 50, "姓名")
+            ?? InputGuard.CheckMaxLength(phone, 20, "电话")
+            ?? InputGuard.CheckMaxLength(email, 100, "邮箱");
+        if (lengthError is not null)
+        {
+            return new RegisterResult(null, lengthError);
+        }
+
         using var conn = new OracleConnection(connString);
         conn.Open();
 

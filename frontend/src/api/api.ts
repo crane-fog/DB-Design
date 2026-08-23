@@ -1246,7 +1246,10 @@ export interface LoginData {
 }
 export interface LoginLog {
     'log_id'?: number;
-    'user_id'?: number;
+    /**
+     * 登录用户 ID；工号不存在等失败登录场景下为空
+     */
+    'user_id'?: number | null;
     'login_time'?: string;
     'ip_address'?: string;
     'result'?: LoginLogResultEnum;
@@ -3424,13 +3427,22 @@ export const RoleResponseCodeEnum = {
 export type RoleResponseCodeEnum = typeof RoleResponseCodeEnum[keyof typeof RoleResponseCodeEnum];
 
 export interface RoleUpdateRequest {
+    /**
+     * 角色编号。
+     */
+    'role_id': number;
+    /**
+     * 角色名称。
+     */
     'role_name': string;
+    /**
+     * 角色描述。
+     */
     'description'?: string | null;
     /**
-     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。新增时默认为 valid，允许后续通过 updateRoleData 修改为 disabled 或从 disabled 恢复为 valid。
+     * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。更新时不传则保持原状态。
      */
     'status'?: RoleUpdateRequestStatusEnum;
-    'role_id': number;
 }
 
 export const RoleUpdateRequestStatusEnum = {
