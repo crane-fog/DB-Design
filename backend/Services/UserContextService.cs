@@ -14,6 +14,14 @@ public sealed record CurrentUser(long UserId, string EmployeeNo, string UserName
     /// <summary>是否具备生产/系统管理员视角（可查看全部生产、外部订单）。</summary>
     public bool IsProductionManager =>
         RoleNames.Contains("系统管理员") || RoleNames.Contains("生产管理员");
+
+    /// <summary>是否具备库存管理视角（库存管理员、生产管理员、系统管理员）。</summary>
+    public bool IsInventoryManager =>
+        RoleNames.Contains("系统管理员") || RoleNames.Contains("生产管理员") || RoleNames.Contains("库存管理员");
+
+    /// <summary>是否具备采购视角（采购员、采购主管、系统管理员）。</summary>
+    public bool IsPurchaser =>
+        RoleNames.Contains("系统管理员") || RoleNames.Contains("采购员") || RoleNames.Contains("采购主管");
 }
 
 /// <summary>
