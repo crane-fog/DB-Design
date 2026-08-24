@@ -108,6 +108,37 @@
   padding: 20px;
 }
 
+/* Keep the reference-inspired chrome limited to the Dashboard surface. */
+.admin-layout:has(.dashboard-page) .admin-sidebar {
+  border-right-color: rgb(185 202 235 / 72%);
+  background: rgb(235 241 255 / 92%);
+}
+.admin-layout:has(.dashboard-page) .admin-header {
+  border-bottom-color: rgb(203 216 239 / 82%);
+  background: rgb(248 251 255 / 95%);
+}
+.admin-layout:has(.dashboard-page) .sidebar-menu {
+  --el-menu-bg-color: transparent;
+  --el-menu-hover-bg-color: rgb(91 206 250 / 12%);
+  --el-menu-text-color: #46516a;
+  --el-menu-active-color: #3478f6;
+}
+.admin-layout:has(.dashboard-page) .sidebar-menu .el-menu-item.is-active,
+.admin-layout:has(.dashboard-page) .sidebar-menu .el-sub-menu.is-active > .el-sub-menu__title {
+  border-radius: 8px;
+  background: rgb(91 206 250 / 20%);
+  color: #3478f6;
+  margin-inline: 8px;
+}
+.admin-layout:has(.dashboard-page) .sidebar-menu .el-menu-item.is-active .el-icon,
+.admin-layout:has(.dashboard-page)
+  .sidebar-menu
+  .el-sub-menu.is-active
+  > .el-sub-menu__title
+  .el-icon {
+  color: #3478f6;
+}
+
 .page-placeholder {
   max-width: 760px;
 }
