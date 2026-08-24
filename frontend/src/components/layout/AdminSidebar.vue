@@ -3,15 +3,16 @@ import {
   Box,
   Connection,
   Goods,
+  House,
   Menu as MenuIcon,
   Operation,
   Setting,
   ShoppingCart,
 } from '@element-plus/icons-vue'
 import { type Component, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { router } from '@/router'
 import { useAuthStore } from '@/stores/auth'
+import { useRoute } from 'vue-router'
 
 interface MenuItem {
   name: string
@@ -29,12 +30,11 @@ interface MenuGroup {
   title: string
 }
 
-const { collapsed } = defineProps<{ collapsed: boolean }>()
 const auth = useAuthStore()
 const route = useRoute()
-const currentRouter = useRouter()
 
 const moduleIcons: Record<string, Component> = {
+  home: House,
   inventory: Goods,
   materials: Box,
   production: Operation,
@@ -118,31 +118,27 @@ const menuGroups = computed<MenuGroup[]>(() => {
 })
 
 const activePath = computed(() => route.path)
-
-function navigateToModule(path: string) {
-  if (route.path !== path) {
-    void currentRouter.push(path)
-  }
-}
+const activeGroupKeys = computed(() =>
+  menuGroups.value
+    .filter((group) => group.items.some((item) => item.path === route.path))
+    .map((group) => group.module),
+)
 </script>
 
 <template>
   <aside class="admin-sidebar" aria-label="主导航">
     <el-menu
       class="sidebar-menu"
-      :collapse="collapsed"
-      :collapse-transition="false"
       :default-active="activePath"
+      :default-openeds="activeGroupKeys"
       :unique-opened="true"
       router
     >
       <template v-for="group in menuGroups" :key="group.module">
-        <el-sub-menu v-if="group.items.length" :index="group.module">
+        <el-sub-menu v-if="group.items.length" :index="group.module" :title="group.title">
           <template #title>
             <el-icon><component :is="group.icon" /></el-icon>
-            <span class="sidebar-module-title" @click="navigateToModule(group.path)">
-              {{ group.title }}
-            </span>
+            <span class="sidebar-module-title">{{ group.title }}</span>
           </template>
           <el-menu-item v-for="item in group.items" :key="item.name" :index="item.path">
             {{ item.title }}

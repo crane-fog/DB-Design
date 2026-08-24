@@ -19,7 +19,14 @@ declare module 'vue-router' {
 const adminRoutes: RouteRecordRaw[] = [
   {
     component: () => import('@/pages/HomePage.vue'),
-    meta: { requiresAuth: true, title: '工作台' },
+    meta: {
+      isModule: true,
+      module: 'home',
+      pageOrder: 0,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '工作台',
+    },
     name: 'home',
     path: '',
   },

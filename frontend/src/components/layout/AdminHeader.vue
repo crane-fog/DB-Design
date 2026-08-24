@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { Expand, Fold, SwitchButton, UserFilled } from '@element-plus/icons-vue'
-import AdminBreadcrumb from './AdminBreadcrumb.vue'
+import { SwitchButton, UserFilled } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
-const { collapsed } = defineProps<{ collapsed: boolean }>()
-
-const emit = defineEmits<{ toggleSidebar: [] }>()
 const auth = useAuthStore()
 const userDisplayName = computed(
   () => auth.currentUser?.name || auth.currentUser?.employeeNo || '已登录用户',
@@ -26,20 +22,6 @@ function handleUserCommand(command: string) {
       <span class="admin-brand-mark" aria-hidden="true">IM</span>
       <span class="admin-brand-title">工业制造物料管理系统</span>
     </div>
-
-    <el-tooltip :content="collapsed ? '展开侧边栏' : '收起侧边栏'" placement="bottom">
-      <el-button
-        class="sidebar-toggle"
-        text
-        circle
-        :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'"
-        @click="emit('toggleSidebar')"
-      >
-        <el-icon :size="20"><Expand v-if="collapsed" /><Fold v-else /></el-icon>
-      </el-button>
-    </el-tooltip>
-
-    <AdminBreadcrumb />
 
     <el-dropdown trigger="click" @command="handleUserCommand">
       <button class="user-summary" type="button" aria-label="用户菜单">
