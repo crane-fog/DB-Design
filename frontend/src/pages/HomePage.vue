@@ -275,11 +275,7 @@ onUnmounted(() => {
   padding: 30px clamp(20px, 3vw, 48px) 44px;
   overflow: hidden;
   color: var(--text-primary);
-  background:
-    radial-gradient(circle at 8% -2%, rgb(52 120 246 / 28%), transparent 48%),
-    radial-gradient(circle at 50% 40%, rgb(105 130 240 / 13%), transparent 54%),
-    radial-gradient(circle at 94% 98%, rgb(245 120 180 / 30%), transparent 55%),
-    linear-gradient(145deg, #edf4ff 0%, #f3f5fc 50%, #fff1f7 100%);
+  background: var(--dashboard-background);
 }
 
 .dashboard-page > :deep(*) {
@@ -295,16 +291,6 @@ onUnmounted(() => {
   color: var(--text-primary);
   font-size: clamp(28px, 3vw, 36px);
   letter-spacing: -0.03em;
-}
-.dashboard-page :deep(.page-header h1)::after {
-  display: inline-block;
-  width: 40px;
-  height: 4px;
-  margin-left: 12px;
-  border-radius: 999px;
-  background: var(--mtf-blue);
-  content: '';
-  vertical-align: middle;
 }
 .dashboard-page :deep(.page-header p) {
   margin: 10px 0 0;
@@ -612,10 +598,6 @@ onUnmounted(() => {
   .statistics-grid,
   .shortcut-grid {
     grid-template-columns: 1fr;
-  }
-  .dashboard-page :deep(.page-header h1)::after {
-    width: 32px;
-    height: 4px;
   }
 }
 </style>

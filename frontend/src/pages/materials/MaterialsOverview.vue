@@ -515,7 +515,7 @@ onMounted(() => void refreshAll())
     <el-tabs v-model="activeTab" class="material-tabs">
       <el-tab-pane label="物料主数据" name="materials">
         <el-card shadow="never">
-          <el-form inline @submit.prevent="loadMaterials(1)">
+          <el-form class="material-filter-form" inline @submit.prevent="loadMaterials(1)">
             <el-form-item label="关键字"
               ><el-input
                 v-model.trim="materialFilters.keyword"
@@ -1129,6 +1129,74 @@ onMounted(() => void refreshAll())
 .permission-tip {
   margin-bottom: 16px;
 }
+.material-filter-form {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+.material-filter-form :deep(.el-form-item) {
+  min-width: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+}
+.material-filter-form :deep(.el-form-item__content) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.material-filter-form :deep(.el-form-item__label) {
+  flex-shrink: 0;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+.material-filter-form :deep(.el-form-item:nth-child(1)) {
+  flex: 1.2 1 220px;
+  min-width: 220px;
+  max-width: 400px;
+}
+.material-filter-form :deep(.el-form-item:nth-child(1) .el-input) {
+  width: 100% !important;
+}
+.material-filter-form :deep(.el-form-item:nth-child(2)) {
+  flex: 0.7 1 115px;
+  min-width: 115px;
+  max-width: 160px;
+}
+.material-filter-form :deep(.el-form-item:nth-child(2) .el-select) {
+  width: 100% !important;
+}
+.material-filter-form :deep(.el-form-item:nth-child(3)) {
+  flex: 0.7 1 115px;
+  min-width: 115px;
+  max-width: 160px;
+}
+.material-filter-form :deep(.el-form-item:nth-child(3) .el-select) {
+  width: 100% !important;
+}
+.material-filter-form :deep(.el-form-item:nth-child(4)) {
+  flex: 0.7 1 115px;
+  min-width: 115px;
+  max-width: 160px;
+}
+.material-filter-form :deep(.el-form-item:nth-child(4) .el-select) {
+  width: 100% !important;
+}
+.material-filter-form :deep(.el-form-item:nth-child(5)) {
+  flex: 1.5 1 300px;
+  min-width: 300px;
+  max-width: 420px;
+}
+.material-filter-form :deep(.el-form-item:nth-child(5) .el-date-editor) {
+  width: 100% !important;
+}
+.material-filter-form :deep(.el-form-item:last-child) {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+}
+.material-filter-form :deep(.el-form-item:last-child .el-button + .el-button) {
+  margin-left: 0;
+}
 .material-tabs :deep(.el-tabs__content) {
   overflow: visible;
 }
@@ -1192,6 +1260,15 @@ small {
   margin: 0;
 }
 @media (max-width: 720px) {
+  .material-filter-form {
+    flex-wrap: wrap;
+  }
+  .material-filter-form :deep(.el-form-item) {
+    flex: 1 1 100%;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
   .pagination {
     justify-content: center;
   }
