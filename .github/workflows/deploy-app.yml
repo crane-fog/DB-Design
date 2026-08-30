@@ -16,6 +16,8 @@ on:
 jobs:
     build_frontend:
         runs-on: ubuntu-latest
+        env:
+            VITE_DATA_MODE: api
         steps:
             - name: Checkout
               uses: actions/checkout@v6

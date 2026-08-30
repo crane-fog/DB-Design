@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import type { LoginData, LoginRequest } from '@/api'
-import { ref } from 'vue'
-import { systemApi } from '@/api/client'
+import { type AuthLoginResult, authService, isMockAuthEnabled } from '@/services/AuthService'
+import { onMounted, ref } from 'vue'
+import { getErrorMessage } from '@/utils/error'
+import { getRequestStatus } from '@/services/SystemService'
+import { useAuthStore } from '@/stores/auth'
 
 const userNo = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
+const auth = useAuthStore()
+const mockLoginAccounts = ref<{ account: string; password: string }[]>([])
 
 function getRedirectTarget() {
   const redirect = new URLSearchParams(globalThis.location.search).get('redirect')
@@ -18,61 +22,40 @@ function getRedirectTarget() {
   return '/'
 }
 
-function getLoginErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const axiosError = error as {
-      response?: {
-        data?: {
-          message?: string
-          msg?: string
-        }
-      }
-    }
-
-    return axiosError.response?.data?.message || axiosError.response?.data?.msg || '登录失败'
-  }
-
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  return '登录失败'
-}
-
-async function hashPassword(value: string) {
-  const passwordBytes = new TextEncoder().encode(value)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', passwordBytes)
-
-  return [...new Uint8Array(hashBuffer)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
-async function buildLoginData(employeeNo: string): Promise<LoginRequest> {
-  return {
-    employee_no: employeeNo,
-    password: await hashPassword(password.value),
-  }
-}
-
-function isLoginData(data: unknown): data is LoginData {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'access_token' in data &&
-    'expires' in data &&
-    typeof data.access_token === 'string' &&
-    typeof data.expires === 'number'
-  )
-}
-
-function handleLoginSuccess(accessToken?: string, expiresInSeconds?: number) {
+async function handleLoginSuccess(result: AuthLoginResult, employeeNo: string) {
+  const { accessToken, expiresInSeconds } = result
   if (!accessToken || expiresInSeconds === undefined || expiresInSeconds <= 0) {
     errorMessage.value = '登录响应缺少令牌信息'
-    return
+    return false
   }
 
-  localStorage.setItem('jwt', accessToken)
-  localStorage.setItem('expires', String(Math.floor(Date.now() / 1000) + expiresInSeconds))
+  auth.setToken(accessToken, Math.floor(Date.now() / 1000) + expiresInSeconds)
+  auth.setCurrentUser(result.access?.currentUser ?? { employeeNo })
+  auth.setRoles([])
+  auth.setPermissions([])
+  try {
+    const access = await authService.initializeAccess(employeeNo, result)
+    auth.setCurrentUser(access.currentUser)
+    auth.setRoles(access.roles)
+    auth.setPermissions(access.permissions)
+  } catch (error) {
+    const status = getRequestStatus(error)
+    if (status === 401) {
+      auth.logout(false)
+      errorMessage.value = '登录状态已失效，请重新登录'
+      return false
+    }
+    if (status === 403) {
+      globalThis.location.href = '/forbidden'
+      return true
+    }
+
+    errorMessage.value = `登录已成功，但权限初始化失败。${getErrorMessage(error, '请稍后刷新重试')}`
+    return false
+  }
+
   globalThis.location.href = getRedirectTarget()
+  return true
 }
 
 async function submitLogin() {
@@ -91,27 +74,25 @@ async function submitLogin() {
   errorMessage.value = ''
 
   try {
-    const loginData = await buildLoginData(employeeNo)
-    const response = await systemApi.login({ loginRequest: loginData })
-    const result = response.data
-
-    if (result.code !== 200) {
-      errorMessage.value = result.message || '登录失败'
-      return
-    }
-
-    if (!isLoginData(result.data)) {
-      errorMessage.value = '登录响应缺少令牌信息'
-      return
-    }
-
-    handleLoginSuccess(result.data.access_token, result.data.expires)
+    const result = await authService.login(employeeNo, password.value)
+    await handleLoginSuccess(result, employeeNo)
   } catch (error) {
-    errorMessage.value = getLoginErrorMessage(error)
+    errorMessage.value = getErrorMessage(error, '登录失败')
   } finally {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  if (isMockAuthEnabled()) {
+    const { getMockLoginAccounts } = await import('@/config/mock-auth')
+    mockLoginAccounts.value = getMockLoginAccounts()
+  }
+
+  if (auth.restoreSession()) {
+    globalThis.location.replace('/')
+  }
+})
 </script>
 
 <template>
@@ -154,7 +135,30 @@ async function submitLogin() {
         </button>
       </form>
 
+      <aside v-if="mockLoginAccounts.length" class="mock-login-hint">
+        <strong>本地开发账号</strong>
+        <p v-for="account in mockLoginAccounts" :key="account.account">
+          {{ account.account }} / {{ account.password }}
+        </p>
+      </aside>
+
       <a class="login-register" href="/register.html">注册</a>
     </section>
   </main>
 </template>
+
+<style scoped>
+.mock-login-hint {
+  margin-top: 18px;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  padding: 12px;
+}
+
+.mock-login-hint p {
+  margin: 6px 0 0;
+}
+</style>

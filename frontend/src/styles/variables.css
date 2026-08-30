@@ -1,0 +1,35 @@
+:root {
+  --dashboard-background:
+    radial-gradient(circle at 8% -2%, rgb(52 120 246 / 28%), transparent 48%),
+    radial-gradient(circle at 50% 40%, rgb(105 130 240 / 13%), transparent 54%),
+    radial-gradient(circle at 94% 98%, rgb(245 120 180 / 30%), transparent 55%),
+    linear-gradient(145deg, #edf4ff 0%, #f3f5fc 50%, #fff1f7 100%);
+  --app-background: #f5f7fa;
+  --border-color: #d8dee8;
+  --card-background: #ffffff;
+  --danger-color: #b42318;
+  --info-color: #2563eb;
+  --page-gap: 24px;
+  --page-padding: 32px;
+  --primary-color: #2563eb;
+  --success-color: #027a48;
+  --text-color: #1f2937;
+  --text-muted: #526071;
+  --warning-color: #b54708;
+  --mtf-blue: #5bcefa;
+  --mtf-blue-strong: #269fd3;
+  --mtf-pink: #f5a9b8;
+  --mtf-purple: #6758c9;
+  --mtf-orange: #e9a23b;
+  --color-text-primary: #25283d;
+  --color-text-secondary: #6f778c;
+  --color-text-muted: #9197a8;
+  --glass-background: rgb(255 255 255 / 84%);
+  --glass-background-strong: rgb(255 255 255 / 92%);
+  --glass-border: rgb(160 175 200 / 32%);
+  --glass-divider: rgb(185 195 212 / 30%);
+  --glass-shadow: 0 6px 22px rgb(38 50 80 / 6.5%);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+}

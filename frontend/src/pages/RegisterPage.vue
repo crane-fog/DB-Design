@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { RegisterRequest } from '@/api'
+import { type RegisterFormData, systemService } from '@/services/SystemService'
+import { getErrorMessage } from '@/utils/error'
 import { ref } from 'vue'
-import { systemApi } from '@/api/client'
 
 const userNo = ref('')
 const password = ref('')
@@ -12,34 +12,6 @@ const email = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-
-function getRegisterErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const axiosError = error as {
-      response?: {
-        data?: {
-          message?: string
-          msg?: string
-        }
-      }
-    }
-
-    return axiosError.response?.data?.message || axiosError.response?.data?.msg || '注册失败'
-  }
-
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  return '注册失败'
-}
-
-async function hashPassword(value: string) {
-  const passwordBytes = new TextEncoder().encode(value)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', passwordBytes)
-
-  return [...new Uint8Array(hashBuffer)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-}
 
 function validateForm() {
   if (!userNo.value.trim() || !password.value || !userName.value.trim() || !phone.value.trim()) {
@@ -53,13 +25,13 @@ function validateForm() {
   return ''
 }
 
-async function buildRegisterData(): Promise<RegisterRequest> {
+function buildRegisterData(): RegisterFormData {
   return {
-    email: email.value.trim() || undefined,
-    employee_no: userNo.value.trim(),
-    password: await hashPassword(password.value),
-    phone: phone.value.trim(),
-    user_name: userName.value.trim(),
+    email: email.value,
+    employeeNo: userNo.value,
+    password: password.value,
+    phone: phone.value,
+    userName: userName.value,
   }
 }
 
@@ -79,22 +51,16 @@ async function submitRegister() {
   successMessage.value = ''
 
   try {
-    const response = await systemApi.register({ registerRequest: await buildRegisterData() })
-    const result = response.data
+    await systemService.register(buildRegisterData())
 
-    if (result.code !== 200) {
-      errorMessage.value = result.message || '注册失败'
-      return
-    }
-
-    successMessage.value = result.message || '注册成功'
+    successMessage.value = '注册成功'
     password.value = ''
     confirmPassword.value = ''
     setTimeout(() => {
       globalThis.location.href = '/login.html'
     }, 2000)
   } catch (error) {
-    errorMessage.value = getRegisterErrorMessage(error)
+    errorMessage.value = getErrorMessage(error, '注册失败')
   } finally {
     loading.value = false
   }

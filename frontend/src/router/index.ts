@@ -1,186 +1,300 @@
+import { PERMISSIONS, type PermissionCode } from '@/constants/permissions'
 import { type RouteRecordRaw, createRouter, createWebHistory } from 'vue-router'
+import { pinia } from '@/stores/pinia'
+import { useAuthStore } from '@/stores/auth'
 
-export type ModuleKey = 'materials' | 'inventory' | 'purchase' | 'production' | 'trace' | 'system'
-
-export interface ModuleSubPage {
-  key: string
-  path: string
-  title: string
+declare module 'vue-router' {
+  interface RouteMeta {
+    icon?: string
+    isModule?: boolean
+    module?: string
+    pageOrder?: number
+    permission?: PermissionCode
+    requiresAuth?: boolean
+    showInMenu?: boolean
+    title?: string
+  }
 }
 
-export interface ModulePage {
-  key: ModuleKey
-  path: string
-  subPages: ModuleSubPage[]
-  title: string
-}
-
-export const pages: ModulePage[] = [
-  {
-    key: 'materials',
-    path: '/materials',
-    subPages: [],
-    title: '物料管理',
-  },
-  {
-    key: 'inventory',
-    path: '/inventory',
-    subPages: [
-      { key: 'calc', path: '/inventory/calc', title: '物料缺口计算' },
-      { key: 'monitor', path: '/inventory/monitor', title: '库存监控' },
-      { key: 'register', path: '/inventory/register', title: '完工入库登记' },
-    ],
-    title: '库存管理',
-  },
-  {
-    key: 'purchase',
-    path: '/purchase',
-    subPages: [],
-    title: '采购管理',
-  },
-  {
-    key: 'production',
-    path: '/production',
-    subPages: [
-      { key: 'capacity', path: '/production/capacity', title: '产能配置' },
-      { key: 'orders', path: '/production/orders', title: '生产订单' },
-      { key: 'breakdown', path: '/production/breakdown', title: '故障反馈' },
-    ],
-    title: '生产管理',
-  },
-  {
-    key: 'trace',
-    path: '/trace',
-    subPages: [],
-    title: '质量追溯',
-  },
-  {
-    key: 'system',
-    path: '/system',
-    subPages: [
-      { key: 'users', path: '/system/users', title: '账号管理' },
-      { key: 'audit-logs', path: '/system/audit-logs', title: '操作审计' },
-    ],
-    title: '系统管理',
-  },
-]
-
-const routes: RouteRecordRaw[] = [
+const adminRoutes: RouteRecordRaw[] = [
   {
     component: () => import('@/pages/HomePage.vue'),
+    meta: {
+      isModule: true,
+      module: 'home',
+      pageOrder: 0,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '工作台',
+    },
     name: 'home',
-    path: '/',
+    path: '',
   },
   {
     component: () => import('@/pages/materials/MaterialsOverview.vue'),
-    meta: { moduleKey: 'materials' },
+    meta: {
+      icon: 'materials',
+      isModule: true,
+      module: 'materials',
+      pageOrder: 1,
+      permission: PERMISSIONS.material.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '物料 BOM',
+    },
     name: 'materials',
-    path: '/materials',
+    path: 'materials',
   },
   {
     component: () => import('@/pages/inventory/InventoryOverview.vue'),
-    meta: { moduleKey: 'inventory' },
+    meta: {
+      icon: 'inventory',
+      isModule: true,
+      module: 'inventory',
+      pageOrder: 2,
+      permission: PERMISSIONS.inventory.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '库存管理',
+    },
     name: 'inventory',
-    path: '/inventory',
+    path: 'inventory',
   },
   {
     component: () => import('@/pages/inventory/CalcPage.vue'),
-    meta: { moduleKey: 'inventory', subPageKey: 'calc' },
-    name: 'calc',
-    path: '/inventory/calc',
+    meta: {
+      icon: 'calc',
+      module: 'inventory',
+      pageOrder: 3,
+      permission: PERMISSIONS.inventory.calc,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '物料缺口计算',
+    },
+    name: 'inventory-calc',
+    path: 'inventory/calc',
   },
   {
     component: () => import('@/pages/inventory/MonitorPage.vue'),
-    meta: { moduleKey: 'inventory', subPageKey: 'monitor' },
-    name: 'monitor',
-    path: '/inventory/monitor',
+    meta: {
+      icon: 'monitor',
+      module: 'inventory',
+      pageOrder: 4,
+      permission: PERMISSIONS.inventory.monitor,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '库存监控',
+    },
+    name: 'inventory-monitor',
+    path: 'inventory/monitor',
   },
   {
     component: () => import('@/pages/inventory/RegisterPage.vue'),
-    meta: { moduleKey: 'inventory', subPageKey: 'register' },
-    name: 'register',
-    path: '/inventory/register',
+    meta: {
+      icon: 'register',
+      module: 'inventory',
+      pageOrder: 5,
+      permission: PERMISSIONS.inventory.register,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '完工入库登记',
+    },
+    name: 'inventory-register',
+    path: 'inventory/register',
   },
   {
     component: () => import('@/pages/purchase/PurchaseOverview.vue'),
-    meta: { moduleKey: 'purchase' },
+    meta: {
+      icon: 'purchase',
+      isModule: true,
+      module: 'purchase',
+      pageOrder: 6,
+      permission: PERMISSIONS.purchase.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '采购管理',
+    },
     name: 'purchase',
-    path: '/purchase',
+    path: 'purchase',
   },
   {
     component: () => import('@/pages/production/ProductionOverview.vue'),
-    meta: { moduleKey: 'production' },
+    meta: {
+      icon: 'production',
+      isModule: true,
+      module: 'production',
+      pageOrder: 7,
+      permission: PERMISSIONS.production.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '生产管理',
+    },
     name: 'production',
-    path: '/production',
+    path: 'production',
   },
   {
     component: () => import('@/pages/production/CapacityPage.vue'),
-    meta: { moduleKey: 'production', subPageKey: 'capacity' },
-    name: 'capacity',
-    path: '/production/capacity',
+    meta: {
+      icon: 'capacity',
+      module: 'production',
+      pageOrder: 8,
+      permission: PERMISSIONS.production.capacity,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '产能配置',
+    },
+    name: 'production-capacity',
+    path: 'production/capacity',
   },
   {
     component: () => import('@/pages/production/OrdersPage.vue'),
-    meta: { moduleKey: 'production', subPageKey: 'orders' },
-    name: 'orders',
-    path: '/production/orders',
+    meta: {
+      icon: 'orders',
+      module: 'production',
+      pageOrder: 9,
+      permission: PERMISSIONS.production.orders,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '生产订单',
+    },
+    name: 'production-orders',
+    path: 'production/orders',
   },
   {
     component: () => import('@/pages/production/BreakdownPage.vue'),
-    meta: { moduleKey: 'production', subPageKey: 'breakdown' },
-    name: 'breakdown',
-    path: '/production/breakdown',
+    meta: {
+      icon: 'breakdown',
+      module: 'production',
+      pageOrder: 10,
+      permission: PERMISSIONS.production.breakdown,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '故障反馈',
+    },
+    name: 'production-breakdown',
+    path: 'production/breakdown',
+  },
+  {
+    component: () => import('@/pages/production/ProductionOperationsPage.vue'),
+    meta: {
+      icon: 'monitor',
+      module: 'production',
+      pageOrder: 11,
+      permission: PERMISSIONS.production.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '生产运营',
+    },
+    name: 'production-operations',
+    path: 'production/operations',
   },
   {
     component: () => import('@/pages/trace/TraceOverview.vue'),
-    meta: { moduleKey: 'trace' },
+    meta: {
+      icon: 'trace',
+      isModule: true,
+      module: 'trace',
+      pageOrder: 12,
+      permission: PERMISSIONS.trace.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '质量追溯',
+    },
     name: 'trace',
-    path: '/trace',
+    path: 'trace',
   },
   {
     component: () => import('@/pages/system/SystemOverview.vue'),
-    meta: { moduleKey: 'system' },
+    meta: {
+      icon: 'system',
+      isModule: true,
+      module: 'system',
+      pageOrder: 13,
+      permission: PERMISSIONS.system.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '系统管理',
+    },
     name: 'system',
-    path: '/system',
+    path: 'system',
   },
   {
     component: () => import('@/pages/system/UsersPage.vue'),
-    meta: { moduleKey: 'system', subPageKey: 'users' },
-    name: 'users',
-    path: '/system/users',
+    meta: {
+      icon: 'users',
+      module: 'system',
+      pageOrder: 14,
+      permission: PERMISSIONS.system.userView,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '账号管理',
+    },
+    name: 'system-users',
+    path: 'system/users',
   },
   {
     component: () => import('@/pages/system/AuditLogsPage.vue'),
-    meta: { moduleKey: 'system', subPageKey: 'audit-logs' },
-    name: 'audit-logs',
-    path: '/system/audit-logs',
+    meta: {
+      icon: 'audit',
+      module: 'system',
+      pageOrder: 16,
+      permission: PERMISSIONS.system.auditView,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '操作审计',
+    },
+    name: 'system-audit-logs',
+    path: 'system/audit-logs',
   },
-  { path: '/:pathMatch(.*)*', redirect: '/' },
+  {
+    component: () => import('@/pages/system/RolesPage.vue'),
+    meta: {
+      icon: 'roles',
+      module: 'system',
+      pageOrder: 15,
+      permission: PERMISSIONS.system.roleView,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '角色管理',
+    },
+    name: 'system-roles',
+    path: 'system/roles',
+  },
+  {
+    component: () => import('@/pages/errors/ForbiddenPage.vue'),
+    meta: { requiresAuth: true, title: '无权限访问' },
+    name: 'forbidden',
+    path: 'forbidden',
+  },
 ]
 
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes,
+  routes: [
+    { children: adminRoutes, component: () => import('@/layouts/AdminLayout.vue'), path: '/' },
+    {
+      component: () => import('@/pages/errors/NotFoundPage.vue'),
+      meta: { title: '页面不存在' },
+      name: 'not-found',
+      path: '/:pathMatch(.*)*',
+    },
+  ],
 })
 
-function hasValidToken() {
-  const token = localStorage.getItem('jwt')
-  const expires = Number(localStorage.getItem('expires'))
-
-  if (!token || !Number.isFinite(expires)) {
-    return false
-  }
-
-  return Date.now() < expires * 1000
-}
-
 router.beforeEach((to) => {
-  if (hasValidToken()) {
+  if (!to.meta.requiresAuth) {
     return true
   }
 
-  localStorage.removeItem('jwt')
-  localStorage.removeItem('expires')
-  globalThis.location.href = `/login.html?redirect=${encodeURIComponent(to.fullPath)}`
-  return false
+  const auth = useAuthStore(pinia)
+  if (!auth.restoreSession()) {
+    globalThis.location.assign(`/login.html?redirect=${encodeURIComponent(to.fullPath)}`)
+    return false
+  }
+
+  if (typeof to.meta.permission === 'string' && !auth.hasPermission(to.meta.permission)) {
+    return { name: 'forbidden', replace: true }
+  }
+
+  return true
 })
