@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -110,6 +111,7 @@ public class ExternalOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("reviewExternalOrder")]
+    [RequireJsonFields("accepted")]
     public IActionResult Review([FromBody] ExternalOrderReviewRequest? request)
     {
         if (ResolveManagerOrForbidden() is { } forbidden)

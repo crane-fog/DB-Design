@@ -58,7 +58,12 @@ builder.Services.AddScoped(_ => new UserContextService(connString));
 builder.Services.AddScoped(_ => new ProductionOrderService(connString));
 builder.Services.AddScoped(sp => new ExternalOrderService(connString, sp.GetRequiredService<ILogger<ExternalOrderService>>()));
 builder.Services.AddScoped(_ => new QualityTraceService(connString));
-builder.Services.AddScoped(sp => new InventoryService(connString, sp.GetService<IBomExpansionQuery>()));
+builder.Services.AddScoped<BomGraphValidationService>();
+builder.Services.AddScoped<MaterialRequirementNettingService>();
+builder.Services.AddScoped(sp => new InventoryService(
+    connString,
+    sp.GetRequiredService<IBomExpansionQuery>(),
+    sp.GetRequiredService<MaterialRequirementNettingService>()));
 builder.Services.AddScoped(sp => new PurchaseService(connString, sp.GetRequiredService<ILogger<PurchaseService>>()));
 builder.Services.AddScoped<IStockOperationService>(sp => sp.GetRequiredService<InventoryService>());
 builder.Services.AddScoped<IStockReadQuery>(_ => new StockQueryService(connString));
@@ -72,6 +77,20 @@ builder.Services.AddScoped(_ => new UserRoleService(connString));
 builder.Services.AddScoped(_ => new RolePermissionService(connString));
 builder.Services.AddScoped(_ => new LoginLogService(connString));
 builder.Services.AddScoped(_ => new OperationLogService(connString));
+builder.Services.AddScoped(sp => new MaterialCatalogService(
+    connString,
+    sp.GetRequiredService<IStockReadQuery>(),
+    sp.GetRequiredService<IStockInitialization>(),
+    sp.GetRequiredService<BomGraphValidationService>()));
+builder.Services.AddScoped(_ => new BomVersionService(connString));
+builder.Services.AddScoped(_ => new BomService(connString));
+builder.Services.AddScoped<SupplierPriceIntegrationService>(_ => new SupplierPriceIntegrationService(connString));
+builder.Services.AddScoped<IPriceQuery>(sp => sp.GetRequiredService<SupplierPriceIntegrationService>());
+builder.Services.AddScoped<DemandAnalysisService>(sp => new DemandAnalysisService(
+    connString,
+    sp.GetRequiredService<IPriceQuery>(),
+    sp.GetRequiredService<MaterialRequirementNettingService>()));
+builder.Services.AddScoped<IBomExpansionQuery>(sp => sp.GetRequiredService<DemandAnalysisService>());
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

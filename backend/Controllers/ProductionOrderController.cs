@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -110,6 +111,7 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("approveProductionOrder")]
+    [RequireJsonFields("approved")]
     public IActionResult Approve([FromBody] ProductionOrderApproveRequest? request)
     {
         if (ResolveManagerOrForbidden() is { } forbidden)
