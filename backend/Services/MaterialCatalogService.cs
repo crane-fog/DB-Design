@@ -82,7 +82,8 @@ public class MaterialStockIntegrationService(string connString) : IStockReadQuer
 public class MaterialCatalogService(
     string connString,
     IStockReadQuery stockReadQuery,
-    IStockInitialization stockInitialization)
+    IStockInitialization stockInitialization,
+    BomGraphValidationService bomGraphValidation)
 {
     public (List<MaterialCategory> Records, int Total) ListCategories(int page, int pageSize, string? categoryName)
     {
@@ -313,6 +314,11 @@ public class MaterialCatalogService(
 
     public MaterialCatalogResult<MaterialDetail> AddMaterial(MaterialCreateRequest request, long createdBy)
     {
+        if (!MaterialTypeMap.IsDefined(request.MaterialType))
+        {
+            return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.BadRequest, "物料类型不合法");
+        }
+
         var validation = ValidateMaterialInput(
             request.MaterialName,
             request.Unit,
@@ -388,6 +394,11 @@ public class MaterialCatalogService(
 
     public MaterialCatalogResult<MaterialDetail> UpdateMaterial(MaterialUpdateRequest request)
     {
+        if (!MaterialTypeMap.IsDefined(request.MaterialType))
+        {
+            return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.BadRequest, "物料类型不合法");
+        }
+
         var validation = ValidateMaterialInput(
             request.MaterialName,
             request.Unit,
@@ -408,7 +419,8 @@ public class MaterialCatalogService(
         using var conn = new OracleConnection(connString);
         conn.Open();
 
-        if (GetMaterialInternal(conn, request.MaterialId) is null)
+        var existing = GetMaterialInternal(conn, request.MaterialId);
+        if (existing is null)
         {
             return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.NotFound, "物料不存在");
         }
@@ -424,31 +436,60 @@ public class MaterialCatalogService(
             return businessError;
         }
 
-        using (var cmd = conn.CreateCommand())
+        using var transaction = conn.BeginTransaction();
+        try
         {
-            cmd.CommandText = @"UPDATE MATERIAL
-                                SET MATERIAL_NAME = :materialName,
-                                    MATERIAL_TYPE = :materialType,
-                                    MODEL = :model,
-                                    UNIT = :unit,
-                                    CATEGORY_ID = :categoryId,
-                                    SAFETY_STOCK = :safetyStock,
-                                    DEFAULT_SUPPLIER_ID = :defaultSupplierId,
-                                    CURRENT_VERSION_ID = :currentVersionId,
-                                    UPDATED_TIME = SYSTIMESTAMP
-                                WHERE MATERIAL_ID = :materialId";
-            AddMaterialWriteParameters(
-                cmd,
-                request.MaterialName.Trim(),
-                MaterialTypeMap.ToDb(request.MaterialType),
-                request.Model,
-                request.Unit.Trim(),
-                request.CategoryId,
-                Convert.ToDecimal(request.SafetyStock),
-                request.DefaultSupplierId,
-                request.CurrentVersionId);
-            cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
-            cmd.ExecuteNonQuery();
+            if (request.CurrentVersionId.HasValue
+                && existing.CurrentVersionId != request.CurrentVersionId)
+            {
+                var graphValidation = bomGraphValidation.ValidateActivation(
+                    conn,
+                    transaction,
+                    request.MaterialId,
+                    request.CurrentVersionId.Value);
+                if (graphValidation.HasCycle)
+                {
+                    transaction.Rollback();
+                    return MaterialCatalogResult<MaterialDetail>.Fail(
+                        MaterialCatalogError.Conflict,
+                        $"发布该 BOM 版本会形成循环依赖：{string.Join(" -> ", graphValidation.CyclePath)}");
+                }
+            }
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = transaction;
+                cmd.CommandText = @"UPDATE MATERIAL
+                                    SET MATERIAL_NAME = :materialName,
+                                        MATERIAL_TYPE = :materialType,
+                                        MODEL = :model,
+                                        UNIT = :unit,
+                                        CATEGORY_ID = :categoryId,
+                                        SAFETY_STOCK = :safetyStock,
+                                        DEFAULT_SUPPLIER_ID = :defaultSupplierId,
+                                        CURRENT_VERSION_ID = :currentVersionId,
+                                        UPDATED_TIME = SYSTIMESTAMP
+                                    WHERE MATERIAL_ID = :materialId";
+                AddMaterialWriteParameters(
+                    cmd,
+                    request.MaterialName.Trim(),
+                    MaterialTypeMap.ToDb(request.MaterialType),
+                    request.Model,
+                    request.Unit.Trim(),
+                    request.CategoryId,
+                    Convert.ToDecimal(request.SafetyStock),
+                    request.DefaultSupplierId,
+                    request.CurrentVersionId);
+                cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
+                cmd.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+        catch (OracleException ex) when (ex.Number == 1 || ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
+        {
+            transaction.Rollback();
+            return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.Conflict, "物料关联数据冲突");
         }
 
         return MaterialCatalogResult<MaterialDetail>.Success(GetMaterialInternal(conn, request.MaterialId)!);
@@ -474,23 +515,50 @@ public class MaterialCatalogService(
             return MaterialCatalogResult<object>.Fail(MaterialCatalogError.Conflict, "物料已被业务数据引用，不能删除");
         }
 
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        cmd.ExecuteNonQuery();
-        return MaterialCatalogResult<object>.Success(new object());
+        using var transaction = conn.BeginTransaction();
+        try
+        {
+            using (var stockCmd = conn.CreateCommand())
+            {
+                stockCmd.Transaction = transaction;
+                stockCmd.CommandText = @"DELETE FROM MATERIAL_STOCK
+                                         WHERE MATERIAL_ID = :materialId
+                                           AND AVAILABLE_QTY = 0
+                                           AND LOCKED_QTY = 0";
+                stockCmd.Parameters.Add(new OracleParameter("materialId", materialId));
+                stockCmd.ExecuteNonQuery();
+            }
+
+            using (var materialCmd = conn.CreateCommand())
+            {
+                materialCmd.Transaction = transaction;
+                materialCmd.CommandText = "DELETE FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+                materialCmd.Parameters.Add(new OracleParameter("materialId", materialId));
+                materialCmd.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+            return MaterialCatalogResult<object>.Success(new object());
+        }
+        catch (OracleException ex) when (ex.Number == 2292)
+        {
+            transaction.Rollback();
+            return MaterialCatalogResult<object>.Fail(MaterialCatalogError.Conflict, "物料已被业务数据引用，不能删除");
+        }
     }
 
     private const string MaterialSelectColumns = @"
         SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MATERIAL_TYPE, m.MODEL, m.UNIT,
                m.CATEGORY_ID, c.CATEGORY_NAME, m.SAFETY_STOCK, m.DEFAULT_SUPPLIER_ID,
-               s.SUPPLIER_NAME, m.CURRENT_VERSION_ID, bv.VERSION_NO, m.CREATED_BY,
+               s.SUPPLIER_NAME, bv.VERSION_ID, bv.VERSION_NO, m.CREATED_BY,
                m.CREATED_TIME, m.UPDATED_TIME, ms.AVAILABLE_QTY, ms.LOCKED_QTY,
                ms.LAST_IN_DATE, ms.LAST_OUT_DATE
         FROM MATERIAL m
         JOIN MATERIAL_CATEGORY c ON c.CATEGORY_ID = m.CATEGORY_ID
         LEFT JOIN SUPPLIER s ON s.SUPPLIER_ID = m.DEFAULT_SUPPLIER_ID
         LEFT JOIN BOM_VERSION bv ON bv.VERSION_ID = m.CURRENT_VERSION_ID
+                                AND bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
+                                AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(SYSDATE))
         LEFT JOIN MATERIAL_STOCK ms ON ms.MATERIAL_ID = m.MATERIAL_ID";
 
     private static List<string> BuildMaterialWhere(
@@ -712,23 +780,35 @@ public class MaterialCatalogService(
 
         if (currentVersionId.HasValue)
         {
+            if (!materialId.HasValue)
+            {
+                return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.BadRequest, "新增物料时不能直接绑定当前 BOM 版本");
+            }
+
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT MATERIAL_ID FROM BOM_VERSION WHERE VERSION_ID = :versionId";
+            cmd.CommandText = @"SELECT MATERIAL_ID,
+                                       CASE
+                                           WHEN EFFECTIVE_DATE <= TRUNC(SYSDATE)
+                                            AND (EXPIRE_DATE IS NULL OR EXPIRE_DATE >= TRUNC(SYSDATE))
+                                           THEN 1 ELSE 0
+                                       END AS IS_EFFECTIVE
+                                FROM BOM_VERSION
+                                WHERE VERSION_ID = :versionId";
             cmd.Parameters.Add(new OracleParameter("versionId", currentVersionId.Value));
-            var versionMaterialId = cmd.ExecuteScalar();
-            if (versionMaterialId is null)
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
             {
                 return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.BadRequest, "当前 BOM 版本不存在");
             }
 
-            if (materialId.HasValue && Convert.ToInt64(versionMaterialId) != materialId.Value)
+            if (Convert.ToInt64(reader.GetValue(0)) != materialId.Value)
             {
                 return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.BadRequest, "当前 BOM 版本不属于该物料");
             }
 
-            if (!materialId.HasValue)
+            if (Convert.ToInt32(reader.GetValue(1)) != 1)
             {
-                return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.BadRequest, "新增物料时不能直接绑定当前 BOM 版本");
+                return MaterialCatalogResult<MaterialDetail>.Fail(MaterialCatalogError.Conflict, "只能发布当前处于有效期内的 BOM 版本");
             }
         }
 
@@ -868,6 +948,10 @@ public static class MaterialTypeMap
     public static string ToDb(MaterialCreateRequest.MaterialTypeEnum type) => CreateToDb[type];
 
     public static string ToDb(MaterialUpdateRequest.MaterialTypeEnum type) => UpdateToDb[type];
+
+    public static bool IsDefined(MaterialCreateRequest.MaterialTypeEnum type) => CreateToDb.ContainsKey(type);
+
+    public static bool IsDefined(MaterialUpdateRequest.MaterialTypeEnum type) => UpdateToDb.ContainsKey(type);
 
     public static string? ToDbOrNull(string? apiType) =>
         !string.IsNullOrWhiteSpace(apiType) && ApiToDb.TryGetValue(apiType.Trim(), out var dbType) ? dbType : null;

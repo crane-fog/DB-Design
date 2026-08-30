@@ -89,7 +89,10 @@ public sealed record ShortageResult(
 /// 库存管理主责 Service（B 模块）。维护 material_stock、stock_alert、stock_lock、
 /// waste_detection、finish_inbound 表及供应商报价查询。
 /// </summary>
-public class InventoryService(string connString, IBomExpansionQuery bomExpansionQuery)
+public class InventoryService(
+    string connString,
+    IBomExpansionQuery bomExpansionQuery,
+    MaterialRequirementNettingService requirementNetting)
     : IStockOperationService
 {
     // ── material_stock ────────────────────────────────────────────
@@ -936,82 +939,20 @@ public class InventoryService(string connString, IBomExpansionQuery bomExpansion
                     reqItem.MaterialId, reqItem.VersionId, reqItem.ProductionQty, conn));
             }
 
-            // 库存、在途量和安全库存均是物料级共享数据。必须先合并所有生产需求中
-            // 相同物料的毛需求，再应用一次共享供给，否则同一份库存会被重复抵扣。
-            var demandGroups = expandedItems
-                .GroupBy(item => item.MaterialId)
-                .OrderBy(group => group.Min(item => item.Depth))
-                .ThenBy(group => group.Key);
-
-            foreach (var demandGroup in demandGroups)
-            {
-                var representative = demandGroup
-                    .OrderBy(item => item.Depth)
-                    .ThenBy(item => item.Path, StringComparer.Ordinal)
-                    .First();
-                var grossRequirement = demandGroup.Sum(item => item.GrossQuantity);
-                var combinedPath = string.Join(
-                    " | ",
-                    demandGroup
-                        .SelectMany(item => item.Path.Split(
-                            " | ",
-                            StringSplitOptions.RemoveEmptyEntries))
-                        .Distinct(StringComparer.Ordinal)
-                        .OrderBy(path => path, StringComparer.Ordinal));
-
-                decimal availableQty = 0;
-                using (var cmd = conn.CreateCommand())
+            allRecords.AddRange(requirementNetting.Calculate(conn, null, expandedItems)
+                .Select(item => new MaterialShortageItem
                 {
-                    cmd.CommandText = "SELECT AVAILABLE_QTY FROM MATERIAL_STOCK WHERE MATERIAL_ID = :materialId";
-                    cmd.Parameters.Add(new OracleParameter("materialId", demandGroup.Key));
-                    var r = cmd.ExecuteScalar();
-                    if (r is not null and not DBNull) availableQty = Convert.ToDecimal(r);
-                }
-
-                decimal inTransitQty = 0;
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = @"
-                        SELECT COALESCE(SUM(poi.QUANTITY - NVL(poi.RECEIVED_QTY, 0)), 0)
-                        FROM PURCHASE_ORDER_ITEM poi
-                        JOIN PURCHASE_ORDER po ON po.ORDER_ID = poi.ORDER_ID
-                        WHERE poi.MATERIAL_ID =  :materialId
-                          AND po.STATUS IN (:submitted, :partial)";
-                    cmd.Parameters.Add(new OracleParameter("materialId", demandGroup.Key));
-                    cmd.Parameters.Add(new OracleParameter("submitted", PurchaseOrderStatusMap.Db.Submitted));
-                    cmd.Parameters.Add(new OracleParameter("partial", PurchaseOrderStatusMap.Db.PartialReceived));
-                    inTransitQty = Convert.ToDecimal(cmd.ExecuteScalar());
-                }
-
-                decimal safetyStock = 0;
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = "SELECT SAFETY_STOCK FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-                    cmd.Parameters.Add(new OracleParameter("materialId", demandGroup.Key));
-                    var r = cmd.ExecuteScalar();
-                    if (r is not null and not DBNull) safetyStock = Convert.ToDecimal(r);
-                }
-
-                decimal netShortage = Math.Max(
-                    grossRequirement - availableQty - inTransitQty + safetyStock, 0);
-                netShortage = Math.Ceiling(netShortage * 100) / 100;
-
-                allRecords.Add(new MaterialShortageItem
-                {
-                    MaterialId = demandGroup.Key,
-                    MaterialName = representative.MaterialName,
-                    ParentMaterialId = demandGroup.Any(item => item.Depth == 0)
-                        ? null
-                        : ResolveParentId(combinedPath),
-                    Level = demandGroup.Min(item => item.Depth),
-                    GrossRequirement = grossRequirement,
-                    AvailableQty = availableQty,
-                    InTransitQty = inTransitQty,
-                    SafetyStock = safetyStock,
-                    NetShortageQty = netShortage,
-                    SuggestedPurchaseQty = netShortage,
-                });
-            }
+                    MaterialId = item.MaterialId,
+                    MaterialName = item.MaterialName,
+                    ParentMaterialId = item.ParentMaterialId,
+                    Level = item.Depth,
+                    GrossRequirement = item.GrossRequirement,
+                    AvailableQty = item.AvailableQuantity,
+                    InTransitQty = item.InTransitQuantity,
+                    SafetyStock = item.SafetyStock,
+                    NetShortageQty = item.NetRequirement,
+                    SuggestedPurchaseQty = item.NetRequirement,
+                }));
         }
         catch (Exception ex)
         {
@@ -1218,22 +1159,6 @@ public class InventoryService(string connString, IBomExpansionQuery bomExpansion
         cmd.Parameters.Add(new OracleParameter("detectionId", detectionId));
         var value = cmd.ExecuteScalar();
         return value is null or DBNull ? null : value.ToString();
-    }
-
-    /// <summary>
-    /// 从 BOM 展开的装配路径（如 "101/402 | 101/403"）解析直接父物料；
-    /// 物料出现在多条路径且父不一致时返回 null。
-    /// </summary>
-    private static long? ResolveParentId(string path)
-    {
-        var parents = path.Split(" | ", StringSplitOptions.RemoveEmptyEntries)
-            .Select(segment => segment.Split('/', StringSplitOptions.RemoveEmptyEntries))
-            .Select(parts => parts.Length >= 2 ? parts[^2] : null)
-            .Where(parent => parent is not null)
-            .Select(parent => parent!)
-            .Distinct()
-            .ToList();
-        return parents.Count == 1 && long.TryParse(parents[0], out var parentId) ? parentId : null;
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -75,6 +76,7 @@ public class BomController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addBomData")]
+    [RequireJsonFields("loss_rate")]
     public IActionResult AddBom([FromBody] BomCreateRequest? request)
     {
         if (ResolveBomManagerOrForbidden() is { } forbidden)
@@ -94,6 +96,7 @@ public class BomController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateBomData")]
+    [RequireJsonFields("loss_rate")]
     public IActionResult UpdateBom([FromBody] BomUpdateRequest? request)
     {
         if (ResolveBomManagerOrForbidden() is { } forbidden)

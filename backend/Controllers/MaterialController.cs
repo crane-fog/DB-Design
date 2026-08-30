@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -176,6 +177,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addMaterialData")]
+    [RequireJsonFields("material_type")]
     public IActionResult AddMaterial([FromBody] MaterialCreateRequest? request)
     {
         var user = ResolveManager();
@@ -196,6 +198,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateMaterialData")]
+    [RequireJsonFields("material_type")]
     public IActionResult UpdateMaterial([FromBody] MaterialUpdateRequest? request)
     {
         if (ResolveMaterialManagerOrForbidden() is { } forbidden)

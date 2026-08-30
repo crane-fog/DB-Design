@@ -66,7 +66,10 @@ public sealed class SupplierPriceIntegrationService(string connString) : IPriceQ
     }
 }
 
-public sealed class DemandAnalysisService(string connString, IPriceQuery priceQuery) : IBomExpansionQuery
+public sealed class DemandAnalysisService(
+    string connString,
+    IPriceQuery priceQuery,
+    MaterialRequirementNettingService requirementNetting) : IBomExpansionQuery
 {
     public DemandAnalysisResult<List<LossCompensationItem>> CalculateLossCompensation(LossCompensationCalculateRequest request)
     {
@@ -130,31 +133,44 @@ public sealed class DemandAnalysisService(string connString, IPriceQuery priceQu
         if (error is not null) return DemandAnalysisResult<DemandAnalysis>.Fail(DemandAnalysisError.BadRequest, error);
         try
         {
-            var details = ExpandDemand(request.MaterialId, request.VersionId, Convert.ToDecimal(request.ProductionQty));
+            using var conn = new OracleConnection(connString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction();
+            var expandedItems = ExpandDemand(
+                request.MaterialId,
+                request.VersionId,
+                Convert.ToDecimal(request.ProductionQty),
+                conn,
+                transaction);
+            var requirements = requirementNetting.Calculate(conn, transaction, expandedItems);
             var detail = new Dictionary<string, object>
             {
-                ["analysis_target"] = GetMaterialName(request.MaterialId),
+                ["analysis_target"] = GetMaterialName(conn, transaction, request.MaterialId),
                 ["material_id"] = request.MaterialId,
                 ["version_id"] = request.VersionId,
                 ["production_qty"] = request.ProductionQty,
-                ["items"] = details.Select(item => new
+                ["items"] = requirements.Select(item => new
                 {
                     material_id = item.MaterialId,
                     material_name = item.MaterialName,
                     material_type = item.MaterialType,
-                    net_quantity = item.NetQuantity,
-                    loss_rate = item.LossRate,
-                    gross_quantity = item.GrossQuantity,
+                    bom_net_quantity = item.BomNetQuantity,
+                    loss_rate = item.LossRates.Count == 1 ? item.LossRates[0] : (decimal?)null,
+                    loss_rates = item.LossRates,
+                    gross_quantity = item.GrossRequirement,
+                    available_qty = item.AvailableQuantity,
+                    in_transit_qty = item.InTransitQuantity,
+                    safety_stock = item.SafetyStock,
+                    net_quantity = item.NetRequirement,
                     depth = item.Depth,
                     path = item.Path,
                     is_leaf = item.IsLeaf
                 }).ToList(),
             };
-            using var conn = new OracleConnection(connString);
-            conn.Open();
             long analysisId;
             using (var cmd = conn.CreateCommand())
             {
+                cmd.Transaction = transaction;
                 cmd.CommandText = @"INSERT INTO DEMAND_ANALYSIS (MATERIAL_ID, VERSION_ID, PRODUCTION_QTY, DEMAND_DETAIL)
                                     VALUES (:materialId, :versionId, :productionQty, :demandDetail) RETURNING ANALYSIS_ID INTO :analysisId";
                 cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
@@ -164,6 +180,8 @@ public sealed class DemandAnalysisService(string connString, IPriceQuery priceQu
                 var id = new OracleParameter("analysisId", OracleDbType.Int64) { Direction = System.Data.ParameterDirection.Output };
                 cmd.Parameters.Add(id); cmd.ExecuteNonQuery(); analysisId = Convert.ToInt64(id.Value.ToString());
             }
+
+            transaction.Commit();
             return DemandAnalysisResult<DemandAnalysis>.Success(GetRequirementAnalysis(analysisId, null, null)!);
         }
         catch (DemandAnalysisBusinessException ex) { return DemandAnalysisResult<DemandAnalysis>.Fail(ex.Error, ex.Message); }
@@ -208,21 +226,18 @@ public sealed class DemandAnalysisService(string connString, IPriceQuery priceQu
 
         var occurrences = new List<BomDemandExpansionItem>();
         ExpandGraph(graph, root, versionId, quantity, 0, materialId.ToString(), new HashSet<long> { materialId }, occurrences);
-        if (occurrences.Count == 0) occurrences.Add(new BomDemandExpansionItem(root.MaterialId, root.MaterialName, root.MaterialType, quantity, quantity, 0, 0, materialId.ToString(), true));
-        return occurrences.GroupBy(item => item.MaterialId).Select(group =>
+        return occurrences.GroupBy(item => new { item.MaterialId, item.LossRate }).Select(group =>
         {
             var first = group.OrderBy(item => item.Depth).ThenBy(item => item.Path, StringComparer.Ordinal).First();
-            var rates = group.Select(item => item.LossRate).Distinct().ToList();
             return first with
             {
                 NetQuantity = group.Sum(item => item.NetQuantity),
                 GrossQuantity = group.Sum(item => item.GrossQuantity),
-                LossRate = rates.Count == 1 ? rates[0] : 0,
                 Depth = group.Min(item => item.Depth),
                 Path = string.Join(" | ", group.Select(item => item.Path).Distinct().OrderBy(path => path, StringComparer.Ordinal)),
                 IsLeaf = group.All(item => item.IsLeaf)
             };
-        }).OrderBy(item => item.Depth).ThenBy(item => item.MaterialId).ToList();
+        }).OrderBy(item => item.Depth).ThenBy(item => item.MaterialId).ThenBy(item => item.LossRate).ToList();
     }
 
     private DateOnly GetDatabaseDate()
@@ -230,9 +245,14 @@ public sealed class DemandAnalysisService(string connString, IPriceQuery priceQu
         using var conn = new OracleConnection(connString); conn.Open(); using var cmd = conn.CreateCommand(); cmd.CommandText = "SELECT TRUNC(SYSDATE) FROM DUAL";
         return DateOnly.FromDateTime(Convert.ToDateTime(cmd.ExecuteScalar()));
     }
-    private string GetMaterialName(long materialId)
+    private static string GetMaterialName(
+        OracleConnection conn,
+        OracleTransaction? transaction,
+        long materialId)
     {
-        using var conn = new OracleConnection(connString); conn.Open(); using var cmd = conn.CreateCommand(); cmd.CommandText = "SELECT MATERIAL_NAME FROM MATERIAL WHERE MATERIAL_ID = :materialId";
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = "SELECT MATERIAL_NAME FROM MATERIAL WHERE MATERIAL_ID = :materialId";
         cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         return cmd.ExecuteScalar()?.ToString() ?? throw new DemandAnalysisBusinessException(DemandAnalysisError.NotFound, "物料不存在");
     }
@@ -244,9 +264,15 @@ public sealed class DemandAnalysisService(string connString, IPriceQuery priceQu
     private static DemandGraph LoadGraph(OracleConnection conn, OracleTransaction? transaction)
     {
         using var cmd = conn.CreateCommand(); cmd.Transaction = transaction;
-        cmd.CommandText = @"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MATERIAL_TYPE, m.CURRENT_VERSION_ID, bv.VERSION_ID, bv.MATERIAL_ID,
+        cmd.CommandText = @"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MATERIAL_TYPE, current_bv.VERSION_ID, bv.VERSION_ID, bv.MATERIAL_ID,
                                    b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID, b.VERSION_ID, b.QUANTITY, b.LOSS_RATE
-                            FROM MATERIAL m LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
+                            FROM MATERIAL m
+                            LEFT JOIN BOM_VERSION current_bv
+                              ON current_bv.VERSION_ID = m.CURRENT_VERSION_ID
+                             AND current_bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
+                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(SYSDATE))
+                            LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
+                            LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
                             ORDER BY m.MATERIAL_ID, bv.VERSION_ID, b.BOM_ID";
         var materials = new Dictionary<long, DemandMaterial>(); var versions = new Dictionary<long, long>(); var children = new Dictionary<long, List<DemandEdge>>();
         using var reader = cmd.ExecuteReader();

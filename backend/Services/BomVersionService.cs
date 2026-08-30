@@ -131,7 +131,7 @@ public class BomVersionService(string connString)
                 newId = Convert.ToInt64(idParam.Value.ToString());
             }
 
-            SyncCurrentVersionIfEffective(conn, transaction, request.MaterialId, newId, request.EffectiveDate, request.ExpireDate);
+            // 版本创建与发布分离：BOM 明细完成后，由物料 current_version_id 显式发布。
             transaction.Commit();
             return BomBusinessResult<BomVersion>.Success(GetVersionInternal(conn, newId)!);
         }
@@ -174,10 +174,17 @@ public class BomVersionService(string connString)
                 return BomBusinessResult<BomVersion>.Fail(BomBusinessError.BadRequest, "物料不存在");
             }
 
-            if (HasBomDetails(conn, transaction, request.VersionId) && existing.MaterialId != request.MaterialId)
+            if (existing.MaterialId != request.MaterialId)
             {
                 transaction.Rollback();
-                return BomBusinessResult<BomVersion>.Fail(BomBusinessError.Conflict, "版本已包含 BOM 明细，不能修改所属物料");
+                return BomBusinessResult<BomVersion>.Fail(BomBusinessError.Conflict, "BOM 版本所属物料不能修改");
+            }
+
+            if (IsCurrentVersion(conn, transaction, request.VersionId)
+                && !IsEffectiveOnDatabaseDate(conn, transaction, request.EffectiveDate, request.ExpireDate))
+            {
+                transaction.Rollback();
+                return BomBusinessResult<BomVersion>.Fail(BomBusinessError.Conflict, "当前发布版本必须处于有效期内，请先取消发布");
             }
 
             if (VersionNoExists(conn, transaction, request.MaterialId, request.VersionNo.Trim(), request.VersionId))
@@ -201,8 +208,6 @@ public class BomVersionService(string connString)
                 cmd.ExecuteNonQuery();
             }
 
-            ClearCurrentVersionIfMoved(conn, transaction, existing.MaterialId, request.VersionId);
-            SyncCurrentVersionIfEffective(conn, transaction, request.MaterialId, request.VersionId, request.EffectiveDate, request.ExpireDate);
             transaction.Commit();
             return BomBusinessResult<BomVersion>.Success(GetVersionInternal(conn, request.VersionId)!);
         }
@@ -287,6 +292,11 @@ public class BomVersionService(string connString)
             return "版本号不能为空";
         }
 
+        if (effectiveDate == default)
+        {
+            return "生效日期不能为空";
+        }
+
         if (expireDate.HasValue && expireDate.Value < effectiveDate)
         {
             return "失效日期不能早于生效日期";
@@ -359,56 +369,27 @@ public class BomVersionService(string connString)
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
-    private static bool HasBomDetails(OracleConnection conn, OracleTransaction transaction, long versionId)
+    private static bool IsCurrentVersion(OracleConnection conn, OracleTransaction transaction, long versionId)
     {
         using var cmd = conn.CreateCommand();
         cmd.Transaction = transaction;
-        cmd.CommandText = "SELECT COUNT(*) FROM BOM WHERE VERSION_ID = :versionId";
+        cmd.CommandText = "SELECT COUNT(*) FROM MATERIAL WHERE CURRENT_VERSION_ID = :versionId";
         cmd.Parameters.Add(new OracleParameter("versionId", versionId));
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
-    private static void SyncCurrentVersionIfEffective(
+    private static bool IsEffectiveOnDatabaseDate(
         OracleConnection conn,
         OracleTransaction transaction,
-        long materialId,
-        long versionId,
         DateOnly effectiveDate,
         DateOnly? expireDate)
     {
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        if (effectiveDate > today || (expireDate.HasValue && expireDate.Value < today))
-        {
-            return;
-        }
-
         using var cmd = conn.CreateCommand();
         cmd.Transaction = transaction;
-        cmd.CommandText = @"UPDATE MATERIAL
-                            SET CURRENT_VERSION_ID = :versionId,
-                                UPDATED_TIME = SYSTIMESTAMP
-                            WHERE MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("versionId", versionId));
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        cmd.ExecuteNonQuery();
-    }
-
-    private static void ClearCurrentVersionIfMoved(
-        OracleConnection conn,
-        OracleTransaction transaction,
-        long materialId,
-        long versionId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.Transaction = transaction;
-        cmd.CommandText = @"UPDATE MATERIAL
-                            SET CURRENT_VERSION_ID = NULL,
-                                UPDATED_TIME = SYSTIMESTAMP
-                            WHERE MATERIAL_ID = :materialId
-                              AND CURRENT_VERSION_ID = :versionId";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        cmd.Parameters.Add(new OracleParameter("versionId", versionId));
-        cmd.ExecuteNonQuery();
+        cmd.CommandText = "SELECT TRUNC(SYSDATE) FROM DUAL";
+        var databaseDate = DateOnly.FromDateTime(Convert.ToDateTime(cmd.ExecuteScalar()));
+        return effectiveDate <= databaseDate
+            && (!expireDate.HasValue || expireDate.Value >= databaseDate);
     }
 
     private static bool ExistsBySql(OracleConnection conn, string sql, long id)

@@ -289,9 +289,13 @@ public class BomService(string connString)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MODEL, m.MATERIAL_TYPE, m.UNIT,
-                                   m.CURRENT_VERSION_ID, bv.VERSION_ID, bv.VERSION_NO,
+                                   current_bv.VERSION_ID, bv.VERSION_ID, bv.VERSION_NO,
                                    b.BOM_ID, b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID, b.QUANTITY
                             FROM MATERIAL m
+                            LEFT JOIN BOM_VERSION current_bv
+                              ON current_bv.VERSION_ID = m.CURRENT_VERSION_ID
+                             AND current_bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
+                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(SYSDATE))
                             LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
                             LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
                             ORDER BY m.MATERIAL_ID, bv.VERSION_ID, b.BOM_ID";
@@ -682,7 +686,10 @@ public class BomService(string connString)
         cmd.CommandText = @"SELECT b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID
                             FROM BOM b
                             JOIN MATERIAL m ON m.MATERIAL_ID = b.PARENT_MATERIAL_ID
+                            JOIN BOM_VERSION bv ON bv.VERSION_ID = b.VERSION_ID
                             WHERE m.CURRENT_VERSION_ID = b.VERSION_ID
+                              AND bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
+                              AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(SYSDATE))
                               AND (:bomId IS NULL OR b.BOM_ID <> :bomId)";
         cmd.Parameters.Add(new OracleParameter("bomId", excludingBomId.HasValue ? excludingBomId.Value : DBNull.Value));
 

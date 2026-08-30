@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -65,6 +66,7 @@ public class BomVersionController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addBomVersionData")]
+    [RequireJsonFields("effective_date")]
     public IActionResult AddVersion([FromBody] BomVersionCreateRequest? request)
     {
         var user = ResolveManager();
@@ -85,6 +87,7 @@ public class BomVersionController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateBomVersionData")]
+    [RequireJsonFields("effective_date")]
     public IActionResult UpdateVersion([FromBody] BomVersionUpdateRequest? request)
     {
         if (ResolveVersionManagerOrForbidden() is { } forbidden)
