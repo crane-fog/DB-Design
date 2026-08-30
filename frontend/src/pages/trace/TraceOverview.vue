@@ -24,11 +24,13 @@ import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
 import { qualityDispositionStatuses } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
+import { useRoute } from 'vue-router'
 
 type TraceTab = 'consumption' | 'impact' | 'material' | 'product'
 
 const pageSize = 10
 const auth = useAuthStore()
+const route = useRoute()
 const canManage = computed(() => auth.hasPermission(PERMISSIONS.trace.manage))
 const activeTab = ref<TraceTab>('consumption')
 const references = ref<TraceConsumptionReferenceData>({ productBatches: [], purchaseItems: [] })
@@ -510,8 +512,22 @@ function getQualityStatusTone(status?: QualityDispositionStatus) {
   return qualityDispositionStatuses[status].tone
 }
 
-onMounted(() => {
-  void Promise.all([loadConsumption(), loadReferences()])
+onMounted(async () => {
+  await Promise.all([loadConsumption(), loadReferences()])
+
+  let batchNo = ''
+  let orderId = ''
+  if (typeof route.query.batchNo === 'string') {
+    ;({ batchNo } = route.query)
+  }
+  if (typeof route.query.orderId === 'string') {
+    ;({ orderId } = route.query)
+  }
+  if (route.query.tab === 'product' && (batchNo || parsePositiveInt(orderId))) {
+    activeTab.value = 'product'
+    Object.assign(productFilters, { batchNo, orderId })
+    await traceProduct()
+  }
 })
 </script>
 
