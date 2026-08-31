@@ -9,6 +9,7 @@ import {
   unwrap,
 } from '@/services/pagination'
 import type {
+  CurrentAccessData,
   LoginData,
   LoginLog,
   LoginRequest,
@@ -405,85 +406,35 @@ function getMockAccessContext(employeeNo: string): SystemAccessContext {
   }
 }
 
-async function loadCurrentAccessFromApi(employeeNo: string): Promise<SystemAccessContext> {
-  const userResponse = await systemApi.listUserData({
-    employeeNo: employeeNo.trim(),
-    page: 1,
-    pageSize: 100,
-  })
-  const userData = unwrap(userResponse.data as ApiEnvelope<unknown>)
-  const currentUser = getPageItems<User>(userData)
-    .map(toSystemUser)
-    .find((user): user is SystemUser => user !== undefined && user.employeeNo === employeeNo.trim())
+async function loadCurrentAccessFromApi(): Promise<SystemAccessContext> {
+  const response = await systemApi.getCurrentAccess()
+  const access = unwrap(response.data as ApiEnvelope<CurrentAccessData>)
+  const currentUser = access?.current_user
 
-  if (!currentUser) {
-    throw new Error('未找到当前登录用户的权限数据')
+  if (!access || !currentUser || !access.roles || !access.permissions) {
+    throw new Error('当前登录用户的权限数据不完整')
   }
 
-  const [userRoles, roles, rolePermissions, permissions] = await Promise.all([
-    getAllPageItems<UserRole>((page, pageSize) =>
-      systemApi.listUserRoleData({ page, pageSize, userId: currentUser.id }),
-    ),
-    getAllPageItems<Role>((page, pageSize) => systemApi.listRoleData({ page, pageSize })),
-    getAllPageItems<RolePermission>((page, pageSize) =>
-      systemApi.listRolePermissionData({ page, pageSize }),
-    ),
-    getAllPageItems<Permission>((page, pageSize) =>
-      systemApi.listPermissionData({ page, pageSize }),
-    ),
-  ])
-  const roleIds = new Set(
-    userRoles
-      .filter(
-        (relation) => relation.user_id === currentUser.id && typeof relation.role_id === 'number',
-      )
-      .map((relation) => relation.role_id as number),
-  )
-  const activeRoles = roles
-    .map(toSystemRole)
-    .filter(
-      (role): role is SystemRole =>
-        role !== undefined && role.status === 'valid' && roleIds.has(role.id),
-    )
-  const activeRoleIds = new Set(activeRoles.map((role) => role.id))
-  const permissionIds = new Set(
-    rolePermissions
-      .filter(
-        (relation) =>
-          activeRoleIds.has(relation.role_id ?? Number.NaN) &&
-          typeof relation.permission_id === 'number',
-      )
-      .map((relation) => relation.permission_id as number),
-  )
-  const permissionsById = new Map(
-    permissions
-      .filter((permission) => typeof permission.permission_id === 'number')
-      .map((permission) => [permission.permission_id as number, permission]),
-  )
+  // uniqueItems 被生成为 Set，实际 JSON 为数组；按可迭代集合读取以兼容两者。
+  const roles = [...new Set(access.roles)]
   const permissionCodes = new Set(
-    [...permissionIds]
-      .map((permissionId) => permissionsById.get(permissionId))
-      .map((permission) => {
-        if (permission) {
-          return toPermissionCode(permission)
-        }
-        return undefined
-      })
+    [...access.permissions]
+      .map(toPermissionCode)
       .filter((permission): permission is string => Boolean(permission)),
   )
 
-  if (activeRoles.some((role) => role.name === '系统管理员')) {
+  if (roles.includes('系统管理员')) {
     getSystemAdministratorPermissions().forEach((permission) => permissionCodes.add(permission))
   }
 
   return {
     currentUser: {
-      employeeNo: currentUser.employeeNo,
-      id: currentUser.id,
-      name: currentUser.name,
+      employeeNo: currentUser.employee_no,
+      id: currentUser.user_id,
+      name: currentUser.user_name,
     },
     permissions: [...permissionCodes],
-    roles: activeRoles.map((role) => role.name),
+    roles,
   }
 }
 
@@ -494,7 +445,7 @@ async function loadCurrentAccess(employeeNo: string): Promise<SystemAccessContex
   }
 
   try {
-    return await loadCurrentAccessFromApi(employeeNo)
+    return await loadCurrentAccessFromApi()
   } catch (error) {
     if (isMockEnabled() && getRequestStatus(error) === 404) {
       return getMockAccessContext(employeeNo)

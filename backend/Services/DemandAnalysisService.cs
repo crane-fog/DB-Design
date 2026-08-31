@@ -136,13 +136,9 @@ public sealed class DemandAnalysisService(
             using var conn = new OracleConnection(connString);
             conn.Open();
             using var transaction = conn.BeginTransaction();
-            var expandedItems = ExpandDemand(
-                request.MaterialId,
-                request.VersionId,
-                Convert.ToDecimal(request.ProductionQty),
-                conn,
-                transaction);
-            var requirements = requirementNetting.Calculate(conn, transaction, expandedItems);
+            var requirements = requirementNetting.Calculate(conn, transaction,
+                [new ProductionRequirement(request.MaterialId, request.VersionId,
+                    Convert.ToDecimal(request.ProductionQty))]).Items;
             var detail = new Dictionary<string, object>
             {
                 ["analysis_target"] = GetMaterialName(conn, transaction, request.MaterialId),
@@ -185,6 +181,7 @@ public sealed class DemandAnalysisService(
             return DemandAnalysisResult<DemandAnalysis>.Success(GetRequirementAnalysis(analysisId, null, null)!);
         }
         catch (DemandAnalysisBusinessException ex) { return DemandAnalysisResult<DemandAnalysis>.Fail(ex.Error, ex.Message); }
+        catch (MaterialPlanningException ex) { return DemandAnalysisResult<DemandAnalysis>.Fail((DemandAnalysisError)ex.Code, ex.Message); }
         catch (OracleException ex) when (ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
         { return DemandAnalysisResult<DemandAnalysis>.Fail(DemandAnalysisError.Conflict, "需求分析关联数据冲突"); }
     }

@@ -193,6 +193,8 @@ paths:
     $ref: './system.yaml#/paths/~1api~1login'
   /api/register:
     $ref: './system.yaml#/paths/~1api~1register'
+  /api/getCurrentAccess:
+    $ref: './system.yaml#/paths/~1api~1getCurrentAccess'
   /api/listUserData:
     $ref: './system.yaml#/paths/~1api~1listUserData'
   /api/getUserData:

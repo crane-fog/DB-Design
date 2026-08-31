@@ -9,6 +9,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
+using Oracle.ManagedDataAccess.Client;
+
+// 在创建任何数据库连接前统一启用按名称绑定。
+OracleConfiguration.BindByName = true;
+
 Env.Load();
 var connString = Env.GetString("ORACLE_CONN");
 var jwtSecret = Env.GetString("JWT_SECRET");
@@ -62,7 +67,6 @@ builder.Services.AddScoped<BomGraphValidationService>();
 builder.Services.AddScoped<MaterialRequirementNettingService>();
 builder.Services.AddScoped(sp => new InventoryService(
     connString,
-    sp.GetRequiredService<IBomExpansionQuery>(),
     sp.GetRequiredService<MaterialRequirementNettingService>()));
 builder.Services.AddScoped(sp => new PurchaseService(connString, sp.GetRequiredService<ILogger<PurchaseService>>()));
 builder.Services.AddScoped<IStockOperationService>(sp => sp.GetRequiredService<InventoryService>());
@@ -91,6 +95,12 @@ builder.Services.AddScoped<DemandAnalysisService>(sp => new DemandAnalysisServic
     sp.GetRequiredService<IPriceQuery>(),
     sp.GetRequiredService<MaterialRequirementNettingService>()));
 builder.Services.AddScoped<IBomExpansionQuery>(sp => sp.GetRequiredService<DemandAnalysisService>());
+builder.Services.AddScoped(sp => new CapacityEstimationDataSource(
+    connString, sp.GetRequiredService<MaterialRequirementNettingService>()));
+builder.Services.AddScoped<IProductionLineService>(_ => new ProductionLineService(connString));
+builder.Services.AddScoped<ICapacityService>(services => new CapacityService(
+    connString,
+    services.GetRequiredService<CapacityEstimationDataSource>()));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

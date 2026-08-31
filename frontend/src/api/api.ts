@@ -724,6 +724,58 @@ export interface ConsumedMaterialBatch {
     'receive_date'?: string | null;
     'consume_qty': number;
 }
+export interface CurrentAccessData {
+    'current_user': CurrentAccessUser;
+    /**
+     * 当前用户全部有效角色的名称，去重且不分页；无有效角色时为空数组。系统管理员保留现有全权限语义。
+     */
+    'roles': Set<string>;
+    /**
+     * 当前用户有效角色关联的全部权限，按 permission_id 去重且不分页；无有效角色时为空数组。有效系统管理员返回全部已登记权限。
+     */
+    'permissions': Set<Permission>;
+}
+export interface CurrentAccessResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': CurrentAccessResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': object | null;
+}
+
+export const CurrentAccessResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type CurrentAccessResponseCodeEnum = typeof CurrentAccessResponseCodeEnum[keyof typeof CurrentAccessResponseCodeEnum];
+
+/**
+ * 当前登录者的最小身份信息，不包含密码哈希或联系方式。
+ */
+export interface CurrentAccessUser {
+    /**
+     * 当前登录用户的唯一编号。
+     */
+    'user_id': number;
+    /**
+     * 根据 JWT 身份查询得到的当前用户工号。
+     */
+    'employee_no': string;
+    /**
+     * 当前用户姓名。
+     */
+    'user_name': string;
+}
 export interface DemandAnalysis {
     'analysis_id'?: number;
     'material_id'?: number;
@@ -12166,6 +12218,40 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
+         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+         * @summary 查询当前登录者身份与权限
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getCurrentAccess: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/getCurrentAccess`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 查询权限详情
          * @param {number} permissionId 权限编号。
@@ -13059,6 +13145,18 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+         * @summary 查询当前登录者身份与权限
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getCurrentAccess(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CurrentAccessResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getCurrentAccess(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.getCurrentAccess']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 查询权限详情
          * @param {number} permissionId 权限编号。
@@ -13401,6 +13499,15 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
          */
         deleteUserRole(requestParameters: SystemApiDeleteUserRoleRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
             return localVarFp.deleteUserRole(requestParameters.userRoleDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+         * @summary 查询当前登录者身份与权限
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getCurrentAccess(options?: RawAxiosRequestConfig): AxiosPromise<CurrentAccessResponse> {
+            return localVarFp.getCurrentAccess(options).then((request) => request(axios, basePath));
         },
         /**
          * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
@@ -14040,6 +14147,16 @@ export class SystemApi extends BaseAPI {
      */
     public deleteUserRole(requestParameters: SystemApiDeleteUserRoleRequest, options?: RawAxiosRequestConfig) {
         return SystemApiFp(this.configuration).deleteUserRole(requestParameters.userRoleDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+     * @summary 查询当前登录者身份与权限
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getCurrentAccess(options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).getCurrentAccess(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
