@@ -67,7 +67,6 @@ builder.Services.AddScoped<BomGraphValidationService>();
 builder.Services.AddScoped<MaterialRequirementNettingService>();
 builder.Services.AddScoped(sp => new InventoryService(
     connString,
-    sp.GetRequiredService<IBomExpansionQuery>(),
     sp.GetRequiredService<MaterialRequirementNettingService>()));
 builder.Services.AddScoped(sp => new PurchaseService(connString, sp.GetRequiredService<ILogger<PurchaseService>>()));
 builder.Services.AddScoped<IStockOperationService>(sp => sp.GetRequiredService<InventoryService>());
@@ -96,7 +95,8 @@ builder.Services.AddScoped<DemandAnalysisService>(sp => new DemandAnalysisServic
     sp.GetRequiredService<IPriceQuery>(),
     sp.GetRequiredService<MaterialRequirementNettingService>()));
 builder.Services.AddScoped<IBomExpansionQuery>(sp => sp.GetRequiredService<DemandAnalysisService>());
-builder.Services.AddScoped(_ => new CapacityEstimationDataSource(connString));
+builder.Services.AddScoped(sp => new CapacityEstimationDataSource(
+    connString, sp.GetRequiredService<MaterialRequirementNettingService>()));
 builder.Services.AddScoped<IProductionLineService>(_ => new ProductionLineService(connString));
 builder.Services.AddScoped<ICapacityService>(services => new CapacityService(
     connString,

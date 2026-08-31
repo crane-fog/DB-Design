@@ -25,7 +25,8 @@ public sealed record CapacityEstimateInput(
     long MaterialId,
     long VersionId,
     decimal PlanQty,
-    DateOnly ExpectedDate);
+    DateOnly ExpectedDate,
+    long? OrderId = null);
 
 public sealed record MaterialReadiness(
     bool Ready,

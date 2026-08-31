@@ -91,7 +91,6 @@ public sealed record ShortageResult(
 /// </summary>
 public class InventoryService(
     string connString,
-    IBomExpansionQuery bomExpansionQuery,
     MaterialRequirementNettingService requirementNetting)
     : IStockOperationService
 {
@@ -928,18 +927,13 @@ public class InventoryService(
         conn.Open();
 
         var allRecords = new List<MaterialShortageItem>();
-        var expandedItems = new List<BomDemandExpansionItem>();
         var calcTime = DateTime.Now;
 
         try
         {
-            foreach (var reqItem in request.Items)
-            {
-                expandedItems.AddRange(bomExpansionQuery.ExpandDemand(
-                    reqItem.MaterialId, reqItem.VersionId, reqItem.ProductionQty, conn));
-            }
-
-            allRecords.AddRange(requirementNetting.Calculate(conn, null, expandedItems)
+            var requests = request.Items.Select(item =>
+                new ProductionRequirement(item.MaterialId, item.VersionId, item.ProductionQty)).ToList();
+            allRecords.AddRange(requirementNetting.Calculate(conn, null, requests).Items
                 .Select(item => new MaterialShortageItem
                 {
                     MaterialId = item.MaterialId,
@@ -953,6 +947,10 @@ public class InventoryService(
                     NetShortageQty = item.NetRequirement,
                     SuggestedPurchaseQty = item.NetRequirement,
                 }));
+        }
+        catch (MaterialPlanningException ex)
+        {
+            return ShortageResult.Fail(ex.Code, ex.Message);
         }
         catch (Exception ex)
         {

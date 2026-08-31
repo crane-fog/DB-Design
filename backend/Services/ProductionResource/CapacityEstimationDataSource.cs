@@ -4,7 +4,8 @@ using Org.OpenAPITools.Models;
 
 namespace Backend.Services;
 
-public sealed class CapacityEstimationDataSource(string connString)
+public sealed class CapacityEstimationDataSource(
+    string connString, MaterialRequirementNettingService requirementNetting)
 {
     public ProductionResourceResult<CapacityEstimateInput> ResolveInput(
         ProductionCapacityEstimateRequest request)
@@ -34,7 +35,8 @@ public sealed class CapacityEstimationDataSource(string connString)
                     Convert.ToInt64(reader.GetValue(0)),
                     Convert.ToInt64(reader.GetValue(1)),
                     Convert.ToDecimal(reader.GetValue(2)),
-                    DateOnly.FromDateTime(reader.GetDateTime(3)));
+                    DateOnly.FromDateTime(reader.GetDateTime(3)),
+                    request.OrderId);
             }
             else
             {
@@ -78,69 +80,17 @@ public sealed class CapacityEstimationDataSource(string connString)
         try
         {
             using OracleConnection connection = OpenConnection();
-            Dictionary<long, decimal> requirements = [];
-            HashSet<long> path = [];
-            string? expansionError = ExpandRequirements(
-                connection,
-                input.MaterialId,
-                input.VersionId,
-                input.PlanQty,
-                path,
-                requirements);
-            if (expansionError is not null)
-            {
-                return ProductionResourceResult<MaterialReadiness>.Fail(409, expansionError);
-            }
-
-            if (requirements.Count == 0)
-            {
-                return ProductionResourceResult<MaterialReadiness>.Success(
-                    new MaterialReadiness(true, DateOnly.FromDateTime(DateTime.Today), null));
-            }
-
-            DateOnly today = DateOnly.FromDateTime(DateTime.Today);
-            DateOnly latestReadyDate = today;
-            List<string> shortages = [];
-
-            foreach ((long materialId, decimal requiredQuantity) in requirements)
-            {
-                decimal remaining = requiredQuantity - ReadAvailableQuantity(connection, materialId);
-                if (remaining <= 0)
-                {
-                    continue;
-                }
-
-                DateOnly? materialReadyDate = null;
-                foreach (IncomingMaterial incoming in ReadIncomingMaterials(connection, materialId))
-                {
-                    remaining -= incoming.Quantity;
-                    materialReadyDate = incoming.ExpectedDate < today ? today : incoming.ExpectedDate;
-                    if (remaining <= 0)
-                    {
-                        break;
-                    }
-                }
-
-                if (remaining > 0)
-                {
-                    shortages.Add($"物料 {materialId} 缺少 {remaining:0.####}");
-                    continue;
-                }
-
-                if (materialReadyDate.HasValue && materialReadyDate.Value > latestReadyDate)
-                {
-                    latestReadyDate = materialReadyDate.Value;
-                }
-            }
-
-            if (shortages.Count > 0)
-            {
-                return ProductionResourceResult<MaterialReadiness>.Success(
-                    new MaterialReadiness(false, null, string.Join("；", shortages)));
-            }
-
-            return ProductionResourceResult<MaterialReadiness>.Success(
-                new MaterialReadiness(true, latestReadyDate, null));
+            // Keep capacity's existing safety-stock and current-version policies, while sharing
+            // inventory allocation with demand planning. Temporary estimates have no order locks.
+            var plan = requirementNetting.Calculate(connection, null,
+                [new ProductionRequirement(input.MaterialId, input.VersionId, input.PlanQty)],
+                new MaterialPlanningOptions(
+                    IncludeSafetyStock: false, OrderId: input.OrderId, RequireEffectiveChildVersions: false));
+            return ProductionResourceResult<MaterialReadiness>.Success(plan.GetMaterialReadiness());
+        }
+        catch (MaterialPlanningException ex)
+        {
+            return ProductionResourceResult<MaterialReadiness>.Fail(ex.Code, ex.Message);
         }
         catch (OracleException)
         {
@@ -148,59 +98,6 @@ public sealed class CapacityEstimationDataSource(string connString)
                 500,
                 "计算物料齐套情况失败");
         }
-    }
-
-    private string? ExpandRequirements(
-        OracleConnection connection,
-        long materialId,
-        long versionId,
-        decimal parentQuantity,
-        HashSet<long> path,
-        Dictionary<long, decimal> requirements)
-    {
-        if (!path.Add(materialId))
-        {
-            return $"BOM 存在循环依赖，涉及物料 {materialId}";
-        }
-
-        List<BomComponent> children = ReadBomComponents(connection, materialId, versionId);
-        if (children.Count == 0)
-        {
-            path.Remove(materialId);
-            return null;
-        }
-
-        foreach (BomComponent child in children)
-        {
-            decimal grossQuantity = decimal.Ceiling(
-                parentQuantity * child.Quantity / (1 - child.LossRate));
-            long? childVersionId = ReadCurrentVersionId(connection, child.MaterialId);
-            bool hasChildBom = childVersionId.HasValue
-                && HasBomComponents(connection, child.MaterialId, childVersionId.Value);
-
-            if (hasChildBom)
-            {
-                string? error = ExpandRequirements(
-                    connection,
-                    child.MaterialId,
-                    childVersionId!.Value,
-                    grossQuantity,
-                    path,
-                    requirements);
-                if (error is not null)
-                {
-                    return error;
-                }
-            }
-            else
-            {
-                requirements.TryGetValue(child.MaterialId, out decimal existing);
-                requirements[child.MaterialId] = existing + grossQuantity;
-            }
-        }
-
-        path.Remove(materialId);
-        return null;
     }
 
     private OracleConnection OpenConnection()
@@ -226,102 +123,4 @@ public sealed class CapacityEstimationDataSource(string connString)
         return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
-    private static List<BomComponent> ReadBomComponents(
-        OracleConnection connection,
-        long materialId,
-        long versionId)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"SELECT CHILD_MATERIAL_ID, QUANTITY, LOSS_RATE
-              FROM BOM
-              WHERE PARENT_MATERIAL_ID = :materialId
-                AND VERSION_ID = :versionId
-              ORDER BY BOM_ID");
-        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
-        command.Parameters.Add("versionId", OracleDbType.Int64).Value = versionId;
-
-        List<BomComponent> result = [];
-        using OracleDataReader reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            result.Add(new BomComponent(
-                Convert.ToInt64(reader.GetValue(0)),
-                Convert.ToDecimal(reader.GetValue(1)),
-                Convert.ToDecimal(reader.GetValue(2))));
-        }
-
-        return result;
-    }
-
-    private static long? ReadCurrentVersionId(OracleConnection connection, long materialId)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"SELECT CURRENT_VERSION_ID
-              FROM MATERIAL
-              WHERE MATERIAL_ID = :materialId");
-        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
-        object? value = command.ExecuteScalar();
-        return value is null || value == DBNull.Value ? null : Convert.ToInt64(value);
-    }
-
-    private static bool HasBomComponents(
-        OracleConnection connection,
-        long materialId,
-        long versionId)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"SELECT COUNT(*)
-              FROM BOM
-              WHERE PARENT_MATERIAL_ID = :materialId
-                AND VERSION_ID = :versionId");
-        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
-        command.Parameters.Add("versionId", OracleDbType.Int64).Value = versionId;
-        return Convert.ToInt32(command.ExecuteScalar()) > 0;
-    }
-
-    private static decimal ReadAvailableQuantity(OracleConnection connection, long materialId)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"SELECT AVAILABLE_QTY
-              FROM MATERIAL_STOCK
-              WHERE MATERIAL_ID = :materialId");
-        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
-        object? value = command.ExecuteScalar();
-        return value is null || value == DBNull.Value ? 0 : Convert.ToDecimal(value);
-    }
-
-    private static List<IncomingMaterial> ReadIncomingMaterials(
-        OracleConnection connection,
-        long materialId)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"SELECT poi.QUANTITY - poi.RECEIVED_QTY, po.EXPECTED_DATE
-              FROM PURCHASE_ORDER_ITEM poi
-              JOIN PURCHASE_ORDER po ON po.ORDER_ID = poi.ORDER_ID
-              WHERE poi.MATERIAL_ID = :materialId
-                AND po.STATUS IN ('已提交', '部分到货')
-                AND poi.QUANTITY > poi.RECEIVED_QTY
-              ORDER BY po.EXPECTED_DATE, poi.ITEM_ID");
-        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
-
-        List<IncomingMaterial> result = [];
-        using OracleDataReader reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            result.Add(new IncomingMaterial(
-                Convert.ToDecimal(reader.GetValue(0)),
-                DateOnly.FromDateTime(reader.GetDateTime(1))));
-        }
-
-        return result;
-    }
-
-    private sealed record BomComponent(long MaterialId, decimal Quantity, decimal LossRate);
-
-    private sealed record IncomingMaterial(decimal Quantity, DateOnly ExpectedDate);
 }
