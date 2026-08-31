@@ -94,6 +94,66 @@ paths:
                     message: 工号已存在
                     data: null
 
+  /api/getCurrentAccess:
+    get:
+      summary: 查询当前登录者身份与权限
+      description: |
+        供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。
+        当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。
+        返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。
+        停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。
+        拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。
+        HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。
+        本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。
+      operationId: getCurrentAccess
+      tags:
+        - system
+      parameters: []
+      responses:
+        '200':
+          description: 统一响应；成功时 data 为当前登录者访问上下文，失败时 data 为 null。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentAccessResponse'
+              examples:
+                success:
+                  summary: 业务角色用户查询成功
+                  value:
+                    code: 200
+                    message: 查询成功
+                    data:
+                      current_user:
+                        user_id: 2
+                        employee_no: EMP002
+                        user_name: 张三
+                      roles:
+                        - 生产管理员
+                      permissions:
+                        - permission_id: 1
+                          resource: 生产订单
+                          action: 查看
+                noRoles:
+                  summary: 无有效角色的用户查询成功
+                  value:
+                    code: 200
+                    message: 查询成功
+                    data:
+                      current_user:
+                        user_id: 3
+                        employee_no: EMP003
+                        user_name: 李四
+                      roles: []
+                      permissions: []
+                unauthorized:
+                  summary: 未登录、登录失效或账号不可用
+                  value:
+                    code: 401
+                    message: 未登录、登录已失效或账号不可用
+                    data: null
+      security:
+        - bearerAuth: []
+
   /api/listUserData:
     get:
       summary: 查询用户列表
@@ -798,6 +858,59 @@ components:
               type: object
               allOf:
                 - $ref: '#/components/schemas/LoginData'
+              nullable: true
+
+    CurrentAccessUser:
+      type: object
+      description: 当前登录者的最小身份信息，不包含密码哈希或联系方式。
+      required:
+        - user_id
+        - employee_no
+        - user_name
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 当前登录用户的唯一编号。
+        employee_no:
+          type: string
+          description: 根据 JWT 身份查询得到的当前用户工号。
+        user_name:
+          type: string
+          description: 当前用户姓名。
+
+    CurrentAccessData:
+      type: object
+      required:
+        - current_user
+        - roles
+        - permissions
+      properties:
+        current_user:
+          $ref: '#/components/schemas/CurrentAccessUser'
+        roles:
+          type: array
+          description: 当前用户全部有效角色的名称，去重且不分页；无有效角色时为空数组。系统管理员保留现有全权限语义。
+          uniqueItems: true
+          items:
+            type: string
+        permissions:
+          type: array
+          description: 当前用户有效角色关联的全部权限，按 permission_id 去重且不分页；无有效角色时为空数组。有效系统管理员返回全部已登记权限。
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Permission'
+
+    CurrentAccessResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/CurrentAccessData'
               nullable: true
 
     RegisterRequest:
