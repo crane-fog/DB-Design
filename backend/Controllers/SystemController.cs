@@ -3,12 +3,14 @@ using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using Oracle.ManagedDataAccess.Client;
+
 using Org.OpenAPITools.Models;
 
 namespace Backend.Controllers;
 
 /// <summary>
-/// 系统管理接口（E 模块）。所有接口（除 login/register 在 DefaultApiController）要求登录且为系统管理员。
+/// 系统管理接口（E 模块）。当前用户权限查询仅要求登录，其余管理接口要求系统管理员。
 /// HTTP 固定 200，业务状态通过响应体 code 表达。
 /// </summary>
 [ApiController]
@@ -25,6 +27,55 @@ public class SystemController(
     LoginLogService loginLogService,
     OperationLogService operationLogService) : ControllerBase
 {
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("getCurrentAccess")]
+    public IActionResult GetCurrentAccess()
+    {
+        Response.Headers["Cache-Control"] = "no-store";
+
+        try
+        {
+            var currentUser = userContext.Resolve(User.GetEmployeeNo());
+            if (currentUser is null)
+            {
+                return Ok(new CurrentAccessResponse
+                {
+                    Code = CurrentAccessResponse.CodeEnum._401Enum,
+                    Message = "未登录、登录已失效或账号不可用",
+                    Data = null!,
+                });
+            }
+
+            return Ok(new CurrentAccessResponse
+            {
+                Code = CurrentAccessResponse.CodeEnum._200Enum,
+                Message = "查询成功",
+                Data = new CurrentAccessData
+                {
+                    CurrentUser = new CurrentAccessUser
+                    {
+                        UserId = currentUser.UserId,
+                        EmployeeNo = currentUser.EmployeeNo,
+                        UserName = currentUser.UserName,
+                    },
+                    Roles = currentUser.RoleNames.Distinct(StringComparer.Ordinal)
+                        .OrderBy(role => role, StringComparer.Ordinal).ToList(),
+                    Permissions = permissionService.GetEffectivePermissions(currentUser),
+                },
+            });
+        }
+        catch (OracleException)
+        {
+            return Ok(new CurrentAccessResponse
+            {
+                Code = CurrentAccessResponse.CodeEnum._500Enum,
+                Message = "查询当前用户权限失败",
+                Data = null!,
+            });
+        }
+    }
+
     // ==================== 用户管理 ====================
 
     [HttpGet]

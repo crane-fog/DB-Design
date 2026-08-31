@@ -21,6 +21,45 @@ public class PermissionService(string connString)
         };
     }
 
+    /// <summary>查询已从登录态解析的用户的有效权限，不分页，不重复返回共享权限。</summary>
+    public List<Permission> GetEffectivePermissions(CurrentUser user)
+    {
+        if (user.RoleNames.Count == 0) return [];
+
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = SelectColumns;
+
+        if (!user.RoleNames.Contains(AuthorizationService.AdminRole))
+        {
+            cmd.CommandText += @" WHERE EXISTS (
+                SELECT 1
+                FROM SYS_USER_ROLE UR
+                JOIN SYS_ROLE R ON R.ROLE_ID = UR.ROLE_ID
+                JOIN SYS_ROLE_PERMISSION RP ON RP.ROLE_ID = R.ROLE_ID
+                WHERE UR.USER_ID = :userId
+                  AND R.STATUS = 'valid'
+                  AND RP.PERMISSION_ID = SYS_PERMISSION.PERMISSION_ID)";
+            cmd.Parameters.Add(new OracleParameter("userId", user.UserId));
+        }
+
+        cmd.CommandText += " ORDER BY PERMISSION_ID";
+        var permissions = new List<Permission>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            permissions.Add(new Permission
+            {
+                PermissionId = Convert.ToInt32(reader.GetValue(0)),
+                Resource = reader.GetString(1),
+                Action = reader.GetString(2),
+            });
+        }
+
+        return permissions;
+    }
+
     public (List<PermissionBrief> Records, int Total) List(
         int page, int pageSize, int? permissionId, string? resource, string? action)
     {

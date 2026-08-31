@@ -1,6 +1,8 @@
 import { PERMISSIONS, type PermissionCode } from '@/constants/permissions'
 import { type RouteRecordRaw, createRouter, createWebHistory } from 'vue-router'
+import { isMockAuthEnabled, isMockEnabled } from '@/config/mock'
 import { pinia } from '@/stores/pinia'
+import { systemService } from '@/services/SystemService'
 import { useAuthStore } from '@/stores/auth'
 
 declare module 'vue-router' {
@@ -281,7 +283,9 @@ export const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+let initializedAccessToken: string | undefined = undefined
+
+router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) {
     return true
   }
@@ -290,6 +294,21 @@ router.beforeEach((to) => {
   if (!auth.restoreSession()) {
     globalThis.location.assign(`/login.html?redirect=${encodeURIComponent(to.fullPath)}`)
     return false
+  }
+
+  // 每次页面加载后从后端恢复权限，避免沿用此前初始化失败时保存的空权限。
+  if (!isMockEnabled() && !isMockAuthEnabled() && initializedAccessToken !== auth.token) {
+    try {
+      const access = await systemService.loadCurrentAccess(auth.currentUser?.employeeNo ?? '')
+      auth.setCurrentUser(access.currentUser)
+      auth.setRoles(access.roles)
+      auth.setPermissions(access.permissions)
+      initializedAccessToken = auth.token
+    } catch {
+      auth.logout(false)
+      globalThis.location.assign(`/login.html?redirect=${encodeURIComponent(to.fullPath)}`)
+      return false
+    }
   }
 
   if (typeof to.meta.permission === 'string' && !auth.hasPermission(to.meta.permission)) {
