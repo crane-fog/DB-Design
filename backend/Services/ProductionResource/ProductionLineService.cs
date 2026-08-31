@@ -295,38 +295,89 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
         try
         {
             using OracleConnection connection = OpenConnection();
-            if (!LineTypeExists(connection, request.TypeId))
+            using OracleTransaction transaction = connection.BeginTransaction();
+            try
             {
-                return ProductionResourceResult<ProductionLine>.Fail(404, "生产线类型不存在");
-            }
+                if (!LineTypeExists(connection, request.TypeId, transaction))
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLine>.Fail(404, "生产线类型不存在");
+                }
 
-            if (!ActiveUserExists(connection, request.ManagerId))
+                if (!ActiveUserExists(connection, request.ManagerId, transaction))
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLine>.Fail(404, "生产线负责人不存在或已停用");
+                }
+
+                ProductionLineUpdateContext? currentLine = GetLineUpdateContext(
+                    connection,
+                    transaction,
+                    request.LineId);
+                if (currentLine is null)
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLine>.Fail(404, "生产线不存在");
+                }
+
+                if (currentLine.TypeId != request.TypeId
+                    && HasCalendarTypeConflict(
+                        connection,
+                        transaction,
+                        request.LineId,
+                        request.TypeId))
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLine>.Fail(
+                        409,
+                        "生产线类型与已有生产日历的产能配置不匹配");
+                }
+
+                if (currentLine.StartDate != request.StartDate
+                    && HasCalendarBeforeStartDate(
+                        connection,
+                        transaction,
+                        request.LineId,
+                        request.StartDate))
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLine>.Fail(
+                        409,
+                        "生产线启用日期不得晚于已有排产日期");
+                }
+
+                using OracleCommand command = OracleCommandFactory.Create(
+                    connection,
+                    @"UPDATE PRODUCTION_LINE
+                      SET TYPE_ID = :typeId,
+                          START_DATE = :startDate,
+                          MANAGER_ID = :managerId
+                      WHERE LINE_ID = :lineId",
+                    transaction);
+                command.Parameters.Add("typeId", OracleDbType.Int64).Value = request.TypeId;
+                command.Parameters.Add("startDate", OracleDbType.Date).Value =
+                    request.StartDate.ToDateTime(TimeOnly.MinValue);
+                command.Parameters.Add("managerId", OracleDbType.Int64).Value = request.ManagerId;
+                command.Parameters.Add("lineId", OracleDbType.Int64).Value = request.LineId;
+                command.ExecuteNonQuery();
+
+                ProductionLine? result = GetLine(connection, request.LineId, transaction);
+                if (result is null)
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLine>.Fail(
+                        500,
+                        "修改后无法读取生产线");
+                }
+
+                transaction.Commit();
+                return ProductionResourceResult<ProductionLine>.Success(result, "修改成功");
+            }
+            catch (OracleException)
             {
-                return ProductionResourceResult<ProductionLine>.Fail(404, "生产线负责人不存在或已停用");
+                transaction.Rollback();
+                return ProductionResourceResult<ProductionLine>.Fail(500, "修改生产线失败");
             }
-
-            using OracleCommand command = OracleCommandFactory.Create(
-                connection,
-                @"UPDATE PRODUCTION_LINE
-                  SET TYPE_ID = :typeId,
-                      START_DATE = :startDate,
-                      MANAGER_ID = :managerId
-                  WHERE LINE_ID = :lineId");
-            command.Parameters.Add("typeId", OracleDbType.Int64).Value = request.TypeId;
-            command.Parameters.Add("startDate", OracleDbType.Date).Value =
-                request.StartDate.ToDateTime(TimeOnly.MinValue);
-            command.Parameters.Add("managerId", OracleDbType.Int64).Value = request.ManagerId;
-            command.Parameters.Add("lineId", OracleDbType.Int64).Value = request.LineId;
-
-            if (command.ExecuteNonQuery() == 0)
-            {
-                return ProductionResourceResult<ProductionLine>.Fail(404, "生产线不存在");
-            }
-
-            ProductionLine? result = GetLine(connection, request.LineId);
-            return result is null
-                ? ProductionResourceResult<ProductionLine>.Fail(500, "修改后无法读取生产线")
-                : ProductionResourceResult<ProductionLine>.Success(result, "修改成功");
         }
         catch (OracleException)
         {
@@ -566,27 +617,12 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
             return ProductionResourceResult<ProductionLineStatus>.Fail(400, "生产线状态参数无效");
         }
 
-        if (databaseStatus == ProductionLineRunStatusMap.Db.Running
-            && !request.CurrentOrderId.HasValue)
-        {
-            return ProductionResourceResult<ProductionLineStatus>.Fail(
-                400,
-                "运行状态必须关联当前生产订单");
-        }
-
         if (databaseStatus == ProductionLineRunStatusMap.Db.Idle
             && (request.CurrentOrderId.HasValue || request.CurrentMaterialId.HasValue))
         {
             return ProductionResourceResult<ProductionLineStatus>.Fail(
                 400,
                 "空闲状态不得关联生产订单或产品");
-        }
-
-        if (!request.CurrentOrderId.HasValue && request.CurrentMaterialId.HasValue)
-        {
-            return ProductionResourceResult<ProductionLineStatus>.Fail(
-                400,
-                "当前产品必须与生产订单同时提供");
         }
 
         try
@@ -603,76 +639,161 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                 return ProductionResourceResult<ProductionLineStatus>.Fail(403, "无权更新该生产线状态");
             }
 
-            long? effectiveMaterialId = request.CurrentMaterialId;
-            decimal? effectiveFinishedQty = request.FinishedQty;
-            if (request.CurrentOrderId.HasValue)
+            using OracleTransaction transaction = connection.BeginTransaction();
+            try
             {
-                ProductionOrderLineContext? order = GetProductionOrderLineContext(
+                ProductionLineStatus? currentStatus = GetLineStatus(
                     connection,
-                    request.CurrentOrderId.Value);
-                if (order is null)
-                {
-                    return ProductionResourceResult<ProductionLineStatus>.Fail(404, "生产订单不存在");
-                }
+                    request.LineId,
+                    transaction,
+                    forUpdate: true);
 
-                if (effectiveMaterialId.HasValue && effectiveMaterialId != order.MaterialId)
+                if (databaseStatus == ProductionLineRunStatusMap.Db.Running
+                    && HasActiveFaults(connection, transaction, request.LineId))
                 {
+                    transaction.Rollback();
                     return ProductionResourceResult<ProductionLineStatus>.Fail(
-                        400,
-                        "当前产品与生产订单不匹配");
+                        409,
+                        "生产线存在未恢复故障，无法切换为运行状态");
                 }
 
-                effectiveMaterialId = order.MaterialId;
-                ProductionLineStatus? currentStatus = GetLineStatus(connection, request.LineId);
-                if (!effectiveFinishedQty.HasValue)
-                {
-                    effectiveFinishedQty = currentStatus?.CurrentOrderId == request.CurrentOrderId
-                        ? currentStatus.FinishedQty
-                        : 0;
-                }
+                long? effectiveMaterialId = request.CurrentMaterialId;
+                bool sameProductionContext = currentStatus is not null
+                    && (request.CurrentOrderId.HasValue
+                        ? currentStatus.CurrentOrderId == request.CurrentOrderId
+                        : currentStatus.CurrentOrderId is null
+                            && currentStatus.CurrentMaterialId == request.CurrentMaterialId);
+                decimal effectiveFinishedQty = request.FinishedQty
+                    ?? (sameProductionContext ? currentStatus!.FinishedQty : 0m);
 
-                if (effectiveFinishedQty > order.PlanQty)
+                if (request.CurrentOrderId.HasValue)
                 {
+                    ProductionOrderLineContext? order = GetProductionOrderLineContext(
+                        connection,
+                        transaction,
+                        request.CurrentOrderId.Value);
+                    if (order is null)
+                    {
+                        transaction.Rollback();
+                        return ProductionResourceResult<ProductionLineStatus>.Fail(
+                            404,
+                            "生产订单不存在");
+                    }
+
+                    if (databaseStatus == ProductionLineRunStatusMap.Db.Running
+                        && order.Status != ProductionStatusMap.Db.InProgress)
+                    {
+                        transaction.Rollback();
+                        return ProductionResourceResult<ProductionLineStatus>.Fail(
+                            409,
+                            "运行状态只能关联生产中的订单");
+                    }
+
+                    if (effectiveMaterialId.HasValue && effectiveMaterialId != order.MaterialId)
+                    {
+                        transaction.Rollback();
+                        return ProductionResourceResult<ProductionLineStatus>.Fail(
+                            400,
+                            "当前产品与生产订单不匹配");
+                    }
+
+                    effectiveMaterialId = order.MaterialId;
+                    if (effectiveFinishedQty > order.PlanQty)
+                    {
+                        transaction.Rollback();
+                        return ProductionResourceResult<ProductionLineStatus>.Fail(
+                            400,
+                            "已完成数量不得超过生产订单计划数量");
+                    }
+                }
+                else if (effectiveMaterialId.HasValue
+                    && !MaterialExists(connection, transaction, effectiveMaterialId.Value))
+                {
+                    transaction.Rollback();
                     return ProductionResourceResult<ProductionLineStatus>.Fail(
-                        400,
-                        "已完成数量不得超过生产订单计划数量");
+                        404,
+                        "当前产品不存在");
                 }
+
+                decimal previousFinishedQty = sameProductionContext
+                    ? currentStatus!.FinishedQty
+                    : 0m;
+                if (effectiveFinishedQty < previousFinishedQty)
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLineStatus>.Fail(
+                        409,
+                        "同一生产上下文的已完成数量不得回退");
+                }
+
+                decimal outputIncrement = effectiveFinishedQty - previousFinishedQty;
+
+                using (OracleCommand command = OracleCommandFactory.Create(
+                           connection,
+                           @"MERGE INTO LINE_STATUS target
+                             USING (SELECT :lineId AS LINE_ID FROM DUAL) source
+                             ON (target.LINE_ID = source.LINE_ID)
+                             WHEN MATCHED THEN UPDATE SET
+                                 target.STATUS = :status,
+                                 target.CURRENT_ORDER_ID = :currentOrderId,
+                                 target.CURRENT_MATERIAL_ID = :currentMaterialId,
+                                 target.FINISHED_QTY = :finishedQty,
+                                 target.EFFICIENCY = NVL(:efficiency, target.EFFICIENCY),
+                                 target.UPDATED_TIME = SYSTIMESTAMP
+                             WHEN NOT MATCHED THEN INSERT
+                                 (LINE_ID, STATUS, CURRENT_ORDER_ID, CURRENT_MATERIAL_ID,
+                                  FINISHED_QTY, EFFICIENCY, UPDATED_TIME)
+                             VALUES
+                                 (:lineId, :status, :currentOrderId, :currentMaterialId,
+                                  :finishedQty, NVL(:efficiency, 0), SYSTIMESTAMP)",
+                           transaction))
+                {
+                    command.Parameters.Add("lineId", OracleDbType.Int64).Value = request.LineId;
+                    command.Parameters.Add("status", OracleDbType.Varchar2).Value = databaseStatus;
+                    command.Parameters.Add("currentOrderId", OracleDbType.Int64).Value =
+                        OracleCommandFactory.DbValue(request.CurrentOrderId);
+                    command.Parameters.Add("currentMaterialId", OracleDbType.Int64).Value =
+                        OracleCommandFactory.DbValue(effectiveMaterialId);
+                    command.Parameters.Add("finishedQty", OracleDbType.Decimal).Value =
+                        effectiveFinishedQty;
+                    command.Parameters.Add("efficiency", OracleDbType.Decimal).Value =
+                        OracleCommandFactory.DbValue(request.Efficiency);
+                    command.ExecuteNonQuery();
+                }
+
+                if (outputIncrement > 0)
+                {
+                    InsertOutputRecord(
+                        connection,
+                        transaction,
+                        request.LineId,
+                        request.CurrentOrderId,
+                        outputIncrement,
+                        currentUser.UserId);
+                }
+
+                ProductionLineStatus? result = GetLineStatus(
+                    connection,
+                    request.LineId,
+                    transaction);
+                if (result is null)
+                {
+                    transaction.Rollback();
+                    return ProductionResourceResult<ProductionLineStatus>.Fail(
+                        500,
+                        "更新后无法读取产线状态");
+                }
+
+                transaction.Commit();
+                return ProductionResourceResult<ProductionLineStatus>.Success(
+                    result,
+                    "产线状态已更新");
             }
-
-            using OracleCommand command = OracleCommandFactory.Create(
-                connection,
-                @"MERGE INTO LINE_STATUS target
-                  USING (SELECT :lineId AS LINE_ID FROM DUAL) source
-                  ON (target.LINE_ID = source.LINE_ID)
-                  WHEN MATCHED THEN UPDATE SET
-                      target.STATUS = :status,
-                      target.CURRENT_ORDER_ID = :currentOrderId,
-                      target.CURRENT_MATERIAL_ID = :currentMaterialId,
-                      target.FINISHED_QTY = NVL(:finishedQty, target.FINISHED_QTY),
-                      target.EFFICIENCY = NVL(:efficiency, target.EFFICIENCY),
-                      target.UPDATED_TIME = SYSTIMESTAMP
-                  WHEN NOT MATCHED THEN INSERT
-                      (LINE_ID, STATUS, CURRENT_ORDER_ID, CURRENT_MATERIAL_ID,
-                       FINISHED_QTY, EFFICIENCY, UPDATED_TIME)
-                  VALUES
-                      (:lineId, :status, :currentOrderId, :currentMaterialId,
-                       NVL(:finishedQty, 0), NVL(:efficiency, 0), SYSTIMESTAMP)");
-            command.Parameters.Add("lineId", OracleDbType.Int64).Value = request.LineId;
-            command.Parameters.Add("status", OracleDbType.Varchar2).Value = databaseStatus;
-            command.Parameters.Add("currentOrderId", OracleDbType.Int64).Value =
-                OracleCommandFactory.DbValue(request.CurrentOrderId);
-            command.Parameters.Add("currentMaterialId", OracleDbType.Int64).Value =
-                OracleCommandFactory.DbValue(effectiveMaterialId);
-            command.Parameters.Add("finishedQty", OracleDbType.Decimal).Value =
-                OracleCommandFactory.DbValue(effectiveFinishedQty);
-            command.Parameters.Add("efficiency", OracleDbType.Decimal).Value =
-                OracleCommandFactory.DbValue(request.Efficiency);
-            command.ExecuteNonQuery();
-
-            ProductionLineStatus? result = GetLineStatus(connection, request.LineId);
-            return result is null
-                ? ProductionResourceResult<ProductionLineStatus>.Fail(500, "更新后无法读取产线状态")
-                : ProductionResourceResult<ProductionLineStatus>.Success(result, "产线状态已更新");
+            catch (OracleException)
+            {
+                transaction.Rollback();
+                return ProductionResourceResult<ProductionLineStatus>.Fail(500, "更新产线状态失败");
+            }
         }
         catch (OracleException)
         {
@@ -813,14 +934,16 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
     private static ProductionLineStatus? GetLineStatus(
         OracleConnection connection,
         long lineId,
-        OracleTransaction? transaction = null)
+        OracleTransaction? transaction = null,
+        bool forUpdate = false)
     {
+        string lockClause = forUpdate ? " FOR UPDATE" : string.Empty;
         using OracleCommand command = OracleCommandFactory.Create(
             connection,
             @"SELECT LINE_ID, STATUS, CURRENT_ORDER_ID, CURRENT_MATERIAL_ID,
                      FINISHED_QTY, EFFICIENCY, UPDATED_TIME
               FROM LINE_STATUS
-              WHERE LINE_ID = :lineId",
+              WHERE LINE_ID = :lineId" + lockClause,
             transaction);
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
         using OracleDataReader reader = command.ExecuteReader();
@@ -889,20 +1012,135 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
 
     private static ProductionOrderLineContext? GetProductionOrderLineContext(
         OracleConnection connection,
+        OracleTransaction transaction,
         long orderId)
     {
         using OracleCommand command = OracleCommandFactory.Create(
             connection,
-            @"SELECT MATERIAL_ID, PLAN_QTY
+            @"SELECT MATERIAL_ID, PLAN_QTY, STATUS
               FROM PRODUCTION_ORDER
-              WHERE ORDER_ID = :orderId");
+              WHERE ORDER_ID = :orderId",
+            transaction);
         command.Parameters.Add("orderId", OracleDbType.Int64).Value = orderId;
         using OracleDataReader reader = command.ExecuteReader();
         return reader.Read()
             ? new ProductionOrderLineContext(
                 Convert.ToInt64(reader.GetValue(0)),
-                Convert.ToDecimal(reader.GetValue(1)))
+                Convert.ToDecimal(reader.GetValue(1)),
+                reader.GetString(2))
             : null;
+    }
+
+    private static bool HasCalendarTypeConflict(
+        OracleConnection connection,
+        OracleTransaction transaction,
+        long lineId,
+        long typeId)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            @"SELECT COUNT(*)
+              FROM PRODUCTION_CALENDAR calendar
+              INNER JOIN CAPACITY_CONFIG config ON config.CONFIG_ID = calendar.CONFIG_ID
+              WHERE calendar.LINE_ID = :lineId
+                AND config.TYPE_ID <> :typeId",
+            transaction);
+        command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
+        command.Parameters.Add("typeId", OracleDbType.Int64).Value = typeId;
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
+    }
+
+    private static ProductionLineUpdateContext? GetLineUpdateContext(
+        OracleConnection connection,
+        OracleTransaction transaction,
+        long lineId)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            @"SELECT TYPE_ID, START_DATE
+              FROM PRODUCTION_LINE
+              WHERE LINE_ID = :lineId
+              FOR UPDATE",
+            transaction);
+        command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
+        using OracleDataReader reader = command.ExecuteReader();
+        return reader.Read()
+            ? new ProductionLineUpdateContext(
+                Convert.ToInt64(reader.GetValue(0)),
+                DateOnly.FromDateTime(reader.GetDateTime(1)))
+            : null;
+    }
+
+    private static bool HasCalendarBeforeStartDate(
+        OracleConnection connection,
+        OracleTransaction transaction,
+        long lineId,
+        DateOnly startDate)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            @"SELECT COUNT(*)
+              FROM PRODUCTION_CALENDAR
+              WHERE LINE_ID = :lineId
+                AND CALENDAR_DATE < :startDate",
+            transaction);
+        command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
+        command.Parameters.Add("startDate", OracleDbType.Date).Value =
+            startDate.ToDateTime(TimeOnly.MinValue);
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
+    }
+
+    private static bool HasActiveFaults(
+        OracleConnection connection,
+        OracleTransaction transaction,
+        long lineId)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            @"SELECT COUNT(*)
+              FROM FAULT_RECORD
+              WHERE LINE_ID = :lineId
+                AND STATUS <> :recovered",
+            transaction);
+        command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
+        command.Parameters.Add("recovered", OracleDbType.Varchar2).Value =
+            FaultStatusMap.Db.Recovered;
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
+    }
+
+    private static bool MaterialExists(
+        OracleConnection connection,
+        OracleTransaction transaction,
+        long materialId)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            "SELECT COUNT(*) FROM MATERIAL WHERE MATERIAL_ID = :materialId",
+            transaction);
+        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
+    }
+
+    private static void InsertOutputRecord(
+        OracleConnection connection,
+        OracleTransaction transaction,
+        long lineId,
+        long? orderId,
+        decimal outputQty,
+        long operatorId)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            @"INSERT INTO LINE_OUTPUT_RECORD
+              (LINE_ID, ORDER_ID, OUTPUT_QTY, RECORDED_TIME, OPERATOR_ID)
+              VALUES (:lineId, :orderId, :outputQty, SYSTIMESTAMP, :operatorId)",
+            transaction);
+        command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
+        command.Parameters.Add("orderId", OracleDbType.Int64).Value =
+            OracleCommandFactory.DbValue(orderId);
+        command.Parameters.Add("outputQty", OracleDbType.Decimal).Value = outputQty;
+        command.Parameters.Add("operatorId", OracleDbType.Int64).Value = operatorId;
+        command.ExecuteNonQuery();
     }
 
     private static void UpsertFaultLineStatus(
@@ -972,5 +1210,10 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
         command.ExecuteNonQuery();
     }
 
-    private sealed record ProductionOrderLineContext(long MaterialId, decimal PlanQty);
+    private sealed record ProductionOrderLineContext(
+        long MaterialId,
+        decimal PlanQty,
+        string Status);
+
+    private sealed record ProductionLineUpdateContext(long TypeId, DateOnly StartDate);
 }

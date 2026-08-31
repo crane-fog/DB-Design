@@ -15,6 +15,7 @@ public sealed class CapacityService(
     private const int DuplicateKeyError = 1;
     private const decimal StandardWorkMinutesPerCalendarDay = 480m;
     private const int EstimateHorizonDays = 365;
+    private static readonly TimeOnly StandardShiftStart = new(8, 0);
 
     public ProductionResourceResult<ProductionResourcePage<CapacityConfig>> ListConfigs(
         int page,
@@ -99,24 +100,43 @@ public sealed class CapacityService(
                 return ProductionResourceResult<CapacityConfig>.Fail(404, "生产线类型不存在");
             }
 
+            using OracleTransaction transaction = connection.BeginTransaction();
             long configId;
             if (request.ConfigId is > 0)
             {
+                CapacityConfigKey? current = ReadCapacityConfigKey(
+                    connection,
+                    request.ConfigId.Value,
+                    transaction);
+                if (current is null)
+                {
+                    return ProductionResourceResult<CapacityConfig>.Fail(404, "产能配置不存在");
+                }
+
+                if ((current.MaterialId != request.MaterialId || current.TypeId != request.TypeId)
+                    && CapacityConfigHasCalendarReferences(
+                        connection,
+                        request.ConfigId.Value,
+                        transaction))
+                {
+                    return ProductionResourceResult<CapacityConfig>.Fail(
+                        409,
+                        "已被生产日历引用的产能配置不能修改产品或生产线类型");
+                }
+
                 using OracleCommand command = OracleCommandFactory.Create(
                     connection,
                     @"UPDATE CAPACITY_CONFIG
                       SET MATERIAL_ID = :materialId,
                           TYPE_ID = :typeId,
                           UNIT_TIME = :unitTime
-                      WHERE CONFIG_ID = :configId");
+                      WHERE CONFIG_ID = :configId",
+                    transaction);
                 command.Parameters.Add("materialId", OracleDbType.Int64).Value = request.MaterialId;
                 command.Parameters.Add("typeId", OracleDbType.Int64).Value = request.TypeId;
                 command.Parameters.Add("unitTime", OracleDbType.Decimal).Value = request.UnitTime;
                 command.Parameters.Add("configId", OracleDbType.Int64).Value = request.ConfigId.Value;
-                if (command.ExecuteNonQuery() == 0)
-                {
-                    return ProductionResourceResult<CapacityConfig>.Fail(404, "产能配置不存在");
-                }
+                command.ExecuteNonQuery();
 
                 configId = request.ConfigId.Value;
             }
@@ -127,7 +147,8 @@ public sealed class CapacityService(
                     @"INSERT INTO CAPACITY_CONFIG
                       (MATERIAL_ID, TYPE_ID, UNIT_TIME)
                       VALUES (:materialId, :typeId, :unitTime)
-                      RETURNING CONFIG_ID INTO :newId");
+                      RETURNING CONFIG_ID INTO :newId",
+                    transaction);
                 command.Parameters.Add("materialId", OracleDbType.Int64).Value = request.MaterialId;
                 command.Parameters.Add("typeId", OracleDbType.Int64).Value = request.TypeId;
                 command.Parameters.Add("unitTime", OracleDbType.Decimal).Value = request.UnitTime;
@@ -140,10 +161,17 @@ public sealed class CapacityService(
                 configId = OracleCommandFactory.ReadIdentity(idParameter);
             }
 
-            CapacityConfig? result = GetCapacityConfig(connection, configId);
-            return result is null
-                ? ProductionResourceResult<CapacityConfig>.Fail(500, "保存后无法读取产能配置")
-                : ProductionResourceResult<CapacityConfig>.Success(result, "保存成功");
+            CapacityConfig? result = GetCapacityConfig(connection, configId, transaction);
+            if (result is null)
+            {
+                transaction.Rollback();
+                return ProductionResourceResult<CapacityConfig>.Fail(
+                    500,
+                    "保存后无法读取产能配置");
+            }
+
+            transaction.Commit();
+            return ProductionResourceResult<CapacityConfig>.Success(result, "保存成功");
         }
         catch (OracleException exception) when (exception.Number == DuplicateKeyError)
         {
@@ -247,10 +275,17 @@ public sealed class CapacityService(
         try
         {
             using OracleConnection connection = OpenConnection();
-            long? lineTypeId = ReadLineTypeId(connection, request.LineId);
-            if (!lineTypeId.HasValue)
+            LineCalendarContext? line = ReadLineCalendarContext(connection, request.LineId);
+            if (line is null)
             {
                 return ProductionResourceResult<ProductionCalendar>.Fail(404, "生产线不存在");
+            }
+
+            if (request.CalendarDate < line.StartDate)
+            {
+                return ProductionResourceResult<ProductionCalendar>.Fail(
+                    400,
+                    "排产日期不得早于生产线启用日期");
             }
 
             long? configTypeId = ReadConfigTypeId(connection, request.ConfigId);
@@ -259,7 +294,7 @@ public sealed class CapacityService(
                 return ProductionResourceResult<ProductionCalendar>.Fail(404, "产能配置不存在");
             }
 
-            if (lineTypeId != configTypeId)
+            if (line.TypeId != configTypeId)
             {
                 return ProductionResourceResult<ProductionCalendar>.Fail(
                     400,
@@ -387,8 +422,9 @@ public sealed class CapacityService(
                     "产品尚未配置可用产能");
             }
 
-            CapacityPlanResult selected = SelectBestCapacityPlan(
-                plans.Select(plan => EvaluateCapacityPlan(plan, input, capacityStart)));
+            CapacityPlanResult selected = AggregateRequiredCapacityPlans(
+                plans.Select(plan => EvaluateCapacityPlan(plan, input, capacityStart)),
+                capacityStart);
 
             bool canDeliverOnTime = material.Ready
                 && selected.CapacityReady
@@ -437,7 +473,7 @@ public sealed class CapacityService(
         if (request.LineId <= 0
             || request.PeriodStart == default
             || request.PeriodEnd == default
-            || request.PeriodEnd < request.PeriodStart)
+            || request.PeriodEnd <= request.PeriodStart)
         {
             return ProductionResourceResult<CapacityDetection>.Fail(400, "产能检测周期无效");
         }
@@ -457,9 +493,10 @@ public sealed class CapacityService(
                 request.PeriodEnd);
             decimal plannedWorkMinutes = 0;
             decimal planCapacity = 0;
+            List<WorkInterval> plannedWorkIntervals = [];
             foreach (ScheduledCapacity schedule in schedules)
             {
-                DateTime workStart = schedule.Date.ToDateTime(TimeOnly.MinValue);
+                DateTime workStart = schedule.Date.ToDateTime(StandardShiftStart);
                 DateTime workEnd = workStart.AddMinutes((double)StandardWorkMinutesPerCalendarDay);
                 decimal overlapMinutes = CalculateOverlapMinutes(
                     request.PeriodStart,
@@ -468,6 +505,15 @@ public sealed class CapacityService(
                     workEnd);
                 plannedWorkMinutes += overlapMinutes;
                 planCapacity += overlapMinutes / schedule.UnitTime;
+                WorkInterval? overlap = CalculateOverlapInterval(
+                    request.PeriodStart,
+                    request.PeriodEnd,
+                    workStart,
+                    workEnd);
+                if (overlap is not null)
+                {
+                    plannedWorkIntervals.Add(overlap);
+                }
             }
 
             planCapacity = decimal.Round(planCapacity, 2, MidpointRounding.AwayFromZero);
@@ -475,9 +521,10 @@ public sealed class CapacityService(
                 connection,
                 request.LineId,
                 request.PeriodStart,
-                request.PeriodEnd);
+                request.PeriodEnd,
+                plannedWorkIntervals);
             decimal actualCapacity = decimal.Round(
-                ReadActualCapacitySnapshot(
+                ReadActualCapacity(
                     connection,
                     request.LineId,
                     request.PeriodStart,
@@ -495,9 +542,12 @@ public sealed class CapacityService(
                     decimal.Round(diffQuantity / planCapacity, 4),
                     -9.9999m,
                     9.9999m);
-            decimal efficiency = planCapacity == 0
-                ? 0
-                : Math.Max(0, decimal.Round(actualCapacity / planCapacity, 4));
+            decimal? efficiency = planCapacity == 0
+                ? null
+                : Math.Clamp(
+                    decimal.Round(actualCapacity / planCapacity, 4),
+                    0m,
+                    1m);
             string reasonType = downtimeMinutes > 0
                 ? "故障停机"
                 : actualCapacity < planCapacity
@@ -723,11 +773,15 @@ public sealed class CapacityService(
         TypeName = reader.GetString(7),
     };
 
-    private static CapacityConfig? GetCapacityConfig(OracleConnection connection, long configId)
+    private static CapacityConfig? GetCapacityConfig(
+        OracleConnection connection,
+        long configId,
+        OracleTransaction? transaction = null)
     {
         using OracleCommand command = OracleCommandFactory.Create(
             connection,
-            CapacityConfigSelect + " WHERE cc.CONFIG_ID = :configId");
+            CapacityConfigSelect + " WHERE cc.CONFIG_ID = :configId",
+            transaction);
         command.Parameters.Add("configId", OracleDbType.Int64).Value = configId;
         using OracleDataReader reader = command.ExecuteReader();
         return reader.Read() ? MapCapacityConfig(reader) : null;
@@ -777,14 +831,56 @@ public sealed class CapacityService(
         return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
-    private static long? ReadLineTypeId(OracleConnection connection, long lineId)
+    private static LineCalendarContext? ReadLineCalendarContext(
+        OracleConnection connection,
+        long lineId)
     {
         using OracleCommand command = OracleCommandFactory.Create(
             connection,
-            "SELECT TYPE_ID FROM PRODUCTION_LINE WHERE LINE_ID = :lineId");
+            "SELECT TYPE_ID, START_DATE FROM PRODUCTION_LINE WHERE LINE_ID = :lineId");
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
-        object? value = command.ExecuteScalar();
-        return value is null || value == DBNull.Value ? null : Convert.ToInt64(value);
+        using OracleDataReader reader = command.ExecuteReader();
+        return reader.Read()
+            ? new LineCalendarContext(
+                Convert.ToInt64(reader.GetValue(0)),
+                DateOnly.FromDateTime(reader.GetDateTime(1)))
+            : null;
+    }
+
+    private static CapacityConfigKey? ReadCapacityConfigKey(
+        OracleConnection connection,
+        long configId,
+        OracleTransaction transaction)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            @"SELECT MATERIAL_ID, TYPE_ID
+              FROM CAPACITY_CONFIG
+              WHERE CONFIG_ID = :configId
+              FOR UPDATE",
+            transaction);
+        command.Parameters.Add("configId", OracleDbType.Int64).Value = configId;
+        using OracleDataReader reader = command.ExecuteReader();
+        return reader.Read()
+            ? new CapacityConfigKey(
+                Convert.ToInt64(reader.GetValue(0)),
+                Convert.ToInt64(reader.GetValue(1)))
+            : null;
+    }
+
+    private static bool CapacityConfigHasCalendarReferences(
+        OracleConnection connection,
+        long configId,
+        OracleTransaction transaction)
+    {
+        using OracleCommand command = OracleCommandFactory.Create(
+            connection,
+            @"SELECT COUNT(*)
+              FROM PRODUCTION_CALENDAR
+              WHERE CONFIG_ID = :configId",
+            transaction);
+        command.Parameters.Add("configId", OracleDbType.Int64).Value = configId;
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
     private static long? ReadConfigTypeId(OracleConnection connection, long configId)
@@ -888,21 +984,22 @@ public sealed class CapacityService(
             capacityReady && completedWithinHorizon);
     }
 
-    private static CapacityPlanResult SelectBestCapacityPlan(
-        IEnumerable<CapacityPlanResult> results)
+    private static CapacityPlanResult AggregateRequiredCapacityPlans(
+        IEnumerable<CapacityPlanResult> results,
+        DateOnly capacityStart)
     {
         List<CapacityPlanResult> candidates = [.. results];
-        CapacityPlanResult? readyPlan = candidates
-            .Where(result => result.CapacityReady)
-            .OrderBy(result => result.EstimatedFinishDate)
-            .ThenByDescending(result => result.AvailableBeforeExpected)
-            .FirstOrDefault();
+        if (candidates.Count == 0)
+        {
+            return new CapacityPlanResult(0, 0, 0, capacityStart, false);
+        }
 
-        return readyPlan ?? candidates
-            .OrderByDescending(result => result.AvailableBeforeExpected)
-            .ThenByDescending(result => result.AvailableWithinHorizon)
-            .ThenBy(result => result.EstimatedFinishDate)
-            .First();
+        return new CapacityPlanResult(
+            candidates.Sum(result => result.RequiredMinutes),
+            candidates.Sum(result => result.AvailableBeforeExpected),
+            candidates.Sum(result => result.AvailableWithinHorizon),
+            candidates.Max(result => result.EstimatedFinishDate),
+            candidates.All(result => result.CapacityReady));
     }
 
     private static List<ScheduledCapacity> ReadDetectionSchedules(
@@ -940,8 +1037,14 @@ public sealed class CapacityService(
         OracleConnection connection,
         long lineId,
         DateTime periodStart,
-        DateTime periodEnd)
+        DateTime periodEnd,
+        IReadOnlyList<WorkInterval> plannedWorkIntervals)
     {
+        if (plannedWorkIntervals.Count == 0)
+        {
+            return 0;
+        }
+
         using OracleCommand command = OracleCommandFactory.Create(
             connection,
             @"SELECT OCCUR_TIME, RECOVER_TIME
@@ -959,11 +1062,17 @@ public sealed class CapacityService(
         {
             DateTime occurTime = reader.GetDateTime(0);
             DateTime recoverTime = reader.IsDBNull(1) ? DateTime.Now : reader.GetDateTime(1);
-            DateTime start = occurTime > periodStart ? occurTime : periodStart;
-            DateTime end = recoverTime < periodEnd ? recoverTime : periodEnd;
-            if (end > start)
+            foreach (WorkInterval workInterval in plannedWorkIntervals)
             {
-                intervals.Add((start, end));
+                WorkInterval? overlap = CalculateOverlapInterval(
+                    occurTime,
+                    recoverTime,
+                    workInterval.Start,
+                    workInterval.End);
+                if (overlap is not null)
+                {
+                    intervals.Add((overlap.Start, overlap.End));
+                }
             }
         }
 
@@ -997,7 +1106,7 @@ public sealed class CapacityService(
         return totalMinutes;
     }
 
-    private static decimal ReadActualCapacitySnapshot(
+    private static decimal ReadActualCapacity(
         OracleConnection connection,
         long lineId,
         DateTime periodStart,
@@ -1005,16 +1114,27 @@ public sealed class CapacityService(
     {
         using OracleCommand command = OracleCommandFactory.Create(
             connection,
-            @"SELECT FINISHED_QTY
-              FROM LINE_STATUS
+            @"SELECT NVL(SUM(OUTPUT_QTY), 0)
+              FROM LINE_OUTPUT_RECORD
               WHERE LINE_ID = :lineId
-                AND UPDATED_TIME >= :periodStart
-                AND UPDATED_TIME <= :periodEnd");
+                AND RECORDED_TIME >= :periodStart
+                AND RECORDED_TIME < :periodEnd");
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
         command.Parameters.Add("periodStart", OracleDbType.TimeStamp).Value = periodStart;
         command.Parameters.Add("periodEnd", OracleDbType.TimeStamp).Value = periodEnd;
         object? value = command.ExecuteScalar();
         return value is null || value == DBNull.Value ? 0 : Convert.ToDecimal(value);
+    }
+
+    private static WorkInterval? CalculateOverlapInterval(
+        DateTime firstStart,
+        DateTime firstEnd,
+        DateTime secondStart,
+        DateTime secondEnd)
+    {
+        DateTime start = firstStart > secondStart ? firstStart : secondStart;
+        DateTime end = firstEnd < secondEnd ? firstEnd : secondEnd;
+        return end <= start ? null : new WorkInterval(start, end);
     }
 
     private static decimal CalculateOverlapMinutes(
@@ -1089,4 +1209,10 @@ public sealed class CapacityService(
         bool CapacityReady);
 
     private sealed record ScheduledCapacity(DateOnly Date, decimal UnitTime);
+
+    private sealed record LineCalendarContext(long TypeId, DateOnly StartDate);
+
+    private sealed record CapacityConfigKey(long MaterialId, long TypeId);
+
+    private sealed record WorkInterval(DateTime Start, DateTime End);
 }
