@@ -9,6 +9,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
+using Oracle.ManagedDataAccess.Client;
+
+// 在创建任何数据库连接前统一启用按名称绑定。
+OracleConfiguration.BindByName = true;
+
 Env.Load();
 var connString = Env.GetString("ORACLE_CONN");
 var jwtSecret = Env.GetString("JWT_SECRET");

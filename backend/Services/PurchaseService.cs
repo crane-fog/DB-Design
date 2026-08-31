@@ -118,10 +118,15 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
 
         var where = new List<string>();
 
+        // 结束日期包含整天；最大日期无需上界，避免计算次日时溢出。
+        var orderDateEndExclusive = orderDateEnd.HasValue && orderDateEnd.Value < DateOnly.MaxValue
+            ? orderDateEnd.Value.AddDays(1).ToDateTime(TimeOnly.MinValue)
+            : (DateTime?)null;
+
         if (supplierId.HasValue) where.Add("o.SUPPLIER_ID = :supplierId");
         if (!string.IsNullOrEmpty(dbStatus)) where.Add("o.STATUS = :status");
         if (orderDateStart.HasValue) where.Add("o.ORDER_DATE >= :orderDateStart");
-        if (orderDateEnd.HasValue) where.Add("o.ORDER_DATE <= :orderDateEnd");
+        if (orderDateEndExclusive.HasValue) where.Add("o.ORDER_DATE < :orderDateEndExclusive");
         if (expectedDateStart.HasValue) where.Add("o.EXPECTED_DATE >= :expectedDateStart");
         if (expectedDateEnd.HasValue) where.Add("o.EXPECTED_DATE <= :expectedDateEnd");
         if (buyerId.HasValue) where.Add("o.BUYER_ID = :buyerId");
@@ -137,7 +142,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
             if (supplierId.HasValue) cmd.Parameters.Add(new OracleParameter("supplierId", supplierId.Value));
             if (!string.IsNullOrEmpty(dbStatus)) cmd.Parameters.Add(new OracleParameter("status", dbStatus));
             if (orderDateStart.HasValue) cmd.Parameters.Add(new OracleParameter("orderDateStart", orderDateStart.Value.ToDateTime(TimeOnly.MinValue)));
-            if (orderDateEnd.HasValue) cmd.Parameters.Add(new OracleParameter("orderDateEnd", orderDateEnd.Value.ToDateTime(TimeOnly.MinValue)));
+            if (orderDateEndExclusive.HasValue) cmd.Parameters.Add(new OracleParameter("orderDateEndExclusive", orderDateEndExclusive.Value));
             if (expectedDateStart.HasValue) cmd.Parameters.Add(new OracleParameter("expectedDateStart", expectedDateStart.Value.ToDateTime(TimeOnly.MinValue)));
             if (expectedDateEnd.HasValue) cmd.Parameters.Add(new OracleParameter("expectedDateEnd", expectedDateEnd.Value.ToDateTime(TimeOnly.MinValue)));
             if (buyerId.HasValue) cmd.Parameters.Add(new OracleParameter("buyerId", buyerId.Value));

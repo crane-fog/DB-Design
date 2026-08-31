@@ -37,8 +37,8 @@ public class PermissionService(string connString)
         }
         if (!string.IsNullOrWhiteSpace(resource))
         {
-            conditions.Add("\"resource\" LIKE :resource");
-            filters.Add(new SqlFilter("resource", $"%{resource.Trim()}%"));
+            conditions.Add("\"resource\" LIKE :res");
+            filters.Add(new SqlFilter("res", $"%{resource.Trim()}%"));
         }
         if (!string.IsNullOrWhiteSpace(action))
         {
@@ -99,9 +99,9 @@ public class PermissionService(string connString)
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"INSERT INTO SYS_PERMISSION (""resource"", ACTION)
-                            VALUES (:resource, :action)
+                            VALUES (:res, :action)
                             RETURNING PERMISSION_ID INTO :permissionId";
-        cmd.Parameters.Add(new OracleParameter("resource", request.Resource.Trim()));
+        cmd.Parameters.Add(new OracleParameter("res", request.Resource.Trim()));
         cmd.Parameters.Add(new OracleParameter("action", request.Action.Trim()));
         var permissionIdOut = new OracleParameter("permissionId", OracleDbType.Int64) { Direction = System.Data.ParameterDirection.Output };
         cmd.Parameters.Add(permissionIdOut);
@@ -128,9 +128,9 @@ public class PermissionService(string connString)
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"UPDATE SYS_PERMISSION
-                            SET ""resource"" = :resource, ACTION = :action
+                            SET ""resource"" = :res, ACTION = :action
                             WHERE PERMISSION_ID = :permissionId";
-        cmd.Parameters.Add(new OracleParameter("resource", request.Resource.Trim()));
+        cmd.Parameters.Add(new OracleParameter("res", request.Resource.Trim()));
         cmd.Parameters.Add(new OracleParameter("action", request.Action.Trim()));
         cmd.Parameters.Add(new OracleParameter("permissionId", request.PermissionId));
 
