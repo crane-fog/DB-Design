@@ -1,22 +1,24 @@
-import type { PageResult } from '@/services/pagination'
-
-export type DashboardMockScenario = 'empty' | 'error' | 'success'
-export type { PageResult }
+export interface DashboardAccess {
+  permissions: readonly string[]
+  roles: readonly string[]
+}
 
 export type DashboardStatisticKey =
   | 'auditLogs'
-  | 'pendingItems'
+  | 'inventoryAlerts'
+  | 'permissions'
+  | 'purchaseReminders'
   | 'roles'
-  | 'todayOperations'
   | 'users'
 
 export interface DashboardStatistic {
   description: string
   key: DashboardStatisticKey
-  permission?: string
-  route?: string
+  permission: string
+  route: string
   title: string
-  value: number
+  /** 未加载成功时不显示数字，不能用 0 代替未知总数。 */
+  value?: number
 }
 
 export type DashboardShortcutIcon = 'audit' | 'materials' | 'roles' | 'users'
@@ -29,42 +31,40 @@ export interface DashboardShortcut {
   title: string
 }
 
-export type DashboardTodoStatus = 'pending' | 'processing' | 'resolved'
-export type DashboardTodoType = 'notice' | 'reminder' | 'warning'
-
 export interface DashboardTodo {
   createdAt: string
   id: string
-  permission?: string
-  route?: string
-  status: DashboardTodoStatus
+  permission: string
+  route: string
+  statusLabel: string
   title: string
-  type: DashboardTodoType
+  type: 'reminder' | 'warning'
 }
 
-export type DashboardOperationResult = 'failure' | 'success'
-
-/** 与系统审计操作日志保持相同的展示字段，供概览页精简呈现。 */
+/** 仅保留操作日志接口提供的字段，不推断姓名或操作成功与否。 */
 export interface DashboardOperation {
-  action: string
-  id: string
+  action?: string
+  id?: number
   ipAddress?: string
-  module: string
-  operateTime: string
-  operatorName: string
-  permission?: string
-  result: DashboardOperationResult
+  module?: string
+  operateTime?: string
+  operatorId?: number
 }
 
-export interface HomeDashboardData {
-  recentOperations: PageResult<DashboardOperation>
-  shortcuts: DashboardShortcut[]
-  statistics: DashboardStatistic[]
-  todos: PageResult<DashboardTodo>
+export interface DashboardSection<TItem> {
+  errors: string[]
+  items: TItem[]
+  state: 'error' | 'forbidden' | 'partial' | 'ready'
+  /** 仅在所有有权访问的数据源均成功时提供完整总数。 */
+  total?: number
 }
 
 export interface SystemDashboardData {
-  recentOperations: PageResult<DashboardOperation>
-  shortcuts: DashboardShortcut[]
+  errors: string[]
+  recentOperations: DashboardSection<DashboardOperation>
   statistics: DashboardStatistic[]
+}
+
+export interface HomeDashboardData extends SystemDashboardData {
+  todos: DashboardSection<DashboardTodo>
 }

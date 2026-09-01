@@ -22,9 +22,7 @@ import type {
   ProductionLineStatus,
   ProductionOrderDetail,
 } from '@/api'
-import { isMockEnabled } from '@/config/mock'
 import { productionApi } from '@/api/client'
-import { productionRepository as productionMock } from '@/mock/repositories'
 import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
@@ -45,9 +43,6 @@ export type ExternalOrderStatusValue = ExternalOrder['status']
 
 /** 故障记录状态。 */
 export type FaultStatusValue = 'pending_repair' | 'recovered' | 'repairing'
-
-/** 生产阶段状态。 */
-export type ProductionStageStatus = 'completed' | 'in_progress' | 'pending' | 'paused'
 
 export interface ProductionOrderQuery extends PageRequest {
   materialId?: number
@@ -86,8 +81,6 @@ export interface ProductionOrderItem {
   actualEnd?: string
   actualStart?: string
   finishedQty?: number
-  lastProgressRemark?: string
-  lastProgressReportedAt?: string
   materialId: number
   materialName?: string
   orderId: number
@@ -95,40 +88,9 @@ export interface ProductionOrderItem {
   planQty: number
   planStart: string
   reviewComment?: string
-  schedule?: ProductionScheduleItem
   status: ProductionOrderStatus
   versionId: number
   versionNo?: string
-}
-
-export interface ProductionProgressReportFormData {
-  completedQty: number
-  orderId: number
-  remark?: string
-  reportedAt?: string
-}
-
-export interface ProductionScheduleFormData {
-  lineId: number
-  orderId: number
-  plannedEnd: string
-  plannedStart: string
-}
-
-export interface ProductionScheduleItem {
-  lineId: number
-  lineName: string
-  orderId: number
-  plannedEnd: string
-  plannedStart: string
-  scheduleId: number
-}
-
-export interface ProductionStageItem {
-  completedAt?: string
-  name: string
-  startedAt?: string
-  status: ProductionStageStatus
 }
 
 export interface ProductionOrderFormData {
@@ -317,41 +279,25 @@ export interface ProductionLineStatusItem {
 export interface FaultRecordItem {
   description: string
   faultId: number
-  faultLevel: 'critical' | 'major' | 'minor'
   faultType: string
   lineId: number
-  lineName?: string
   occurTime: string
-  processingNote?: string
   recoverTime?: string
   repairerId?: number
-  repairerName?: string
   reporterId: number
-  reporterName?: string
   status: FaultStatusValue
-}
-
-export interface FaultRecordQuery extends PageRequest {
-  faultType?: string
-  lineId?: number
-  occurEnd?: string
-  occurStart?: string
-  status?: FaultStatusValue
 }
 
 export interface FaultReportFormData {
   description: string
-  faultLevel: FaultRecordItem['faultLevel']
   faultType: string
   lineId: number
-  occurTime?: string
 }
 
 export interface FaultUpdateFormData {
   faultId: number
   recoverTime?: string
   repairerId?: number
-  processingNote?: string
   status: FaultStatusValue
 }
 
@@ -437,7 +383,6 @@ function toFaultRecord(record: FaultRecord): FaultRecordItem {
   return {
     description: record.description,
     faultId: record.fault_id,
-    faultLevel: 'major',
     faultType: record.fault_type,
     lineId: record.line_id,
     occurTime: record.occur_time,
@@ -521,16 +466,13 @@ function toExternalOrderConvert(result: ExternalOrderConvertResult): ExternalOrd
   }
 }
 
-function assertProductionMockIsReadOnly() {
-  if (isMockEnabled()) {
-    throw new Error('生产 Mock 当前为只读模式，暂不支持写操作。')
+/** 生产查询和写入接口均约定返回数据，缺失时不能当作操作成功。 */
+function requireData<TData>(response: ApiEnvelope<TData>): NonNullable<TData> {
+  const data = unwrap(response)
+  if (data === undefined || data === null) {
+    throw new Error('生产接口未返回有效数据，请刷新核实操作结果')
   }
-}
-
-function assertMockPermission(permission: string) {
-  if (isMockEnabled() && !useAuthStore().hasPermission(permission)) {
-    throw new Error('当前账号没有执行该生产管理操作的权限')
-  }
+  return data
 }
 
 export const productionService = {
@@ -540,14 +482,6 @@ export const productionService = {
     if (auth.hasRole('外部客户')) {
       customerId = undefined
     }
-    if (isMockEnabled()) {
-      assertMockPermission('production:view')
-      if (auth.hasRole('外部客户')) {
-        customerId = auth.currentUser?.id
-      }
-      return productionMock.addExternalOrder({ ...form, customerId })
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.addExternalOrder({
       externalOrderCreateRequest: {
         contact_person: form.contactPerson.trim(),
@@ -558,21 +492,13 @@ export const productionService = {
         quantity: form.quantity,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ExternalOrder | undefined>)
-    if (data) {
-      return toExternalOrder(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ExternalOrder | undefined>)
+    return toExternalOrder(data)
   },
 
   api: productionApi,
 
   async approveOrder(orderId: number, approved: boolean, reviewComment?: string) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.approveOrder(orderId, approved, reviewComment)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.approveProductionOrder({
       productionOrderApproveRequest: {
         approved,
@@ -580,35 +506,19 @@ export const productionService = {
         review_comment: nullableText(reviewComment),
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
-    if (data) {
-      return toProductionOrder(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
+    return toProductionOrder(data)
   },
 
   async cancelOrder(orderId: number, remark?: string) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.cancelOrder(orderId, remark)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.cancelProductionOrder({
       productionOrderActionRequest: { order_id: orderId, remark: nullableText(remark) },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
-    if (data) {
-      return toProductionOrder(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
+    return toProductionOrder(data)
   },
 
   async convertExternalOrder(form: ExternalOrderConvertFormData) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.convertExternalOrder(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.convertExternalOrderToProductionOrder({
       externalOrderConvertRequest: {
         ext_order_id: form.extOrderId,
@@ -621,19 +531,11 @@ export const productionService = {
         })),
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ExternalOrderConvertResult | undefined>)
-    if (data) {
-      return toExternalOrderConvert(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ExternalOrderConvertResult | undefined>)
+    return toExternalOrderConvert(data)
   },
 
   async createLine(form: ProductionLineFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.createLine(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.addProductionLine({
       productionLineCreateRequest: {
         manager_id: form.managerId,
@@ -641,19 +543,11 @@ export const productionService = {
         type_id: form.typeId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionLine | undefined>)
-    if (data) {
-      return toProductionLine(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionLine | undefined>)
+    return toProductionLine(data)
   },
 
   async createOrder(form: ProductionOrderFormData) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.createOrder(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.addProductionOrder({
       productionOrderCreateRequest: {
         material_id: form.materialId,
@@ -663,19 +557,11 @@ export const productionService = {
         version_id: form.versionId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
-    if (data) {
-      return toProductionOrder(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
+    return toProductionOrder(data)
   },
 
   async deleteCalendar(calendarDate: string, lineId: number) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.deleteCalendar(calendarDate, lineId)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.deleteProductionCalendar({
       productionCalendarDeleteRequest: { calendar_date: calendarDate, line_id: lineId },
     })
@@ -683,10 +569,6 @@ export const productionService = {
   },
 
   async estimateCapacity(form: ProductionCapacityEstimateFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.estimateCapacity(form)
-    }
     const response = await productionApi.estimateProductionCapacity({
       productionCapacityEstimateRequest: {
         expected_date: form.expectedDate,
@@ -696,19 +578,13 @@ export const productionService = {
         version_id: form.versionId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionCapacityEstimateResult | undefined>)
-    if (data) {
-      return toCapacityEstimate(data)
-    }
-    return undefined
+    const data = requireData(
+      response.data as ApiEnvelope<ProductionCapacityEstimateResult | undefined>,
+    )
+    return toCapacityEstimate(data)
   },
 
   async finishOrder(orderId: number, finishedQty: number, remark?: string) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.finishOrder(orderId, finishedQty)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.finishProductionOrder({
       productionOrderFinishRequest: {
         finished_qty: finishedQty,
@@ -716,52 +592,23 @@ export const productionService = {
         remark: nullableText(remark),
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
-    if (data) {
-      return toProductionOrder(data)
-    }
-    return undefined
-  },
-
-  async getFault(faultId: number): Promise<FaultRecordItem | undefined> {
-    if (isMockEnabled()) {
-      return productionMock.getFault(faultId)
-    }
-    throw new Error('当前后端暂未提供生产故障详情接口')
+    const data = requireData(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
+    return toProductionOrder(data)
   },
 
   async getOrder(orderId: number) {
-    if (isMockEnabled()) {
-      return productionMock.getOrder(orderId)
-    }
     const response = await productionApi.getProductionOrder({ orderId })
-    const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
-    if (data) {
-      return toProductionOrder(data)
-    }
-    return undefined
-  },
-
-  async getOrderStages(orderId: number): Promise<ProductionStageItem[]> {
-    if (isMockEnabled()) {
-      return productionMock.getOrderStages(orderId)
-    }
-    throw new Error('当前后端暂未提供生产阶段查询接口')
+    const data = requireData(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
+    return toProductionOrder(data)
   },
 
   async listAllLineTypes(): Promise<LineTypeItem[]> {
-    if (isMockEnabled()) {
-      return productionMock.listAllLineTypes()
-    }
     const response = await productionApi.listProductionLineType({ page: 1, pageSize: 100 })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data as ApiEnvelope<unknown>)
     return getPageItems<LineType>(data).map(toLineType)
   },
 
   async listCalendars(query: ProductionCalendarQuery): Promise<PageResult<ProductionCalendarItem>> {
-    if (isMockEnabled()) {
-      return productionMock.listCalendars(query)
-    }
     const response = await productionApi.listProductionCalendar({
       calendarDateEnd: query.calendarDateEnd,
       calendarDateStart: query.calendarDateStart,
@@ -770,7 +617,7 @@ export const productionService = {
       page: query.page,
       pageSize: query.pageSize,
     })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<ProductionCalendar>(data).map(toProductionCalendar)
     const metadata = getPageMetadata(data, {
       page: query.page,
@@ -781,16 +628,13 @@ export const productionService = {
   },
 
   async listCapacityConfigs(query: CapacityConfigQuery): Promise<PageResult<CapacityConfigItem>> {
-    if (isMockEnabled()) {
-      return productionMock.listCapacityConfigs(query)
-    }
     const response = await productionApi.listCapacityConfig({
       materialId: query.materialId,
       page: query.page,
       pageSize: query.pageSize,
       typeId: query.typeId,
     })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<CapacityConfig>(data).map(toCapacityConfig)
     const metadata = getPageMetadata(data, {
       page: query.page,
@@ -801,26 +645,13 @@ export const productionService = {
   },
 
   async listExternalOrders(query: ExternalOrderQuery): Promise<PageResult<ExternalOrderItem>> {
-    if (isMockEnabled()) {
-      const auth = useAuthStore()
-      if (auth.hasRole('外部客户')) {
-        return productionMock.listExternalOrders({
-          ...query,
-          customerId: auth.currentUser?.id,
-        })
-      }
-      if (!auth.hasPermission('production:orders')) {
-        throw new Error('当前账号没有查看外部订单的权限')
-      }
-      return productionMock.listExternalOrders(query)
-    }
     const response = await productionApi.listExternalOrder({
       customerId: query.customerId,
       page: query.page,
       pageSize: query.pageSize,
       status: query.status,
     })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<ExternalOrder>(data).map(toExternalOrder)
     const metadata = getPageMetadata(data, {
       page: query.page,
@@ -830,23 +661,13 @@ export const productionService = {
     return { items, ...metadata }
   },
 
-  async listFaults(query: FaultRecordQuery): Promise<PageResult<FaultRecordItem>> {
-    if (isMockEnabled()) {
-      return productionMock.listFaults(query)
-    }
-    throw new Error('当前后端暂未提供生产故障列表接口')
-  },
-
   async listLineTypes(query: LineTypeQuery): Promise<PageResult<LineTypeItem>> {
-    if (isMockEnabled()) {
-      return productionMock.listLineTypes(query)
-    }
     const response = await productionApi.listProductionLineType({
       page: query.page,
       pageSize: query.pageSize,
       typeName: query.typeName || undefined,
     })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<LineType>(data).map(toLineType)
     const metadata = getPageMetadata(data, {
       page: query.page,
@@ -857,16 +678,13 @@ export const productionService = {
   },
 
   async listLines(query: ProductionLineQuery): Promise<PageResult<ProductionLineItem>> {
-    if (isMockEnabled()) {
-      return productionMock.listLines(query)
-    }
     const response = await productionApi.listProductionLine({
       page: query.page,
       pageSize: query.pageSize,
       status: query.status,
       typeId: query.typeId,
     })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<ProductionLine>(data).map(toProductionLine)
     const metadata = getPageMetadata(data, {
       page: query.page,
@@ -877,9 +695,6 @@ export const productionService = {
   },
 
   async listOrders(query: ProductionOrderQuery): Promise<PageResult<ProductionOrderItem>> {
-    if (isMockEnabled()) {
-      return productionMock.listOrders(query)
-    }
     const response = await productionApi.listProductionOrder({
       materialId: query.materialId,
       page: query.page,
@@ -888,7 +703,7 @@ export const productionService = {
       planEndStart: query.planEndStart,
       status: query.status,
     })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<ProductionOrderDetail>(data).map(toProductionOrder)
     const metadata = getPageMetadata(data, {
       page: query.page,
@@ -899,11 +714,6 @@ export const productionService = {
   },
 
   async reportFault(form: FaultReportFormData) {
-    assertMockPermission('production:breakdown')
-    if (isMockEnabled()) {
-      return productionMock.reportFault(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.reportProductionLineFault({
       faultRecordCreateRequest: {
         description: form.description.trim(),
@@ -911,27 +721,11 @@ export const productionService = {
         line_id: form.lineId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<FaultRecord | undefined>)
-    if (data) {
-      return toFaultRecord(data)
-    }
-    return undefined
-  },
-
-  async reportOrderProgress(form: ProductionProgressReportFormData) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.reportOrderProgress(form)
-    }
-    throw new Error('当前后端暂未提供生产进度上报接口')
+    const data = requireData(response.data as ApiEnvelope<FaultRecord | undefined>)
+    return toFaultRecord(data)
   },
 
   async reviewExternalOrder(extOrderId: number, accepted: boolean, reviewComment?: string) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.reviewExternalOrder(extOrderId, accepted, reviewComment)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.reviewExternalOrder({
       externalOrderReviewRequest: {
         accepted,
@@ -939,18 +733,11 @@ export const productionService = {
         review_comment: nullableText(reviewComment),
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ExternalOrder | undefined>)
-    if (data) {
-      return toExternalOrder(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ExternalOrder | undefined>)
+    return toExternalOrder(data)
   },
 
   async runCapacityDetection(form: CapacityDetectionFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.runCapacityDetection(form)
-    }
     const response = await productionApi.runCapacityDetection({
       capacityDetectionRunRequest: {
         line_id: form.lineId,
@@ -958,19 +745,11 @@ export const productionService = {
         period_start: form.periodStart,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<CapacityDetection | undefined>)
-    if (data) {
-      return toCapacityDetection(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<CapacityDetection | undefined>)
+    return toCapacityDetection(data)
   },
 
   async saveCalendar(form: ProductionCalendarFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.saveCalendar(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.saveProductionCalendar({
       productionCalendarSaveRequest: {
         calendar_date: form.calendarDate,
@@ -978,18 +757,11 @@ export const productionService = {
         line_id: form.lineId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionCalendar | undefined>)
-    if (data) {
-      return toProductionCalendar(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionCalendar | undefined>)
+    return toProductionCalendar(data)
   },
 
   async saveCapacityBalance(form: CapacityBalanceFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.saveCapacityBalance(form)
-    }
     const response = await productionApi.saveCapacityBalance({
       capacityBalanceSaveRequest: {
         affected_orders: form.affectedOrders,
@@ -997,19 +769,11 @@ export const productionService = {
         before_plan: form.beforePlan,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<CapacityBalance | undefined>)
-    if (data) {
-      return toCapacityBalance(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<CapacityBalance | undefined>)
+    return toCapacityBalance(data)
   },
 
   async saveCapacityConfig(form: CapacityConfigFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.saveCapacityConfig(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.saveCapacityConfig({
       capacityConfigSaveRequest: {
         config_id: form.configId ?? undefined,
@@ -1018,59 +782,27 @@ export const productionService = {
         unit_time: form.unitTime,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<CapacityConfig | undefined>)
-    if (data) {
-      return toCapacityConfig(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<CapacityConfig | undefined>)
+    return toCapacityConfig(data)
   },
 
   async saveLineType(form: LineTypeFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.saveLineType(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.saveProductionLineType({
       lineTypeSaveRequest: { type_id: form.typeId ?? undefined, type_name: form.typeName.trim() },
     })
-    const data = unwrap(response.data as ApiEnvelope<LineType | undefined>)
-    if (data) {
-      return toLineType(data)
-    }
-    return undefined
-  },
-
-  async saveOrderSchedule(form: ProductionScheduleFormData) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.saveOrderSchedule(form)
-    }
-    throw new Error('当前后端暂未提供生产订单排产接口')
+    const data = requireData(response.data as ApiEnvelope<LineType | undefined>)
+    return toLineType(data)
   },
 
   async startOrder(orderId: number, remark?: string) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.startOrder(orderId)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.startProductionOrder({
       productionOrderActionRequest: { order_id: orderId, remark: nullableText(remark) },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
-    if (data) {
-      return toProductionOrder(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
+    return toProductionOrder(data)
   },
 
   async updateFault(form: FaultUpdateFormData) {
-    assertMockPermission('production:breakdown')
-    if (isMockEnabled()) {
-      return productionMock.updateFault(form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionLineFault({
       faultRecordUpdateRequest: {
         fault_id: form.faultId,
@@ -1079,19 +811,11 @@ export const productionService = {
         status: form.status,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<FaultRecord | undefined>)
-    if (data) {
-      return toFaultRecord(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<FaultRecord | undefined>)
+    return toFaultRecord(data)
   },
 
   async updateLine(lineId: number, form: ProductionLineFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.updateLine(lineId, form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionLine({
       productionLineUpdateRequest: {
         line_id: lineId,
@@ -1100,18 +824,11 @@ export const productionService = {
         type_id: form.typeId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionLine | undefined>)
-    if (data) {
-      return toProductionLine(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionLine | undefined>)
+    return toProductionLine(data)
   },
 
   async updateLineStatus(form: ProductionLineStatusFormData) {
-    assertMockPermission('production:capacity')
-    if (isMockEnabled()) {
-      return productionMock.updateLineStatus(form)
-    }
     const response = await productionApi.updateProductionLineStatus({
       productionLineStatusUpdateRequest: {
         current_material_id: form.currentMaterialId,
@@ -1122,19 +839,11 @@ export const productionService = {
         status: form.status,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionLineStatus | undefined>)
-    if (data) {
-      return toProductionLineStatus(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionLineStatus | undefined>)
+    return toProductionLineStatus(data)
   },
 
   async updateOrder(orderId: number, form: ProductionOrderFormData) {
-    assertMockPermission('production:orders')
-    if (isMockEnabled()) {
-      return productionMock.updateOrder(orderId, form)
-    }
-    assertProductionMockIsReadOnly()
     const response = await productionApi.updateProductionOrder({
       productionOrderUpdateRequest: {
         material_id: form.materialId,
@@ -1145,10 +854,7 @@ export const productionService = {
         version_id: form.versionId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
-    if (data) {
-      return toProductionOrder(data)
-    }
-    return undefined
+    const data = requireData(response.data as ApiEnvelope<ProductionOrderDetail | undefined>)
+    return toProductionOrder(data)
   },
 }

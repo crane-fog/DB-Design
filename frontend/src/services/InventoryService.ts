@@ -13,7 +13,9 @@ import type {
   CompletionInboundOrder,
   InventoryAlertEvent,
   Material,
+  MaterialShortageCalculateResponseAllOfData,
   MaterialStock,
+  MaterialStockLockData,
   ObsoleteMaterialDetection,
   ProductionOrderDetail,
   StockLockRecord,
@@ -44,14 +46,21 @@ import type {
 } from '@/types/inventory'
 import { inventoryApi, materialBomApi, productionApi } from '@/api/client'
 import { cleanQuery } from '@/services/request'
-import { inventoryRepository as inventoryMock } from '@/mock/repositories'
-import { isMockEnabled } from '@/config/mock'
+import { pinia } from '@/stores/pinia'
+import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
 
-interface ShortagePayload {
-  calculation_time?: string
-  records?: ApiMaterialShortageItem[]
+export type InventoryStockData = Omit<
+  InventoryStockItem,
+  'materialType' | 'safetyStock' | 'status'
+> &
+  Partial<Pick<InventoryStockItem, 'materialType' | 'safetyStock' | 'status'>>
+
+function canReadMaterialReferences() {
+  return useAuthStore(pinia).roles.some((role) =>
+    ['系统管理员', '生产管理员', '采购员'].includes(role),
+  )
 }
 
 interface AlertGeneratePayload {
@@ -60,30 +69,24 @@ interface AlertGeneratePayload {
   skipped_pending_count?: number
 }
 
-interface LockPayload {
-  records?: StockLockRecord[]
-  shortages?: {
-    available_qty: number
-    material_id: number
-    required_qty: number
-    shortage_qty: number
-  }[]
-  success?: boolean
-}
-
 interface ObsoleteDetectPayload {
   detected_count?: number
   records?: ObsoleteMaterialDetection[]
 }
 
-function mapOptional<TSource, TResult>(
-  value: TSource | undefined,
-  mapper: (item: TSource) => TResult,
-) {
-  if (value === undefined) {
-    return undefined
+function requireData<TData>(response: ApiEnvelope<TData>) {
+  const data = unwrap(response)
+  if (response.code !== 200 || data === undefined || data === null) {
+    throw new Error('接口响应数据无效')
   }
-  return mapper(value)
+  return data
+}
+
+function getLockData(envelope: ApiEnvelope<MaterialStockLockData>) {
+  if (envelope.code === 409 && envelope.data?.success === false) {
+    return envelope.data
+  }
+  return requireData(envelope)
 }
 
 function toAlert(item: InventoryAlertEvent): InventoryAlertItem {
@@ -253,7 +256,7 @@ async function loadAllPageItems<TItem>(
 ) {
   const pageSize = 100
   const firstResponse = await loadPage(1, pageSize)
-  const firstPayload = unwrap(firstResponse.data as ApiEnvelope<unknown>)
+  const firstPayload = requireData(firstResponse.data as ApiEnvelope<unknown>)
   const firstItems = getPageItems<TItem>(firstPayload)
   const metadata = getPageMetadata(firstPayload, { page: 1, pageSize, total: firstItems.length })
   const remainingPageCount = Math.ceil(metadata.total / metadata.pageSize) - 1
@@ -269,7 +272,7 @@ async function loadAllPageItems<TItem>(
   return [
     ...firstItems,
     ...remainingResponses.flatMap((response) => {
-      const payload = unwrap(response.data as ApiEnvelope<unknown>)
+      const payload = requireData(response.data as ApiEnvelope<unknown>)
       return getPageItems<TItem>(payload)
     }),
   ]
@@ -295,7 +298,7 @@ async function loadStockCatalog() {
           const response = await materialBomApi.getMaterialStockData({
             materialId: material.material_id,
           })
-          const stock = unwrap(response.data as ApiEnvelope<MaterialStock | undefined>)
+          const stock = requireData(response.data as ApiEnvelope<MaterialStock | undefined>)
           return toStock(material, stock)
         }),
       )
@@ -310,11 +313,6 @@ async function loadStockCatalog() {
 
 export const inventoryService = {
   async addCompletionInbound(form: CompletionInboundFormData) {
-    if (isMockEnabled()) {
-      const result = await inventoryMock.addCompletionInbound(form)
-      invalidateStockCatalog()
-      return result
-    }
     const response = await inventoryApi.addCompletionInbound({
       completionInboundCreateRequest: {
         batch_no: form.batchNo,
@@ -326,15 +324,12 @@ export const inventoryService = {
         version_id: form.versionId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<CompletionInboundOrder | undefined>)
+    const data = requireData(response.data as ApiEnvelope<CompletionInboundOrder>)
     invalidateStockCatalog()
-    return mapOptional(data, toInbound)
+    return toInbound(data)
   },
 
   async calculateShortage(items: MaterialShortageRequestItem[]): Promise<MaterialShortageResult> {
-    if (isMockEnabled()) {
-      return inventoryMock.calculateShortage(items)
-    }
     const response = await inventoryApi.calculateMaterialShortage({
       materialShortageCalculateRequest: {
         items: items.map((item) => ({
@@ -344,38 +339,36 @@ export const inventoryService = {
         })),
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ShortagePayload | undefined>)
+    const data = requireData(
+      response.data as ApiEnvelope<MaterialShortageCalculateResponseAllOfData>,
+    )
     return {
-      calculatedAt: data?.calculation_time ?? new Date().toISOString(),
-      items: (data?.records ?? []).map(toShortage),
+      calculatedAt: data.calculation_time,
+      items: data.records.map(toShortage),
     }
   },
+
+  canReadMaterialReferences,
 
   async detectObsolete(
     idleDaysThreshold: number,
     materialId?: number,
   ): Promise<ObsoleteDetectionResult> {
-    if (isMockEnabled()) {
-      return inventoryMock.detectObsolete(idleDaysThreshold, materialId)
-    }
     const response = await inventoryApi.detectObsoleteMaterial({
       obsoleteMaterialDetectRequest: {
         idle_days_threshold: idleDaysThreshold,
         material_id: materialId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ObsoleteDetectPayload | undefined>)
-    const items = (data?.records ?? []).map(toObsolete)
+    const data = requireData(response.data as ApiEnvelope<ObsoleteDetectPayload>)
+    const items = (data.records ?? []).map(toObsolete)
     return {
-      detectedCount: data?.detected_count ?? items.length,
+      detectedCount: data.detected_count ?? items.length,
       items,
     }
   },
 
   async generateAlerts(materialId?: number): Promise<InventoryAlertGenerateResult> {
-    if (isMockEnabled()) {
-      return inventoryMock.generateAlerts(materialId)
-    }
     let request: { material_id: number } | undefined = undefined
     if (materialId !== undefined) {
       request = { material_id: materialId }
@@ -383,15 +376,17 @@ export const inventoryService = {
     const response = await inventoryApi.generateInventoryAlert({
       inventoryAlertGenerateRequest: request,
     })
-    const data = unwrap(response.data as ApiEnvelope<AlertGeneratePayload | undefined>)
+    const data = requireData(response.data as ApiEnvelope<AlertGeneratePayload>)
     return {
-      generatedCount: data?.generated_count ?? 0,
-      items: (data?.records ?? []).map(toAlert),
-      skippedPendingCount: data?.skipped_pending_count ?? 0,
+      generatedCount: data.generated_count ?? 0,
+      items: (data.records ?? []).map(toAlert),
+      skippedPendingCount: data.skipped_pending_count ?? 0,
     }
   },
 
-  async getAlertDetail(alertId: number): Promise<InventoryAlertDetail> {
+  async getAlertDetail(
+    alertId: number,
+  ): Promise<Omit<InventoryAlertDetail, 'stock'> & { stock: InventoryStockData }> {
     const alert = await findPagedRecord(
       (page, pageSize) => this.listAlerts({ page, pageSize }),
       (item) => item.alertId === alertId,
@@ -432,40 +427,44 @@ export const inventoryService = {
     return detail
   },
 
-  async getObsoleteDetail(detectionId: number): Promise<ObsoleteMaterialDetail> {
+  async getObsoleteDetail(detectionId: number): Promise<
+    Omit<ObsoleteMaterialDetail, 'activeOrders' | 'bomVersions' | 'stock'> & {
+      stock: InventoryStockData
+    }
+  > {
     const item = await findPagedRecord(
       (page, pageSize) => this.listObsolete({ page, pageSize }),
       (record) => record.detectionId === detectionId,
       '呆滞物料检测记录不存在或已删除',
     )
-    const [stock, references] = await Promise.all([
-      this.getStockDetail(item.materialId),
-      this.getReferenceData(),
-    ])
+    const stock = await this.getStockDetail(item.materialId)
     return {
       ...item,
-      activeOrders: references.productionOrders
-        .filter((order) => item.activeOrderIds?.includes(order.orderId))
-        .map((order) => ({
-          materialName: order.materialName,
-          orderId: order.orderId,
-          status: order.status,
-        })),
-      bomVersions: references.bomVersions
-        .filter((version) => item.bomVersionIds?.includes(version.versionId))
-        .map((version) => ({ versionId: version.versionId, versionNo: version.versionNo })),
       stock,
     }
   },
 
-  async getOverview(): Promise<InventoryOverviewSummary> {
+  async getOverview(): Promise<Partial<InventoryOverviewSummary>> {
+    let stocksPromise: Promise<PageResult<InventoryStockData>> | undefined = undefined
+    if (canReadMaterialReferences()) {
+      stocksPromise = this.listStocks({ page: 1, pageSize: 100 })
+    }
     const [alerts, locks, obsolete, inbound, firstStockPage] = await Promise.all([
       this.listAlerts({ page: 1, pageSize: 1, status: 'pending' }),
       this.listLocks({ page: 1, pageSize: 1, status: 'locked' }),
       this.listObsolete({ page: 1, pageSize: 1, status: 'pending' }),
       this.listCompletionInbound({ page: 1, pageSize: 1 }),
-      this.listStocks({ page: 1, pageSize: 100 }),
+      stocksPromise,
     ])
+    const summary = {
+      inboundCount: inbound.total,
+      lockedCount: locks.total,
+      obsoletePendingCount: obsolete.total,
+      pendingAlertCount: alerts.total,
+    }
+    if (!firstStockPage) {
+      return summary
+    }
     const remainingPageCount = Math.ceil(firstStockPage.total / firstStockPage.pageSize) - 1
     let stocks = [...firstStockPage.items]
     if (remainingPageCount > 0) {
@@ -478,39 +477,38 @@ export const inventoryService = {
       stocks = [...stocks, ...remainingPages.flatMap((page) => page.items)]
     }
     return {
+      ...summary,
       availableMaterialCount: stocks.filter((item) => item.availableQty > 0).length,
-      inboundCount: inbound.total,
-      lockedCount: locks.total,
       lockedMaterialCount: stocks.filter((item) => item.lockedQty > 0).length,
       lowStockCount: stocks.filter((item) => item.status === 'low').length,
       materialCount: firstStockPage.total,
-      obsoletePendingCount: obsolete.total,
-      pendingAlertCount: alerts.total,
       zeroStockCount: stocks.filter((item) => item.status === 'zero').length,
     }
   },
 
   async getReferenceData(includeProductionOrders = true): Promise<InventoryReferenceData> {
-    if (isMockEnabled()) {
-      const data = await inventoryMock.getReferenceData()
-      if (includeProductionOrders) {
-        return data
-      }
-      return { ...data, productionOrders: [] }
+    let materialItemsPromise = Promise.resolve<Material[]>([])
+    let versionItemsPromise = Promise.resolve<BomVersion[]>([])
+    if (canReadMaterialReferences()) {
+      materialItemsPromise = loadAllPageItems<Material>((page, pageSize) =>
+        materialBomApi.listMaterialData({ page, pageSize }),
+      )
+      versionItemsPromise = loadAllPageItems<BomVersion>((page, pageSize) =>
+        materialBomApi.listBomVersionData({ effectiveOnly: true, page, pageSize }),
+      )
     }
     let orderItemsPromise: Promise<ProductionOrderDetail[]> = Promise.resolve([])
-    if (includeProductionOrders) {
+    if (
+      includeProductionOrders &&
+      useAuthStore(pinia).roles.some((role) => ['系统管理员', '生产管理员'].includes(role))
+    ) {
       orderItemsPromise = loadAllPageItems<ProductionOrderDetail>((page, pageSize) =>
         productionApi.listProductionOrder({ page, pageSize }),
       )
     }
     const [materialItems, versionItems, orderItems] = await Promise.all([
-      loadAllPageItems<Material>((page, pageSize) =>
-        materialBomApi.listMaterialData({ page, pageSize }),
-      ),
-      loadAllPageItems<BomVersion>((page, pageSize) =>
-        materialBomApi.listBomVersionData({ effectiveOnly: true, page, pageSize }),
-      ),
+      materialItemsPromise,
+      versionItemsPromise,
       orderItemsPromise,
     ])
     const materials = materialItems
@@ -567,29 +565,37 @@ export const inventoryService = {
     return { bomVersions, materials, productionOrders }
   },
 
-  async getStockDetail(materialId: number): Promise<InventoryStockItem> {
-    return findPagedRecord(
-      (page, pageSize) => this.listStocks({ materialId, page, pageSize }),
-      (item) => item.materialId === materialId,
-      '库存记录不存在或已删除',
-    )
+  async getStockDetail(materialId: number): Promise<InventoryStockData> {
+    const response = await materialBomApi.getMaterialStockData({ materialId })
+    const stock = requireData(response.data as ApiEnvelope<MaterialStock>)
+    if (canReadMaterialReferences()) {
+      const materialResponse = await materialBomApi.getMaterialData({ materialId })
+      const material = requireData(materialResponse.data as ApiEnvelope<Material>)
+      const item = toStock(material, stock)
+      if (!item) {
+        throw new Error('物料数据无效')
+      }
+      return item
+    }
+    return {
+      availableQty: stock.available_qty ?? 0,
+      lastInDate: optionalText(stock.last_in_date),
+      lastOutDate: optionalText(stock.last_out_date),
+      lockedQty: stock.locked_qty ?? 0,
+      materialId,
+      materialName: `物料 #${materialId}`,
+    }
   },
 
   async handleAlert(alertId: number, status: 'handled' | 'ignored', handlerId: number) {
-    if (isMockEnabled()) {
-      return inventoryMock.handleAlert(alertId, status, handlerId)
-    }
     const response = await inventoryApi.handleInventoryAlert({
       inventoryAlertHandleRequest: { alert_id: alertId, handler_id: handlerId, status },
     })
-    const data = unwrap(response.data as ApiEnvelope<InventoryAlertEvent | undefined>)
-    return mapOptional(data, toAlert)
+    const data = requireData(response.data as ApiEnvelope<InventoryAlertEvent>)
+    return toAlert(data)
   },
 
   async handleObsolete(detectionId: number, status: 'handled' | 'ignored', handlerId: number) {
-    if (isMockEnabled()) {
-      return inventoryMock.handleObsolete(detectionId, status, handlerId)
-    }
     const response = await inventoryApi.handleObsoleteMaterialDetection({
       obsoleteMaterialHandleRequest: {
         detection_id: detectionId,
@@ -597,8 +603,8 @@ export const inventoryService = {
         status,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<ObsoleteMaterialDetection | undefined>)
-    return mapOptional(data, toObsolete)
+    const data = requireData(response.data as ApiEnvelope<ObsoleteMaterialDetection>)
+    return toObsolete(data)
   },
 
   async listAlerts(query: InventoryAlertQuery) {
@@ -607,9 +613,6 @@ export const inventoryService = {
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
     })
-    if (isMockEnabled()) {
-      return inventoryMock.listAlerts(normalizedQuery)
-    }
     const response = await inventoryApi.listInventoryAlert({
       endTime: normalizedQuery.endTime,
       materialId: normalizedQuery.materialId,
@@ -618,7 +621,7 @@ export const inventoryService = {
       startTime: normalizedQuery.startTime,
       status: normalizedQuery.status,
     })
-    const payload = unwrap(response.data as ApiEnvelope<unknown>)
+    const payload = requireData(response.data as ApiEnvelope<unknown>)
     return mapPageResult<InventoryAlertEvent, InventoryAlertItem>(payload, normalizedQuery, toAlert)
   },
 
@@ -628,9 +631,6 @@ export const inventoryService = {
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
     })
-    if (isMockEnabled()) {
-      return inventoryMock.listCompletionInbound(normalizedQuery)
-    }
     const response = await inventoryApi.listCompletionInbound({
       inboundTimeEnd: normalizedQuery.endTime,
       inboundTimeStart: normalizedQuery.startTime,
@@ -639,7 +639,7 @@ export const inventoryService = {
       page: normalizedQuery.page,
       pageSize: normalizedQuery.pageSize,
     })
-    const payload = unwrap(response.data as ApiEnvelope<unknown>)
+    const payload = requireData(response.data as ApiEnvelope<unknown>)
     return mapPageResult<CompletionInboundOrder, CompletionInboundItem>(
       payload,
       normalizedQuery,
@@ -649,9 +649,6 @@ export const inventoryService = {
 
   async listLocks(query: StockLockQuery) {
     const normalizedQuery = cleanQuery(query)
-    if (isMockEnabled()) {
-      return inventoryMock.listLocks(normalizedQuery)
-    }
     const response = await inventoryApi.listMaterialStockLock({
       materialId: normalizedQuery.materialId,
       orderId: normalizedQuery.orderId,
@@ -659,7 +656,7 @@ export const inventoryService = {
       pageSize: normalizedQuery.pageSize,
       status: normalizedQuery.status,
     })
-    const payload = unwrap(response.data as ApiEnvelope<unknown>)
+    const payload = requireData(response.data as ApiEnvelope<unknown>)
     return mapPageResult<StockLockRecord, StockLockItem>(payload, normalizedQuery, toLock)
   },
 
@@ -669,9 +666,6 @@ export const inventoryService = {
       endTime: toIsoDayBoundary(query.endTime, true),
       startTime: toIsoDayBoundary(query.startTime, false),
     })
-    if (isMockEnabled()) {
-      return inventoryMock.listObsolete(normalizedQuery)
-    }
     const response = await inventoryApi.listObsoleteMaterialDetection({
       detectTimeEnd: normalizedQuery.endTime,
       detectTimeStart: normalizedQuery.startTime,
@@ -680,7 +674,7 @@ export const inventoryService = {
       pageSize: normalizedQuery.pageSize,
       status: normalizedQuery.status,
     })
-    const payload = unwrap(response.data as ApiEnvelope<unknown>)
+    const payload = requireData(response.data as ApiEnvelope<unknown>)
     return mapPageResult<ObsoleteMaterialDetection, ObsoleteMaterialItem>(
       payload,
       normalizedQuery,
@@ -688,9 +682,13 @@ export const inventoryService = {
     )
   },
 
-  async listStocks(query: InventoryStockQuery): Promise<PageResult<InventoryStockItem>> {
-    if (isMockEnabled()) {
-      return inventoryMock.listStocks(query)
+  async listStocks(query: InventoryStockQuery): Promise<PageResult<InventoryStockData>> {
+    if (!canReadMaterialReferences()) {
+      const items: InventoryStockData[] = []
+      if (query.materialId) {
+        items.push(await this.getStockDetail(query.materialId))
+      }
+      return paginateItems(items, query.page, query.pageSize)
     }
     const items = await loadStockCatalog()
     const materialName = query.materialName?.trim().toLowerCase()
@@ -705,11 +703,6 @@ export const inventoryService = {
   },
 
   async lockStock(form: StockLockFormData): Promise<StockLockResult> {
-    if (isMockEnabled()) {
-      const result = await inventoryMock.lockStock(form)
-      invalidateStockCatalog()
-      return result
-    }
     const response = await inventoryApi.lockMaterialStock({
       materialStockLockRequest: {
         items: form.items.map((item) => ({
@@ -720,16 +713,18 @@ export const inventoryService = {
         order_id: form.orderId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<LockPayload | undefined>)
+    const envelope = response.data as ApiEnvelope<MaterialStockLockData>
+    // 库存不足时后端返回 409 和缺口明细，交给页面展示失败原因。
+    const data = getLockData(envelope)
     const result = {
-      items: (data?.records ?? []).map(toLock),
-      shortages: (data?.shortages ?? []).map((item) => ({
+      items: data.records.map(toLock),
+      shortages: data.shortages.map((item) => ({
         availableQty: item.available_qty,
         materialId: item.material_id,
         requiredQty: item.required_qty,
         shortageQty: item.shortage_qty,
       })),
-      success: data?.success ?? false,
+      success: data.success,
     }
     if (result.success) {
       invalidateStockCatalog()
@@ -742,16 +737,11 @@ export const inventoryService = {
   },
 
   async releaseLock(lockId: number, operatorId: number) {
-    if (isMockEnabled()) {
-      const result = await inventoryMock.releaseLock(lockId, operatorId)
-      invalidateStockCatalog()
-      return result
-    }
     const response = await inventoryApi.releaseMaterialStock({
       materialStockReleaseRequest: { lock_id: lockId, operator_id: operatorId },
     })
-    const data = unwrap(response.data as ApiEnvelope<StockLockRecord | undefined>)
+    const data = requireData(response.data as ApiEnvelope<StockLockRecord>)
     invalidateStockCatalog()
-    return mapOptional(data, toLock)
+    return toLock(data)
   },
 }

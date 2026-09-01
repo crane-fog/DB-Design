@@ -25,6 +25,7 @@ import { getErrorMessage } from '@/utils/error'
 import { inventoryService } from '@/services/InventoryService'
 import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
+import { useRoute } from 'vue-router'
 
 type OperationsTab = 'balance' | 'detection' | 'estimate' | 'external' | 'status'
 
@@ -36,6 +37,7 @@ const externalStatusLabels = {
 const lineStatusLabels = { fault: '故障', idle: '空闲', running: '运行中' }
 
 const auth = useAuthStore()
+const route = useRoute()
 const isExternalCustomer = computed(() => auth.hasRole('外部客户'))
 const canManageOrders = computed(() => auth.hasPermission(PERMISSIONS.production.orders))
 const canManageCapacity = computed(() => auth.hasPermission(PERMISSIONS.production.capacity))
@@ -45,6 +47,9 @@ const hasOperationsAccess = computed(
 let initialTab: OperationsTab = 'estimate'
 if (isExternalCustomer.value || canManageOrders.value) {
   initialTab = 'external'
+}
+if (route.query.tab === 'status' && canManageCapacity.value) {
+  initialTab = 'status'
 }
 const activeTab = ref<OperationsTab>(initialTab)
 
@@ -198,7 +203,7 @@ function openConvert(order: ExternalOrderItem) {
   convertResult.value = undefined
   Object.assign(convertForm, {
     materialId: order.materialId,
-    planEnd: `${order.expectedDate} 18:00:00`,
+    planEnd: order.expectedDate,
     planQty: order.quantity,
     planStart: '',
     versionId: 0,
@@ -218,6 +223,10 @@ async function submitConvert() {
     ElMessage.warning('请完整填写生产订单计划')
     return
   }
+  if (convertForm.planEnd < convertForm.planStart) {
+    ElMessage.warning('计划完工日期不得早于计划开工日期')
+    return
+  }
   convertSubmitting.value = true
   try {
     const result = await productionService.convertExternalOrder({
@@ -226,12 +235,9 @@ async function submitConvert() {
     })
     convertResult.value = result
     convertVisible.value = false
-    const orderIds = result?.productionOrders.map((order) => `#${order.orderId}`).join('、')
-    if (orderIds) {
-      ElMessage.success(`已转换为生产订单 ${orderIds}`)
-    } else {
-      ElMessage.success('外部订单已转换')
-    }
+    const orderIds = result.productionOrders.map((order) => `#${order.orderId}`).join('、')
+    ElMessage.success(`已转换为生产订单 ${orderIds}`)
+    await loadExternalOrders(externalPage.value)
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '外部订单转换失败'))
   } finally {
@@ -364,8 +370,8 @@ const balanceError = ref('')
 const balanceResult = ref<CapacityBalanceItem>()
 const balanceForm = reactive({
   affectedOrders: '',
-  afterPlan: '{\n  "line_id": 102,\n  "shift": "night"\n}',
-  beforePlan: '{\n  "line_id": 101,\n  "shift": "day"\n}',
+  afterPlan: '',
+  beforePlan: '',
 })
 
 function parseOrderIds(value: string) {
@@ -395,7 +401,7 @@ async function saveBalance() {
       afterPlan,
       beforePlan,
     })
-    ElMessage.success('产能平衡调整已保存')
+    ElMessage.success('产能平衡方案记录已保存')
   } catch (error) {
     balanceResult.value = undefined
     balanceError.value = getErrorMessage(error, '产能平衡保存失败，请检查 JSON 格式')
@@ -411,8 +417,8 @@ const lineStatusResult = ref<ProductionLineStatusItem>()
 const lineStatusForm = reactive({
   currentMaterialId: 0,
   currentOrderId: 0,
-  efficiency: 0,
-  finishedQty: 0,
+  efficiency: undefined as number | undefined,
+  finishedQty: undefined as number | undefined,
   lineId: 0,
   status: 'idle' as ProductionLineRunStatus,
 })
@@ -422,16 +428,25 @@ async function updateLineStatus() {
     ElMessage.warning('请选择生产线')
     return
   }
-  if (lineStatusForm.efficiency < 0 || lineStatusForm.efficiency > 1) {
+  if (
+    lineStatusForm.efficiency !== undefined &&
+    (lineStatusForm.efficiency < 0 || lineStatusForm.efficiency > 1)
+  ) {
     ElMessage.warning('效率必须在 0 到 1 之间')
     return
   }
   lineStatusLoading.value = true
   lineStatusError.value = ''
   try {
+    let currentMaterialId = lineStatusForm.currentMaterialId || undefined
+    let currentOrderId = lineStatusForm.currentOrderId || undefined
+    if (lineStatusForm.status === 'idle') {
+      currentMaterialId = undefined
+      currentOrderId = undefined
+    }
     lineStatusResult.value = await productionService.updateLineStatus({
-      currentMaterialId: lineStatusForm.currentMaterialId || undefined,
-      currentOrderId: lineStatusForm.currentOrderId || undefined,
+      currentMaterialId,
+      currentOrderId,
       efficiency: lineStatusForm.efficiency,
       finishedQty: lineStatusForm.finishedQty,
       lineId: lineStatusForm.lineId,
@@ -448,6 +463,17 @@ async function updateLineStatus() {
 }
 
 onMounted(() => {
+  if (
+    route.query.tab === 'status' &&
+    canManageCapacity.value &&
+    typeof route.query.orderId === 'string'
+  ) {
+    const orderId = parsePositiveInt(route.query.orderId)
+    if (orderId) {
+      lineStatusForm.currentOrderId = orderId
+      lineStatusForm.status = 'running'
+    }
+  }
   if (isExternalCustomer.value || canManageOrders.value) {
     void loadExternalOrders()
   }
@@ -766,7 +792,11 @@ onMounted(() => {
               </div>
               <div class="metric">
                 <span>生产效率</span>
-                <strong>{{ formatNumber((detectionResult.efficiency ?? 0) * 100) }}%</strong>
+                <strong>{{
+                  detectionResult.efficiency === undefined
+                    ? '-'
+                    : `${formatNumber(detectionResult.efficiency * 100)}%`
+                }}</strong>
               </div>
               <div class="metric">
                 <span>实际工时</span>
@@ -778,8 +808,9 @@ onMounted(() => {
               </div>
             </div>
             <el-progress
-              :percentage="Math.round((detectionResult.efficiency ?? 0) * 100)"
-              :status="(detectionResult.efficiency ?? 0) >= 0.8 ? 'success' : 'warning'"
+              v-if="detectionResult.efficiency !== undefined"
+              :percentage="Math.min(100, Math.round(detectionResult.efficiency * 100))"
+              :status="detectionResult.efficiency >= 0.8 ? 'success' : 'warning'"
             />
           </template>
           <el-empty v-else description="选择生产线与统计周期后执行产能检测" />
@@ -788,11 +819,12 @@ onMounted(() => {
 
       <el-tab-pane v-if="canManageCapacity" label="产能平衡" name="balance">
         <el-card class="section-card" shadow="never">
+          <p>保存调整方案及关联订单；订单计划与生产日历在对应页面维护。</p>
           <el-form :model="balanceForm" label-position="top">
             <el-form-item label="受影响生产订单">
               <el-input
                 v-model.trim="balanceForm.affectedOrders"
-                placeholder="多个订单 ID 用逗号分隔，如 5002,5003"
+                placeholder="多个订单 ID 用逗号分隔"
               />
             </el-form-item>
             <div class="plan-grid">
@@ -804,7 +836,7 @@ onMounted(() => {
               </el-form-item>
             </div>
             <el-button type="primary" :loading="balanceLoading" @click="saveBalance">
-              保存调整
+              保存方案记录
             </el-button>
           </el-form>
         </el-card>
@@ -834,7 +866,7 @@ onMounted(() => {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="canManageCapacity" label="产线状态" name="status">
+      <el-tab-pane v-if="canManageCapacity" label="产线状态与报工" name="status">
         <el-card class="section-card" shadow="never">
           <el-table :data="lineOptions" stripe>
             <el-table-column label="生产线" min-width="100">
@@ -857,6 +889,7 @@ onMounted(() => {
           <el-empty v-if="!lineOptions.length" description="暂无生产线数据" />
         </el-card>
         <el-card class="section-card" shadow="never">
+          <p>按产线当前任务记录累计产量；订单完工数量在生产订单页登记。</p>
           <el-form :model="lineStatusForm" inline>
             <el-form-item label="生产线">
               <el-select v-model="lineStatusForm.lineId" filterable style="width: 180px">
@@ -875,14 +908,18 @@ onMounted(() => {
                 <el-option label="故障" value="fault" />
               </el-select>
             </el-form-item>
-            <el-form-item label="当前订单">
+            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前订单">
               <el-input-number v-model="lineStatusForm.currentOrderId" :min="0" />
             </el-form-item>
-            <el-form-item label="当前产品">
+            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前产品">
               <el-input-number v-model="lineStatusForm.currentMaterialId" :min="0" />
             </el-form-item>
-            <el-form-item label="已完成数量">
-              <el-input-number v-model="lineStatusForm.finishedQty" :min="0" />
+            <el-form-item label="累计完成数量">
+              <el-input-number
+                v-model="lineStatusForm.finishedQty"
+                :min="0"
+                placeholder="留空由后端沿用当前任务数量"
+              />
             </el-form-item>
             <el-form-item label="当前效率">
               <el-input-number
@@ -891,6 +928,7 @@ onMounted(() => {
                 :min="0"
                 :precision="2"
                 :step="0.05"
+                placeholder="留空保留当前效率"
               />
             </el-form-item>
             <el-form-item>
@@ -986,16 +1024,16 @@ onMounted(() => {
           <el-date-picker
             v-model="convertForm.planStart"
             style="width: 100%"
-            type="datetime"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            type="date"
+            value-format="YYYY-MM-DD"
           />
         </el-form-item>
         <el-form-item label="计划完工">
           <el-date-picker
             v-model="convertForm.planEnd"
             style="width: 100%"
-            type="datetime"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            type="date"
+            value-format="YYYY-MM-DD"
           />
         </el-form-item>
       </el-form>

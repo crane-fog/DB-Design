@@ -1,11 +1,7 @@
 import type { LoginData, LoginRequest } from '@/api'
-import { type SystemAccessContext, setMockActor, systemService } from '@/services/SystemService'
-import { isMockAuthEnabled } from '@/config/mock'
-
-export { isMockAuthEnabled }
+import { systemService } from '@/services/SystemService'
 
 export interface AuthLoginResult {
-  access?: SystemAccessContext
   accessToken: string
   expiresInSeconds: number
 }
@@ -29,20 +25,11 @@ function isLoginData(data: unknown): data is LoginData {
 }
 
 export const authService = {
-  async initializeAccess(employeeNo: string, result: AuthLoginResult) {
-    setMockActor(employeeNo)
-    if (result.access) {
-      return result.access
-    }
-    return systemService.loadCurrentAccess(employeeNo)
+  async initializeAccess() {
+    return systemService.loadCurrentAccess()
   },
 
   async login(employeeNo: string, password: string): Promise<AuthLoginResult> {
-    if (isMockAuthEnabled()) {
-      const { authenticateMockAccount } = await import('@/config/mock-auth')
-      return authenticateMockAccount(employeeNo, password)
-    }
-
     const request: LoginRequest = {
       employee_no: employeeNo,
       password: await hashPassword(password),

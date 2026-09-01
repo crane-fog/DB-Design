@@ -9,7 +9,6 @@ import type {
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getErrorMessage } from '@/utils/error'
@@ -33,9 +32,7 @@ const calculating = ref(false)
 const creatingDrafts = ref(false)
 const error = ref('')
 const result = ref<MaterialShortageResult>()
-const rows = reactive<CalculationRow[]>([
-  { key: 1, materialId: 2001, productionQty: 100, versionId: 32 },
-])
+const rows = reactive<CalculationRow[]>([{ key: 1, materialId: 0, productionQty: 1, versionId: 0 }])
 const purchaseQuantities = reactive<Record<number, number>>({})
 const draftExpectedDate = ref(new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10))
 const selectedBuyerId = ref<number>()
@@ -53,7 +50,6 @@ const referenceData = ref<InventoryReferenceData>({
 })
 let referenceRequestId = 0
 
-const canCreatePurchaseDraft = computed(() => auth.hasPermission(PERMISSIONS.purchase.manage))
 const shortageItems = computed(
   () => result.value?.items.filter((item) => item.netShortageQty > 0) ?? [],
 )
@@ -200,6 +196,9 @@ async function createPurchaseDrafts() {
 }
 
 async function loadBuyerOptions() {
+  if (!auth.roles.some((role) => ['系统管理员', '采购员', '采购主管'].includes(role))) {
+    return
+  }
   buyerLoading.value = true
   buyerError.value = ''
   try {
@@ -256,7 +255,13 @@ onBeforeUnmount(() => {
           <span class="row-index">{{ index + 1 }}</span>
           <label
             ><span>成品物料</span
-            ><el-select
+            ><el-input-number
+              v-if="!productOptions.length"
+              v-model="row.materialId"
+              :min="1"
+              :precision="0"
+              placeholder="输入成品编号" /><el-select
+              v-else
               v-model="row.materialId"
               filterable
               :loading="referenceLoading"
@@ -274,7 +279,15 @@ onBeforeUnmount(() => {
           /></label>
           <label
             ><span>BOM 版本</span
-            ><el-select v-model="row.versionId" placeholder="选择版本"
+            ><el-input-number
+              v-if="!getVersionOptions(row.materialId).length"
+              v-model="row.versionId"
+              :min="1"
+              :precision="0"
+              placeholder="输入版本编号" /><el-select
+              v-else
+              v-model="row.versionId"
+              placeholder="选择版本"
               ><el-option
                 v-for="version in getVersionOptions(row.materialId)"
                 :key="version.versionId"
@@ -326,16 +339,22 @@ onBeforeUnmount(() => {
               >总缺口 <strong>{{ formatNumber(totalShortage) }}</strong></span
             >
             <el-date-picker
-              v-if="canCreatePurchaseDraft"
               v-model="draftExpectedDate"
               placeholder="采购预计交期"
               type="date"
               value-format="YYYY-MM-DD"
             />
-            <el-select
-              v-if="canCreatePurchaseDraft"
+            <el-input-number
+              v-if="!buyerOptions.length"
               v-model="selectedBuyerId"
-              :disabled="buyerLoading || !buyerOptions.length"
+              :min="1"
+              :precision="0"
+              placeholder="输入采购员编号"
+            />
+            <el-select
+              v-else
+              v-model="selectedBuyerId"
+              :disabled="buyerLoading"
               :loading="buyerLoading"
               placeholder="请选择采购员"
               style="width: 180px"
@@ -348,10 +367,9 @@ onBeforeUnmount(() => {
               />
             </el-select>
             <el-button
-              v-if="canCreatePurchaseDraft"
               :icon="ShoppingCart"
               :loading="creatingDrafts"
-              :disabled="buyerLoading || !buyerOptions.length"
+              :disabled="buyerLoading"
               type="primary"
               @click="createPurchaseDrafts"
             >
@@ -411,7 +429,7 @@ onBeforeUnmount(() => {
               }}</strong></template
             >
           </el-table-column>
-          <el-table-column v-if="canCreatePurchaseDraft" label="建议采购" min-width="150">
+          <el-table-column label="建议采购" min-width="150">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.netShortageQty > 0"

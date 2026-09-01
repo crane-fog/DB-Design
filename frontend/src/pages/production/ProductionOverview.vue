@@ -51,7 +51,7 @@ const shortcuts: OverviewShortcut[] = [
     title: '产能配置',
   },
   {
-    description: '上报与跟踪生产线故障处理进度。',
+    description: '查看产线状态，上报故障并按编号处理。',
     icon: Tools,
     permission: 'production:breakdown',
     route: '/production/breakdown',

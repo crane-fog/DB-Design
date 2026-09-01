@@ -2,18 +2,16 @@
 import { Bell, Lock, Plus, Refresh, Search, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import type {
-  InventoryAlertDetail,
   InventoryAlertItem,
   InventoryAlertQuery,
   InventoryReferenceData,
-  InventoryStockItem,
-  ObsoleteMaterialDetail,
   ObsoleteMaterialItem,
   ObsoleteMaterialQuery,
   StockLockFormData,
   StockLockItem,
   StockLockQuery,
 } from '@/types/inventory'
+import { type InventoryStockData, inventoryService } from '@/services/InventoryService'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -21,7 +19,6 @@ import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
-import { inventoryService } from '@/services/InventoryService'
 import { inventoryMonitorStatusLabels as statusLabels } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
 
@@ -38,7 +35,7 @@ const referenceData = ref<InventoryReferenceData>({
   materials: [],
   productionOrders: [],
 })
-const lockMaterialOptions = ref<InventoryStockItem[]>([])
+const lockMaterialOptions = ref<InventoryStockData[]>([])
 
 // 库存预警
 const alertLoading = ref(false)
@@ -51,7 +48,7 @@ const generatingAlerts = ref(false)
 const generateDialogOpen = ref(false)
 const generateMaterialId = ref<number>()
 const handlingAlert = ref<{ alertId: number; status: 'handled' | 'ignored' }>()
-const alertDetail = ref<InventoryAlertDetail>()
+const alertDetail = ref<Awaited<ReturnType<typeof inventoryService.getAlertDetail>>>()
 const alertDetailError = ref('')
 const alertDetailLoading = ref(false)
 let alertRequestId = 0
@@ -92,7 +89,7 @@ const handlingObsolete = ref<{
   detectionId: number
   status: 'handled' | 'ignored'
 }>()
-const obsoleteDetail = ref<ObsoleteMaterialDetail>()
+const obsoleteDetail = ref<Awaited<ReturnType<typeof inventoryService.getObsoleteDetail>>>()
 const obsoleteDetailError = ref('')
 const obsoleteDetailLoading = ref(false)
 const detectionForm = reactive({
@@ -840,7 +837,13 @@ onBeforeUnmount(() => {
     <el-dialog v-model="generateDialogOpen" title="生成库存预警" width="min(92vw, 430px)"
       ><el-form label-width="90px"
         ><el-form-item label="物料"
-          ><el-select
+          ><el-input-number
+            v-if="!referenceData.materials.length"
+            v-model="generateMaterialId"
+            :min="1"
+            :precision="0"
+            placeholder="物料编号，留空扫描全部" /><el-select
+            v-else
             v-model="generateMaterialId"
             clearable
             filterable
@@ -867,7 +870,13 @@ onBeforeUnmount(() => {
       @closed="lockFormRef?.resetFields()"
       ><el-form ref="lockFormRef" :model="lockForm" :rules="lockRules" label-width="100px"
         ><el-form-item label="生产订单" prop="orderId"
-          ><el-select
+          ><el-input-number
+            v-if="!referenceData.productionOrders.length"
+            v-model="lockForm.orderId"
+            :min="1"
+            :precision="0"
+            placeholder="输入生产订单编号" /><el-select
+            v-else
             v-model="lockForm.orderId"
             filterable
             :loading="referenceLoading"
@@ -889,7 +898,14 @@ onBeforeUnmount(() => {
         ><el-form-item label="锁定明细"
           ><div class="lock-lines">
             <div v-for="(item, index) in lockForm.items" :key="index" class="lock-line">
-              <el-select
+              <el-input-number
+                v-if="!lockMaterialOptions.length"
+                v-model="item.materialId"
+                :min="1"
+                :precision="0"
+                placeholder="输入物料编号"
+              /><el-select
+                v-else
                 v-model="item.materialId"
                 filterable
                 :loading="referenceLoading"
@@ -941,7 +957,13 @@ onBeforeUnmount(() => {
             :min="1"
             style="width: 100%" /></el-form-item
         ><el-form-item label="指定物料"
-          ><el-select
+          ><el-input-number
+            v-if="!referenceData.materials.length"
+            v-model="detectionForm.materialId"
+            :min="1"
+            :precision="0"
+            placeholder="物料编号，留空扫描全部" /><el-select
+            v-else
             v-model="detectionForm.materialId"
             clearable
             filterable
@@ -1049,28 +1071,6 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <span>检测时间</span><strong>{{ formatDateTime(obsoleteDetail.detectTime) }}</strong>
-          </div>
-          <div>
-            <span>有效 BOM 引用</span>
-            <strong>{{
-              obsoleteDetail.bomVersionIds === undefined
-                ? '接口未返回'
-                : obsoleteDetail.bomVersions.length
-                  ? obsoleteDetail.bomVersions.map((item) => item.versionNo).join('、')
-                  : '无'
-            }}</strong>
-          </div>
-          <div>
-            <span>活跃生产订单</span>
-            <strong>{{
-              obsoleteDetail.activeOrderIds === undefined
-                ? '接口未返回'
-                : obsoleteDetail.activeOrders.length
-                  ? obsoleteDetail.activeOrders
-                      .map((item) => '#' + item.orderId + ' · ' + item.materialName)
-                      .join('、')
-                  : '无'
-            }}</strong>
           </div>
           <div>
             <span>锁定数量</span><strong>{{ formatNumber(obsoleteDetail.stock.lockedQty) }}</strong>

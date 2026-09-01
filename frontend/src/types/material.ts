@@ -1,65 +1,6 @@
 import type { PageRequest } from '@/services/pagination'
 
-export type MaterialBomStatus = 'archived' | 'draft' | 'released'
-export type MaterialBomComponentType = 'material' | 'semiFinished'
-export type MaterialStatus = 'active' | 'disabled'
-export type MaterialType = 'finished' | 'raw' | 'semiFinished'
-
-export interface MaterialBomListQuery extends PageRequest {
-  keyword?: string
-  owner?: string
-  status?: MaterialBomStatus
-}
-
-export interface MaterialBomSummary {
-  activeCount: number
-  archivedCount: number
-  draftCount: number
-  releasedCount: number
-}
-
-export interface MaterialBomListItem {
-  bomCode: string
-  bomId: string
-  componentCount: number
-  effectiveDate: string
-  materialCode: string
-  materialName: string
-  owner: string
-  status: MaterialBomStatus
-  totalLossRate: number
-  totalQuantity: number
-  unit: string
-  updatedAt: string
-  version: string
-}
-
-export interface MaterialBomComponent {
-  componentId: string
-  leadTimeDays: number
-  lineNo: number
-  lossRate: number
-  materialCode: string
-  materialName: string
-  quantity: number
-  remark?: string
-  substituteGroup?: string
-  type: MaterialBomComponentType
-  unit: string
-  workCenter: string
-}
-
-export interface MaterialBomAudit {
-  action: string
-  operator: string
-  operatedAt: string
-}
-
-export interface MaterialBomDetail extends MaterialBomListItem {
-  audits: MaterialBomAudit[]
-  components: MaterialBomComponent[]
-  description: string
-}
+export type MaterialType = 'auxiliary' | 'finished' | 'raw' | 'semiFinished'
 
 export interface MaterialCategory {
   id: string
@@ -69,13 +10,16 @@ export interface MaterialCategory {
 export interface MaterialRecord {
   categoryId: string
   categoryName: string
+  /** 后端自动分配的 material_id，不是独立的业务编码。 */
   code: string
   createdAt: string
   currentBomVersion?: string
+  currentVersionId?: number | null
+  defaultSupplierId?: number | null
   id: string
   model: string
   name: string
-  status: MaterialStatus
+  safetyStock: number
   type: MaterialType
   unit: string
   updatedAt: string
@@ -86,14 +30,37 @@ export interface MaterialListQuery extends PageRequest {
   createdFrom?: string
   createdTo?: string
   keyword?: string
-  status?: MaterialStatus
   type?: MaterialType
 }
 
-export type MaterialForm = Pick<
-  MaterialRecord,
-  'categoryId' | 'code' | 'model' | 'name' | 'status' | 'type' | 'unit'
->
+export type MaterialForm = Pick<MaterialRecord, 'categoryId' | 'model' | 'name' | 'type' | 'unit'>
+
+export interface MaterialBomListItem {
+  /** 页面选择的是版本，值对应 version_id；明细 ID 单独存放在 componentId。 */
+  bomId: string
+  effectiveDate: string
+  expireDate?: string
+  isCurrent: boolean
+  materialCode: string
+  materialName: string
+  version: string
+}
+
+export interface MaterialBomComponent {
+  componentId: string
+  lineNo: number
+  /** 页面使用百分数，服务层负责与接口的 0～1 小数转换。 */
+  lossRate: number
+  materialCode: string
+  materialName: string
+  quantity: number
+  unit: string
+}
+
+export interface MaterialBomDetail extends MaterialBomListItem {
+  components: MaterialBomComponent[]
+  description: string
+}
 
 export interface BomComponentForm {
   componentId?: string
@@ -104,6 +71,7 @@ export interface BomComponentForm {
 
 export interface BomVersionForm {
   effectiveDate: string
+  expireDate: string
   materialCode: string
   reason: string
   version: string
@@ -114,11 +82,10 @@ export interface BomTreeNode {
   cumulativeQuantity: number
   isLeaf: boolean
   level: number
-  lossRate?: number
   materialCode: string
   materialName: string
   path: string
-  quantity?: number
+  quantity: number
   unit: string
 }
 
@@ -133,8 +100,6 @@ export interface BomAnalysisRecord {
 }
 
 export interface BomAnalysisResult {
-  cumulativeQuantity: number
-  lossRate: number
   materialCode: string
   materialName: string
   path: string
@@ -145,24 +110,12 @@ export interface BomAnalysisResult {
 
 export interface BomReverseTraceResult {
   cumulativeQuantity: number
-  finalMaterialCode: string
-  finalMaterialName: string
-  includesLoss: false
   level: number
-  materialCode: string
-  materialName: string
-  parentMaterialCode: string
-  parentMaterialName: string
   path: string
-  pathNodes: {
-    bomVersion?: string
-    cumulativeQuantity: number
-    level: number
-    materialCode: string
-    materialName: string
-    unit: string
-    unitQuantity?: number
-  }[]
+  productMaterialCode: string
+  productMaterialName: string
   unit: string
-  versions: string[]
+  version: string
+  versionId: string
+  versionStatus: 'effective' | 'history'
 }

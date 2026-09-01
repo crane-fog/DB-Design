@@ -21,6 +21,8 @@
 - 前端：`frontend/src/`
 - 后端：`backend/Controllers/`、`backend/Services/`、`backend/Program.cs` 等
 
+开发时不必考虑并发问题，可以假定所有请求都是串行的，Agent 只需关注业务逻辑。
+
 ## 2. Agent 执行规范
 
 无论任务看起来多小，Agent 都要判断改动类型：前端 / 后端 / API 契约，然后按以下流程执行。
