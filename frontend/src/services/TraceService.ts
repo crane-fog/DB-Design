@@ -1,10 +1,12 @@
 import type {
   AffectedProductBatch,
   BatchConsumption,
+  CompletionInboundOrder,
   ConsumedMaterialBatch,
   MaterialBatchTraceResult,
-  ProductBatchTraceResult,
-  QualityImpactAnalyzeResult,
+  ProductionOrderBrief,
+  ProductionOrderStatus,
+  PurchaseOrder,
 } from '@/api'
 import {
   type ApiEnvelope,
@@ -16,15 +18,10 @@ import {
   optionalText,
   unwrap,
 } from '@/services/pagination'
-import type { ProductionOrderStatus } from '@/services/ProductionService'
-import { isMockEnabled } from '@/config/mock'
-import { qualityTraceabilityApi } from '@/api/client'
-import { traceRepository as traceMock } from '@/mock/repositories'
+import { inventoryApi, productionApi, purchaseApi, qualityTraceabilityApi } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
-
-/** 质量影响分析建议处理动作。 */
 export type SuggestedActionValue = 'freeze' | 'observe' | 'recall'
 
 export interface BatchConsumptionQuery extends PageRequest {
@@ -34,51 +31,25 @@ export interface BatchConsumptionQuery extends PageRequest {
 }
 
 export interface BatchConsumptionItem {
-  consumedAt?: string
   consumeQty: number
   consumptionId: number
   itemId: number
+  materialId?: number
   materialName?: string
   orderId: number
-  operatorName?: string
-  productBatchNo?: string
   productMaterialName?: string
   productionStatus?: ProductionOrderStatus
-  purchaseOrderNo?: string
-  remarks?: string
-  supplierId?: number
-  supplierName?: string
-  unit?: string
-  materialBatchNo?: string
+  purchaseOrderId?: number
 }
 
 export interface BatchConsumptionCreateFormData {
-  consumedAt?: string
   consumeQty: number
   itemId: number
   orderId: number
-  operatorName?: string
-  productBatchNo?: string
-  purchaseOrderNo?: string
-  remarks?: string
-  supplierId?: number
-  unit?: string
-  materialBatchNo?: string
 }
 
-export interface BatchConsumptionUpdateFormData {
-  consumeQty: number
+export interface BatchConsumptionUpdateFormData extends BatchConsumptionCreateFormData {
   consumptionId: number
-  itemId: number
-  orderId: number
-  consumedAt?: string
-  operatorName?: string
-  productBatchNo?: string
-  purchaseOrderNo?: string
-  remarks?: string
-  supplierId?: number
-  unit?: string
-  materialBatchNo?: string
 }
 
 export interface MaterialBatchTraceQuery {
@@ -92,18 +63,10 @@ export interface MaterialBatchTraceQuery {
 export interface AffectedProductItem {
   batchNo?: string
   consumeQty: number
-  defectiveQty?: number
-  inboundQty?: number
-  inboundAt?: string
   orderId: number
-  planQty?: number
-  producedAt?: string
   productMaterialId: number
   productMaterialName?: string
   productionStatus?: ProductionOrderStatus
-  qualifiedQty?: number
-  qualityStatus?: QualityDispositionStatus
-  finishedQty?: number
 }
 
 export interface MaterialBatchTraceItem {
@@ -126,30 +89,23 @@ export interface ConsumedMaterialItem {
   itemId: number
   materialId: number
   materialName?: string
-  orderId?: number
+  purchaseOrderId?: number
   receiveDate?: string
   supplierId?: number
   supplierName?: string
-  materialBatchNo?: string
-  purchaseOrderNo?: string
-  unit?: string
 }
 
 export interface ProductBatchTraceItem {
   batchNo?: string
   bomVersion?: string
   consumedBatches: ConsumedMaterialItem[]
-  defectiveQty?: number
   finishedQty?: number
-  inboundQty?: number
-  inboundAt?: string
   materialId: number
   materialName?: string
   orderId: number
   planQty?: number
   producedAt?: string
-  qualifiedQty?: number
-  qualityStatus?: QualityDispositionStatus
+  inboundRecords?: CompletionInboundOrder[]
 }
 
 export interface QualityImpactAnalyzeFormData {
@@ -159,67 +115,20 @@ export interface QualityImpactAnalyzeFormData {
   receiveDateStart?: string
 }
 
-export type QualityDispositionStatus = 'frozen' | 'pending' | 'recalled' | 'released'
-export type QualityDispositionType = 'freeze' | 'recall'
-
-export interface QualityDisposition {
-  affectedQty?: number
-  batchNo: string
-  dispositionId: number
-  handlingInstruction?: string
-  materialName?: string
-  note?: string
-  operatedAt: string
-  operatorName: string
-  orderId: number
-  reason: string
-  recallScope?: string
-  status: QualityDispositionStatus
-  type: QualityDispositionType
-}
-
-export interface QualityDispositionFormData {
-  affectedQty?: number
-  batchNo: string
-  handlingInstruction?: string
-  note?: string
-  operatorName: string
-  reason: string
-  recallScope?: string
-}
-
 export interface TraceSupplierOption {
   supplierId: number
   supplierName: string
 }
 
 export interface TraceConsumptionReferenceData {
-  productBatches: {
-    batchNo: string
-    materialName: string
-    orderId: number
-  }[]
-  purchaseItems: {
+  productionOrders?: { materialName?: string; orderId: number; status: ProductionOrderStatus }[]
+  purchaseItems?: {
     itemId: number
-    materialBatchNo: string
-    materialName: string
-    purchaseOrderNo: string
-    supplierId: number
-    supplierName: string
-    unit: string
+    materialName?: string
+    purchaseOrderId: number
+    supplierName?: string
   }[]
-}
-
-export interface QualityImpactSummary {
-  affectedBatchCount: number
-  affectedOrderCount: number
-  affectedProductCount: number
-  defectiveQty: number
-  frozenBatchCount: number
-  inboundQty: number
-  pendingBatchCount: number
-  qualifiedQty: number
-  recalledBatchCount: number
+  suppliers?: TraceSupplierOption[]
 }
 
 export interface QualityImpactResult {
@@ -227,7 +136,6 @@ export interface QualityImpactResult {
   affectedOrderCount?: number
   affectedProducts: AffectedProductItem[]
   suggestedAction?: SuggestedActionValue
-  summary?: QualityImpactSummary
 }
 
 function toBatchConsumption(record: BatchConsumption): BatchConsumptionItem {
@@ -235,10 +143,12 @@ function toBatchConsumption(record: BatchConsumption): BatchConsumptionItem {
     consumeQty: record.consume_qty,
     consumptionId: record.consumption_id,
     itemId: record.item_id,
+    materialId: optionalNumber(record.purchase_item?.material_id),
     materialName: optionalText(record.purchase_item?.material_name),
     orderId: record.order_id,
     productMaterialName: optionalText(record.production_order?.material_name),
     productionStatus: record.production_order?.status,
+    purchaseOrderId: optionalNumber(record.purchase_item?.order_id),
   }
 }
 
@@ -270,50 +180,64 @@ function toConsumedMaterial(batch: ConsumedMaterialBatch): ConsumedMaterialItem 
     itemId: batch.item_id,
     materialId: batch.material_id,
     materialName: optionalText(batch.material_name),
-    orderId: optionalNumber(batch.order_id),
+    purchaseOrderId: optionalNumber(batch.order_id),
     receiveDate: optionalText(batch.receive_date),
     supplierId: optionalNumber(batch.supplier_id),
     supplierName: optionalText(batch.supplier_name),
   }
 }
 
-function toProductBatchTrace(result: ProductBatchTraceResult): ProductBatchTraceItem {
-  return {
-    batchNo: optionalText(result.batch_no),
-    consumedBatches: (result.consumed_batches ?? []).map(toConsumedMaterial),
-    materialId: result.material_id,
-    materialName: optionalText(result.material_name),
-    orderId: result.order_id,
+function requireData<TPayload>(payload: ApiEnvelope<TPayload>): TPayload {
+  const data = unwrap(payload)
+  if (data === undefined || data === null) {
+    throw new Error('接口未返回有效数据')
   }
+  return data
 }
 
-function toQualityImpact(result: QualityImpactAnalyzeResult): QualityImpactResult {
-  return {
-    affectedBatchCount: optionalNumber(result.affected_batch_count),
-    affectedOrderCount: optionalNumber(result.affected_order_count),
-    affectedProducts: (result.affected_products ?? []).map(toAffectedProduct),
-    suggestedAction: result.suggested_action,
-  }
+// 遵循 UserContextService 的跨模块读权限，避免辅助查询触发无权限跳转。
+function canReadProduction() {
+  const auth = useAuthStore()
+  return auth.hasRole('系统管理员') || auth.hasRole('生产管理员')
 }
 
-function assertMockPermission() {
-  if (isMockEnabled() && !useAuthStore().hasPermission('trace:manage')) {
-    throw new Error('当前账号没有执行追溯管理操作的权限')
+function canReadPurchase() {
+  const auth = useAuthStore()
+  return ['系统管理员', '采购员', '采购主管'].some((role) => auth.hasRole(role))
+}
+
+function canReadInventory() {
+  return canReadProduction() || useAuthStore().hasRole('库存管理员')
+}
+
+async function readAllPages<TRecord>(
+  request: (page: number, pageSize: number) => Promise<{ data: ApiEnvelope<unknown> }>,
+  page = 1,
+  records: TRecord[] = [],
+): Promise<TRecord[]> {
+  const response = await request(page, 100)
+  const data = requireData(response.data)
+  const items = getPageItems<TRecord>(data)
+  const metadata = getPageMetadata(data, { page, pageSize: 100, total: items.length })
+  records.push(...items)
+  if (records.length >= metadata.total) {
+    return records
   }
+  if (!items.length || metadata.page !== page) {
+    throw new Error('分页数据不完整，请重新查询')
+  }
+  return readAllPages(request, page + 1, records)
 }
 
 function assertConsumptionId(consumptionId: number) {
-  if (!Number.isInteger(consumptionId) || consumptionId <= 0) {
+  if (!Number.isSafeInteger(consumptionId) || consumptionId <= 0) {
     throw new Error('批次消耗记录 ID 无效')
   }
 }
 
-/** 质量追溯接口的唯一入口；页面只允许通过此对象访问后端。 */
+/** 质量追溯只通过生成的 API 访问真实后端。 */
 export const traceService = {
-  async analyzeQualityImpact(form: QualityImpactAnalyzeFormData) {
-    if (isMockEnabled()) {
-      return traceMock.analyzeQualityImpact(form)
-    }
+  async analyzeQualityImpact(form: QualityImpactAnalyzeFormData): Promise<QualityImpactResult> {
     let itemIds: number[] | undefined = undefined
     if (form.itemIds?.length) {
       ;({ itemIds } = form)
@@ -326,20 +250,16 @@ export const traceService = {
         receive_date_start: form.receiveDateStart,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<QualityImpactAnalyzeResult | undefined>)
-    if (data) {
-      return toQualityImpact(data)
+    const data = requireData(response.data)
+    return {
+      affectedBatchCount: optionalNumber(data.affected_batch_count),
+      affectedOrderCount: optionalNumber(data.affected_order_count),
+      affectedProducts: (data.affected_products ?? []).map(toAffectedProduct),
+      suggestedAction: data.suggested_action,
     }
-    return undefined
   },
 
-  api: qualityTraceabilityApi,
-
   async createBatchConsumption(form: BatchConsumptionCreateFormData) {
-    assertMockPermission()
-    if (isMockEnabled()) {
-      return traceMock.createBatchConsumption(form)
-    }
     const response = await qualityTraceabilityApi.addBatchConsumption({
       batchConsumptionCreateRequest: {
         consume_qty: form.consumeQty,
@@ -347,47 +267,35 @@ export const traceService = {
         order_id: form.orderId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<BatchConsumption | undefined>)
-    if (data) {
-      return toBatchConsumption(data)
-    }
-    return undefined
+    return toBatchConsumption(requireData(response.data))
   },
 
   async deleteBatchConsumption(consumptionId: number) {
-    assertMockPermission()
     assertConsumptionId(consumptionId)
-    if (isMockEnabled()) {
-      return traceMock.deleteBatchConsumption(consumptionId)
-    }
     const response = await qualityTraceabilityApi.deleteBatchConsumption({
       batchConsumptionDeleteRequest: { consumption_id: consumptionId },
     })
-    unwrap(response.data as ApiEnvelope<unknown>)
+    unwrap(response.data)
   },
 
-  async freezeBatch(form: QualityDispositionFormData) {
-    assertMockPermission()
-    if (isMockEnabled()) {
-      return traceMock.freezeBatch(form)
-    }
-    throw new Error('当前后端暂未提供质量冻结接口')
-  },
-
-  async getBatchConsumption(consumptionId: number): Promise<BatchConsumptionItem | undefined> {
+  async getBatchConsumption(
+    consumptionId: number,
+    query: Pick<BatchConsumptionQuery, 'itemId' | 'orderId'> = {},
+  ): Promise<BatchConsumptionItem> {
     assertConsumptionId(consumptionId)
-    if (isMockEnabled()) {
-      return traceMock.getBatchConsumption(consumptionId)
+    const records = await readAllPages<BatchConsumption>((page, pageSize) =>
+      qualityTraceabilityApi.listBatchConsumption({ ...query, page, pageSize }),
+    )
+    const record = records.find((item) => item.consumption_id === consumptionId)
+    if (!record) {
+      throw new Error('批次消耗记录不存在或已删除')
     }
-    throw new Error('当前后端暂未提供按 ID 查询批次消耗记录的接口')
+    return toBatchConsumption(record)
   },
 
   async listBatchConsumption(
     query: BatchConsumptionQuery,
   ): Promise<PageResult<BatchConsumptionItem>> {
-    if (isMockEnabled()) {
-      return traceMock.listBatchConsumption(query)
-    }
     const response = await qualityTraceabilityApi.listBatchConsumption({
       itemId: query.itemId,
       materialId: query.materialId,
@@ -395,48 +303,69 @@ export const traceService = {
       page: query.page,
       pageSize: query.pageSize,
     })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const data = requireData(response.data)
     const items = getPageItems<BatchConsumption>(data).map(toBatchConsumption)
-    const metadata = getPageMetadata(data, {
-      page: query.page,
-      pageSize: query.pageSize,
-      total: items.length,
-    })
-    return { items, ...metadata }
+    return { items, ...getPageMetadata(data, { ...query, total: items.length }) }
   },
 
-  async listConsumptionReferences() {
-    if (isMockEnabled()) {
-      return traceMock.listConsumptionReferences()
+  async listConsumptionReferences(): Promise<TraceConsumptionReferenceData> {
+    const references: TraceConsumptionReferenceData = {}
+    if (canReadProduction()) {
+      const orders = await readAllPages<ProductionOrderBrief>((page, pageSize) =>
+        productionApi.listProductionOrder({ page, pageSize }),
+      )
+      references.productionOrders = orders.map((order) => ({
+        materialName: optionalText(order.material_name),
+        orderId: order.order_id,
+        status: order.status,
+      }))
     }
-    return { productBatches: [], purchaseItems: [] } satisfies TraceConsumptionReferenceData
-  },
-
-  async listQualityDispositions(batchNo?: string) {
-    if (isMockEnabled()) {
-      return traceMock.listQualityDispositions(batchNo)
+    if (canReadPurchase()) {
+      const orders = await readAllPages<PurchaseOrder>((page, pageSize) =>
+        purchaseApi.listPurchaseOrder({ page, pageSize }),
+      )
+      references.purchaseItems = orders.flatMap((order) =>
+        (order.details ?? []).map((item) => ({
+          itemId: item.item_id,
+          materialName: optionalText(item.material_name),
+          purchaseOrderId: order.order_id,
+          supplierName: optionalText(order.supplier?.supplier_name),
+        })),
+      )
+      references.suppliers = [
+        ...new Map(
+          orders
+            .filter((order) => order.supplier?.supplier_id)
+            .map((order) => [
+              order.supplier.supplier_id,
+              {
+                supplierId: order.supplier.supplier_id,
+                supplierName: order.supplier.supplier_name || `#${order.supplier.supplier_id}`,
+              },
+            ]),
+        ).values(),
+      ]
     }
-    return [] as QualityDisposition[]
-  },
-
-  async listTraceSuppliers() {
-    if (isMockEnabled()) {
-      return traceMock.listTraceSuppliers()
-    }
-    return [] as TraceSupplierOption[]
-  },
-
-  async recallBatch(form: QualityDispositionFormData) {
-    assertMockPermission()
-    if (isMockEnabled()) {
-      return traceMock.recallBatch(form)
-    }
-    throw new Error('当前后端暂未提供质量召回接口')
+    return references
   },
 
   async traceMaterialBatch(query: MaterialBatchTraceQuery): Promise<MaterialBatchTraceItem[]> {
-    if (isMockEnabled()) {
-      return traceMock.traceMaterialBatch(query)
+    const hasTraceFilter =
+      query.itemId || query.materialId || (query.receiveDateStart && query.receiveDateEnd)
+    if (!hasTraceFilter && query.supplierId) {
+      if (!canReadPurchase()) {
+        throw new Error('请同时提供采购明细、原材料 ID 或完整到货日期范围')
+      }
+      const orders = await readAllPages<PurchaseOrder>((page, pageSize) =>
+        purchaseApi.listPurchaseOrder({ page, pageSize, supplierId: query.supplierId }),
+      )
+      const itemIds = new Set(
+        orders.flatMap((order) => (order.details ?? []).map((item) => item.item_id)),
+      )
+      const results = await Promise.all(
+        [...itemIds].map((itemId) => traceService.traceMaterialBatch({ ...query, itemId })),
+      )
+      return results.flat()
     }
     const response = await qualityTraceabilityApi.traceMaterialBatch({
       itemId: query.itemId,
@@ -444,31 +373,46 @@ export const traceService = {
       receiveDateEnd: query.receiveDateEnd,
       receiveDateStart: query.receiveDateStart,
     })
-    const data = unwrap(response.data as ApiEnvelope<MaterialBatchTraceResult[] | undefined>)
-    return (data ?? []).map(toMaterialBatchTrace)
+    return requireData(response.data)
+      .map(toMaterialBatchTrace)
+      .filter((item) => query.supplierId === undefined || item.supplierId === query.supplierId)
   },
 
-  async traceProductBatch(query: ProductBatchTraceQuery) {
-    if (isMockEnabled()) {
-      return traceMock.traceProductBatch(query)
-    }
+  async traceProductBatch(query: ProductBatchTraceQuery): Promise<ProductBatchTraceItem> {
     const response = await qualityTraceabilityApi.traceProductBatch({
       batchNo: query.batchNo,
       includeSupplier: query.includeSupplier,
       orderId: query.orderId,
     })
-    const data = unwrap(response.data as ApiEnvelope<ProductBatchTraceResult | undefined>)
-    if (data) {
-      return toProductBatchTrace(data)
+    const data = requireData(response.data)
+    const result: ProductBatchTraceItem = {
+      batchNo: optionalText(data.batch_no),
+      consumedBatches: (data.consumed_batches ?? []).map(toConsumedMaterial),
+      materialId: data.material_id,
+      materialName: optionalText(data.material_name),
+      orderId: data.order_id,
     }
-    return undefined
+    if (canReadProduction()) {
+      const orderResponse = await productionApi.getProductionOrder({ orderId: data.order_id })
+      const order = requireData(orderResponse.data)
+      result.bomVersion = optionalText(order.version_no)
+      result.planQty = optionalNumber(order.plan_qty)
+      result.finishedQty = optionalNumber(order.finished_qty)
+      result.producedAt = optionalText(order.actual_end)
+    }
+    if (canReadInventory()) {
+      const inbounds = await readAllPages<CompletionInboundOrder>((page, pageSize) =>
+        inventoryApi.listCompletionInbound({ orderId: data.order_id, page, pageSize }),
+      )
+      result.inboundRecords = inbounds.filter(
+        (item) => !result.batchNo || item.batch_no === result.batchNo,
+      )
+    }
+    return result
   },
 
   async updateBatchConsumption(form: BatchConsumptionUpdateFormData) {
-    assertMockPermission()
-    if (isMockEnabled()) {
-      return traceMock.updateBatchConsumption(form)
-    }
+    assertConsumptionId(form.consumptionId)
     const response = await qualityTraceabilityApi.updateBatchConsumption({
       batchConsumptionUpdateRequest: {
         consume_qty: form.consumeQty,
@@ -477,10 +421,6 @@ export const traceService = {
         order_id: form.orderId,
       },
     })
-    const data = unwrap(response.data as ApiEnvelope<BatchConsumption | undefined>)
-    if (data) {
-      return toBatchConsumption(data)
-    }
-    return undefined
+    return toBatchConsumption(requireData(response.data))
   },
 }

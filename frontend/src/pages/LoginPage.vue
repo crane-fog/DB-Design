@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type AuthLoginResult, authService, isMockAuthEnabled } from '@/services/AuthService'
+import { type AuthLoginResult, authService } from '@/services/AuthService'
 import { onMounted, ref } from 'vue'
 import { getErrorMessage } from '@/utils/error'
 import { getRequestStatus } from '@/services/SystemService'
@@ -10,7 +10,6 @@ const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const auth = useAuthStore()
-const mockLoginAccounts = ref<{ account: string; password: string }[]>([])
 
 function getRedirectTarget() {
   const redirect = new URLSearchParams(globalThis.location.search).get('redirect')
@@ -30,11 +29,11 @@ async function handleLoginSuccess(result: AuthLoginResult, employeeNo: string) {
   }
 
   auth.setToken(accessToken, Math.floor(Date.now() / 1000) + expiresInSeconds)
-  auth.setCurrentUser(result.access?.currentUser ?? { employeeNo })
+  auth.setCurrentUser({ employeeNo })
   auth.setRoles([])
   auth.setPermissions([])
   try {
-    const access = await authService.initializeAccess(employeeNo, result)
+    const access = await authService.initializeAccess()
     auth.setCurrentUser(access.currentUser)
     auth.setRoles(access.roles)
     auth.setPermissions(access.permissions)
@@ -83,12 +82,7 @@ async function submitLogin() {
   }
 }
 
-onMounted(async () => {
-  if (isMockAuthEnabled()) {
-    const { getMockLoginAccounts } = await import('@/config/mock-auth')
-    mockLoginAccounts.value = getMockLoginAccounts()
-  }
-
+onMounted(() => {
   if (auth.restoreSession()) {
     globalThis.location.replace('/')
   }
@@ -135,30 +129,7 @@ onMounted(async () => {
         </button>
       </form>
 
-      <aside v-if="mockLoginAccounts.length" class="mock-login-hint">
-        <strong>本地开发账号</strong>
-        <p v-for="account in mockLoginAccounts" :key="account.account">
-          {{ account.account }} / {{ account.password }}
-        </p>
-      </aside>
-
       <a class="login-register" href="/register.html">注册</a>
     </section>
   </main>
 </template>
-
-<style scoped>
-.mock-login-hint {
-  margin-top: 18px;
-  border: 1px solid #bfdbfe;
-  border-radius: 4px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 13px;
-  padding: 12px;
-}
-
-.mock-login-hint p {
-  margin: 6px 0 0;
-}
-</style>

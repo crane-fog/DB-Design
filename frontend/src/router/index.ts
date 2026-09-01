@@ -1,6 +1,5 @@
 import { PERMISSIONS, type PermissionCode } from '@/constants/permissions'
 import { type RouteRecordRaw, createRouter, createWebHistory } from 'vue-router'
-import { isMockAuthEnabled, isMockEnabled } from '@/config/mock'
 import { pinia } from '@/stores/pinia'
 import { systemService } from '@/services/SystemService'
 import { useAuthStore } from '@/stores/auth'
@@ -297,9 +296,9 @@ router.beforeEach(async (to) => {
   }
 
   // 每次页面加载后从后端恢复权限，避免沿用此前初始化失败时保存的空权限。
-  if (!isMockEnabled() && !isMockAuthEnabled() && initializedAccessToken !== auth.token) {
+  if (initializedAccessToken !== auth.token) {
     try {
-      const access = await systemService.loadCurrentAccess(auth.currentUser?.employeeNo ?? '')
+      const access = await systemService.loadCurrentAccess()
       auth.setCurrentUser(access.currentUser)
       auth.setRoles(access.roles)
       auth.setPermissions(access.permissions)

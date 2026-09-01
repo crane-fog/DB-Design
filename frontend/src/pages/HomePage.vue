@@ -5,16 +5,20 @@ import {
   DocumentChecked,
   List,
   Operation,
-  TrendCharts,
   User,
   UserFilled,
 } from '@element-plus/icons-vue'
-import { type Component, computed, onMounted, onUnmounted, ref } from 'vue'
+import { type Component, computed, onUnmounted, ref, watch } from 'vue'
 import type { DashboardShortcutIcon, HomeDashboardData } from '@/types/dashboard'
+import {
+  dashboardService,
+  hasDashboardPermission,
+  homeDashboardShortcuts,
+} from '@/services/DashboardService'
 import { formatDateTime, formatNumber } from '@/utils/format'
+import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { dashboardService } from '@/services/DashboardService'
 import { getErrorMessage } from '@/utils/error'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -35,14 +39,15 @@ const shortcutIcons: Record<DashboardShortcutIcon, Component> = {
 }
 
 const statisticIcons: Record<string, Component> = {
-  pendingItems: Bell,
+  auditLogs: DocumentChecked,
+  inventoryAlerts: Bell,
+  purchaseReminders: Bell,
   roles: User,
-  todayOperations: TrendCharts,
   users: UserFilled,
 }
 
 const visibleShortcuts = computed(() =>
-  (dashboard.value?.shortcuts ?? []).filter((shortcut) => auth.hasPermission(shortcut.permission)),
+  homeDashboardShortcuts.filter((shortcut) => canAccess(shortcut.permission)),
 )
 const visibleStatistics = computed(() =>
   (dashboard.value?.statistics ?? []).filter((statistic) => canAccess(statistic.permission)),
@@ -50,14 +55,36 @@ const visibleStatistics = computed(() =>
 const visibleTodos = computed(() =>
   (dashboard.value?.todos.items ?? []).filter((todo) => canAccess(todo.permission)),
 )
-const visibleOperations = computed(() =>
-  (dashboard.value?.recentOperations.items ?? []).filter((operation) =>
-    canAccess(operation.permission),
-  ),
-)
+const visibleOperations = computed(() => {
+  if (!canAccess(PERMISSIONS.system.auditView)) {
+    return []
+  }
+  return dashboard.value?.recentOperations.items ?? []
+})
+const operationsEmptyText = computed(() => {
+  if (!canAccess(PERMISSIONS.system.auditView)) {
+    return '当前账号无权查看操作日志'
+  }
+  if (!dashboard.value || dashboard.value.recentOperations.state === 'error') {
+    return '操作日志未能加载，请重试'
+  }
+  return '暂无最近操作记录'
+})
+const todosEmptyText = computed(() => {
+  if (!canAccess(PERMISSIONS.inventory.monitor) && !canAccess(PERMISSIONS.purchase.view)) {
+    return '当前账号无权查看库存预警或采购提醒'
+  }
+  if (!dashboard.value || dashboard.value.todos.state === 'error') {
+    return '待办未能加载，请重试'
+  }
+  if (dashboard.value.todos.state === 'partial') {
+    return '已加载来源暂无待办，其他来源加载失败'
+  }
+  return '权限范围内暂无待处理库存预警或待催交采购提醒'
+})
 
 function canAccess(permission?: string) {
-  return !permission || auth.hasPermission(permission)
+  return !permission || hasDashboardPermission(auth, permission)
 }
 
 function navigateTo(route?: string, permission?: string) {
@@ -70,10 +97,15 @@ async function loadDashboard() {
   const currentRequestId = ++requestId
   loading.value = true
   error.value = ''
+  dashboard.value = undefined
   try {
-    const result = await dashboardService.getHomeDashboard()
+    const result = await dashboardService.getHomeDashboard({
+      permissions: [...auth.permissions],
+      roles: [...auth.roles],
+    })
     if (!isUnmounted && currentRequestId === requestId) {
       dashboard.value = result
+      error.value = result.errors.join('；')
     }
   } catch (requestError) {
     if (!isUnmounted && currentRequestId === requestId) {
@@ -86,7 +118,11 @@ async function loadDashboard() {
   }
 }
 
-onMounted(() => void loadDashboard())
+watch(
+  () => [auth.permissions, auth.roles],
+  () => void loadDashboard(),
+  { deep: true, immediate: true },
+)
 onUnmounted(() => {
   isUnmounted = true
 })
@@ -132,6 +168,7 @@ onUnmounted(() => {
           <div>
             <p class="statistic-card__title">{{ statistic.title }}</p>
             <strong>{{ formatNumber(statistic.value) }}</strong>
+            <small v-if="statistic.value === undefined">加载失败</small>
             <p class="statistic-card__description">{{ statistic.description }}</p>
           </div>
           <el-icon class="statistic-card__icon" :size="34">
@@ -151,13 +188,8 @@ onUnmounted(() => {
 
     <el-card class="dashboard-section dashboard-section--shortcuts" shadow="never">
       <template #header><span>快捷入口</span></template>
-      <div v-if="loading && !dashboard" class="shortcut-grid">
-        <el-skeleton v-for="index in 4" :key="index" animated>
-          <template #template><el-skeleton-item variant="rect" style="height: 92px" /></template>
-        </el-skeleton>
-      </div>
       <el-empty
-        v-else-if="!visibleShortcuts.length"
+        v-if="!visibleShortcuts.length"
         :image-size="70"
         description="当前账号暂无可用快捷入口"
       />
@@ -180,21 +212,15 @@ onUnmounted(() => {
 
     <div class="dashboard-content-grid">
       <el-card class="dashboard-section dashboard-section--todos" shadow="never">
-        <template #header><span>待办与提醒</span></template>
+        <template #header><span>待办与提醒（各来源最多 5 条）</span></template>
         <el-skeleton v-if="loading && !dashboard" :rows="4" animated />
-        <el-empty
-          v-else-if="!visibleTodos.length"
-          :image-size="70"
-          description="暂无待办或系统提醒"
-        />
+        <el-empty v-else-if="!visibleTodos.length" :image-size="70" :description="todosEmptyText" />
         <el-timeline v-else>
           <el-timeline-item
             v-for="todo in visibleTodos"
             :key="todo.id"
             :timestamp="formatDateTime(todo.createdAt)"
-            :type="
-              todo.type === 'warning' ? 'danger' : todo.type === 'reminder' ? 'warning' : 'primary'
-            "
+            :type="todo.type === 'warning' ? 'danger' : 'warning'"
           >
             <button
               v-if="todo.route && canAccess(todo.permission)"
@@ -205,18 +231,8 @@ onUnmounted(() => {
               {{ todo.title }}
             </button>
             <span v-else>{{ todo.title }}</span>
-            <el-tag
-              class="todo-status"
-              size="small"
-              :type="todo.status === 'resolved' ? 'success' : 'warning'"
-            >
-              {{
-                todo.status === 'resolved'
-                  ? '已处理'
-                  : todo.status === 'processing'
-                    ? '处理中'
-                    : '待处理'
-              }}
+            <el-tag class="todo-status" size="small" type="warning">
+              {{ todo.statusLabel }}
             </el-tag>
           </el-timeline-item>
         </el-timeline>
@@ -228,21 +244,16 @@ onUnmounted(() => {
         <el-empty
           v-else-if="!visibleOperations.length"
           :image-size="70"
-          description="暂无最近操作记录"
+          :description="operationsEmptyText"
         />
         <el-table v-else :data="visibleOperations" size="small" stripe>
-          <el-table-column label="操作人" min-width="100" prop="operatorName" />
+          <el-table-column label="操作人编号" min-width="100">
+            <template #default="{ row }">{{ row.operatorId ?? '-' }}</template>
+          </el-table-column>
           <el-table-column label="模块" min-width="100" prop="module" />
           <el-table-column label="操作内容" min-width="130" prop="action" />
           <el-table-column label="操作时间" min-width="165">
             <template #default="{ row }">{{ formatDateTime(row.operateTime) }}</template>
-          </el-table-column>
-          <el-table-column label="结果" min-width="72">
-            <template #default="{ row }">
-              <el-tag size="small" :type="row.result === 'success' ? 'success' : 'danger'">
-                {{ row.result === 'success' ? '成功' : '失败' }}
-              </el-tag>
-            </template>
           </el-table-column>
         </el-table>
       </el-card>
@@ -380,7 +391,7 @@ onUnmounted(() => {
   font-size: 28px;
   line-height: 1;
 }
-.statistic-card--pendingItems .statistic-card__content strong {
+.statistic-card--inventoryAlerts .statistic-card__content strong {
   color: var(--target-blue);
 }
 .statistic-card__description {
@@ -400,11 +411,11 @@ onUnmounted(() => {
   background: rgb(91 206 250 / 15%);
   color: var(--mtf-blue-strong);
 }
-.statistic-card--pendingItems .statistic-card__icon {
+.statistic-card--inventoryAlerts .statistic-card__icon {
   background: rgb(233 162 59 / 16%);
   color: var(--target-orange);
 }
-.statistic-card--todayOperations .statistic-card__icon {
+.statistic-card--auditLogs .statistic-card__icon {
   background: rgb(245 169 184 / 13%);
   color: var(--mtf-pink-strong);
 }

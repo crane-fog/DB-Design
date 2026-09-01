@@ -12,7 +12,6 @@ import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getErrorMessage } from '@/utils/error'
@@ -22,7 +21,6 @@ import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
 const router = useRouter()
-const canViewTrace = computed(() => auth.hasPermission(PERMISSIONS.trace.view))
 const loading = ref(false)
 const submitting = ref(false)
 const error = ref('')
@@ -201,7 +199,7 @@ async function viewInbound(item: CompletionInboundItem) {
 
 function openBatchTrace() {
   const inbound = selectedInbound.value
-  if (!inbound || !canViewTrace.value) {
+  if (!inbound) {
     return
   }
   void router.push({
@@ -227,14 +225,13 @@ async function submitInbound() {
   }
   const productionOrder: InventoryProductionOrderOption | undefined = selectedProductionOrder.value
   if (
-    !productionOrder ||
-    productionOrder.materialId !== form.materialId ||
-    productionOrder.versionId !== form.versionId
+    productionOrder &&
+    (productionOrder.materialId !== form.materialId || productionOrder.versionId !== form.versionId)
   ) {
     ElMessage.warning('生产订单、成品物料和 BOM 版本不匹配')
     return
   }
-  if (form.finishQty > productionOrder.remainingQty) {
+  if (productionOrder && form.finishQty > productionOrder.remainingQty) {
     ElMessage.warning(`本次完工数量不能超过剩余数量 ${formatNumber(productionOrder.remainingQty)}`)
     return
   }
@@ -422,7 +419,13 @@ onBeforeUnmount(() => {
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="115px">
         <div class="form-grid">
           <el-form-item label="生产订单" prop="orderId"
-            ><el-select
+            ><el-input-number
+              v-if="!referenceData.productionOrders.length"
+              v-model="form.orderId"
+              :min="1"
+              :precision="0"
+              placeholder="输入生产订单编号" /><el-select
+              v-else
               v-model="form.orderId"
               filterable
               :loading="referenceLoading"
@@ -437,14 +440,24 @@ onBeforeUnmount(() => {
                 :value="order.orderId" /></el-select
           ></el-form-item>
           <el-form-item label="成品物料" prop="materialId"
-            ><el-select v-model="form.materialId" disabled
+            ><el-input-number
+              v-if="!referenceData.productionOrders.length"
+              v-model="form.materialId"
+              :min="1"
+              :precision="0"
+              placeholder="输入成品物料编号" /><el-select v-else v-model="form.materialId" disabled
               ><el-option
                 v-if="selectedProductionOrder"
                 :label="selectedProductionOrder.materialName"
                 :value="selectedProductionOrder.materialId" /></el-select
           ></el-form-item>
           <el-form-item label="BOM 版本" prop="versionId"
-            ><el-select v-model="form.versionId" disabled
+            ><el-input-number
+              v-if="!referenceData.productionOrders.length"
+              v-model="form.versionId"
+              :min="1"
+              :precision="0"
+              placeholder="输入 BOM 版本编号" /><el-select v-else v-model="form.versionId" disabled
               ><el-option
                 v-if="selectedProductionOrder"
                 :label="
@@ -540,7 +553,7 @@ onBeforeUnmount(() => {
               <span>操作人</span><strong>#{{ selectedInbound.operatorId }}</strong>
             </div>
           </div>
-          <div v-if="canViewTrace" class="detail-actions">
+          <div class="detail-actions">
             <el-button :icon="Search" type="primary" @click="openBatchTrace">批次追溯</el-button>
           </div>
           <el-divider content-position="left">原料锁定消耗</el-divider>

@@ -5,18 +5,17 @@ import type {
   BomComponentForm,
   BomReverseTraceResult,
   BomTreeNode,
+  BomVersionForm,
   MaterialBomDetail,
   MaterialBomListItem,
-  MaterialBomStatus,
   MaterialCategory,
   MaterialForm,
   MaterialListQuery,
   MaterialRecord,
-  MaterialStatus,
   MaterialType,
 } from '@/types/material'
 import { EditPen, Plus, Refresh, Search, View } from '@element-plus/icons-vue'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -26,8 +25,6 @@ import type { PageResult } from '@/services/pagination'
 import { getErrorMessage } from '@/utils/error'
 import { materialService } from '@/services/MaterialService'
 import { useAuthStore } from '@/stores/auth'
-
-type TagType = 'danger' | 'info' | 'primary' | 'success' | 'warning'
 
 const auth = useAuthStore()
 const activeTab = ref('materials')
@@ -42,7 +39,6 @@ const materialFilters = reactive({
   categoryId: '',
   createdRange: [] as string[],
   keyword: '',
-  status: '',
   type: '',
 })
 const materialResult = ref<PageResult<MaterialRecord>>({
@@ -58,10 +54,8 @@ const materialEditingId = ref<string>()
 const materialSaving = ref(false)
 const materialForm = reactive<MaterialForm>({
   categoryId: '',
-  code: '',
   model: '',
   name: '',
-  status: 'active',
   type: 'raw',
   unit: '',
 })
@@ -69,14 +63,20 @@ const materialForm = reactive<MaterialForm>({
 const bomResult = ref<MaterialBomListItem[]>([])
 const selectedBomId = ref('')
 const currentBom = ref<MaterialBomDetail>()
-const versionList = ref<MaterialBomDetail[]>([])
+const versionList = ref<MaterialBomListItem[]>([])
 const bomLoading = ref(false)
 const bomEditorOpen = ref(false)
 const bomEditorSaving = ref(false)
 const bomComponentForm = reactive<BomComponentForm>({ lossRate: 0, materialCode: '', quantity: 1 })
 const versionEditorOpen = ref(false)
 const versionSaving = ref(false)
-const versionForm = reactive({ effectiveDate: '', materialCode: '', reason: '', version: '' })
+const versionForm = reactive<BomVersionForm>({
+  effectiveDate: '',
+  expireDate: '',
+  materialCode: '',
+  reason: '',
+  version: '',
+})
 
 const treeBomId = ref('')
 const treeLoading = ref(false)
@@ -91,7 +91,11 @@ const analysisLoading = ref(false)
 const analysisError = ref('')
 const analysisResult = ref<BomAnalysisResult[]>([])
 const analysisHistory = ref<BomAnalysisRecord[]>([])
+const analysisRecordLoading = ref(false)
+const analysisRecordError = ref('')
+const analysisQueried = ref(false)
 const reverseMaterialCode = ref('')
+const reverseIncludeHistory = ref(false)
 const reverseLoading = ref(false)
 const reverseResult = ref<BomReverseTraceResult[]>([])
 const reverseError = ref('')
@@ -100,14 +104,10 @@ const reverseQueried = ref(false)
 const canManage = computed(
   () => auth.hasPermission('material:manage') || auth.hasRole('系统管理员'),
 )
-const selectedBom = computed(() =>
-  bomOptions.value.find((bom) => bom.bomId === selectedBomId.value),
-)
 const treeBom = computed(() => bomOptions.value.find((bom) => bom.bomId === treeBomId.value))
 const analysisBom = computed(() =>
   bomOptions.value.find((bom) => bom.bomId === analysisBomId.value),
 )
-const isCurrentBomDraft = computed(() => currentBom.value?.status === 'draft')
 const materialDialogTitle = computed(() => {
   if (materialEditingId.value) {
     return '编辑物料'
@@ -115,62 +115,15 @@ const materialDialogTitle = computed(() => {
   return '新增物料'
 })
 const materialTypeLabels: Record<MaterialType, string> = {
+  auxiliary: '辅料',
   finished: '成品',
   raw: '原材料',
   semiFinished: '半成品',
-}
-const materialStatusLabels: Record<MaterialStatus, string> = { active: '启用', disabled: '停用' }
-const bomStatusLabels: Record<MaterialBomStatus, string> = {
-  archived: '已归档',
-  draft: '草稿',
-  released: '已发布',
-}
-const statusTone: Record<MaterialBomStatus | MaterialStatus, TagType> = {
-  active: 'success',
-  archived: 'info',
-  disabled: 'danger',
-  draft: 'warning',
-  released: 'success',
 }
 
 function materialTypeLabel(type: MaterialType) {
   return materialTypeLabels[type]
 }
-
-function materialStatusLabel(status: MaterialStatus) {
-  return materialStatusLabels[status]
-}
-
-function statusTagType(status: MaterialBomStatus | MaterialStatus) {
-  return statusTone[status]
-}
-
-function bomStatusLabel(status: MaterialBomStatus) {
-  return bomStatusLabels[status]
-}
-const summarizedAnalysis = computed(() => {
-  const groups = new Map<string, BomAnalysisResult & { paths: string[] }>()
-  analysisResult.value.forEach((item) => {
-    const current = groups.get(item.materialCode)
-    if (current) {
-      current.theoreticalQuantity += item.theoreticalQuantity
-      current.withLossQuantity += item.withLossQuantity
-      current.paths.push(item.path)
-    } else {
-      groups.set(item.materialCode, { ...item, paths: [item.path] })
-    }
-  })
-  return [...groups.values()]
-})
-const reverseQuantitySummary = computed(() => {
-  const totals = new Map<string, number>()
-  reverseResult.value.forEach((item) => {
-    totals.set(item.unit, (totals.get(item.unit) ?? 0) + item.cumulativeQuantity)
-  })
-  return [...totals.entries()]
-    .map(([unit, quantity]) => `${formatNumber(quantity)} ${unit}`)
-    .join('；')
-})
 
 function makeMaterialQuery(): MaterialListQuery {
   return {
@@ -180,7 +133,6 @@ function makeMaterialQuery(): MaterialListQuery {
     keyword: materialFilters.keyword,
     page: materialPage.value,
     pageSize: materialPageSize.value,
-    status: materialFilters.status as MaterialStatus | undefined,
     type: materialFilters.type as MaterialType | undefined,
   }
 }
@@ -193,6 +145,12 @@ async function loadMaterials(targetPage = materialPage.value) {
     materialResult.value = await materialService.listMaterials(makeMaterialQuery())
     materialPage.value = materialResult.value.page
   } catch (requestError) {
+    materialResult.value = {
+      items: [],
+      page: targetPage,
+      pageSize: materialPageSize.value,
+      total: 0,
+    }
     error.value = getErrorMessage(requestError, '物料数据加载失败')
   } finally {
     loading.value = false
@@ -200,23 +158,32 @@ async function loadMaterials(targetPage = materialPage.value) {
 }
 
 async function loadOptions() {
-  const [categoryData, materialData, bomData] = await Promise.all([
+  const [categoryData, options] = await Promise.all([
     materialService.listCategories(),
-    materialService.listMaterials({ page: 1, pageSize: 300 }),
-    materialService.listBomRecords({ page: 1, pageSize: 300 }),
+    materialService.getOptions(),
   ])
   categories.value = categoryData
-  materialOptions.value = materialData.items
-  bomOptions.value = bomData.items
-  bomResult.value = bomData.items
+  materialOptions.value = options.materials
+  bomOptions.value = options.boms
+  bomResult.value = options.boms
 }
 
 async function refreshAll() {
   loading.value = true
   error.value = ''
+  treeData.value = []
+  resetAnalysis()
+  resetReverseTrace()
   try {
-    await Promise.all([loadOptions(), loadMaterials(materialPage.value), loadAnalysisHistory()])
+    await loadOptions()
+    await loadMaterials(materialPage.value)
+    if (selectedBomId.value) {
+      await selectBom(selectedBomId.value)
+    }
+    await loadAnalysisHistory()
   } catch (requestError) {
+    currentBom.value = undefined
+    versionList.value = []
     error.value = getErrorMessage(requestError, '物料与 BOM 数据加载失败')
   } finally {
     loading.value = false
@@ -228,7 +195,6 @@ function resetMaterialFilters() {
     categoryId: '',
     createdRange: [],
     keyword: '',
-    status: '',
     type: '',
   })
   void loadMaterials(1)
@@ -239,17 +205,19 @@ async function changeMaterialPageSize() {
 }
 
 async function openMaterialDetail(record: MaterialRecord) {
-  currentMaterial.value = await materialService.getMaterial(record.id)
-  materialDrawer.value = true
+  try {
+    currentMaterial.value = await materialService.getMaterial(record.id)
+    materialDrawer.value = true
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '物料详情加载失败'))
+  }
 }
 
 function resetMaterialForm() {
   Object.assign(materialForm, {
     categoryId: '',
-    code: '',
     model: '',
     name: '',
-    status: 'active',
     type: 'raw',
     unit: '',
   })
@@ -260,10 +228,8 @@ function openMaterialEditor(record?: MaterialRecord) {
   if (record) {
     Object.assign(materialForm, {
       categoryId: record.categoryId,
-      code: record.code,
       model: record.model,
       name: record.name,
-      status: record.status,
       type: record.type,
       unit: record.unit,
     })
@@ -297,6 +263,8 @@ async function saveMaterial() {
 
 async function selectBom(bomId: string) {
   selectedBomId.value = bomId
+  currentBom.value = undefined
+  versionList.value = []
   if (!bomId) {
     currentBom.value = undefined
     versionList.value = []
@@ -307,6 +275,7 @@ async function selectBom(bomId: string) {
     currentBom.value = await materialService.getBomDetail(bomId)
     versionList.value = await materialService.listBomVersions(currentBom.value.materialCode)
   } catch (requestError) {
+    currentBom.value = undefined
     ElMessage.error(getErrorMessage(requestError, 'BOM 明细加载失败'))
   } finally {
     bomLoading.value = false
@@ -340,20 +309,13 @@ async function saveBomComponent() {
   try {
     let message = 'BOM 明细已新增'
     if (bomComponentForm.componentId) {
-      currentBom.value = await materialService.updateBomComponent(
-        currentBom.value.bomId,
-        bomComponentForm,
-      )
+      await materialService.updateBomComponent(currentBom.value.bomId, bomComponentForm)
       message = 'BOM 明细已更新'
     } else {
-      currentBom.value = await materialService.addBomComponent(
-        currentBom.value.bomId,
-        bomComponentForm,
-      )
+      await materialService.addBomComponent(currentBom.value.bomId, bomComponentForm)
     }
     bomEditorOpen.value = false
     ElMessage.success(message)
-    await selectBom(currentBom.value.bomId)
     await refreshAll()
   } catch (requestError) {
     ElMessage.error(getErrorMessage(requestError, 'BOM 明细保存失败'))
@@ -368,9 +330,8 @@ async function removeBomComponent(componentId: string) {
   }
   bomEditorSaving.value = true
   try {
-    currentBom.value = await materialService.removeBomComponent(currentBom.value.bomId, componentId)
+    await materialService.removeBomComponent(componentId)
     ElMessage.success('BOM 明细已移除')
-    await selectBom(currentBom.value.bomId)
     await refreshAll()
   } catch (requestError) {
     ElMessage.error(getErrorMessage(requestError, 'BOM 明细移除失败'))
@@ -382,6 +343,7 @@ async function removeBomComponent(componentId: string) {
 function openVersionEditor() {
   Object.assign(versionForm, {
     effectiveDate: '',
+    expireDate: '',
     materialCode: currentBom.value?.materialCode ?? '',
     reason: '',
     version: '',
@@ -394,9 +356,9 @@ async function saveVersion() {
   try {
     const created = await materialService.createBomVersion(versionForm)
     versionEditorOpen.value = false
-    ElMessage.success('BOM 草稿版本已创建')
+    ElMessage.success('BOM 版本已创建，请添加组件后设为当前版本')
     await refreshAll()
-    await selectBom(created.bomId)
+    await selectBom(created)
   } catch (requestError) {
     ElMessage.error(getErrorMessage(requestError, 'BOM 版本创建失败'))
   } finally {
@@ -408,9 +370,8 @@ async function releaseBom(bomId: string) {
   versionSaving.value = true
   try {
     const updated = await materialService.setBomVersionReleased(bomId)
-    ElMessage.success(`${updated.version} 已设置为当前生效版本`)
+    ElMessage.success(`${updated.currentBomVersion} 已设置为当前生效版本`)
     await refreshAll()
-    await selectBom(updated.bomId)
   } catch (requestError) {
     ElMessage.error(getErrorMessage(requestError, '设置版本生效失败'))
   } finally {
@@ -424,6 +385,7 @@ async function loadTree() {
   }
   treeLoading.value = true
   treeError.value = ''
+  treeData.value = []
   try {
     treeData.value = await materialService.getTree(treeBomId.value)
   } catch (requestError) {
@@ -444,12 +406,13 @@ async function runAnalysis() {
   }
   analysisLoading.value = true
   analysisError.value = ''
+  analysisQueried.value = true
+  analysisResult.value = []
   try {
     analysisResult.value = await materialService.runAnalysis(
       analysisBomId.value,
       plannedQuantity.value,
     )
-    await loadAnalysisHistory()
   } catch (requestError) {
     analysisError.value = getErrorMessage(requestError, '用料分析失败')
   } finally {
@@ -458,7 +421,48 @@ async function runAnalysis() {
 }
 
 async function loadAnalysisHistory() {
-  analysisHistory.value = await materialService.listAnalysisHistory()
+  analysisHistory.value = []
+  analysisRecordError.value = ''
+  if (!analysisBomId.value) {
+    return
+  }
+  analysisRecordLoading.value = true
+  try {
+    const latest = await materialService.getLatestAnalysis(analysisBomId.value)
+    if (latest) {
+      analysisHistory.value = [latest]
+    }
+  } catch (requestError) {
+    analysisRecordError.value = getErrorMessage(requestError, '最近分析记录加载失败')
+  } finally {
+    analysisRecordLoading.value = false
+  }
+}
+
+async function saveAnalysisRecord() {
+  if (!analysisBomId.value) {
+    return
+  }
+  analysisRecordLoading.value = true
+  analysisRecordError.value = ''
+  try {
+    const record = await materialService.createAnalysisRecord(
+      analysisBomId.value,
+      plannedQuantity.value,
+    )
+    analysisHistory.value = [record]
+    ElMessage.success('净需求分析已由后端计算并保存')
+  } catch (requestError) {
+    analysisRecordError.value = getErrorMessage(requestError, '净需求分析保存失败')
+  } finally {
+    analysisRecordLoading.value = false
+  }
+}
+
+function resetAnalysis() {
+  analysisResult.value = []
+  analysisError.value = ''
+  analysisQueried.value = false
 }
 
 async function loadReverseTrace() {
@@ -466,7 +470,10 @@ async function loadReverseTrace() {
   reverseError.value = ''
   reverseQueried.value = true
   try {
-    reverseResult.value = await materialService.getReverseTrace(reverseMaterialCode.value)
+    reverseResult.value = await materialService.getReverseTrace(
+      reverseMaterialCode.value,
+      reverseIncludeHistory.value,
+    )
   } catch (requestError) {
     reverseResult.value = []
     reverseError.value = getErrorMessage(requestError, '反向追溯加载失败')
@@ -482,6 +489,13 @@ function resetReverseTrace() {
 }
 
 onMounted(() => void refreshAll())
+watch(treeBomId, () => {
+  treeData.value = []
+  treeError.value = ''
+})
+watch([analysisBomId, plannedQuantity], resetAnalysis)
+watch(analysisBomId, () => void loadAnalysisHistory())
+watch(reverseIncludeHistory, resetReverseTrace)
 </script>
 
 <template>
@@ -546,16 +560,6 @@ onMounted(() => void refreshAll())
                   :label="category.name"
                   :value="category.id" /></el-select
             ></el-form-item>
-            <el-form-item label="状态"
-              ><el-select
-                v-model="materialFilters.status"
-                clearable
-                placeholder="全部"
-                style="width: 110px"
-                ><el-option label="启用" value="active" /><el-option
-                  label="停用"
-                  value="disabled" /></el-select
-            ></el-form-item>
             <el-form-item label="创建日期"
               ><el-date-picker
                 v-model="materialFilters.createdRange"
@@ -590,15 +594,8 @@ onMounted(() => void refreshAll())
               label="单位"
               min-width="80"
               prop="unit"
-            /><el-table-column label="分类" min-width="100" prop="categoryName" /><el-table-column
-              label="状态"
-              min-width="90"
-              ><template #default="{ row }"
-                ><el-tag :type="statusTagType(row.status)">{{
-                  materialStatusLabel(row.status)
-                }}</el-tag></template
-              ></el-table-column
-            ><el-table-column label="当前 BOM" min-width="100"
+            /><el-table-column label="分类" min-width="100" prop="categoryName" />
+            <el-table-column label="当前 BOM" min-width="100"
               ><template #default="{ row }">{{
                 row.currentBomVersion || '-'
               }}</template></el-table-column
@@ -658,12 +655,7 @@ onMounted(() => void refreshAll())
                   :label="`${bom.materialCode} · ${bom.version} · ${bom.materialName}`"
                   :value="bom.bomId" /></el-select></el-form-item
             ><el-form-item
-              ><el-button
-                v-if="canManage"
-                :disabled="!currentBom"
-                :icon="Plus"
-                type="primary"
-                @click="openVersionEditor"
+              ><el-button v-if="canManage" :icon="Plus" type="primary" @click="openVersionEditor"
                 >创建版本</el-button
               ></el-form-item
             ></el-form
@@ -671,26 +663,27 @@ onMounted(() => void refreshAll())
           <EmptyState
             v-if="!selectedBomId"
             title="请选择一个 BOM 版本"
-            description="选择后可查看版本历史并维护草稿版本的组件。"
+            description="选择后可查看已有版本和组件；也可直接为物料创建首个版本。"
           />
           <template v-else-if="currentBom">
             <el-skeleton v-if="bomLoading" :rows="6" animated />
             <template v-else>
               <el-descriptions border :column="3"
-                ><el-descriptions-item label="BOM 编号">{{
-                  currentBom.bomCode
-                }}</el-descriptions-item
+                ><el-descriptions-item label="版本编号">{{ currentBom.bomId }}</el-descriptions-item
                 ><el-descriptions-item label="产品"
                   >{{ currentBom.materialName }}（{{
                     currentBom.materialCode
                   }}）</el-descriptions-item
                 ><el-descriptions-item label="状态"
-                  ><el-tag :type="statusTagType(currentBom.status)">{{
-                    bomStatusLabel(currentBom.status)
+                  ><el-tag :type="currentBom.isCurrent ? 'success' : 'info'">{{
+                    currentBom.isCurrent ? '当前生效版本' : '非当前版本'
                   }}</el-tag></el-descriptions-item
                 ><el-descriptions-item label="版本">{{ currentBom.version }}</el-descriptions-item
                 ><el-descriptions-item label="生效日期">{{
                   currentBom.effectiveDate
+                }}</el-descriptions-item
+                ><el-descriptions-item label="失效日期">{{
+                  currentBom.expireDate || '无'
                 }}</el-descriptions-item
                 ><el-descriptions-item label="变更说明">{{
                   currentBom.description
@@ -698,31 +691,34 @@ onMounted(() => void refreshAll())
               >
               <div class="section-heading">
                 <h3>版本列表</h3>
-                <span>历史版本只读，草稿版本可维护。</span>
+                <span
+                  >版本是否生效由有效期和物料当前版本共同决定；修改当前版本会影响后续 BOM
+                  展开。</span
+                >
               </div>
               <el-table :data="versionList" stripe
                 ><el-table-column label="版本" prop="version" /><el-table-column label="状态"
                   ><template #default="{ row }"
-                    ><el-tag :type="statusTagType(row.status)">{{
-                      bomStatusLabel(row.status)
+                    ><el-tag :type="row.isCurrent ? 'success' : 'info'">{{
+                      row.isCurrent ? '当前生效版本' : '非当前版本'
                     }}</el-tag></template
                   ></el-table-column
                 ><el-table-column label="生效日期" prop="effectiveDate" /><el-table-column
-                  label="更新时间"
+                  label="失效日期"
                   ><template #default="{ row }">{{
-                    formatDateTime(row.updatedAt)
+                    row.expireDate || '无'
                   }}</template></el-table-column
                 ><el-table-column label="操作" min-width="170"
                   ><template #default="{ row }"
                     ><el-button link type="primary" @click="selectBom(row.bomId)">查看</el-button
                     ><el-popconfirm
-                      v-if="canManage && row.status === 'draft'"
-                      title="设置后当前已发布版本将归档，是否继续？"
+                      v-if="canManage && !row.isCurrent"
+                      title="将切换该物料的当前版本；后端会校验有效期与循环依赖，是否继续？"
                       confirm-button-text="确认生效"
                       @confirm="releaseBom(row.bomId)"
                       ><template #reference
                         ><el-button :loading="versionSaving" link type="danger"
-                          >设为生效</el-button
+                          >设为当前版本</el-button
                         ></template
                       ></el-popconfirm
                     ></template
@@ -732,7 +728,7 @@ onMounted(() => void refreshAll())
               <div class="section-heading">
                 <h3>组件明细</h3>
                 <el-button
-                  v-if="canManage && isCurrentBomDraft"
+                  v-if="canManage"
                   :icon="Plus"
                   type="primary"
                   @click="openComponentEditor()"
@@ -754,20 +750,16 @@ onMounted(() => void refreshAll())
                   ><template #default="{ row }"
                     >{{ formatNumber(row.lossRate) }}%</template
                   ></el-table-column
-                ><el-table-column
-                  label="工作中心"
-                  min-width="100"
-                  prop="workCenter"
-                /><el-table-column label="操作" min-width="150"
+                ><el-table-column label="操作" min-width="150"
                   ><template #default="{ row }"
                     ><el-button
-                      v-if="canManage && isCurrentBomDraft"
+                      v-if="canManage"
                       link
                       type="primary"
                       @click="openComponentEditor(row)"
                       >编辑</el-button
                     ><el-popconfirm
-                      v-if="canManage && isCurrentBomDraft"
+                      v-if="canManage"
                       title="移除后无法恢复，是否继续？"
                       confirm-button-text="移除"
                       @confirm="removeBomComponent(row.componentId)"
@@ -800,7 +792,11 @@ onMounted(() => void refreshAll())
                   :label="`${bom.materialCode} · ${bom.version}`"
                   :value="bom.bomId" /></el-select></el-form-item
             ><el-form-item
-              ><el-button :loading="treeLoading" type="primary" @click="loadTree"
+              ><el-button
+                :disabled="!treeBomId"
+                :loading="treeLoading"
+                type="primary"
+                @click="loadTree"
                 >加载结构</el-button
               ><el-button :disabled="!treeData.length" @click="toggleTree(true)">展开全部</el-button
               ><el-button :disabled="!treeData.length" @click="toggleTree(false)"
@@ -841,7 +837,7 @@ onMounted(() => void refreshAll())
         /></el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="理论用料分析" name="analysis">
+      <el-tab-pane label="用料分析" name="analysis">
         <el-card shadow="never"
           ><el-form inline
             ><el-form-item label="产品 BOM"
@@ -862,11 +858,11 @@ onMounted(() => void refreshAll())
                 :precision="2" /></el-form-item
             ><el-form-item
               ><el-button
-                :disabled="!analysisBomId"
+                :disabled="!canManage || !analysisBomId || analysisRecordLoading"
                 :loading="analysisLoading"
                 type="primary"
                 @click="runAnalysis"
-                >发起分析</el-button
+                >计算理论用料</el-button
               ></el-form-item
             ></el-form
           ><el-alert
@@ -882,9 +878,11 @@ onMounted(() => void refreshAll())
           >
           <div v-if="analysisResult.length" class="section-heading">
             <h3>用料汇总</h3>
-            <span>数量不扣减库存；补偿后用量已按各层级损耗率计算。</span>
+            <span
+              >包含各层组件；理论用量不含损耗和库存扣减，补偿后用量由后端逐层除以（1－损耗率）并向上取整。</span
+            >
           </div>
-          <el-table v-if="analysisResult.length" :data="summarizedAnalysis" stripe
+          <el-table v-if="analysisResult.length" :data="analysisResult" stripe
             ><el-table-column label="物料" min-width="200"
               ><template #default="{ row }"
                 >{{ row.materialName }}<small>{{ row.materialCode }}</small></template
@@ -898,16 +896,48 @@ onMounted(() => void refreshAll())
                 >{{ formatNumber(row.withLossQuantity) }} {{ row.unit }}</template
               ></el-table-column
             ><el-table-column label="来源路径" min-width="300"
-              ><template #default="{ row }">{{ row.paths.join('；') }}</template></el-table-column
+              ><template #default="{ row }">{{ row.path }}</template></el-table-column
             ></el-table
           >
-          <div class="section-heading"><h3>分析记录</h3></div>
-          <el-table :data="analysisHistory" stripe
-            ><el-table-column label="产品" prop="materialName" /><el-table-column
-              label="版本"
-              prop="version"
-            /><el-table-column label="计划数量" prop="plannedQuantity" /><el-table-column
-              label="执行时间"
+          <EmptyState
+            v-if="analysisQueried && !analysisLoading && !analysisError && !analysisResult.length"
+            title="该版本没有可展开的子项"
+            description="请检查并维护该版本的 BOM 组件。"
+          />
+          <div class="section-heading">
+            <h3>所选版本最近一次净需求分析</h3>
+            <el-button
+              :disabled="!analysisBomId || analysisLoading"
+              :loading="analysisRecordLoading"
+              @click="loadAnalysisHistory"
+              >刷新记录</el-button
+            >
+            <el-button
+              v-if="canManage"
+              :disabled="!analysisBomId || analysisLoading"
+              :loading="analysisRecordLoading"
+              type="primary"
+              @click="saveAnalysisRecord"
+              >生成并保存净需求分析</el-button
+            >
+          </div>
+          <p class="form-hint">
+            净需求分析单独由后端结合库存、在途量和安全库存计算并保存。此处只展示该版本最新一条记录，不代表全部历史；理论用料计算不写入记录。
+          </p>
+          <el-alert
+            v-if="analysisRecordError"
+            :closable="false"
+            :title="analysisRecordError"
+            type="error"
+          />
+          <el-table v-loading="analysisRecordLoading" :data="analysisHistory" stripe
+            ><el-table-column label="分析编号" prop="id" /><el-table-column
+              label="产品"
+              prop="materialName"
+            /><el-table-column label="版本" prop="version" /><el-table-column
+              label="计划数量"
+              prop="plannedQuantity"
+            /><el-table-column label="执行时间"
               ><template #default="{ row }">{{
                 formatDateTime(row.executedAt)
               }}</template></el-table-column
@@ -932,6 +962,10 @@ onMounted(() => void refreshAll())
                   :label="`${material.code} · ${material.name}`"
                   :value="material.code" /></el-select></el-form-item
             ><el-form-item
+              ><el-checkbox v-model="reverseIncludeHistory"
+                >包含非当前版本</el-checkbox
+              ></el-form-item
+            ><el-form-item
               ><el-button
                 :disabled="!reverseMaterialCode"
                 :loading="reverseLoading"
@@ -948,26 +982,23 @@ onMounted(() => void refreshAll())
             ></el-alert
           ><template v-else-if="reverseResult.length"
             ><div class="section-heading">
-              <h3>完整上层路径</h3>
+              <h3>上层物料引用</h3>
               <span
-                >累计理论用量不含损耗；按路径分别展示，所有路径合计：{{
-                  reverseQuantitySummary
-                }}</span
+                >每行对应一个上层物料，包含中间组件；累计理论用量不含损耗，不将不同产品和层级相加。</span
               >
             </div>
             <el-table :data="reverseResult" stripe
-              ><el-table-column label="直接父项" min-width="190"
+              ><el-table-column label="上层物料" min-width="190"
                 ><template #default="{ row }"
-                  >{{ row.parentMaterialName }}<small>{{ row.parentMaterialCode }}</small></template
+                  >{{ row.productMaterialName
+                  }}<small>{{ row.productMaterialCode }}</small></template
                 ></el-table-column
-              ><el-table-column label="最终产品" min-width="190"
-                ><template #default="{ row }"
-                  >{{ row.finalMaterialName }}<small>{{ row.finalMaterialCode }}</small></template
-                ></el-table-column
-              ><el-table-column label="BOM 版本路径" min-width="160"
+              ><el-table-column label="版本状态" min-width="120"
                 ><template #default="{ row }">{{
-                  row.versions.join(' → ')
+                  row.versionStatus === 'effective' ? '当前生效版本' : '非当前版本'
                 }}</template></el-table-column
+              ><el-table-column label="上层 BOM 版本" min-width="160"
+                ><template #default="{ row }">{{ row.version }}</template></el-table-column
               ><el-table-column label="上溯层级" min-width="100"
                 ><template #default="{ row }">第 {{ row.level }} 层</template></el-table-column
               ><el-table-column label="累计理论用量" min-width="140"
@@ -981,7 +1012,7 @@ onMounted(() => void refreshAll())
           ><EmptyState
             v-else-if="!reverseLoading && reverseQueried"
             title="暂无上层 BOM 引用"
-            description="所选物料当前没有被任何 BOM 版本使用。" /><EmptyState
+            description="所选查询范围内没有找到上层引用关系。" /><EmptyState
             v-else-if="!reverseLoading"
             title="选择物料后查询"
             description="结果会展示完整上层路径、层级与累计理论用量。"
@@ -999,8 +1030,8 @@ onMounted(() => void refreshAll())
         ><el-descriptions-item label="型号">{{ currentMaterial.model }}</el-descriptions-item
         ><el-descriptions-item label="单位">{{ currentMaterial.unit }}</el-descriptions-item
         ><el-descriptions-item label="分类">{{ currentMaterial.categoryName }}</el-descriptions-item
-        ><el-descriptions-item label="状态">{{
-          materialStatusLabels[currentMaterial.status]
+        ><el-descriptions-item label="安全库存">{{
+          currentMaterial.safetyStock
         }}</el-descriptions-item
         ><el-descriptions-item label="当前 BOM 版本">{{
           currentMaterial.currentBomVersion || '-'
@@ -1016,12 +1047,10 @@ onMounted(() => void refreshAll())
 
     <el-dialog v-model="materialDialog" :title="materialDialogTitle" width="560px"
       ><el-form label-width="92px"
-        ><el-form-item label="物料编号" required
-          ><el-input
-            v-model.trim="materialForm.code"
-            :disabled="Boolean(materialEditingId)"
-            placeholder="例如 RM-AL-6061" /></el-form-item
-        ><el-form-item label="物料名称" required
+        ><p class="form-hint">
+          物料编号由后端自动分配；编辑主数据会保留安全库存、默认供应商和当前 BOM 版本。
+        </p>
+        <el-form-item label="物料名称" required
           ><el-input v-model.trim="materialForm.name" /></el-form-item
         ><el-form-item label="类型" required
           ><el-select v-model="materialForm.type"
@@ -1030,8 +1059,7 @@ onMounted(() => void refreshAll())
               :key="value"
               :label="label"
               :value="value" /></el-select></el-form-item
-        ><el-form-item label="型号" required
-          ><el-input v-model.trim="materialForm.model" /></el-form-item
+        ><el-form-item label="型号"><el-input v-model.trim="materialForm.model" /></el-form-item
         ><el-form-item label="单位" required
           ><el-input v-model.trim="materialForm.unit" /></el-form-item
         ><el-form-item label="分类" required
@@ -1040,13 +1068,7 @@ onMounted(() => void refreshAll())
               v-for="category in categories"
               :key="category.id"
               :label="category.name"
-              :value="category.id" /></el-select></el-form-item
-        ><el-form-item label="状态"
-          ><el-radio-group v-model="materialForm.status"
-            ><el-radio value="active">启用</el-radio
-            ><el-radio value="disabled">停用</el-radio></el-radio-group
-          ></el-form-item
-        ></el-form
+              :value="category.id" /></el-select></el-form-item></el-form
       ><template #footer
         ><el-button @click="materialDialog = false">取消</el-button
         ><el-button :loading="materialSaving" type="primary" @click="saveMaterial"
@@ -1077,7 +1099,7 @@ onMounted(() => void refreshAll())
         ><el-form-item label="损耗率" required
           ><el-input-number
             v-model="bomComponentForm.lossRate"
-            :max="100"
+            :max="99.99"
             :min="0"
             :precision="2"
           /><span class="input-unit">%</span></el-form-item
@@ -1098,7 +1120,7 @@ onMounted(() => void refreshAll())
         ><el-form-item label="产品" required
           ><el-select v-model="versionForm.materialCode" filterable style="width: 100%"
             ><el-option
-              v-for="material in materialOptions.filter((item) => item.type !== 'raw')"
+              v-for="material in materialOptions"
               :key="material.id"
               :label="`${material.code} · ${material.name}`"
               :value="material.code" /></el-select></el-form-item
@@ -1110,6 +1132,13 @@ onMounted(() => void refreshAll())
             style="width: 100%"
             type="date"
             value-format="YYYY-MM-DD" /></el-form-item
+        ><el-form-item label="失效日期"
+          ><el-date-picker
+            v-model="versionForm.expireDate"
+            clearable
+            style="width: 100%"
+            type="date"
+            value-format="YYYY-MM-DD" /></el-form-item
         ><el-form-item label="变更原因"
           ><el-input
             v-model.trim="versionForm.reason"
@@ -1118,7 +1147,7 @@ onMounted(() => void refreshAll())
       ><template #footer
         ><el-button @click="versionEditorOpen = false">取消</el-button
         ><el-button :loading="versionSaving" type="primary" @click="saveVersion"
-          >创建草稿</el-button
+          >创建版本</el-button
         ></template
       ></el-dialog
     >
@@ -1174,19 +1203,11 @@ onMounted(() => void refreshAll())
   width: 100% !important;
 }
 .material-filter-form :deep(.el-form-item:nth-child(4)) {
-  flex: 0.7 1 115px;
-  min-width: 115px;
-  max-width: 160px;
-}
-.material-filter-form :deep(.el-form-item:nth-child(4) .el-select) {
-  width: 100% !important;
-}
-.material-filter-form :deep(.el-form-item:nth-child(5)) {
   flex: 1.5 1 300px;
   min-width: 300px;
   max-width: 420px;
 }
-.material-filter-form :deep(.el-form-item:nth-child(5) .el-date-editor) {
+.material-filter-form :deep(.el-form-item:nth-child(4) .el-date-editor) {
   width: 100% !important;
 }
 .material-filter-form :deep(.el-form-item:last-child) {

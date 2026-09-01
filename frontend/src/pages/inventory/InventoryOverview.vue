@@ -2,34 +2,31 @@
 import { Bell, Box, DataAnalysis, Refresh, Search, TrendCharts, Van } from '@element-plus/icons-vue'
 import type {
   InventoryOverviewSummary,
-  InventoryStockItem,
   InventoryStockQuery,
   InventoryStockStatus,
 } from '@/types/inventory'
+import { type InventoryStockData, inventoryService } from '@/services/InventoryService'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { formatNumber } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
-import { inventoryService } from '@/services/InventoryService'
-import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
-const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
-const summary = ref<InventoryOverviewSummary>()
+const summary = ref<Partial<InventoryOverviewSummary>>()
+const canBrowseCatalog = computed(() => inventoryService.canReadMaterialReferences())
 let requestId = 0
 const stockLoading = ref(false)
 const stockError = ref('')
-const stockItems = ref<InventoryStockItem[]>([])
+const stockItems = ref<InventoryStockData[]>([])
 const stockTotal = ref(0)
 const stockQuery = reactive<InventoryStockQuery>({ page: 1, pageSize: 10 })
 let stockRequestId = 0
-const stockDetail = ref<InventoryStockItem>()
+const stockDetail = ref<InventoryStockData>()
 const stockDetailError = ref('')
 const stockDetailLoading = ref(false)
 
@@ -50,29 +47,22 @@ const shortcuts = [
   {
     description: '按 BOM 展开需求并核对可用、在途与安全库存。',
     icon: DataAnalysis,
-    permission: PERMISSIONS.inventory.calc,
     route: '/inventory/calc',
     title: '物料缺口计算',
   },
   {
     description: '处理低库存预警、库存锁定与呆滞物料。',
     icon: Bell,
-    permission: PERMISSIONS.inventory.monitor,
     route: '/inventory/monitor',
     title: '库存监控',
   },
   {
     description: '登记生产订单完工批次并查询入库记录。',
     icon: Van,
-    permission: PERMISSIONS.inventory.register,
     route: '/inventory/register',
     title: '完工入库',
   },
 ]
-
-const visibleShortcuts = computed(() =>
-  shortcuts.filter(({ permission }) => auth.hasPermission(permission)),
-)
 
 const statistics = computed(() => [
   {
@@ -118,7 +108,7 @@ const statistics = computed(() => [
 ])
 const refreshing = computed(() => loading.value || stockLoading.value)
 
-function getStockTagType(status: InventoryStockStatus) {
+function getStockTagType(status?: InventoryStockStatus) {
   if (status === 'normal') {
     return 'success'
   }
@@ -131,12 +121,18 @@ function getStockTagType(status: InventoryStockStatus) {
   return 'info'
 }
 
-function getMaterialTypeLabel(item: InventoryStockItem) {
-  return materialTypeLabels[item.materialType]
+function getMaterialTypeLabel(item: InventoryStockData) {
+  if (item.materialType) {
+    return materialTypeLabels[item.materialType]
+  }
+  return '-'
 }
 
-function getStockStatusLabel(item: InventoryStockItem) {
-  return stockStatusLabels[item.status]
+function getStockStatusLabel(item: InventoryStockData) {
+  if (item.status) {
+    return stockStatusLabels[item.status]
+  }
+  return '-'
 }
 
 async function loadOverview() {
@@ -276,12 +272,18 @@ onBeforeUnmount(() => {
       <div class="stock-filters">
         <el-input-number v-model="stockQuery.materialId" :min="1" placeholder="物料编号" />
         <el-input
+          v-if="canBrowseCatalog"
           v-model.trim="stockQuery.materialName"
           clearable
           placeholder="物料名称"
           @keyup.enter="searchStocks"
         />
-        <el-select v-model="stockQuery.materialType" clearable placeholder="物料类型">
+        <el-select
+          v-if="canBrowseCatalog"
+          v-model="stockQuery.materialType"
+          clearable
+          placeholder="物料类型"
+        >
           <el-option
             v-for="(label, value) in materialTypeLabels"
             :key="value"
@@ -289,7 +291,12 @@ onBeforeUnmount(() => {
             :value="value"
           />
         </el-select>
-        <el-select v-model="stockQuery.status" clearable placeholder="库存状态">
+        <el-select
+          v-if="canBrowseCatalog"
+          v-model="stockQuery.status"
+          clearable
+          placeholder="库存状态"
+        >
           <el-option
             v-for="(label, value) in stockStatusLabels"
             :key="value"
@@ -324,7 +331,11 @@ onBeforeUnmount(() => {
       <div v-loading="stockLoading" class="stock-table-area">
         <EmptyState
           v-if="!stockLoading && !stockError && !stockItems.length"
-          description="当前查询条件下没有库存记录。"
+          :description="
+            !canBrowseCatalog && !stockQuery.materialId
+              ? '输入物料编号查询库存。'
+              : '当前查询条件下没有库存记录。'
+          "
         />
         <el-table v-else :data="stockItems" stripe>
           <el-table-column label="物料" min-width="210">
@@ -443,14 +454,9 @@ onBeforeUnmount(() => {
           <el-icon><TrendCharts /></el-icon><span>库存作业入口</span>
         </div>
       </template>
-      <el-empty
-        v-if="!visibleShortcuts.length"
-        :image-size="72"
-        description="当前账号暂无库存作业权限"
-      />
-      <div v-else class="operation-grid">
+      <div class="operation-grid">
         <button
-          v-for="(shortcut, index) in visibleShortcuts"
+          v-for="(shortcut, index) in shortcuts"
           :key="shortcut.route"
           class="operation-entry"
           :class="index % 2 ? 'operation-entry--pink' : 'operation-entry--blue'"

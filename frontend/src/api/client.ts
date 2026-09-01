@@ -73,4 +73,7 @@ export const qualityTraceabilityApi = new QualityTraceabilityApi(
 )
 export const systemApi = new SystemApi(apiConfig, apiConfig.basePath, axiosInstance)
 
-export const Api = { getUserTest: () => axiosInstance.get<UserData[]>('/api/user-test') }
+export const Api = {
+  getUserTest: () =>
+    axiosInstance.get<UserData[]>('/api/user-test', { baseURL: apiConfig.basePath }),
+}

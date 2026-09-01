@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { type Component, computed, onMounted, onUnmounted, ref } from 'vue'
+import { type Component, computed, onUnmounted, ref, watch } from 'vue'
 import type { DashboardShortcutIcon, SystemDashboardData } from '@/types/dashboard'
 import { DocumentChecked, Key, Operation, User, UserFilled } from '@element-plus/icons-vue'
+import {
+  dashboardService,
+  hasDashboardPermission,
+  systemDashboardShortcuts,
+} from '@/services/DashboardService'
 import { formatDateTime, formatNumber } from '@/utils/format'
+import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { dashboardService } from '@/services/DashboardService'
 import { getErrorMessage } from '@/utils/error'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -26,19 +31,29 @@ const shortcutIcons: Record<DashboardShortcutIcon, Component> = {
 }
 
 const visibleShortcuts = computed(() =>
-  (dashboard.value?.shortcuts ?? []).filter((shortcut) => auth.hasPermission(shortcut.permission)),
+  systemDashboardShortcuts.filter((shortcut) => canAccess(shortcut.permission)),
 )
 const visibleStatistics = computed(() =>
   (dashboard.value?.statistics ?? []).filter((statistic) => canAccess(statistic.permission)),
 )
-const visibleOperations = computed(() =>
-  (dashboard.value?.recentOperations.items ?? []).filter((operation) =>
-    canAccess(operation.permission),
-  ),
-)
+const visibleOperations = computed(() => {
+  if (!canAccess(PERMISSIONS.system.auditView)) {
+    return []
+  }
+  return dashboard.value?.recentOperations.items ?? []
+})
+const operationsEmptyText = computed(() => {
+  if (!canAccess(PERMISSIONS.system.auditView)) {
+    return '当前账号无权查看操作日志'
+  }
+  if (!dashboard.value || dashboard.value.recentOperations.state === 'error') {
+    return '操作日志未能加载，请重试'
+  }
+  return '暂无系统操作记录'
+})
 
 function canAccess(permission?: string) {
-  return !permission || auth.hasPermission(permission)
+  return !permission || hasDashboardPermission(auth, permission)
 }
 
 function navigateTo(route?: string, permission?: string) {
@@ -51,10 +66,15 @@ async function loadDashboard() {
   const currentRequestId = ++requestId
   loading.value = true
   error.value = ''
+  dashboard.value = undefined
   try {
-    const result = await dashboardService.getSystemDashboard()
+    const result = await dashboardService.getSystemDashboard({
+      permissions: [...auth.permissions],
+      roles: [...auth.roles],
+    })
     if (!isUnmounted && currentRequestId === requestId) {
       dashboard.value = result
+      error.value = result.errors.join('；')
     }
   } catch (requestError) {
     if (!isUnmounted && currentRequestId === requestId) {
@@ -67,7 +87,11 @@ async function loadDashboard() {
   }
 }
 
-onMounted(() => void loadDashboard())
+watch(
+  () => [auth.permissions, auth.roles],
+  () => void loadDashboard(),
+  { deep: true, immediate: true },
+)
 onUnmounted(() => {
   isUnmounted = true
 })
@@ -97,7 +121,7 @@ onUnmounted(() => {
     <section class="statistics-grid" aria-label="系统管理统计">
       <el-card
         v-for="statistic in visibleStatistics"
-        :key="statistic.title"
+        :key="statistic.key"
         :class="{ 'statistic-card--clickable': statistic.route && canAccess(statistic.permission) }"
         class="statistic-card"
         shadow="never"
@@ -105,6 +129,7 @@ onUnmounted(() => {
       >
         <p>{{ statistic.title }}</p>
         <strong>{{ formatNumber(statistic.value) }}</strong>
+        <small v-if="statistic.value === undefined">加载失败</small>
         <small>{{ statistic.description }}</small>
       </el-card>
       <el-skeleton
@@ -119,13 +144,8 @@ onUnmounted(() => {
 
     <el-card class="overview-card" shadow="never">
       <template #header><span>管理快捷入口</span></template>
-      <div v-if="loading && !dashboard" class="shortcut-grid">
-        <el-skeleton v-for="index in 3" :key="index" animated
-          ><template #template><el-skeleton-item variant="rect" style="height: 90px" /></template
-        ></el-skeleton>
-      </div>
       <el-empty
-        v-else-if="!visibleShortcuts.length"
+        v-if="!visibleShortcuts.length"
         :image-size="70"
         description="当前账号暂无系统管理入口"
       />
@@ -163,10 +183,12 @@ onUnmounted(() => {
       <el-empty
         v-else-if="!visibleOperations.length"
         :image-size="70"
-        description="暂无系统操作记录"
+        :description="operationsEmptyText"
       />
       <el-table v-else :data="visibleOperations" stripe>
-        <el-table-column label="操作人" min-width="120" prop="operatorName" />
+        <el-table-column label="操作人编号" min-width="120">
+          <template #default="{ row }">{{ row.operatorId ?? '-' }}</template>
+        </el-table-column>
         <el-table-column label="业务模块" min-width="130" prop="module" />
         <el-table-column label="操作类型" min-width="140" prop="action" />
         <el-table-column label="操作时间" min-width="180"

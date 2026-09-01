@@ -4,12 +4,8 @@ import {
   type BatchConsumptionItem,
   type BatchConsumptionUpdateFormData,
   type MaterialBatchTraceItem,
-  type QualityDisposition,
-  type QualityDispositionStatus,
-  type QualityDispositionType,
   type QualityImpactResult,
   type TraceConsumptionReferenceData,
-  type TraceSupplierOption,
   traceService,
 } from '@/services/TraceService'
 import { Delete, EditPen, Plus, Refresh, Search, View } from '@element-plus/icons-vue'
@@ -20,9 +16,9 @@ import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
+import type { ProductionOrderStatus } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
-import { qualityDispositionStatuses } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute } from 'vue-router'
 
@@ -33,21 +29,19 @@ const auth = useAuthStore()
 const route = useRoute()
 const canManage = computed(() => auth.hasPermission(PERMISSIONS.trace.manage))
 const activeTab = ref<TraceTab>('consumption')
-const references = ref<TraceConsumptionReferenceData>({ productBatches: [], purchaseItems: [] })
-const suppliers = ref<TraceSupplierOption[]>([])
+const references = ref<TraceConsumptionReferenceData>({})
+const suppliers = computed(() => references.value.suppliers ?? [])
+const referenceError = ref('')
 const referenceLoading = ref(false)
 
 async function loadReferences() {
   referenceLoading.value = true
   try {
-    const [referenceData, supplierData] = await Promise.all([
-      traceService.listConsumptionReferences(),
-      traceService.listTraceSuppliers(),
-    ])
-    references.value = referenceData
-    suppliers.value = supplierData
+    referenceError.value = ''
+    references.value = await traceService.listConsumptionReferences()
   } catch (error) {
-    ElMessage.error(getErrorMessage(error, '追溯参考数据加载失败'))
+    references.value = {}
+    referenceError.value = getErrorMessage(error, '追溯参考数据加载失败')
   } finally {
     referenceLoading.value = false
   }
@@ -75,16 +69,8 @@ const consumptionDetailVisible = ref(false)
 const consumptionDetailLoading = ref(false)
 const consumptionForm = reactive<BatchConsumptionCreateFormData>({
   consumeQty: 1,
-  consumedAt: '',
   itemId: 0,
-  materialBatchNo: '',
-  operatorName: '当前操作员',
   orderId: 0,
-  productBatchNo: '',
-  purchaseOrderNo: '',
-  remarks: '',
-  supplierId: 0,
-  unit: '',
 })
 const consumptionDialogTitle = computed(() => {
   if (consumptionDialogMode.value === 'create') {
@@ -97,24 +83,24 @@ const consumptionRules: FormRules<BatchConsumptionCreateFormData> = {
     { message: '请输入消耗数量', required: true, trigger: 'blur', type: 'number' },
     { message: '消耗数量必须大于 0', min: 0.01, trigger: 'blur', type: 'number' },
   ],
-  consumedAt: [
-    { message: '请选择消耗时间', required: true, trigger: 'change' },
+  itemId: [
     {
-      message: '消耗时间格式无效',
+      message: '请输入有效采购明细 ID',
+      min: 1,
+      required: true,
       trigger: 'change',
-      validator: (_rule, value, callback) => {
-        if (Date.parse(String(value).replace(' ', 'T'))) {
-          callback()
-          return
-        }
-        callback(new Error('消耗时间格式无效'))
-      },
+      type: 'integer',
     },
   ],
-  itemId: [{ message: '请选择采购明细与原材料批次', required: true, trigger: 'change' }],
-  operatorName: [{ message: '请输入操作人', required: true, trigger: 'blur' }],
-  productBatchNo: [{ message: '请选择生产订单与产品批次', required: true, trigger: 'change' }],
-  supplierId: [{ message: '请选择供应商', required: true, trigger: 'change' }],
+  orderId: [
+    {
+      message: '请输入有效生产订单 ID',
+      min: 1,
+      required: true,
+      trigger: 'change',
+      type: 'integer',
+    },
+  ],
 }
 
 async function loadConsumption(targetPage = consumptionPage.value) {
@@ -142,41 +128,7 @@ function resetConsumptionFilters() {
 }
 
 function resetConsumptionForm() {
-  Object.assign(consumptionForm, {
-    consumeQty: 1,
-    consumedAt: '',
-    itemId: 0,
-    materialBatchNo: '',
-    operatorName: '当前操作员',
-    orderId: 0,
-    productBatchNo: '',
-    purchaseOrderNo: '',
-    remarks: '',
-    supplierId: 0,
-    unit: '',
-  })
-}
-
-function onPurchaseItemChange(itemId: number) {
-  const item = references.value.purchaseItems.find((candidate) => candidate.itemId === itemId)
-  if (!item) {
-    return
-  }
-  Object.assign(consumptionForm, {
-    itemId: item.itemId,
-    materialBatchNo: item.materialBatchNo,
-    purchaseOrderNo: item.purchaseOrderNo,
-    supplierId: item.supplierId,
-    unit: item.unit,
-  })
-}
-
-function onProductBatchChange(batchNo: string) {
-  const batch = references.value.productBatches.find((candidate) => candidate.batchNo === batchNo)
-  if (!batch) {
-    return
-  }
-  Object.assign(consumptionForm, { orderId: batch.orderId, productBatchNo: batch.batchNo })
+  Object.assign(consumptionForm, { consumeQty: 1, itemId: 0, orderId: 0 })
 }
 
 function openConsumptionCreate() {
@@ -192,16 +144,8 @@ function openConsumptionEdit(record: BatchConsumptionItem) {
   editingConsumptionId.value = record.consumptionId
   Object.assign(consumptionForm, {
     consumeQty: record.consumeQty,
-    consumedAt: record.consumedAt ?? '',
     itemId: record.itemId,
-    materialBatchNo: record.materialBatchNo ?? '',
-    operatorName: record.operatorName ?? '当前操作员',
     orderId: record.orderId,
-    productBatchNo: record.productBatchNo ?? '',
-    purchaseOrderNo: record.purchaseOrderNo ?? '',
-    remarks: record.remarks ?? '',
-    supplierId: record.supplierId ?? 0,
-    unit: record.unit ?? '',
   })
   consumptionFormRef.value?.clearValidate()
   consumptionDialogVisible.value = true
@@ -211,7 +155,10 @@ async function openConsumptionDetail(record: BatchConsumptionItem) {
   consumptionDetailVisible.value = true
   consumptionDetailLoading.value = true
   try {
-    consumptionDetail.value = await traceService.getBatchConsumption(record.consumptionId)
+    consumptionDetail.value = await traceService.getBatchConsumption(record.consumptionId, {
+      itemId: record.itemId,
+      orderId: record.orderId,
+    })
   } catch (error) {
     consumptionDetail.value = undefined
     ElMessage.error(getErrorMessage(error, '批次消耗详情加载失败'))
@@ -236,6 +183,8 @@ async function submitConsumptionForm() {
         consumptionId: editingConsumptionId.value,
       } satisfies BatchConsumptionUpdateFormData)
       ElMessage.success('批次消耗已更新')
+    } else {
+      throw new Error('消耗记录 ID 无效，请重新打开编辑窗口')
     }
     consumptionDialogVisible.value = false
     await loadConsumption(consumptionPage.value)
@@ -370,36 +319,31 @@ function resetMaterialFilters() {
   materialError.value = ''
 }
 
-// ---------- 质量影响分析与 Mock 处置 ----------
+// ---------- 质量影响分析 ----------
 const impactFilters = reactive({ itemIds: '', materialId: '', receiveRange: [] as string[] })
 const impactLoading = ref(false)
 const impactError = ref('')
 const impactSearched = ref(false)
 const impactResult = ref<QualityImpactResult>()
-const impactDispositions = ref<QualityDisposition[]>([])
-const dispositionDialogVisible = ref(false)
-const dispositionSubmitting = ref(false)
-const dispositionFormRef = ref<FormInstance>()
-const dispositionType = ref<QualityDispositionType>('freeze')
-const dispositionTarget = ref<QualityImpactResult['affectedProducts'][number]>()
-const dispositionForm = reactive({
-  affectedQty: 0,
-  handlingInstruction: '',
-  note: '',
-  operatorName: '当前操作员',
-  reason: '',
-  recallScope: '',
-})
-const dispositionTitle = computed(() => {
-  if (dispositionType.value === 'freeze') {
-    return '冻结受影响批次'
+const suggestedActionLabels = {
+  freeze: '建议冻结受影响批次',
+  observe: '建议继续观察',
+  recall: '建议召回受影响批次',
+} as const
+
+const productionStatusLabels: Record<ProductionOrderStatus, string> = {
+  cancelled: '已取消',
+  completed: '已完工',
+  in_progress: '生产中',
+  pending_review: '待审核',
+  pending_schedule: '待排产',
+}
+
+function getProductionStatusLabel(status?: ProductionOrderStatus) {
+  if (!status) {
+    return '-'
   }
-  return '发起质量召回'
-})
-const dispositionRules: FormRules = {
-  operatorName: [{ message: '请输入操作人', required: true, trigger: 'blur' }],
-  reason: [{ message: '请输入处置原因', required: true, trigger: 'blur' }],
-  recallScope: [{ message: '请输入召回范围', required: true, trigger: 'blur' }],
+  return productionStatusLabels[status]
 }
 
 function parseItemIds(value: string) {
@@ -407,10 +351,6 @@ function parseItemIds(value: string) {
     .split(/[\s,，]+/)
     .map((token) => Number(token.trim()))
     .filter((id) => Number.isInteger(id) && id > 0)
-}
-
-async function loadDispositions() {
-  impactDispositions.value = await traceService.listQualityDispositions()
 }
 
 async function analyzeImpact() {
@@ -425,11 +365,12 @@ async function analyzeImpact() {
   impactError.value = ''
   impactSearched.value = true
   try {
-    const [result] = await Promise.all([
-      traceService.analyzeQualityImpact({ itemIds, materialId, receiveDateEnd, receiveDateStart }),
-      loadDispositions(),
-    ])
-    impactResult.value = result
+    impactResult.value = await traceService.analyzeQualityImpact({
+      itemIds,
+      materialId,
+      receiveDateEnd,
+      receiveDateStart,
+    })
   } catch (error) {
     impactResult.value = undefined
     impactError.value = getErrorMessage(error, '质量影响分析失败')
@@ -443,73 +384,6 @@ function resetImpactFilters() {
   impactResult.value = undefined
   impactSearched.value = false
   impactError.value = ''
-}
-
-function openDisposition(
-  type: QualityDispositionType,
-  target: QualityImpactResult['affectedProducts'][number],
-) {
-  dispositionType.value = type
-  dispositionTarget.value = target
-  Object.assign(dispositionForm, {
-    affectedQty: target.finishedQty ?? 0,
-    handlingInstruction: '',
-    note: '',
-    operatorName: '当前操作员',
-    reason: '',
-    recallScope: '',
-  })
-  dispositionFormRef.value?.clearValidate()
-  dispositionDialogVisible.value = true
-}
-
-async function submitDisposition() {
-  const valid = await dispositionFormRef.value?.validate().catch(() => false)
-  const target = dispositionTarget.value
-  if (!valid || !target?.batchNo || dispositionSubmitting.value) {
-    return
-  }
-  try {
-    let actionName = '召回'
-    if (dispositionType.value === 'freeze') {
-      actionName = '冻结'
-    }
-    await ElMessageBox.confirm(`确认${actionName}批次 ${target.batchNo} 吗？`, '二次确认', {
-      confirmButtonText: '确认提交',
-      type: 'warning',
-    })
-    dispositionSubmitting.value = true
-    const form = { batchNo: target.batchNo, ...dispositionForm }
-    if (dispositionType.value === 'freeze') {
-      await traceService.freezeBatch(form)
-      ElMessage.success('批次已冻结')
-    } else {
-      await traceService.recallBatch(form)
-      ElMessage.success('召回记录已创建')
-    }
-    dispositionDialogVisible.value = false
-    await analyzeImpact()
-  } catch (error) {
-    if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error(getErrorMessage(error, '质量处置提交失败'))
-    }
-  } finally {
-    dispositionSubmitting.value = false
-  }
-}
-
-function getQualityStatusLabel(status?: QualityDispositionStatus) {
-  if (!status) {
-    return '-'
-  }
-  return qualityDispositionStatuses[status].label
-}
-
-function getQualityStatusTone(status?: QualityDispositionStatus) {
-  if (!status) {
-    return 'info'
-  }
-  return qualityDispositionStatuses[status].tone
 }
 
 onMounted(async () => {
@@ -535,25 +409,43 @@ onMounted(async () => {
   <PageContainer>
     <PageHeader
       title="质量追溯"
-      description="维护批次消耗关系，并完成正反向追溯、质量影响分析和 Mock 质量处置。"
+      description="维护真实批次消耗关系，查询正反向追溯与质量影响分析。"
     />
+
+    <el-alert
+      v-if="referenceError"
+      class="trace-request-error"
+      :closable="false"
+      :title="referenceError"
+      type="error"
+      show-icon
+    >
+      <el-button link type="primary" :loading="referenceLoading" @click="loadReferences"
+        >重新加载参考数据</el-button
+      >
+    </el-alert>
 
     <el-tabs v-model="activeTab" class="trace-tabs">
       <el-tab-pane label="批次消耗" name="consumption">
         <el-card class="trace-search-card" shadow="never">
           <el-form :model="consumptionFilters" inline @submit.prevent="loadConsumption(1)">
-            <el-form-item label="生产订单 ID"
-              ><el-input v-model.trim="consumptionFilters.orderId" clearable placeholder="精确查询"
-            /></el-form-item>
-            <el-form-item label="采购明细 ID"
-              ><el-input v-model.trim="consumptionFilters.itemId" clearable placeholder="精确查询"
-            /></el-form-item>
-            <el-form-item label="原材料 ID"
-              ><el-input
+            <el-form-item label="生产订单 ID">
+              <el-input
+                v-model.trim="consumptionFilters.orderId"
+                clearable
+                placeholder="精确查询"
+              />
+            </el-form-item>
+            <el-form-item label="采购明细 ID">
+              <el-input v-model.trim="consumptionFilters.itemId" clearable placeholder="精确查询" />
+            </el-form-item>
+            <el-form-item label="原材料 ID">
+              <el-input
                 v-model.trim="consumptionFilters.materialId"
                 clearable
                 placeholder="精确查询"
-            /></el-form-item>
+              />
+            </el-form-item>
             <el-form-item>
               <el-button :loading="consumptionLoading" type="primary" @click="loadConsumption(1)"
                 >查询</el-button
@@ -578,61 +470,52 @@ onMounted(async () => {
             show-icon
             :title="consumptionError"
             type="error"
-            ><template #default
-              ><el-button link type="primary" @click="loadConsumption(consumptionPage)"
-                >重新加载</el-button
-              ></template
-            ></el-alert
           >
-          <el-table
-            v-else
-            v-loading="consumptionLoading"
-            :data="consumptionResult.items"
-            min-height="320"
-            stripe
-          >
+            <el-button link type="primary" @click="loadConsumption(consumptionPage)"
+              >重新加载</el-button
+            >
+          </el-alert>
+          <el-table v-else v-loading="consumptionLoading" :data="consumptionResult.items" stripe>
             <el-table-column label="消耗 ID" min-width="90" prop="consumptionId" />
-            <el-table-column label="产品批次 / 订单" min-width="170"
-              ><template #default="{ row }"
-                ><strong>{{ row.productBatchNo || '-' }}</strong
-                ><small class="cell-sub">订单 #{{ row.orderId }}</small></template
-              ></el-table-column
-            >
-            <el-table-column label="原材料批次" min-width="185"
-              ><template #default="{ row }"
-                ><strong>{{ row.materialBatchNo || '-' }}</strong
-                ><small class="cell-sub"
-                  >{{ row.materialName || '-' }} · {{ row.purchaseOrderNo || '-' }}</small
-                ></template
-              ></el-table-column
-            >
-            <el-table-column label="供应商" min-width="145"
-              ><template #default="{ row }">{{
-                row.supplierName || '-'
-              }}</template></el-table-column
-            >
-            <el-table-column label="消耗数量" min-width="120"
-              ><template #default="{ row }"
-                >{{ formatNumber(row.consumeQty) }} {{ row.unit || '' }}</template
-              ></el-table-column
-            >
-            <el-table-column label="消耗时间" min-width="170"
-              ><template #default="{ row }">{{
-                formatDateTime(row.consumedAt)
-              }}</template></el-table-column
-            >
-            <el-table-column fixed="right" label="操作" min-width="190"
-              ><template #default="{ row }"
-                ><el-button link type="primary" :icon="View" @click="openConsumptionDetail(row)"
+            <el-table-column label="生产订单 / 产品" min-width="180">
+              <template #default="{ row }">
+                <strong>#{{ row.orderId }}</strong>
+                <small class="cell-sub">{{ row.productMaterialName || '-' }}</small>
+              </template>
+            </el-table-column>
+            <el-table-column label="采购明细 / 原材料" min-width="185">
+              <template #default="{ row }">
+                <strong>明细 #{{ row.itemId }}</strong>
+                <small class="cell-sub">{{ row.materialName || '-' }}</small>
+              </template>
+            </el-table-column>
+            <el-table-column label="采购订单" min-width="120">
+              <template #default="{ row }">{{
+                row.purchaseOrderId ? '#' + row.purchaseOrderId : '-'
+              }}</template>
+            </el-table-column>
+            <el-table-column label="生产状态" min-width="110">
+              <template #default="{ row }">{{
+                getProductionStatusLabel(row.productionStatus)
+              }}</template>
+            </el-table-column>
+            <el-table-column label="消耗数量" min-width="120">
+              <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
+            </el-table-column>
+            <el-table-column fixed="right" label="操作" min-width="190">
+              <template #default="{ row }">
+                <el-button link type="primary" :icon="View" @click="openConsumptionDetail(row)"
                   >详情</el-button
-                ><el-button
+                >
+                <el-button
                   v-if="canManage"
                   link
                   type="primary"
                   :icon="EditPen"
                   @click="openConsumptionEdit(row)"
                   >修改</el-button
-                ><el-button
+                >
+                <el-button
                   v-if="canManage"
                   link
                   type="danger"
@@ -640,14 +523,10 @@ onMounted(async () => {
                   :disabled="consumptionDeleting"
                   @click="removeConsumption(row)"
                   >删除</el-button
-                ></template
-              ></el-table-column
-            >
+                >
+              </template>
+            </el-table-column>
           </el-table>
-          <el-empty
-            v-if="!consumptionLoading && !consumptionError && !consumptionResult.items.length"
-            description="暂无符合条件的批次消耗记录"
-          />
           <div v-if="!consumptionError && consumptionResult.total > 0" class="trace-pagination">
             <el-pagination
               v-model:current-page="consumptionPage"
@@ -662,33 +541,39 @@ onMounted(async () => {
       </el-tab-pane>
 
       <el-tab-pane label="正向追溯" name="product">
-        <el-card class="trace-search-card" shadow="never"
-          ><el-form :model="productFilters" inline @submit.prevent="traceProduct"
-            ><el-form-item label="生产订单 ID"
-              ><el-input
+        <el-card class="trace-search-card" shadow="never">
+          <el-form :model="productFilters" inline @submit.prevent="traceProduct">
+            <el-form-item label="生产订单 ID">
+              <el-input
                 v-model.trim="productFilters.orderId"
                 clearable
-                placeholder="与批次号二选一" /></el-form-item
-            ><el-form-item label="成品批次号"
-              ><el-input
+                placeholder="与批次号二选一"
+              />
+            </el-form-item>
+            <el-form-item label="成品批次号">
+              <el-input
                 v-model.trim="productFilters.batchNo"
                 clearable
-                placeholder="与订单二选一" /></el-form-item
-            ><el-form-item label="含供应商"
-              ><el-switch v-model="productFilters.includeSupplier" /></el-form-item
-            ><el-form-item
-              ><el-button
+                placeholder="与订单二选一"
+              />
+            </el-form-item>
+            <el-form-item label="含供应商">
+              <el-switch v-model="productFilters.includeSupplier" />
+            </el-form-item>
+            <el-form-item>
+              <el-button
                 :icon="Search"
                 :loading="productLoading"
                 type="primary"
                 @click="traceProduct"
                 >追溯</el-button
-              ><el-button :disabled="productLoading" :icon="Refresh" @click="resetProductFilters"
+              >
+              <el-button :disabled="productLoading" :icon="Refresh" @click="resetProductFilters"
                 >重置</el-button
-              ></el-form-item
-            ></el-form
-          ></el-card
-        >
+              >
+            </el-form-item>
+          </el-form>
+        </el-card>
         <el-card v-loading="productLoading" class="trace-table-card" shadow="never">
           <el-alert
             v-if="productError"
@@ -698,310 +583,291 @@ onMounted(async () => {
             type="error"
           />
           <template v-else-if="productResult">
-            <el-descriptions border :column="3" class="trace-summary" title="成品批次"
-              ><el-descriptions-item label="生产订单"
+            <el-descriptions border :column="3" class="trace-summary" title="成品批次">
+              <el-descriptions-item label="生产订单"
                 >#{{ productResult.orderId }}</el-descriptions-item
-              ><el-descriptions-item label="成品批次">{{
+              >
+              <el-descriptions-item label="成品批次">{{
                 productResult.batchNo || '-'
-              }}</el-descriptions-item
-              ><el-descriptions-item label="BOM 版本">{{
-                productResult.bomVersion || '-'
-              }}</el-descriptions-item
-              ><el-descriptions-item label="计划 / 完工"
-                >{{ formatNumber(productResult.planQty) }} /
-                {{ formatNumber(productResult.finishedQty) }}</el-descriptions-item
-              ><el-descriptions-item label="合格 / 不合格"
-                >{{ formatNumber(productResult.qualifiedQty) }} /
-                {{ formatNumber(productResult.defectiveQty) }}</el-descriptions-item
-              ><el-descriptions-item label="入库数量">{{
-                formatNumber(productResult.inboundQty)
-              }}</el-descriptions-item
-              ><el-descriptions-item label="生产时间">{{
+              }}</el-descriptions-item>
+              <el-descriptions-item label="产品">{{
+                productResult.materialName || '#' + productResult.materialId
+              }}</el-descriptions-item>
+              <el-descriptions-item v-if="productResult.bomVersion" label="BOM 版本">{{
+                productResult.bomVersion
+              }}</el-descriptions-item>
+              <el-descriptions-item
+                v-if="productResult.planQty !== undefined"
+                label="订单计划数量"
+                >{{ formatNumber(productResult.planQty) }}</el-descriptions-item
+              >
+              <el-descriptions-item
+                v-if="productResult.finishedQty !== undefined"
+                label="订单完工数量"
+                >{{ formatNumber(productResult.finishedQty) }}</el-descriptions-item
+              >
+              <el-descriptions-item v-if="productResult.producedAt" label="订单完工日期">{{
                 formatDateTime(productResult.producedAt)
-              }}</el-descriptions-item
-              ><el-descriptions-item label="入库时间">{{
-                formatDateTime(productResult.inboundAt)
-              }}</el-descriptions-item></el-descriptions
-            >
-            <el-table :data="productResult.consumedBatches" stripe
-              ><el-table-column label="原材料批次" min-width="180"
-                ><template #default="{ row }"
-                  ><strong>{{ row.materialBatchNo || '-' }}</strong
-                  ><small class="cell-sub">{{
-                    row.materialName || `#${row.materialId}`
-                  }}</small></template
-                ></el-table-column
-              ><el-table-column label="采购订单" min-width="150"
-                ><template #default="{ row }">{{
-                  row.purchaseOrderNo || '-'
-                }}</template></el-table-column
-              ><el-table-column label="供应商" min-width="150"
-                ><template #default="{ row }">{{
-                  row.supplierName || '-'
-                }}</template></el-table-column
-              ><el-table-column label="到货日期" min-width="125"
-                ><template #default="{ row }">{{
-                  formatDateTime(row.receiveDate)
-                }}</template></el-table-column
-              ><el-table-column label="消耗数量" min-width="115"
-                ><template #default="{ row }"
-                  >{{ formatNumber(row.consumeQty) }} {{ row.unit || '' }}</template
-                ></el-table-column
-              ></el-table
-            >
-            <el-empty
-              v-if="!productResult.consumedBatches.length"
-              description="该成品批次暂无原材料消耗记录"
-            />
+              }}</el-descriptions-item>
+            </el-descriptions>
+            <el-table :data="productResult.consumedBatches" stripe>
+              <el-table-column label="采购明细 / 原材料" min-width="190">
+                <template #default="{ row }">
+                  <strong>明细 #{{ row.itemId }}</strong>
+                  <small class="cell-sub">{{ row.materialName || '#' + row.materialId }}</small>
+                </template>
+              </el-table-column>
+              <el-table-column label="采购订单" min-width="120">
+                <template #default="{ row }">{{
+                  row.purchaseOrderId ? '#' + row.purchaseOrderId : '-'
+                }}</template>
+              </el-table-column>
+              <el-table-column v-if="productFilters.includeSupplier" label="供应商" min-width="150">
+                <template #default="{ row }">{{ row.supplierName || '-' }}</template>
+              </el-table-column>
+              <el-table-column label="到货日期" min-width="125">
+                <template #default="{ row }">{{ formatDateTime(row.receiveDate) }}</template>
+              </el-table-column>
+              <el-table-column label="消耗数量" min-width="115">
+                <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
+              </el-table-column>
+            </el-table>
+            <template v-if="productResult.inboundRecords">
+              <el-divider content-position="left">关联完工入库记录</el-divider>
+              <el-table :data="productResult.inboundRecords" stripe>
+                <el-table-column label="入库 ID" prop="inbound_id" min-width="90" />
+                <el-table-column label="成品批次" prop="batch_no" min-width="145" />
+                <el-table-column label="完工数量" min-width="110">
+                  <template #default="{ row }">{{ formatNumber(row.finish_qty) }}</template>
+                </el-table-column>
+                <el-table-column label="合格数量" min-width="110">
+                  <template #default="{ row }">{{ formatNumber(row.qualified_qty) }}</template>
+                </el-table-column>
+                <el-table-column label="不合格数量" min-width="110">
+                  <template #default="{ row }">{{
+                    formatNumber(row.finish_qty - row.qualified_qty)
+                  }}</template>
+                </el-table-column>
+                <el-table-column label="入库时间" min-width="170">
+                  <template #default="{ row }">{{ formatDateTime(row.inbound_time) }}</template>
+                </el-table-column>
+              </el-table>
+            </template>
           </template>
-          <el-empty v-else-if="productSearched" description="未查询到匹配的成品批次" /><el-empty
-            v-else
-            description="请输入生产订单 ID 或成品批次号后开始正向追溯"
-          />
+          <el-empty v-else-if="productSearched" description="未查询到匹配的成品批次" />
+          <el-empty v-else description="请输入生产订单 ID 或成品批次号后开始正向追溯" />
         </el-card>
       </el-tab-pane>
 
       <el-tab-pane label="反向追溯" name="material">
-        <el-card class="trace-search-card" shadow="never"
-          ><el-form :model="materialFilters" inline @submit.prevent="traceMaterial"
-            ><el-form-item label="采购明细 ID"
-              ><el-input
-                v-model.trim="materialFilters.itemId"
-                clearable
-                placeholder="可选" /></el-form-item
-            ><el-form-item label="原材料 ID"
-              ><el-input
-                v-model.trim="materialFilters.materialId"
-                clearable
-                placeholder="可选" /></el-form-item
-            ><el-form-item label="供应商筛选"
-              ><el-select
+        <el-card class="trace-search-card" shadow="never">
+          <el-form :model="materialFilters" inline @submit.prevent="traceMaterial">
+            <el-form-item label="采购明细 ID">
+              <el-input v-model.trim="materialFilters.itemId" clearable placeholder="可选" />
+            </el-form-item>
+            <el-form-item label="原材料 ID">
+              <el-input v-model.trim="materialFilters.materialId" clearable placeholder="可选" />
+            </el-form-item>
+            <el-form-item label="供应商筛选">
+              <el-select
+                v-if="references.suppliers"
                 v-model="materialFilters.supplierId"
                 clearable
                 filterable
                 :loading="referenceLoading"
                 placeholder="选择供应商"
-                ><el-option
+                style="width: 200px"
+              >
+                <el-option
                   v-for="supplier in suppliers"
                   :key="supplier.supplierId"
-                  :label="`${supplier.supplierName} · #${supplier.supplierId}`"
-                  :value="supplier.supplierId" /></el-select></el-form-item
-            ><el-form-item label="到货日期"
-              ><el-date-picker
+                  :label="supplier.supplierName + ' · #' + supplier.supplierId"
+                  :value="supplier.supplierId"
+                />
+              </el-select>
+              <el-input-number
+                v-else
+                v-model="materialFilters.supplierId"
+                :min="1"
+                :precision="0"
+                :controls="false"
+                placeholder="供应商 ID（可选）"
+              />
+            </el-form-item>
+            <el-form-item label="到货日期">
+              <el-date-picker
                 v-model="materialFilters.receiveRange"
                 end-placeholder="结束日期"
                 range-separator="至"
                 start-placeholder="开始日期"
                 type="daterange"
-                value-format="YYYY-MM-DD" /></el-form-item
-            ><el-form-item
-              ><el-button
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button
                 :icon="Search"
                 :loading="materialLoading"
                 type="primary"
                 @click="traceMaterial"
                 >追溯</el-button
-              ><el-button :disabled="materialLoading" :icon="Refresh" @click="resetMaterialFilters"
+              >
+              <el-button :disabled="materialLoading" :icon="Refresh" @click="resetMaterialFilters"
                 >重置</el-button
-              ></el-form-item
-            ></el-form
-          ></el-card
-        >
-        <el-card v-loading="materialLoading" class="trace-table-card" shadow="never"
-          ><el-alert
+              >
+            </el-form-item>
+          </el-form>
+        </el-card>
+        <el-card v-loading="materialLoading" class="trace-table-card" shadow="never">
+          <el-alert
             v-if="materialError"
             :closable="false"
             show-icon
             :title="materialError"
-            type="error" /><template v-else-if="materialResult.length"
-            ><el-card
+            type="error"
+          />
+          <template v-else-if="materialResult.length">
+            <el-card
               v-for="batch in materialResult"
               :key="batch.itemId"
               class="material-batch-card"
               shadow="never"
-              ><template #header
-                ><div class="material-batch-header">
-                  <strong>{{ batch.materialName || `原材料 #${batch.materialId}` }}</strong
-                  ><span>采购明细 #{{ batch.itemId }} · {{ batch.supplierName || '-' }}</span>
-                </div></template
-              ><el-table :data="batch.affectedProducts" stripe
-                ><el-table-column label="生产订单" min-width="110"
-                  ><template #default="{ row }">#{{ row.orderId }}</template></el-table-column
-                ><el-table-column label="产品批次" min-width="155"
-                  ><template #default="{ row }">{{ row.batchNo || '-' }}</template></el-table-column
-                ><el-table-column label="产品 / 完工数量" min-width="180"
-                  ><template #default="{ row }"
-                    >{{ row.productMaterialName || '-'
-                    }}<small class="cell-sub"
-                      >完工 {{ formatNumber(row.finishedQty) }}</small
-                    ></template
-                  ></el-table-column
-                ><el-table-column label="消耗数量" min-width="110"
-                  ><template #default="{ row }">{{
-                    formatNumber(row.consumeQty)
-                  }}</template></el-table-column
-                ><el-table-column label="处置状态" min-width="110"
-                  ><template #default="{ row }"
-                    ><el-tag
-                      v-if="row.qualityStatus"
-                      :type="getQualityStatusTone(row.qualityStatus)"
-                      >{{ getQualityStatusLabel(row.qualityStatus) }}</el-tag
-                    ></template
-                  ></el-table-column
-                ></el-table
-              ></el-card
-            ></template
-          ><el-empty v-else-if="materialSearched" description="未查询到匹配的原材料批次" /><el-empty
-            v-else
-            description="请输入查询条件后开始反向追溯"
-        /></el-card>
+            >
+              <template #header>
+                <div class="material-batch-header">
+                  <strong>{{ batch.materialName || '原材料 #' + batch.materialId }}</strong>
+                  <span>采购明细 #{{ batch.itemId }} · {{ batch.supplierName || '-' }}</span>
+                </div>
+              </template>
+              <el-table :data="batch.affectedProducts" stripe>
+                <el-table-column label="生产订单" min-width="110">
+                  <template #default="{ row }">#{{ row.orderId }}</template>
+                </el-table-column>
+                <el-table-column label="产品批次" min-width="155">
+                  <template #default="{ row }">{{ row.batchNo || '-' }}</template>
+                </el-table-column>
+                <el-table-column label="产品" min-width="180">
+                  <template #default="{ row }">{{
+                    row.productMaterialName || '#' + row.productMaterialId
+                  }}</template>
+                </el-table-column>
+                <el-table-column label="原料消耗数量" min-width="120">
+                  <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
+                </el-table-column>
+                <el-table-column label="生产状态" min-width="110">
+                  <template #default="{ row }">{{
+                    getProductionStatusLabel(row.productionStatus)
+                  }}</template>
+                </el-table-column>
+              </el-table>
+            </el-card>
+          </template>
+          <el-empty v-else-if="materialSearched" description="未查询到匹配的原材料批次" />
+          <el-empty v-else description="请输入查询条件后开始反向追溯" />
+        </el-card>
       </el-tab-pane>
 
       <el-tab-pane label="质量影响分析" name="impact">
-        <el-card class="trace-search-card" shadow="never"
-          ><el-form :model="impactFilters" inline @submit.prevent="analyzeImpact"
-            ><el-form-item label="问题采购明细"
-              ><el-input
+        <el-card class="trace-search-card" shadow="never">
+          <el-form :model="impactFilters" inline @submit.prevent="analyzeImpact">
+            <el-form-item label="问题采购明细">
+              <el-input
                 v-model.trim="impactFilters.itemIds"
                 clearable
-                placeholder="多个 ID 用逗号分隔" /></el-form-item
-            ><el-form-item label="原材料 ID"
-              ><el-input
-                v-model.trim="impactFilters.materialId"
-                clearable
-                placeholder="可选" /></el-form-item
-            ><el-form-item label="到货日期"
-              ><el-date-picker
+                placeholder="多个 ID 用逗号分隔"
+              />
+            </el-form-item>
+            <el-form-item label="原材料 ID">
+              <el-input v-model.trim="impactFilters.materialId" clearable placeholder="可选" />
+            </el-form-item>
+            <el-form-item label="到货日期">
+              <el-date-picker
                 v-model="impactFilters.receiveRange"
                 end-placeholder="结束日期"
                 range-separator="至"
                 start-placeholder="开始日期"
                 type="daterange"
-                value-format="YYYY-MM-DD" /></el-form-item
-            ><el-form-item
-              ><el-button
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button
                 :icon="Search"
                 :loading="impactLoading"
                 type="primary"
                 @click="analyzeImpact"
                 >分析</el-button
-              ><el-button :disabled="impactLoading" :icon="Refresh" @click="resetImpactFilters"
+              >
+              <el-button :disabled="impactLoading" :icon="Refresh" @click="resetImpactFilters"
                 >重置</el-button
-              ></el-form-item
-            ></el-form
-          ></el-card
-        >
-        <el-card v-loading="impactLoading" class="trace-table-card" shadow="never"
-          ><el-alert
+              >
+            </el-form-item>
+          </el-form>
+        </el-card>
+        <el-card v-loading="impactLoading" class="trace-table-card" shadow="never">
+          <el-alert
             v-if="impactError"
             :closable="false"
             show-icon
             :title="impactError"
-            type="error" /><template v-else-if="impactResult"
-            ><el-alert
-              class="mock-notice"
-              :closable="false"
-              show-icon
-              title="当前为前端 Mock 处置记录，不代表已同步修改库存状态。"
-              type="warning"
-            />
+            type="error"
+          />
+          <template v-else-if="impactResult">
             <div class="impact-summary">
               <div
                 v-for="metric in [
-                  { label: '受影响订单', value: impactResult.summary?.affectedOrderCount },
-                  { label: '产品批次', value: impactResult.summary?.affectedBatchCount },
-                  { label: '受影响产品', value: impactResult.summary?.affectedProductCount },
-                  { label: '合格品', value: impactResult.summary?.qualifiedQty },
-                  { label: '不合格品', value: impactResult.summary?.defectiveQty },
-                  { label: '已入库', value: impactResult.summary?.inboundQty },
-                  { label: '待处理', value: impactResult.summary?.pendingBatchCount },
-                  { label: '已冻结', value: impactResult.summary?.frozenBatchCount },
-                  { label: '已召回', value: impactResult.summary?.recalledBatchCount },
+                  { label: '受影响订单', value: impactResult.affectedOrderCount },
+                  {
+                    label: '受影响批次（未入库按订单统计）',
+                    value: impactResult.affectedBatchCount,
+                  },
+                  {
+                    label: '受影响产品种类',
+                    value: new Set(
+                      impactResult.affectedProducts.map((product) => product.productMaterialId),
+                    ).size,
+                  },
                 ]"
                 :key="metric.label"
                 class="impact-metric"
               >
-                <span>{{ metric.label }}</span
-                ><strong>{{ formatNumber(metric.value) }}</strong>
+                <span>{{ metric.label }}</span>
+                <strong>{{ formatNumber(metric.value) }}</strong>
               </div>
             </div>
-            <el-table :data="impactResult.affectedProducts" stripe
-              ><el-table-column label="生产订单" min-width="105"
-                ><template #default="{ row }">#{{ row.orderId }}</template></el-table-column
-              ><el-table-column label="产品批次" min-width="145"
-                ><template #default="{ row }">{{ row.batchNo || '-' }}</template></el-table-column
-              ><el-table-column label="产品 / 数量" min-width="180"
-                ><template #default="{ row }"
-                  >{{ row.productMaterialName || '-'
-                  }}<small class="cell-sub"
-                    >计划 {{ formatNumber(row.planQty) }} · 完工
-                    {{ formatNumber(row.finishedQty) }}</small
-                  ></template
-                ></el-table-column
-              ><el-table-column label="合格 / 不合格" min-width="145"
-                ><template #default="{ row }"
-                  >{{ formatNumber(row.qualifiedQty) }} /
-                  {{ formatNumber(row.defectiveQty) }}</template
-                ></el-table-column
-              ><el-table-column label="状态" min-width="105"
-                ><template #default="{ row }"
-                  ><el-tag
-                    v-if="row.qualityStatus"
-                    :type="getQualityStatusTone(row.qualityStatus)"
-                    >{{ getQualityStatusLabel(row.qualityStatus) }}</el-tag
-                  ></template
-                ></el-table-column
-              ><el-table-column v-if="canManage" fixed="right" label="处置" min-width="160"
-                ><template #default="{ row }"
-                  ><el-button
-                    v-if="row.qualityStatus === 'pending'"
-                    link
-                    type="warning"
-                    @click="openDisposition('freeze', row)"
-                    >冻结</el-button
-                  ><el-button
-                    v-if="row.qualityStatus !== 'recalled'"
-                    link
-                    type="danger"
-                    @click="openDisposition('recall', row)"
-                    >召回</el-button
-                  ></template
-                ></el-table-column
-              ></el-table
-            ><el-divider content-position="left">质量处置记录</el-divider
-            ><el-table :data="impactDispositions" size="small" stripe
-              ><el-table-column label="类型" min-width="90"
-                ><template #default="{ row }"
-                  ><el-tag :type="row.type === 'freeze' ? 'warning' : 'danger'">{{
-                    row.type === 'freeze' ? '冻结' : '召回'
-                  }}</el-tag></template
-                ></el-table-column
-              ><el-table-column label="产品批次" min-width="140" prop="batchNo" /><el-table-column
-                label="原因"
-                min-width="220"
-                prop="reason"
-              /><el-table-column
-                label="操作人"
-                min-width="100"
-                prop="operatorName"
-              /><el-table-column label="受影响数量" min-width="110"
-                ><template #default="{ row }">{{
-                  formatNumber(row.affectedQty)
-                }}</template></el-table-column
-              ><el-table-column
-                label="召回范围"
-                min-width="180"
-                prop="recallScope"
-              /><el-table-column label="操作时间" min-width="170"
-                ><template #default="{ row }">{{
-                  formatDateTime(row.operatedAt)
-                }}</template></el-table-column
-              ></el-table
-            ></template
-          ><el-empty v-else-if="impactSearched" description="未查询到质量影响分析结果" /><el-empty
-            v-else
-            description="请输入问题批次条件后开始分析"
-        /></el-card>
+            <el-alert
+              v-if="impactResult.suggestedAction"
+              class="trace-request-error"
+              :closable="false"
+              show-icon
+              :title="'后端分析建议：' + suggestedActionLabels[impactResult.suggestedAction]"
+              type="info"
+            />
+            <el-table :data="impactResult.affectedProducts" stripe>
+              <el-table-column label="生产订单" min-width="110">
+                <template #default="{ row }">#{{ row.orderId }}</template>
+              </el-table-column>
+              <el-table-column label="产品批次" min-width="145">
+                <template #default="{ row }">{{ row.batchNo || '-' }}</template>
+              </el-table-column>
+              <el-table-column label="产品" min-width="180">
+                <template #default="{ row }">{{
+                  row.productMaterialName || '#' + row.productMaterialId
+                }}</template>
+              </el-table-column>
+              <el-table-column label="原料消耗数量" min-width="120">
+                <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
+              </el-table-column>
+              <el-table-column label="生产状态" min-width="110">
+                <template #default="{ row }">{{
+                  getProductionStatusLabel(row.productionStatus)
+                }}</template>
+              </el-table-column>
+            </el-table>
+          </template>
+          <el-empty v-else-if="impactSearched" description="未查询到质量影响分析结果" />
+          <el-empty v-else description="请输入问题批次条件后开始分析" />
+        </el-card>
       </el-tab-pane>
     </el-tabs>
 
@@ -1010,175 +876,114 @@ onMounted(async () => {
       :close-on-click-modal="false"
       :title="consumptionDialogTitle"
       width="650px"
-      ><el-form
+    >
+      <el-form
         ref="consumptionFormRef"
         label-width="120px"
         :model="consumptionForm"
         :rules="consumptionRules"
-        ><el-form-item label="产品批次 / 订单" prop="productBatchNo"
-          ><el-select
-            v-model="consumptionForm.productBatchNo"
-            filterable
-            :loading="referenceLoading"
-            placeholder="选择产品批次"
-            style="width: 100%"
-            @change="onProductBatchChange"
-            ><el-option
-              v-for="batch in references.productBatches"
-              :key="batch.batchNo"
-              :label="`${batch.batchNo} · ${batch.materialName} · 订单 #${batch.orderId}`"
-              :value="batch.batchNo" /></el-select></el-form-item
-        ><el-form-item label="采购明细 / 原材料" prop="itemId"
-          ><el-select
-            v-model="consumptionForm.itemId"
-            filterable
-            :loading="referenceLoading"
-            placeholder="选择原材料批次"
-            style="width: 100%"
-            @change="onPurchaseItemChange"
-            ><el-option
-              v-for="item in references.purchaseItems"
-              :key="item.itemId"
-              :label="`${item.materialBatchNo} · ${item.materialName} · ${item.purchaseOrderNo}`"
-              :value="item.itemId" /></el-select
-        ></el-form-item>
-        <div class="form-grid">
-          <el-form-item label="供应商" prop="supplierId"
-            ><el-select v-model="consumptionForm.supplierId" disabled style="width: 100%"
-              ><el-option
-                v-for="supplier in suppliers"
-                :key="supplier.supplierId"
-                :label="supplier.supplierName"
-                :value="supplier.supplierId" /></el-select></el-form-item
-          ><el-form-item label="单位"
-            ><el-input v-model="consumptionForm.unit" disabled /></el-form-item
-          ><el-form-item label="原材料批次"
-            ><el-input v-model="consumptionForm.materialBatchNo" disabled /></el-form-item
-          ><el-form-item label="采购订单"
-            ><el-input v-model="consumptionForm.purchaseOrderNo" disabled /></el-form-item
-          ><el-form-item label="消耗数量" prop="consumeQty"
-            ><el-input-number
-              v-model="consumptionForm.consumeQty"
-              :min="0.01"
-              :precision="2"
-              style="width: 100%" /></el-form-item
-          ><el-form-item label="消耗时间" prop="consumedAt"
-            ><el-date-picker
-              v-model="consumptionForm.consumedAt"
-              type="datetime"
-              value-format="YYYY-MM-DD HH:mm:ss"
-              style="width: 100%" /></el-form-item
-          ><el-form-item label="操作人" prop="operatorName"
-            ><el-input v-model.trim="consumptionForm.operatorName"
-          /></el-form-item>
-        </div>
-        <el-form-item label="备注"
-          ><el-input
-            v-model.trim="consumptionForm.remarks"
-            :rows="2"
-            type="textarea" /></el-form-item></el-form
-      ><template #footer
-        ><el-button :disabled="consumptionSubmitting" @click="consumptionDialogVisible = false"
+      >
+        <el-form-item label="生产订单 ID" prop="orderId">
+          <div class="reference-input">
+            <el-input-number
+              v-model="consumptionForm.orderId"
+              :min="1"
+              :precision="0"
+              :controls="false"
+            />
+            <el-select
+              v-if="references.productionOrders?.length"
+              v-model="consumptionForm.orderId"
+              filterable
+              :loading="referenceLoading"
+              placeholder="选择生产订单"
+            >
+              <el-option
+                v-for="order in references.productionOrders"
+                :key="order.orderId"
+                :label="
+                  '#' +
+                  order.orderId +
+                  ' · ' +
+                  (order.materialName || '-') +
+                  ' · ' +
+                  getProductionStatusLabel(order.status)
+                "
+                :value="order.orderId"
+              />
+            </el-select>
+          </div>
+        </el-form-item>
+        <el-form-item label="采购明细 ID" prop="itemId">
+          <div class="reference-input">
+            <el-input-number
+              v-model="consumptionForm.itemId"
+              :min="1"
+              :precision="0"
+              :controls="false"
+            />
+            <el-select
+              v-if="references.purchaseItems?.length"
+              v-model="consumptionForm.itemId"
+              filterable
+              :loading="referenceLoading"
+              placeholder="选择采购明细"
+            >
+              <el-option
+                v-for="item in references.purchaseItems"
+                :key="item.itemId"
+                :label="
+                  '#' +
+                  item.itemId +
+                  ' · ' +
+                  (item.materialName || '-') +
+                  ' · 采购订单 #' +
+                  item.purchaseOrderId
+                "
+                :value="item.itemId"
+              />
+            </el-select>
+          </div>
+        </el-form-item>
+        <el-form-item label="消耗数量" prop="consumeQty">
+          <el-input-number v-model="consumptionForm.consumeQty" :min="0.01" :precision="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :loading="referenceLoading" @click="loadReferences">刷新参考数据</el-button>
+        <el-button :disabled="consumptionSubmitting" @click="consumptionDialogVisible = false"
           >取消</el-button
-        ><el-button :loading="consumptionSubmitting" type="primary" @click="submitConsumptionForm"
-          >确定</el-button
-        ></template
-      ></el-dialog
-    >
-
-    <el-drawer v-model="consumptionDetailVisible" size="460px" title="批次消耗详情"
-      ><div v-loading="consumptionDetailLoading">
-        <el-descriptions v-if="consumptionDetail" border :column="1"
-          ><el-descriptions-item label="消耗记录"
-            >#{{ consumptionDetail.consumptionId }}</el-descriptions-item
-          ><el-descriptions-item label="生产订单 / 产品批次"
-            >#{{ consumptionDetail.orderId }} ·
-            {{ consumptionDetail.productBatchNo || '-' }}</el-descriptions-item
-          ><el-descriptions-item label="原材料 / 批次"
-            >{{ consumptionDetail.materialName || '-' }} ·
-            {{ consumptionDetail.materialBatchNo || '-' }}</el-descriptions-item
-          ><el-descriptions-item label="采购订单 / 供应商"
-            >{{ consumptionDetail.purchaseOrderNo || '-' }} ·
-            {{ consumptionDetail.supplierName || '-' }}</el-descriptions-item
-          ><el-descriptions-item label="实际消耗数量"
-            >{{ formatNumber(consumptionDetail.consumeQty) }}
-            {{ consumptionDetail.unit || '' }}</el-descriptions-item
-          ><el-descriptions-item label="消耗时间">{{
-            formatDateTime(consumptionDetail.consumedAt)
-          }}</el-descriptions-item
-          ><el-descriptions-item label="操作人">{{
-            consumptionDetail.operatorName || '-'
-          }}</el-descriptions-item
-          ><el-descriptions-item label="备注">{{
-            consumptionDetail.remarks || '-'
-          }}</el-descriptions-item></el-descriptions
         >
-      </div></el-drawer
-    >
+        <el-button :loading="consumptionSubmitting" type="primary" @click="submitConsumptionForm"
+          >确定</el-button
+        >
+      </template>
+    </el-dialog>
 
-    <el-dialog
-      v-model="dispositionDialogVisible"
-      :close-on-click-modal="false"
-      :title="dispositionTitle"
-      width="520px"
-      ><el-alert
-        :closable="false"
-        show-icon
-        :title="`目标批次：${dispositionTarget?.batchNo || '-'}`"
-        type="warning"
-      /><el-descriptions border :column="1" class="disposition-target"
-        ><el-descriptions-item label="产品 / 生产订单"
-          >{{ dispositionTarget?.productMaterialName || '-' }} · #{{
-            dispositionTarget?.orderId || '-'
-          }}</el-descriptions-item
-        ><el-descriptions-item label="受影响数量">{{
-          formatNumber(dispositionTarget?.finishedQty)
-        }}</el-descriptions-item
-        ><el-descriptions-item label="操作时间"
-          >提交时自动记录</el-descriptions-item
-        ></el-descriptions
-      ><el-form
-        ref="dispositionFormRef"
-        class="disposition-form"
-        label-width="90px"
-        :model="dispositionForm"
-        :rules="dispositionRules"
-        ><el-form-item label="处置原因" prop="reason"
-          ><el-input
-            v-model.trim="dispositionForm.reason"
-            :rows="3"
-            type="textarea" /></el-form-item
-        ><template v-if="dispositionType === 'recall'"
-          ><el-form-item label="召回范围" prop="recallScope"
-            ><el-input
-              v-model.trim="dispositionForm.recallScope"
-              placeholder="例如：已入库成品及渠道库存"
-          /></el-form-item>
-          <el-form-item label="受影响数量"
-            ><el-input-number
-              v-model="dispositionForm.affectedQty"
-              :min="0.01"
-              disabled
-              style="width: 100%"
-          /></el-form-item>
-          <el-form-item label="处理说明"
-            ><el-input
-              v-model.trim="dispositionForm.handlingInstruction"
-              :rows="2"
-              type="textarea" /></el-form-item
-        ></template>
-        ><el-form-item label="备注"
-          ><el-input v-model.trim="dispositionForm.note" :rows="2" type="textarea" /></el-form-item
-        ><el-form-item label="操作人" prop="operatorName"
-          ><el-input v-model.trim="dispositionForm.operatorName" /></el-form-item></el-form
-      ><template #footer
-        ><el-button :disabled="dispositionSubmitting" @click="dispositionDialogVisible = false"
-          >取消</el-button
-        ><el-button :loading="dispositionSubmitting" type="primary" @click="submitDisposition"
-          >确认提交</el-button
-        ></template
-      ></el-dialog
-    >
+    <el-drawer v-model="consumptionDetailVisible" size="460px" title="批次消耗详情">
+      <div v-loading="consumptionDetailLoading">
+        <el-descriptions v-if="consumptionDetail" border :column="1">
+          <el-descriptions-item label="消耗记录"
+            >#{{ consumptionDetail.consumptionId }}</el-descriptions-item
+          >
+          <el-descriptions-item label="生产订单 / 产品">
+            #{{ consumptionDetail.orderId }} · {{ consumptionDetail.productMaterialName || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="生产状态">{{
+            getProductionStatusLabel(consumptionDetail.productionStatus)
+          }}</el-descriptions-item>
+          <el-descriptions-item label="采购明细 / 原材料">
+            #{{ consumptionDetail.itemId }} · {{ consumptionDetail.materialName || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="采购订单">
+            {{ consumptionDetail.purchaseOrderId ? '#' + consumptionDetail.purchaseOrderId : '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="实际消耗数量">{{
+            formatNumber(consumptionDetail.consumeQty)
+          }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </el-drawer>
   </PageContainer>
 </template>
 
@@ -1189,20 +994,15 @@ onMounted(async () => {
   min-width: 0;
 }
 .trace-search-card,
-.material-batch-card {
-  margin-bottom: 16px;
-}
+.material-batch-card,
 .trace-request-error,
-.mock-notice {
+.trace-summary {
   margin-bottom: 16px;
 }
 .trace-pagination {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
-}
-.trace-summary {
-  margin-bottom: 16px;
 }
 .cell-sub {
   display: block;
@@ -1242,23 +1042,21 @@ onMounted(async () => {
 .impact-metric strong {
   font-size: 22px;
 }
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.reference-input {
+  display: flex;
+  gap: 8px;
+  width: 100%;
 }
-.disposition-form {
-  margin-top: 16px;
-}
-.disposition-target {
-  margin-top: 16px;
+.reference-input .el-select {
+  flex: 1;
+  min-width: 0;
 }
 @media (max-width: 768px) {
-  .impact-summary,
-  .form-grid {
+  .impact-summary {
     grid-template-columns: 1fr;
   }
-  .material-batch-header {
-    align-items: flex-start;
+  .material-batch-header,
+  .reference-input {
     flex-direction: column;
     gap: 4px;
   }

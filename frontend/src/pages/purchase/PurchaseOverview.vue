@@ -1,14 +1,5 @@
 <script setup lang="ts">
-import {
-  Bell,
-  CirclePlus,
-  Document,
-  Edit,
-  Plus,
-  Refresh,
-  Search,
-  Van,
-} from '@element-plus/icons-vue'
+import { Bell, CirclePlus, Document, Plus, Refresh, Search, Van } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import type {
   PurchaseOrderFormData,
@@ -29,7 +20,6 @@ import {
   purchaseReminderStatusLabels as reminderStatusLabels,
 } from '@/constants/status'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { PERMISSIONS } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -62,10 +52,6 @@ const orderActionConfig = {
 
 const auth = useAuthStore()
 const operatorId = computed(() => auth.currentUser?.id)
-const canManagePurchase = computed(() => auth.hasPermission(PERMISSIONS.purchase.manage))
-const canEditPurchaseDraft = computed(
-  () => canManagePurchase.value && purchaseService.canUpdateDraft(),
-)
 const activeTab = ref<PurchaseTab>('orders')
 const summary = ref<PurchaseOverviewSummary>()
 const summaryLoading = ref(false)
@@ -83,7 +69,6 @@ const expectedDateRange = ref<[string, string]>()
 const orderQuery = reactive<PurchaseOrderQuery>({ page: 1, pageSize: 10 })
 const orderDialogOpen = ref(false)
 const orderSubmitting = ref(false)
-const editingOrderId = ref<number>()
 const orderFormRef = ref<FormInstance>()
 const orderForm = reactive<PurchaseOrderFormData>({
   buyerId: 0,
@@ -174,12 +159,6 @@ const statistics = computed(() => [
 const orderTotalAmount = computed(() =>
   orderForm.details.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
 )
-const orderDialogTitle = computed(() => {
-  if (editingOrderId.value) {
-    return `编辑采购草稿 #${editingOrderId.value}`
-  }
-  return '新建采购订单草稿'
-})
 const receivableOrders = computed(() =>
   referenceData.value.orders.filter((order) =>
     ['partial_received', 'submitted'].includes(order.status),
@@ -386,27 +365,13 @@ function searchReminders() {
   void loadReminders()
 }
 
-function openOrderDialog(order?: PurchaseOrderItem) {
-  editingOrderId.value = order?.orderId
-  if (order) {
-    Object.assign(orderForm, {
-      buyerId: order.buyerId,
-      details: order.details.map(({ materialId, quantity, unitPrice }) => ({
-        materialId,
-        quantity,
-        unitPrice,
-      })),
-      expectedDate: order.expectedDate,
-      supplierId: order.supplier.supplierId,
-    })
-  } else {
-    Object.assign(orderForm, {
-      buyerId: referenceData.value.buyers[0]?.buyerId ?? 0,
-      details: [{ materialId: 0, quantity: 1, unitPrice: 0 }],
-      expectedDate: '',
-      supplierId: 0,
-    })
-  }
+function openOrderDialog() {
+  Object.assign(orderForm, {
+    buyerId: operatorId.value ?? referenceData.value.buyers[0]?.buyerId ?? 0,
+    details: [{ materialId: 0, quantity: 1, unitPrice: 0 }],
+    expectedDate: '',
+    supplierId: 0,
+  })
   orderDialogOpen.value = true
 }
 
@@ -422,6 +387,9 @@ function removeOrderLine(index: number) {
 
 function handleOrderMaterialChange(index: number) {
   const line = orderForm.details[index]
+  if (line) {
+    line.materialId = Number(line.materialId)
+  }
   const material = referenceData.value.materials.find(
     (item) => item.materialId === line?.materialId,
   )
@@ -452,7 +420,7 @@ function getOverdueLabel(order: PurchaseOrderItem) {
 }
 
 function validateOrderSelections() {
-  if (!referenceData.value.buyers.some((item) => item.buyerId === orderForm.buyerId)) {
+  if (!Number.isInteger(orderForm.buyerId) || orderForm.buyerId <= 0) {
     ElMessage.warning('请选择有效采购员')
     return false
   }
@@ -464,21 +432,13 @@ function validateOrderSelections() {
     ElMessage.warning('请完整填写采购物料、数量和单价')
     return false
   }
-  if (!activeSuppliers.value.some((item) => item.supplierId === orderForm.supplierId)) {
+  if (!Number.isInteger(orderForm.supplierId) || orderForm.supplierId <= 0) {
     ElMessage.warning('请选择有效供应商')
     return false
   }
   const selectedMaterialIds = orderForm.details.map((item) => item.materialId)
   if (new Set(selectedMaterialIds).size !== selectedMaterialIds.length) {
     ElMessage.warning('同一物料不能重复添加')
-    return false
-  }
-  if (
-    selectedMaterialIds.some(
-      (materialId) => !referenceData.value.materials.some((item) => item.materialId === materialId),
-    )
-  ) {
-    ElMessage.warning('请选择有效采购物料')
     return false
   }
   return true
@@ -491,13 +451,8 @@ async function saveOrderForm(buyerId: number) {
     expectedDate: orderForm.expectedDate,
     supplierId: orderForm.supplierId,
   }
-  if (editingOrderId.value) {
-    await purchaseService.updateOrder(editingOrderId.value, payload)
-    ElMessage.success('采购订单草稿已更新')
-  } else {
-    await purchaseService.createOrder(payload)
-    ElMessage.success('采购订单草稿已创建')
-  }
+  await purchaseService.createOrder(payload)
+  ElMessage.success('采购订单草稿已创建')
 }
 
 async function submitOrderForm() {
@@ -557,7 +512,11 @@ async function refreshDetailIfOpen() {
 }
 
 async function changeOrderStatus(item: PurchaseOrderItem, action: 'cancel' | 'submit') {
-  if (!operatorId.value || actingOrderId.value) {
+  if (!operatorId.value) {
+    ElMessage.error('当前会话缺少操作人信息，请重新登录')
+    return
+  }
+  if (actingOrderId.value) {
     return
   }
   const config = orderActionConfig[action]
@@ -701,11 +660,7 @@ onBeforeUnmount(() => {
     >
       <template #actions>
         <el-button :icon="Refresh" :loading="refreshing" @click="refreshAll">刷新数据</el-button>
-        <el-button
-          v-if="canManagePurchase"
-          :icon="CirclePlus"
-          type="primary"
-          @click="openOrderDialog()"
+        <el-button :icon="CirclePlus" type="primary" @click="openOrderDialog()"
           >新建采购订单</el-button
         >
       </template>
@@ -890,29 +845,20 @@ onBeforeUnmount(() => {
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewOrder(row.orderId)">详情</el-button
                   ><el-button
-                    v-if="canEditPurchaseDraft && row.status === 'draft'"
-                    :icon="Edit"
-                    link
-                    type="primary"
-                    @click="openOrderDialog(row)"
-                    >编辑</el-button
-                  ><el-button
-                    v-if="canManagePurchase && row.status === 'draft'"
+                    v-if="row.status === 'draft'"
                     :loading="actingOrderId === row.orderId"
                     link
                     type="primary"
                     @click="changeOrderStatus(row, 'submit')"
                     >提交</el-button
                   ><el-button
-                    v-if="
-                      canManagePurchase && ['submitted', 'partial_received'].includes(row.status)
-                    "
+                    v-if="['submitted', 'partial_received'].includes(row.status)"
                     link
                     type="success"
                     @click="openReceiptDialog(row)"
                     >收货</el-button
                   ><el-button
-                    v-if="canManagePurchase && ['draft', 'submitted'].includes(row.status)"
+                    v-if="['draft', 'submitted'].includes(row.status)"
                     :loading="actingOrderId === row.orderId"
                     link
                     type="danger"
@@ -958,13 +904,7 @@ onBeforeUnmount(() => {
               ><el-button :icon="Search" type="primary" @click="searchReceipts">查询</el-button
               ><el-button @click="resetReceiptQuery">重置</el-button>
             </div>
-            <el-button
-              v-if="canManagePurchase"
-              :icon="Plus"
-              type="primary"
-              @click="openReceiptDialog()"
-              >登记收货</el-button
-            >
+            <el-button :icon="Plus" type="primary" @click="openReceiptDialog()">登记收货</el-button>
           </div>
           <el-alert
             v-if="receiptError"
@@ -1040,7 +980,6 @@ onBeforeUnmount(() => {
               ><el-button @click="resetReminderQuery">重置</el-button>
             </div>
             <el-button
-              v-if="canManagePurchase"
               :icon="Bell"
               :loading="generatingReminders"
               type="primary"
@@ -1097,7 +1036,7 @@ onBeforeUnmount(() => {
               ><el-table-column fixed="right" label="操作" min-width="100"
                 ><template #default="{ row }"
                   ><el-button
-                    v-if="canManagePurchase && row.status !== 'received'"
+                    v-if="row.status !== 'received'"
                     link
                     type="primary"
                     @click="openReminderDialog(row)"
@@ -1123,7 +1062,7 @@ onBeforeUnmount(() => {
 
     <el-dialog
       v-model="orderDialogOpen"
-      :title="orderDialogTitle"
+      title="新建采购订单草稿"
       width="min(96vw, 780px)"
       @closed="orderFormRef?.resetFields()"
       ><el-form ref="orderFormRef" :model="orderForm" :rules="orderRules" label-width="100px"
@@ -1131,9 +1070,12 @@ onBeforeUnmount(() => {
           <el-form-item label="采购员" prop="buyerId">
             <el-select
               v-model="orderForm.buyerId"
+              allow-create
+              default-first-option
               filterable
               :loading="referenceLoading"
-              placeholder="选择采购员"
+              placeholder="选择采购员或输入编号"
+              @change="orderForm.buyerId = Number($event)"
             >
               <el-option
                 v-for="buyer in referenceData.buyers"
@@ -1146,9 +1088,12 @@ onBeforeUnmount(() => {
           <el-form-item label="供应商" prop="supplierId">
             <el-select
               v-model="orderForm.supplierId"
+              allow-create
+              default-first-option
               filterable
               :loading="referenceLoading"
-              placeholder="选择供应商"
+              placeholder="选择供应商或输入编号"
+              @change="orderForm.supplierId = Number($event)"
             >
               <el-option
                 v-for="supplier in activeSuppliers"
@@ -1176,8 +1121,10 @@ onBeforeUnmount(() => {
             <div v-for="(line, index) in orderForm.details" :key="index" class="order-line">
               <el-select
                 v-model="line.materialId"
+                allow-create
+                default-first-option
                 filterable
-                placeholder="选择物料"
+                placeholder="选择物料或输入编号"
                 @change="handleOrderMaterialChange(index)"
                 ><el-option
                   v-for="material in referenceData.materials"
@@ -1213,9 +1160,9 @@ onBeforeUnmount(() => {
         </div></el-form
       ><template #footer
         ><el-button @click="orderDialogOpen = false">取消</el-button
-        ><el-button :loading="orderSubmitting" type="primary" @click="submitOrderForm">{{
-          editingOrderId ? '保存草稿' : '创建草稿'
-        }}</el-button></template
+        ><el-button :loading="orderSubmitting" type="primary" @click="submitOrderForm"
+          >创建草稿</el-button
+        ></template
       ></el-dialog
     >
 

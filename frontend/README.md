@@ -37,45 +37,18 @@ copy .env.example .env
 - `.env.production`：仅生产构建使用的公开配置；所有 `VITE_` 前缀变量会被打包到浏览器，不能存放秘密。
 - `VITE_API_BASE_URL`：生成 API 客户端的基址。默认留空，接口仍以同源 `/api` 路径访问。
 - `VITE_API_PROXY_TARGET`：Vite 开发代理的目标地址，默认 `http://localhost:5000`。
-- `VITE_USE_MOCK_AUTH`：只在 Vite 开发环境启用本地 Mock 登录；即使生产环境设为 `true`，生产构建也会禁用。
-- `VITE_DATA_MODE`：`mock`（默认）让具有 Mock 分支的业务 Service 使用本地演示数据；`api` 只调用真实接口，不会自动回退 Mock。尚未接入 API 的工作台和物料模块会明确报错。`VITE_MOCK_PERSIST=true` 会将演示数据保存到 localStorage。
 
 页面只能通过 Service 调用 API，禁止在页面中硬编码完整接口地址。新增环境变量时先补充 `.env.example` 和本节说明；不要提交 `.env`、Token、密码或个人本地配置。
 
-## 本地 Mock 登录
+## 后端连接与 Service 规范
 
-当 Oracle 或后端暂不可用时，在本机 `.env` 中设置后重启 Vite：
+登录、权限初始化和所有业务操作均调用真实后端。开发前先启动后端及其数据库，并配置 API 基址或开发代理地址；登录需要真实账号。
 
-```env
-VITE_USE_MOCK_AUTH=true
-```
-
-可使用以下公开测试账号登录：
-
-```text
-DEV_ADMIN / dev-admin-123
-DEV_USER / dev-user-123
-```
-
-- `DEV_ADMIN` 拥有当前前端全部已注册权限，可进入系统管理、用户管理、角色管理和审计日志。
-- `DEV_USER` 仅拥有普通业务查看权限；不显示系统管理，访问 `/system` 会进入 403。
-- 设置 `VITE_USE_MOCK_AUTH=false` 后，登录会恢复调用真实 `/api/login`，请求体与密码哈希流程不变。
-
-Mock 账号仅用于本地前端开发，密码属于可公开的测试数据，不能替代真实账号。Mock 登录要求同时满足 `import.meta.env.DEV` 和 `VITE_USE_MOCK_AUTH=true`；因此生产构建无法启用该入口，也不得将真实账号、密码、Token 或数据库连接写入仓库。
-
-## Mock 与 Service 规范
-
-业务数据模式统一由 `src/config/mock.ts` 读取。`VITE_DATA_MODE` 是唯一的全局 Mock/API 入口；Mock 仅作为显式数据源，API 网络或业务错误不会自动回退成 Mock。`VITE_USE_MOCK_AUTH` 保持独立，仅用于受开发环境限制的 Mock 登录。
-
-全量 Mock 演示模式下，开发环境默认使用 `VITE_DATA_MODE=mock`。如需恢复稳定种子数据，可在浏览器控制台执行 `resetMockDatabase()` 后刷新页面；该函数仅在开发环境挂载，且不会保存真实账号、Token 或密码。
-
-- 页面只能调用 `src/services/`，禁止直接调用 Axios、自动生成 API 或在模板中编写大型 Mock 数组。
-- 工作台 Mock 集中放在 `src/config/dashboard-mock.ts`，类型位于 `src/types/dashboard.ts`，唯一调用入口为 `DashboardService.ts`。
-- Mock 与未来接口共用同一套 TypeScript 类型。列表/分页统一使用 `{ items, total, page, pageSize }`；成功数据由 Service 返回该业务类型，失败必须 `throw Error` 供页面捕获。
-- 当前工作台没有 OpenAPI 契约接口，因此 Service 使用集中 Mock。后端契约和实现可用后，只替换 Service 内部实现，不改页面和类型。
-- `VITE_MOCK_SCENARIO` 可设为 `success`、`empty` 或 `error`，用于验证工作台正常、空数据和失败重试状态；修改后重启 `pnpm dev`。未配置时为稳定的 `success` 数据。它只选择场景，不决定是否启用 Mock。
-- 只有已知“后端尚未实现且返回 404”的权限联调链路可以降级到既有 Mock；其他 404、网络错误和前端运行时错误必须如实显示，不能被 Mock 掩盖。
-- 当真实接口已经覆盖页面所需字段、分页和错误语义，并完成联调验证后，删除对应 Mock 降级分支。
+- 登录调用 `/api/login`，密码按现有流程进行 SHA-256 哈希；权限通过 `/api/getCurrentAccess` 获取，每次加载应用都会重新校验。
+- 页面只能调用 `src/services/`，由 Service 使用生成 API 客户端和统一鉴权、错误处理。
+- 列表/分页统一使用 `{ items, total, page, pageSize }`；成功数据由 Service 返回业务类型，失败必须抛出错误供页面展示和重试。
+- 工作台通过真实业务接口汇总统计、待办和审计记录，只请求当前用户有权查看的数据。
+- 网络或业务错误会如实显示，不会切换到本地数据或返回虚构的成功结果。
 
 ## 页面开发规范
 

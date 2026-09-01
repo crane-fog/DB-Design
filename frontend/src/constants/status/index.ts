@@ -36,12 +36,6 @@ function labelsOf<TStatus extends string>(statuses: StatusMap<TStatus>) {
   ) as Record<TStatus, string>
 }
 
-export const materialBomStatuses = {
-  archived: { label: '已归档', tone: 'info' },
-  draft: { label: '草稿', tone: 'warning' },
-  released: { label: '已发布', tone: 'success' },
-} satisfies StatusMap<'archived' | 'draft' | 'released'>
-
 export const inventoryMonitorStatuses = {
   cancelled: { label: '已释放', tone: 'neutral' },
   consumed: { label: '已消耗', tone: 'info' },
@@ -74,13 +68,6 @@ export const productionOrderStatuses = {
 } satisfies StatusMap<
   'cancelled' | 'completed' | 'in_progress' | 'pending_review' | 'pending_schedule'
 >
-
-export const qualityDispositionStatuses = {
-  frozen: { label: '已冻结', tone: 'warning' },
-  pending: { label: '待处理', tone: 'info' },
-  recalled: { label: '已召回', tone: 'danger' },
-  released: { label: '已解除', tone: 'success' },
-} satisfies StatusMap<'frozen' | 'pending' | 'recalled' | 'released'>
 
 export const inventoryMonitorStatusLabels = labelsOf(inventoryMonitorStatuses)
 export const productionOrderStatusLabels = labelsOf(productionOrderStatuses)

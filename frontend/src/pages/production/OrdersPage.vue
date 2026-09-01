@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { Calendar, EditPen, Plus, Refresh, TrendCharts, View } from '@element-plus/icons-vue'
+import { EditPen, Plus, Refresh, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
   type ProductionOrderFormData,
   type ProductionOrderItem,
   type ProductionOrderStatus,
-  type ProductionProgressReportFormData,
-  type ProductionScheduleFormData,
-  type ProductionStageItem,
   productionService,
 } from '@/services/ProductionService'
 import { computed, onMounted, reactive, ref } from 'vue'
@@ -21,9 +18,11 @@ import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
 import { productionOrderStatusLabels as statusLabels } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 
 const pageSize = 10
 const auth = useAuthStore()
+const router = useRouter()
 const filters = reactive({ materialId: '', planEndEnd: '', planEndStart: '', status: '' })
 const page = ref(1)
 const loading = ref(false)
@@ -31,6 +30,7 @@ const error = ref('')
 const result = ref<PageResult<ProductionOrderItem>>({ items: [], page: 1, pageSize, total: 0 })
 
 const canManage = computed(() => auth.hasPermission(PERMISSIONS.production.orders))
+const canReportLine = computed(() => auth.hasPermission(PERMISSIONS.production.capacity))
 
 const orderDialogVisible = ref(false)
 const orderDialogMode = ref<'create' | 'edit'>('create')
@@ -38,22 +38,10 @@ const orderFormRef = ref<FormInstance>()
 const editingOrderId = ref<number>()
 const submitting = ref(false)
 const actionSubmitting = ref(false)
-const progressDialogVisible = ref(false)
-const progressFormRef = ref<FormInstance>()
-const progressSubmitting = ref(false)
-const progressTarget = ref<ProductionOrderItem>()
-const scheduleDialogVisible = ref(false)
-const scheduleFormRef = ref<FormInstance>()
-const scheduleSubmitting = ref(false)
-const scheduleTarget = ref<ProductionOrderItem>()
-const lineLoading = ref(false)
-const lineOptions = ref<Awaited<ReturnType<typeof productionService.listLines>>['items']>([])
-
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
 const detail = ref<ProductionOrderItem>()
-const detailStages = ref<ProductionStageItem[]>([])
 
 const orderForm = reactive<ProductionOrderFormData>({
   materialId: 0,
@@ -62,19 +50,6 @@ const orderForm = reactive<ProductionOrderFormData>({
   planStart: '',
   versionId: 0,
 })
-const progressForm = reactive<ProductionProgressReportFormData>({
-  completedQty: 1,
-  orderId: 0,
-  remark: '',
-  reportedAt: '',
-})
-const scheduleForm = reactive<ProductionScheduleFormData>({
-  lineId: 0,
-  orderId: 0,
-  plannedEnd: '',
-  plannedStart: '',
-})
-
 const orderDialogTitle = computed(() => {
   if (orderDialogMode.value === 'create') {
     return '新增生产订单'
@@ -87,28 +62,16 @@ const orderRules: FormRules<ProductionOrderFormData> = {
     { message: '请输入产品物料 ID', required: true, trigger: 'blur', type: 'number' },
     { message: '物料 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
   ],
-  planEnd: [{ message: '请选择计划完工时间', required: true, trigger: 'change' }],
+  planEnd: [{ message: '请选择计划完工日期', required: true, trigger: 'change' }],
   planQty: [
     { message: '请输入计划数量', required: true, trigger: 'blur', type: 'number' },
     { message: '计划数量必须大于 0', min: 1, trigger: 'blur', type: 'number' },
   ],
-  planStart: [{ message: '请选择计划开工时间', required: true, trigger: 'change' }],
+  planStart: [{ message: '请选择计划开工日期', required: true, trigger: 'change' }],
   versionId: [
     { message: '请输入 BOM 版本 ID', required: true, trigger: 'blur', type: 'number' },
     { message: 'BOM 版本 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
   ],
-}
-const progressRules: FormRules<ProductionProgressReportFormData> = {
-  completedQty: [
-    { message: '请输入本次完成数量', required: true, trigger: 'blur', type: 'number' },
-    { message: '本次完成数量必须大于 0', min: 1, trigger: 'blur', type: 'number' },
-  ],
-  reportedAt: [{ message: '请选择上报时间', required: true, trigger: 'change' }],
-}
-const scheduleRules: FormRules<ProductionScheduleFormData> = {
-  lineId: [{ message: '请选择可用生产线', required: true, trigger: 'change', type: 'number' }],
-  plannedEnd: [{ message: '请选择计划结束时间', required: true, trigger: 'change' }],
-  plannedStart: [{ message: '请选择计划开始时间', required: true, trigger: 'change' }],
 }
 
 function selectedStatus(): ProductionOrderStatus | undefined {
@@ -191,6 +154,10 @@ async function submitOrderForm() {
   if (!valid || submitting.value) {
     return
   }
+  if (orderForm.planEnd < orderForm.planStart) {
+    ElMessage.warning('计划完工日期不得早于计划开工日期')
+    return
+  }
   submitting.value = true
   try {
     if (orderDialogMode.value === 'create') {
@@ -214,99 +181,12 @@ async function openDetail(order: ProductionOrderItem) {
   detailLoading.value = true
   detailError.value = ''
   detail.value = undefined
-  detailStages.value = []
   try {
-    const [orderDetail, stages] = await Promise.all([
-      productionService.getOrder(order.orderId),
-      productionService.getOrderStages(order.orderId),
-    ])
-    detail.value = orderDetail
-    detailStages.value = stages
+    detail.value = await productionService.getOrder(order.orderId)
   } catch (requestError) {
     detailError.value = getErrorMessage(requestError, '生产订单详情加载失败')
   } finally {
     detailLoading.value = false
-  }
-}
-
-async function loadLineOptions() {
-  lineLoading.value = true
-  try {
-    const lineResult = await productionService.listLines({ page: 1, pageSize: 100 })
-    lineOptions.value = lineResult.items.filter((line) => line.status !== 'fault')
-  } catch (requestError) {
-    ElMessage.error(getErrorMessage(requestError, '可用生产线加载失败'))
-  } finally {
-    lineLoading.value = false
-  }
-}
-
-function openProgressDialog(order: ProductionOrderItem) {
-  progressTarget.value = order
-  Object.assign(progressForm, {
-    completedQty: 1,
-    orderId: order.orderId,
-    remark: '',
-    reportedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
-  })
-  progressFormRef.value?.clearValidate()
-  progressDialogVisible.value = true
-}
-
-async function submitProgress() {
-  const valid = await progressFormRef.value?.validate().catch(() => false)
-  if (!valid || progressSubmitting.value) {
-    return
-  }
-  progressSubmitting.value = true
-  try {
-    await productionService.reportOrderProgress({ ...progressForm })
-    ElMessage.success('生产进度已上报')
-    progressDialogVisible.value = false
-    await loadOrders(page.value)
-    if (detail.value?.orderId === progressForm.orderId) {
-      await openDetail(detail.value)
-    }
-  } catch (requestError) {
-    ElMessage.error(getErrorMessage(requestError, '生产进度上报失败'))
-  } finally {
-    progressSubmitting.value = false
-  }
-}
-
-async function openScheduleDialog(order: ProductionOrderItem) {
-  scheduleTarget.value = order
-  Object.assign(scheduleForm, {
-    lineId: order.schedule?.lineId ?? 0,
-    orderId: order.orderId,
-    plannedEnd: order.schedule?.plannedEnd ?? order.planEnd,
-    plannedStart: order.schedule?.plannedStart ?? order.planStart,
-  })
-  scheduleFormRef.value?.clearValidate()
-  scheduleDialogVisible.value = true
-  if (!lineOptions.value.length) {
-    await loadLineOptions()
-  }
-}
-
-async function submitSchedule() {
-  const valid = await scheduleFormRef.value?.validate().catch(() => false)
-  if (!valid || scheduleSubmitting.value) {
-    return
-  }
-  scheduleSubmitting.value = true
-  try {
-    await productionService.saveOrderSchedule({ ...scheduleForm })
-    ElMessage.success('订单排产已保存')
-    scheduleDialogVisible.value = false
-    await loadOrders(page.value)
-    if (detail.value?.orderId === scheduleForm.orderId) {
-      await openDetail(detail.value)
-    }
-  } catch (requestError) {
-    ElMessage.error(getErrorMessage(requestError, '订单排产失败'))
-  } finally {
-    scheduleSubmitting.value = false
   }
 }
 
@@ -428,6 +308,13 @@ async function cancelOrder(order: ProductionOrderItem) {
   }
 }
 
+function openLineReporting(order: ProductionOrderItem) {
+  void router.push({
+    name: 'production-operations',
+    query: { orderId: order.orderId, tab: 'status' },
+  })
+}
+
 function canReview(order: ProductionOrderItem) {
   return order.status === 'pending_review'
 }
@@ -435,22 +322,10 @@ function canEdit(order: ProductionOrderItem) {
   return order.status === 'pending_review' || order.status === 'pending_schedule'
 }
 function canStart(order: ProductionOrderItem) {
-  return order.status === 'pending_schedule' && Boolean(order.schedule)
+  return order.status === 'pending_schedule'
 }
 function canFinish(order: ProductionOrderItem) {
   return order.status === 'in_progress'
-}
-function getStageStatus(stage: ProductionStageItem) {
-  if (stage.status === 'completed') {
-    return 'success'
-  }
-  if (stage.status === 'in_progress') {
-    return 'process'
-  }
-  if (stage.status === 'paused') {
-    return 'error'
-  }
-  return 'wait'
 }
 function canCancel(order: ProductionOrderItem) {
   return order.status !== 'completed' && order.status !== 'cancelled'
@@ -465,7 +340,6 @@ function progressPercentage(order: ProductionOrderItem) {
 
 onMounted(() => {
   void loadOrders()
-  void loadLineOptions()
 })
 </script>
 
@@ -544,9 +418,14 @@ onMounted(() => {
         <el-table-column label="完工数量" min-width="90">
           <template #default="{ row }">{{ row.finishedQty ?? '-' }}</template>
         </el-table-column>
-        <el-table-column label="生产进度" min-width="150">
+        <el-table-column label="完工比例" min-width="150">
           <template #default="{ row }">
-            <el-progress :percentage="progressPercentage(row)" :stroke-width="10" />
+            <el-progress
+              v-if="row.finishedQty !== undefined"
+              :percentage="progressPercentage(row)"
+              :stroke-width="10"
+            />
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" min-width="90">
@@ -559,9 +438,6 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="计划完工" min-width="120">
           <template #default="{ row }">{{ row.planEnd || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="排产产线" min-width="150">
-          <template #default="{ row }">{{ row.schedule?.lineName || '未排产' }}</template>
         </el-table-column>
         <el-table-column fixed="right" label="操作" min-width="360">
           <template #default="{ row }">
@@ -581,7 +457,7 @@ onMounted(() => {
                 type="primary"
                 :icon="EditPen"
                 @click="openEditDialog(row)"
-                >修改</el-button
+                >计划排期</el-button
               >
               <el-button
                 v-if="canStart(row)"
@@ -592,22 +468,11 @@ onMounted(() => {
                 >开工</el-button
               >
               <el-button
-                v-if="row.status === 'pending_schedule'"
+                v-if="canFinish(row) && canReportLine"
                 link
-                :disabled="scheduleSubmitting"
-                :icon="Calendar"
                 type="primary"
-                @click="openScheduleDialog(row)"
-                >{{ row.schedule ? '修改排产' : '订单排产' }}</el-button
-              >
-              <el-button
-                v-if="canFinish(row)"
-                link
-                :disabled="progressSubmitting"
-                :icon="TrendCharts"
-                type="primary"
-                @click="openProgressDialog(row)"
-                >上报进度</el-button
+                @click="openLineReporting(row)"
+                >产线报工</el-button
               >
               <el-button
                 v-if="canFinish(row)"
@@ -663,20 +528,20 @@ onMounted(() => {
         <el-form-item label="计划数量" prop="planQty">
           <el-input-number v-model="orderForm.planQty" :min="1" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="计划开工时间" prop="planStart">
+        <el-form-item label="计划开工日期" prop="planStart">
           <el-date-picker
             v-model="orderForm.planStart"
             style="width: 100%"
-            type="datetime"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            type="date"
+            value-format="YYYY-MM-DD"
           />
         </el-form-item>
-        <el-form-item label="计划完工时间" prop="planEnd">
+        <el-form-item label="计划完工日期" prop="planEnd">
           <el-date-picker
             v-model="orderForm.planEnd"
             style="width: 100%"
-            type="datetime"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            type="date"
+            value-format="YYYY-MM-DD"
           />
         </el-form-item>
       </el-form>
@@ -704,25 +569,15 @@ onMounted(() => {
         <el-descriptions-item label="完工数量">{{
           detail.finishedQty ?? '-'
         }}</el-descriptions-item>
-        <el-descriptions-item label="生产进度">
-          <el-progress :percentage="progressPercentage(detail)" />
+        <el-descriptions-item label="完工比例">
+          <el-progress
+            v-if="detail.finishedQty !== undefined"
+            :percentage="progressPercentage(detail)"
+          />
+          <span v-else>-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="最近上报时间">{{
-          formatDateTime(detail.lastProgressReportedAt)
-        }}</el-descriptions-item>
-        <el-descriptions-item label="最近上报备注">{{
-          detail.lastProgressRemark || '-'
-        }}</el-descriptions-item>
         <el-descriptions-item label="计划开工">{{ detail.planStart || '-' }}</el-descriptions-item>
         <el-descriptions-item label="计划完工">{{ detail.planEnd || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="分配产线">{{
-          detail.schedule?.lineName || '未排产'
-        }}</el-descriptions-item>
-        <el-descriptions-item label="排产时段">{{
-          detail.schedule
-            ? `${formatDateTime(detail.schedule.plannedStart)} 至 ${formatDateTime(detail.schedule.plannedEnd)}`
-            : '-'
-        }}</el-descriptions-item>
         <el-descriptions-item label="实际开工">{{
           formatDateTime(detail.actualStart)
         }}</el-descriptions-item>
@@ -733,116 +588,8 @@ onMounted(() => {
           detail.reviewComment || '-'
         }}</el-descriptions-item>
       </el-descriptions>
-      <template v-if="detail && detailStages.length">
-        <el-divider content-position="left">生产阶段</el-divider>
-        <el-steps direction="vertical" :active="detailStages.length">
-          <el-step
-            v-for="stage in detailStages"
-            :key="stage.name"
-            :description="formatDateTime(stage.completedAt || stage.startedAt)"
-            :status="getStageStatus(stage)"
-            :title="stage.name"
-          />
-        </el-steps>
-      </template>
       <el-empty v-if="!detail && !detailLoading && !detailError" description="暂无详情数据" />
     </el-drawer>
-
-    <el-dialog
-      v-model="progressDialogVisible"
-      :title="`上报订单进度 #${progressTarget?.orderId || ''}`"
-      width="520px"
-    >
-      <el-alert
-        :closable="false"
-        :title="`计划 ${progressTarget?.planQty || 0}，当前已完成 ${progressTarget?.finishedQty || 0}`"
-        type="info"
-      />
-      <el-form
-        ref="progressFormRef"
-        :model="progressForm"
-        :rules="progressRules"
-        label-width="100px"
-        class="dialog-form"
-      >
-        <el-form-item label="本次完成" prop="completedQty">
-          <el-input-number v-model="progressForm.completedQty" :min="1" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="上报时间" prop="reportedAt">
-          <el-date-picker
-            v-model="progressForm.reportedAt"
-            type="datetime"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model.trim="progressForm.remark" type="textarea" :rows="2" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button :disabled="progressSubmitting" @click="progressDialogVisible = false"
-          >取消</el-button
-        >
-        <el-button :loading="progressSubmitting" type="primary" @click="submitProgress"
-          >提交</el-button
-        >
-      </template>
-    </el-dialog>
-
-    <el-dialog
-      v-model="scheduleDialogVisible"
-      :title="`订单排产 #${scheduleTarget?.orderId || ''}`"
-      width="560px"
-    >
-      <el-form
-        ref="scheduleFormRef"
-        :model="scheduleForm"
-        :rules="scheduleRules"
-        label-width="110px"
-      >
-        <el-form-item label="可用生产线" prop="lineId">
-          <el-select
-            v-model="scheduleForm.lineId"
-            filterable
-            :loading="lineLoading"
-            style="width: 100%"
-            placeholder="选择生产线"
-          >
-            <el-option
-              v-for="line in lineOptions"
-              :key="line.lineId"
-              :label="`生产线 ${line.lineId} · ${line.typeName || '-'} · ${line.status === 'idle' ? '空闲' : '运行中'}`"
-              :value="line.lineId"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="计划开始" prop="plannedStart">
-          <el-date-picker
-            v-model="scheduleForm.plannedStart"
-            type="datetime"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="计划结束" prop="plannedEnd">
-          <el-date-picker
-            v-model="scheduleForm.plannedEnd"
-            type="datetime"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button :disabled="scheduleSubmitting" @click="scheduleDialogVisible = false"
-          >取消</el-button
-        >
-        <el-button :loading="scheduleSubmitting" type="primary" @click="submitSchedule"
-          >保存排产</el-button
-        >
-      </template>
-    </el-dialog>
   </PageContainer>
 </template>
 
@@ -856,9 +603,6 @@ onMounted(() => {
 .pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
-}
-.dialog-form {
   margin-top: 16px;
 }
 </style>
