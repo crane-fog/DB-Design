@@ -19,7 +19,6 @@ function handleUserCommand(command: string) {
 <template>
   <header class="admin-header">
     <div class="admin-header-brand">
-      <span class="admin-brand-mark" aria-hidden="true">IM</span>
       <span class="admin-brand-title">工业制造物料管理系统</span>
     </div>
 
