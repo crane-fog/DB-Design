@@ -7,6 +7,64 @@ tags:
   - name: purchase
     description: 采购管理模块
 paths:
+  /api/listSupplierData:
+    get:
+      summary: 查询供应商列表
+      description: 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。权限：采购员、采购主管、生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: listSupplierData
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: supplier_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: supplier_name
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierPageResponse'
+  /api/listPurchaseBuyerData:
+    get:
+      summary: 查询采购员列表
+      description: 分页查询具有有效采购角色的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+      operationId: listPurchaseBuyerData
+      tags: [purchase]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: buyer_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: buyer_name
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseBuyerPageResponse'
   /api/listPurchaseOrder:
     get:
       summary: 查询采购订单列表
@@ -323,6 +381,17 @@ components:
               type: string
               nullable: true
               description: 供应商联系电话，来源于 supplier.contact_phone。
+    PurchaseBuyerBrief:
+      type: object
+      required: [buyer_id, buyer_name]
+      properties:
+        buyer_id:
+          type: integer
+          format: int64
+          description: 采购员用户编号，来源于 sys_user.user_id。
+        buyer_name:
+          type: string
+          description: 采购员姓名，来源于 sys_user.user_name。
     PurchaseOrderBrief:
       type: object
       required: [order_id, status, supplier_id]
@@ -609,6 +678,44 @@ components:
               allOf:
                 - $ref: '#/components/schemas/PurchaseOrder'
               nullable: true
+    SupplierPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/SupplierPageData'
+              nullable: true
+    SupplierPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/SupplierDetail'
+    PurchaseBuyerPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/PurchaseBuyerPageData'
+              nullable: true
+    PurchaseBuyerPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchaseBuyerBrief'
     PurchaseOrderPageResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
