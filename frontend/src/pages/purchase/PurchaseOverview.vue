@@ -150,10 +150,10 @@ const reminderForm = reactive<{ remark: string; status: 'received' | 'urged' }>(
 let reminderRequestId = 0
 
 const statistics = computed(() => [
-  { label: '采购订单总数', tone: 'blue', value: summary.value?.totalOrderCount },
-  { label: '待到货订单', tone: 'pink', value: summary.value?.receivingOrderCount },
-  { label: '逾期订单', tone: 'blue', value: summary.value?.overdueOrderCount },
-  { label: '待催交提醒', tone: 'pink', value: summary.value?.pendingReminderCount },
+  { label: '采购订单总数', value: summary.value?.totalOrderCount },
+  { label: '待到货订单', value: summary.value?.receivingOrderCount },
+  { label: '逾期订单', value: summary.value?.overdueOrderCount },
+  { label: '待催交提醒', value: summary.value?.pendingReminderCount },
 ])
 
 const orderTotalAmount = computed(() =>
@@ -671,10 +671,9 @@ onBeforeUnmount(() => {
         v-for="statistic in statistics"
         :key="statistic.label"
         v-loading="summaryLoading"
-        class="purchase-statistic"
-        :class="`purchase-statistic--${statistic.tone}`"
+        class="purchase-statistic statistic-card"
         shadow="never"
-        ><span>{{ statistic.label }}</span
+        ><span class="statistic-card__title">{{ statistic.label }}</span
         ><strong>{{ formatNumber(statistic.value) }}</strong></el-card
       >
     </section>
@@ -705,7 +704,7 @@ onBeforeUnmount(() => {
       ></el-alert
     >
 
-    <el-card class="purchase-card" shadow="never">
+    <el-card class="purchase-card table-card table-card--accent" shadow="never">
       <el-tabs v-model="activeTab">
         <el-tab-pane name="orders">
           <template #label
@@ -1356,30 +1355,9 @@ onBeforeUnmount(() => {
 .summary-error {
   margin-bottom: 16px;
 }
-.purchase-statistic {
-  min-width: 0;
-  border-top-width: 3px;
-}
-.purchase-statistic--blue {
-  border-top-color: var(--primary-color);
-  background: var(--app-background);
-}
-.purchase-statistic--pink {
-  border-top-color: var(--border-color);
-  background: var(--card-background);
-}
-.purchase-statistic span {
-  color: var(--el-text-color-secondary);
-}
-.purchase-statistic strong {
-  display: block;
-  margin-top: 10px;
-  font-size: 27px;
-}
 .purchase-card {
   min-width: 0;
   overflow: hidden;
-  border-top: 3px solid var(--border-color);
 }
 .tab-label,
 .toolbar,

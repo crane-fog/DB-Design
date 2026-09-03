@@ -85,6 +85,7 @@ const menuGroups = computed<MenuGroup[]>(() => {
       name: String(record.name),
       order: Number(record.meta.pageOrder ?? Number.MAX_SAFE_INTEGER),
       path: record.path,
+      showOverviewInMenu: Boolean(record.meta.showOverviewInMenu),
       title: String(record.meta.title ?? record.path),
     }))
 
@@ -104,6 +105,14 @@ const menuGroups = computed<MenuGroup[]>(() => {
     if (item.isModule) {
       group.path = item.path
       group.title = item.title
+      if (item.showOverviewInMenu) {
+        insertByOrder(group.items, {
+          name: item.name,
+          order: item.order,
+          path: item.path,
+          title: '总览',
+        })
+      }
     } else {
       insertByOrder(group.items, item)
     }

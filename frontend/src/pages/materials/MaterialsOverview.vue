@@ -26,8 +26,10 @@ import { getErrorMessage } from '@/utils/error'
 import { materialService } from '@/services/MaterialService'
 import { useAuthStore } from '@/stores/auth'
 
+type MaterialSection = 'analysis' | 'bom' | 'materials' | 'trace' | 'tree'
+
+const { section } = defineProps<{ section: MaterialSection }>()
 const auth = useAuthStore()
-const activeTab = ref('materials')
 const loading = ref(false)
 const error = ref('')
 const categories = ref<MaterialCategory[]>([])
@@ -120,6 +122,29 @@ const materialTypeLabels: Record<MaterialType, string> = {
   raw: '原材料',
   semiFinished: '半成品',
 }
+const sectionMetadata: Record<MaterialSection, { description: string; title: string }> = {
+  analysis: {
+    description: '按产品、计划数量和 BOM 版本计算理论用料，并生成最新净需求分析。',
+    title: '用料分析',
+  },
+  bom: {
+    description: '维护 BOM 版本、版本生效状态和组件明细。',
+    title: 'BOM 维护与版本',
+  },
+  materials: {
+    description: '维护物料主数据、类型、分类、型号和计量单位。',
+    title: '物料主数据',
+  },
+  trace: {
+    description: '从指定物料反向查询上层 BOM、依赖路径和累计理论用量。',
+    title: 'BOM 反向追溯',
+  },
+  tree: {
+    description: '按 BOM 版本查看产品与组件的多层级结构。',
+    title: 'BOM 结构树',
+  },
+}
+const currentSection = computed(() => sectionMetadata[section])
 
 function materialTypeLabel(type: MaterialType) {
   return materialTypeLabels[type]
@@ -500,10 +525,7 @@ watch(reverseIncludeHistory, resetReverseTrace)
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="物料管理"
-      description="维护物料主数据、BOM 版本和组件关系，并完成树形展开、用料分析与反向追溯。"
-    >
+    <PageHeader :title="currentSection.title" :description="currentSection.description">
       <template #actions>
         <el-button :icon="Refresh" :loading="loading" @click="refreshAll">刷新</el-button>
       </template>
@@ -526,499 +548,480 @@ watch(reverseIncludeHistory, resetReverseTrace)
       type="error"
     />
 
-    <el-tabs v-model="activeTab" class="material-tabs">
-      <el-tab-pane label="物料主数据" name="materials">
-        <el-card shadow="never">
-          <el-form class="material-filter-form" inline @submit.prevent="loadMaterials(1)">
-            <el-form-item label="关键字"
-              ><el-input
-                v-model.trim="materialFilters.keyword"
-                clearable
-                placeholder="编号 / 名称 / 型号"
-            /></el-form-item>
-            <el-form-item label="类型"
-              ><el-select
-                v-model="materialFilters.type"
-                clearable
-                placeholder="全部"
-                style="width: 120px"
-                ><el-option
-                  v-for="(label, value) in materialTypeLabels"
-                  :key="value"
-                  :label="label"
-                  :value="value" /></el-select
-            ></el-form-item>
-            <el-form-item label="分类"
-              ><el-select
-                v-model="materialFilters.categoryId"
-                clearable
-                placeholder="全部"
-                style="width: 130px"
-                ><el-option
-                  v-for="category in categories"
-                  :key="category.id"
-                  :label="category.name"
-                  :value="category.id" /></el-select
-            ></el-form-item>
-            <el-form-item label="创建日期"
-              ><el-date-picker
-                v-model="materialFilters.createdRange"
-                end-placeholder="结束日期"
-                range-separator="至"
-                start-placeholder="开始日期"
-                type="daterange"
-                value-format="YYYY-MM-DD"
-            /></el-form-item>
-            <el-form-item
-              ><el-button :icon="Search" :loading="loading" type="primary" @click="loadMaterials(1)"
-                >查询</el-button
-              ><el-button @click="resetMaterialFilters">重置</el-button></el-form-item
-            >
-          </el-form>
-          <div class="table-toolbar">
-            <span>共 {{ materialResult.total }} 条物料</span
-            ><el-button v-if="canManage" :icon="Plus" type="primary" @click="openMaterialEditor()"
-              >新增物料</el-button
-            >
-          </div>
-          <el-table v-loading="loading" :data="materialResult.items" min-height="360" stripe>
-            <el-table-column label="物料编号" min-width="150" prop="code" /><el-table-column
-              label="名称"
-              min-width="180"
-              prop="name"
-            /><el-table-column label="类型" min-width="100"
-              ><template #default="{ row }">{{
-                materialTypeLabel(row.type)
-              }}</template></el-table-column
-            ><el-table-column label="型号" min-width="120" prop="model" /><el-table-column
-              label="单位"
-              min-width="80"
-              prop="unit"
-            /><el-table-column label="分类" min-width="100" prop="categoryName" />
-            <el-table-column label="当前 BOM" min-width="100"
-              ><template #default="{ row }">{{
-                row.currentBomVersion || '-'
-              }}</template></el-table-column
-            ><el-table-column label="更新时间" min-width="165"
-              ><template #default="{ row }">{{
-                formatDateTime(row.updatedAt)
-              }}</template></el-table-column
-            >
-            <el-table-column fixed="right" label="操作" min-width="130"
-              ><template #default="{ row }"
-                ><el-button :icon="View" link type="primary" @click="openMaterialDetail(row)"
-                  >查看</el-button
-                ><el-button
-                  v-if="canManage"
-                  :icon="EditPen"
-                  link
-                  type="primary"
-                  @click="openMaterialEditor(row)"
-                  >编辑</el-button
-                ></template
-              ></el-table-column
-            >
-          </el-table>
-          <EmptyState
-            v-if="!loading && !materialResult.items.length"
-            title="暂无符合条件的物料"
-            description="请调整筛选条件后重试。"
-          />
-          <div class="pagination">
-            <el-pagination
-              v-model:current-page="materialPage"
-              v-model:page-size="materialPageSize"
-              background
-              layout="total, sizes, prev, pager, next"
-              :page-sizes="[10, 20, 50]"
-              :total="materialResult.total"
-              @current-change="loadMaterials"
-              @size-change="changeMaterialPageSize"
-            />
-          </div>
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane label="BOM 维护与版本" name="bom">
-        <el-card shadow="never">
-          <el-form inline
-            ><el-form-item label="BOM 版本"
-              ><el-select
-                v-model="selectedBomId"
-                filterable
-                placeholder="选择 BOM 版本"
-                style="width: 360px"
-                @change="selectBom"
-                ><el-option
-                  v-for="bom in bomResult"
-                  :key="bom.bomId"
-                  :label="`${bom.materialCode} · ${bom.version} · ${bom.materialName}`"
-                  :value="bom.bomId" /></el-select></el-form-item
-            ><el-form-item
-              ><el-button v-if="canManage" :icon="Plus" type="primary" @click="openVersionEditor"
-                >创建版本</el-button
-              ></el-form-item
-            ></el-form
+    <template v-if="section === 'materials'">
+      <el-card class="table-card" shadow="never">
+        <el-form class="material-filter-form" inline @submit.prevent="loadMaterials(1)">
+          <el-form-item label="关键字"
+            ><el-input
+              v-model.trim="materialFilters.keyword"
+              clearable
+              placeholder="编号 / 名称 / 型号"
+          /></el-form-item>
+          <el-form-item label="类型"
+            ><el-select
+              v-model="materialFilters.type"
+              clearable
+              placeholder="全部"
+              style="width: 120px"
+              ><el-option
+                v-for="(label, value) in materialTypeLabels"
+                :key="value"
+                :label="label"
+                :value="value" /></el-select
+          ></el-form-item>
+          <el-form-item label="分类"
+            ><el-select
+              v-model="materialFilters.categoryId"
+              clearable
+              placeholder="全部"
+              style="width: 130px"
+              ><el-option
+                v-for="category in categories"
+                :key="category.id"
+                :label="category.name"
+                :value="category.id" /></el-select
+          ></el-form-item>
+          <el-form-item label="创建日期"
+            ><el-date-picker
+              v-model="materialFilters.createdRange"
+              end-placeholder="结束日期"
+              range-separator="至"
+              start-placeholder="开始日期"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+          /></el-form-item>
+          <el-form-item
+            ><el-button :icon="Search" :loading="loading" type="primary" @click="loadMaterials(1)"
+              >查询</el-button
+            ><el-button @click="resetMaterialFilters">重置</el-button></el-form-item
           >
-          <EmptyState
-            v-if="!selectedBomId"
-            title="请选择一个 BOM 版本"
-            description="选择后可查看已有版本和组件；也可直接为物料创建首个版本。"
-          />
-          <template v-else-if="currentBom">
-            <el-skeleton v-if="bomLoading" :rows="6" animated />
-            <template v-else>
-              <el-descriptions border :column="3"
-                ><el-descriptions-item label="版本编号">{{ currentBom.bomId }}</el-descriptions-item
-                ><el-descriptions-item label="产品"
-                  >{{ currentBom.materialName }}（{{
-                    currentBom.materialCode
-                  }}）</el-descriptions-item
-                ><el-descriptions-item label="状态"
-                  ><el-tag :type="currentBom.isCurrent ? 'success' : 'info'">{{
-                    currentBom.isCurrent ? '当前生效版本' : '非当前版本'
-                  }}</el-tag></el-descriptions-item
-                ><el-descriptions-item label="版本">{{ currentBom.version }}</el-descriptions-item
-                ><el-descriptions-item label="生效日期">{{
-                  currentBom.effectiveDate
-                }}</el-descriptions-item
-                ><el-descriptions-item label="失效日期">{{
-                  currentBom.expireDate || '无'
-                }}</el-descriptions-item
-                ><el-descriptions-item label="变更说明">{{
-                  currentBom.description
-                }}</el-descriptions-item></el-descriptions
-              >
-              <div class="section-heading">
-                <h3>版本列表</h3>
-                <span
-                  >版本是否生效由有效期和物料当前版本共同决定；修改当前版本会影响后续 BOM
-                  展开。</span
-                >
-              </div>
-              <el-table :data="versionList" stripe
-                ><el-table-column label="版本" prop="version" /><el-table-column label="状态"
-                  ><template #default="{ row }"
-                    ><el-tag :type="row.isCurrent ? 'success' : 'info'">{{
-                      row.isCurrent ? '当前生效版本' : '非当前版本'
-                    }}</el-tag></template
-                  ></el-table-column
-                ><el-table-column label="生效日期" prop="effectiveDate" /><el-table-column
-                  label="失效日期"
-                  ><template #default="{ row }">{{
-                    row.expireDate || '无'
-                  }}</template></el-table-column
-                ><el-table-column label="操作" min-width="170"
-                  ><template #default="{ row }"
-                    ><el-button link type="primary" @click="selectBom(row.bomId)">查看</el-button
-                    ><el-popconfirm
-                      v-if="canManage && !row.isCurrent"
-                      title="将切换该物料的当前版本；后端会校验有效期与循环依赖，是否继续？"
-                      confirm-button-text="确认生效"
-                      @confirm="releaseBom(row.bomId)"
-                      ><template #reference
-                        ><el-button :loading="versionSaving" link type="danger"
-                          >设为当前版本</el-button
-                        ></template
-                      ></el-popconfirm
-                    ></template
-                  ></el-table-column
-                ></el-table
-              >
-              <div class="section-heading">
-                <h3>组件明细</h3>
-                <el-button
-                  v-if="canManage"
-                  :icon="Plus"
-                  type="primary"
-                  @click="openComponentEditor()"
-                  >新增明细</el-button
-                >
-              </div>
-              <el-table :data="currentBom.components" stripe
-                ><el-table-column label="行号" prop="lineNo" width="70" /><el-table-column
-                  label="子项物料"
-                  min-width="210"
-                  ><template #default="{ row }"
-                    >{{ row.materialName }}<small>{{ row.materialCode }}</small></template
-                  ></el-table-column
-                ><el-table-column label="用量" min-width="110"
-                  ><template #default="{ row }"
-                    >{{ formatNumber(row.quantity) }} {{ row.unit }}</template
-                  ></el-table-column
-                ><el-table-column label="损耗率" min-width="90"
-                  ><template #default="{ row }"
-                    >{{ formatNumber(row.lossRate) }}%</template
-                  ></el-table-column
-                ><el-table-column label="操作" min-width="150"
-                  ><template #default="{ row }"
-                    ><el-button
-                      v-if="canManage"
-                      link
-                      type="primary"
-                      @click="openComponentEditor(row)"
-                      >编辑</el-button
-                    ><el-popconfirm
-                      v-if="canManage"
-                      title="移除后无法恢复，是否继续？"
-                      confirm-button-text="移除"
-                      @confirm="removeBomComponent(row.componentId)"
-                      ><template #reference
-                        ><el-button :loading="bomEditorSaving" link type="danger"
-                          >移除</el-button
-                        ></template
-                      ></el-popconfirm
-                    ></template
-                  ></el-table-column
-                ></el-table
-              >
-            </template>
-          </template>
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane label="BOM 结构树" name="tree">
-        <el-card shadow="never"
-          ><el-form inline
-            ><el-form-item label="BOM 版本"
-              ><el-select
-                v-model="treeBomId"
-                filterable
-                placeholder="选择 BOM 版本"
-                style="width: 360px"
-                ><el-option
-                  v-for="bom in bomOptions"
-                  :key="bom.bomId"
-                  :label="`${bom.materialCode} · ${bom.version}`"
-                  :value="bom.bomId" /></el-select></el-form-item
-            ><el-form-item
+        </el-form>
+        <div class="table-toolbar">
+          <span>共 {{ materialResult.total }} 条物料</span
+          ><el-button v-if="canManage" :icon="Plus" type="primary" @click="openMaterialEditor()"
+            >新增物料</el-button
+          >
+        </div>
+        <el-table v-loading="loading" :data="materialResult.items" min-height="360" stripe>
+          <el-table-column label="物料编号" min-width="150" prop="code" /><el-table-column
+            label="名称"
+            min-width="180"
+            prop="name"
+          /><el-table-column label="类型" min-width="100"
+            ><template #default="{ row }">{{
+              materialTypeLabel(row.type)
+            }}</template></el-table-column
+          ><el-table-column label="型号" min-width="120" prop="model" /><el-table-column
+            label="单位"
+            min-width="80"
+            prop="unit"
+          /><el-table-column label="分类" min-width="100" prop="categoryName" />
+          <el-table-column label="当前 BOM" min-width="100"
+            ><template #default="{ row }">{{
+              row.currentBomVersion || '-'
+            }}</template></el-table-column
+          ><el-table-column label="更新时间" min-width="165"
+            ><template #default="{ row }">{{
+              formatDateTime(row.updatedAt)
+            }}</template></el-table-column
+          >
+          <el-table-column fixed="right" label="操作" min-width="130"
+            ><template #default="{ row }"
+              ><el-button :icon="View" link type="primary" @click="openMaterialDetail(row)"
+                >查看</el-button
               ><el-button
-                :disabled="!treeBomId"
-                :loading="treeLoading"
+                v-if="canManage"
+                :icon="EditPen"
+                link
                 type="primary"
-                @click="loadTree"
-                >加载结构</el-button
-              ><el-button :disabled="!treeData.length" @click="toggleTree(true)">展开全部</el-button
-              ><el-button :disabled="!treeData.length" @click="toggleTree(false)"
-                >收起全部</el-button
-              ></el-form-item
-            ></el-form
-          ><el-alert
-            v-if="treeError"
-            :closable="false"
-            :title="treeError"
-            type="error" /><el-descriptions v-if="treeBom" border :column="2" class="tree-meta"
-            ><el-descriptions-item label="产品">{{ treeBom.materialName }}</el-descriptions-item
-            ><el-descriptions-item label="版本">{{
-              treeBom.version
-            }}</el-descriptions-item></el-descriptions
-          ><el-tree
-            v-if="treeData.length"
-            :key="treeKey"
-            class="bom-tree"
-            :data="treeData"
-            :default-expand-all="treeExpanded"
-            node-key="path"
-            :props="{ children: 'children', label: 'materialName' }"
-            ><template #default="{ data }"
-              ><span class="tree-node"
-                ><strong>{{ data.materialName }}</strong
-                ><small
-                  >{{ data.materialCode }} · 层级 {{ data.level }} · 累计
-                  {{ formatNumber(data.cumulativeQuantity) }} {{ data.unit }} ·
-                  {{ data.isLeaf ? '叶子节点' : '组件' }}</small
-                ></span
+                @click="openMaterialEditor(row)"
+                >编辑</el-button
               ></template
-            ></el-tree
-          ><EmptyState
-            v-else-if="!treeLoading && !treeError"
-            title="暂无 BOM 树"
-            description="选择产品版本并加载后查看多层级结构。"
-        /></el-card>
-      </el-tab-pane>
+            ></el-table-column
+          >
+        </el-table>
+        <EmptyState
+          v-if="!loading && !materialResult.items.length"
+          title="暂无符合条件的物料"
+          description="请调整筛选条件后重试。"
+        />
+        <div class="pagination">
+          <el-pagination
+            v-model:current-page="materialPage"
+            v-model:page-size="materialPageSize"
+            background
+            layout="total, sizes, prev, pager, next"
+            :page-sizes="[10, 20, 50]"
+            :total="materialResult.total"
+            @current-change="loadMaterials"
+            @size-change="changeMaterialPageSize"
+          />
+        </div>
+      </el-card>
+    </template>
 
-      <el-tab-pane label="用料分析" name="analysis">
-        <el-card shadow="never"
-          ><el-form inline
-            ><el-form-item label="产品 BOM"
-              ><el-select
-                v-model="analysisBomId"
-                filterable
-                placeholder="选择 BOM 版本"
-                style="width: 360px"
-                ><el-option
-                  v-for="bom in bomOptions"
-                  :key="bom.bomId"
-                  :label="`${bom.materialCode} · ${bom.version}`"
-                  :value="bom.bomId" /></el-select></el-form-item
-            ><el-form-item label="计划生产数量"
-              ><el-input-number
-                v-model="plannedQuantity"
-                :min="0.01"
-                :precision="2" /></el-form-item
-            ><el-form-item
-              ><el-button
-                :disabled="!canManage || !analysisBomId || analysisRecordLoading"
-                :loading="analysisLoading"
-                type="primary"
-                @click="runAnalysis"
-                >计算理论用料</el-button
-              ></el-form-item
-            ></el-form
-          ><el-alert
-            v-if="analysisError"
-            :closable="false"
-            :title="analysisError"
-            type="error"
-          /><el-descriptions v-if="analysisBom" border :column="2" class="tree-meta"
-            ><el-descriptions-item label="产品">{{ analysisBom.materialName }}</el-descriptions-item
-            ><el-descriptions-item label="版本">{{
-              analysisBom.version
-            }}</el-descriptions-item></el-descriptions
-          >
-          <div v-if="analysisResult.length" class="section-heading">
-            <h3>用料汇总</h3>
-            <span
-              >包含各层组件；理论用量不含损耗和库存扣减，补偿后用量由后端逐层除以（1－损耗率）并向上取整。</span
-            >
-          </div>
-          <el-table v-if="analysisResult.length" :data="analysisResult" stripe
-            ><el-table-column label="物料" min-width="200"
-              ><template #default="{ row }"
-                >{{ row.materialName }}<small>{{ row.materialCode }}</small></template
-              ></el-table-column
-            ><el-table-column label="理论用量" min-width="120"
-              ><template #default="{ row }"
-                >{{ formatNumber(row.theoreticalQuantity) }} {{ row.unit }}</template
-              ></el-table-column
-            ><el-table-column label="补偿后用量" min-width="130"
-              ><template #default="{ row }"
-                >{{ formatNumber(row.withLossQuantity) }} {{ row.unit }}</template
-              ></el-table-column
-            ><el-table-column label="来源路径" min-width="300"
-              ><template #default="{ row }">{{ row.path }}</template></el-table-column
-            ></el-table
-          >
-          <EmptyState
-            v-if="analysisQueried && !analysisLoading && !analysisError && !analysisResult.length"
-            title="该版本没有可展开的子项"
-            description="请检查并维护该版本的 BOM 组件。"
-          />
-          <div class="section-heading">
-            <h3>所选版本最近一次净需求分析</h3>
-            <el-button
-              :disabled="!analysisBomId || analysisLoading"
-              :loading="analysisRecordLoading"
-              @click="loadAnalysisHistory"
-              >刷新记录</el-button
-            >
-            <el-button
-              v-if="canManage"
-              :disabled="!analysisBomId || analysisLoading"
-              :loading="analysisRecordLoading"
-              type="primary"
-              @click="saveAnalysisRecord"
-              >生成并保存净需求分析</el-button
-            >
-          </div>
-          <p class="form-hint">
-            净需求分析单独由后端结合库存、在途量和安全库存计算并保存。此处只展示该版本最新一条记录，不代表全部历史；理论用料计算不写入记录。
-          </p>
-          <el-alert
-            v-if="analysisRecordError"
-            :closable="false"
-            :title="analysisRecordError"
-            type="error"
-          />
-          <el-table v-loading="analysisRecordLoading" :data="analysisHistory" stripe
-            ><el-table-column label="分析编号" prop="id" /><el-table-column
-              label="产品"
-              prop="materialName"
-            /><el-table-column label="版本" prop="version" /><el-table-column
-              label="计划数量"
-              prop="plannedQuantity"
-            /><el-table-column label="执行时间"
-              ><template #default="{ row }">{{
-                formatDateTime(row.executedAt)
-              }}</template></el-table-column
-            ></el-table
-          ></el-card
+    <template v-if="section === 'bom'">
+      <el-card class="table-card" shadow="never">
+        <el-form inline
+          ><el-form-item label="BOM 版本"
+            ><el-select
+              v-model="selectedBomId"
+              filterable
+              placeholder="选择 BOM 版本"
+              style="width: 360px"
+              @change="selectBom"
+              ><el-option
+                v-for="bom in bomResult"
+                :key="bom.bomId"
+                :label="`${bom.materialCode} · ${bom.version} · ${bom.materialName}`"
+                :value="bom.bomId" /></el-select></el-form-item
+          ><el-form-item
+            ><el-button v-if="canManage" :icon="Plus" type="primary" @click="openVersionEditor"
+              >创建版本</el-button
+            ></el-form-item
+          ></el-form
         >
-      </el-tab-pane>
-
-      <el-tab-pane label="BOM 反向追溯" name="trace">
-        <el-card shadow="never"
-          ><el-form inline
-            ><el-form-item label="物料"
-              ><el-select
-                v-model="reverseMaterialCode"
-                filterable
-                placeholder="选择物料"
-                style="width: 360px"
-                @change="resetReverseTrace"
-                ><el-option
-                  v-for="material in materialOptions"
-                  :key="material.id"
-                  :label="`${material.code} · ${material.name}`"
-                  :value="material.code" /></el-select></el-form-item
-            ><el-form-item
-              ><el-checkbox v-model="reverseIncludeHistory"
-                >包含非当前版本</el-checkbox
-              ></el-form-item
-            ><el-form-item
-              ><el-button
-                :disabled="!reverseMaterialCode"
-                :loading="reverseLoading"
-                type="primary"
-                @click="loadReverseTrace"
-                >查询使用关系</el-button
-              ></el-form-item
-            ></el-form
-          ><el-alert v-if="reverseError" :closable="false" :title="reverseError" type="error"
-            ><template #default
-              ><el-button link type="primary" @click="loadReverseTrace"
-                >重新查询</el-button
-              ></template
-            ></el-alert
-          ><template v-else-if="reverseResult.length"
-            ><div class="section-heading">
-              <h3>上层物料引用</h3>
+        <EmptyState
+          v-if="!selectedBomId"
+          title="请选择一个 BOM 版本"
+          description="选择后可查看已有版本和组件；也可直接为物料创建首个版本。"
+        />
+        <template v-else-if="currentBom">
+          <el-skeleton v-if="bomLoading" :rows="6" animated />
+          <template v-else>
+            <el-descriptions border :column="3"
+              ><el-descriptions-item label="版本编号">{{ currentBom.bomId }}</el-descriptions-item
+              ><el-descriptions-item label="产品"
+                >{{ currentBom.materialName }}（{{
+                  currentBom.materialCode
+                }}）</el-descriptions-item
+              ><el-descriptions-item label="状态"
+                ><el-tag :type="currentBom.isCurrent ? 'success' : 'info'">{{
+                  currentBom.isCurrent ? '当前生效版本' : '非当前版本'
+                }}</el-tag></el-descriptions-item
+              ><el-descriptions-item label="版本">{{ currentBom.version }}</el-descriptions-item
+              ><el-descriptions-item label="生效日期">{{
+                currentBom.effectiveDate
+              }}</el-descriptions-item
+              ><el-descriptions-item label="失效日期">{{
+                currentBom.expireDate || '无'
+              }}</el-descriptions-item
+              ><el-descriptions-item label="变更说明">{{
+                currentBom.description
+              }}</el-descriptions-item></el-descriptions
+            >
+            <div class="section-heading">
+              <h3>版本列表</h3>
               <span
-                >每行对应一个上层物料，包含中间组件；累计理论用量不含损耗，不将不同产品和层级相加。</span
+                >版本是否生效由有效期和物料当前版本共同决定；修改当前版本会影响后续 BOM 展开。</span
               >
             </div>
-            <el-table :data="reverseResult" stripe
-              ><el-table-column label="上层物料" min-width="190"
+            <el-table :data="versionList" stripe
+              ><el-table-column label="版本" prop="version" /><el-table-column label="状态"
                 ><template #default="{ row }"
-                  >{{ row.productMaterialName
-                  }}<small>{{ row.productMaterialCode }}</small></template
+                  ><el-tag :type="row.isCurrent ? 'success' : 'info'">{{
+                    row.isCurrent ? '当前生效版本' : '非当前版本'
+                  }}</el-tag></template
                 ></el-table-column
-              ><el-table-column label="版本状态" min-width="120"
+              ><el-table-column label="生效日期" prop="effectiveDate" /><el-table-column
+                label="失效日期"
                 ><template #default="{ row }">{{
-                  row.versionStatus === 'effective' ? '当前生效版本' : '非当前版本'
+                  row.expireDate || '无'
                 }}</template></el-table-column
-              ><el-table-column label="上层 BOM 版本" min-width="160"
-                ><template #default="{ row }">{{ row.version }}</template></el-table-column
-              ><el-table-column label="上溯层级" min-width="100"
-                ><template #default="{ row }">第 {{ row.level }} 层</template></el-table-column
-              ><el-table-column label="累计理论用量" min-width="140"
+              ><el-table-column label="操作" min-width="170"
                 ><template #default="{ row }"
-                  >{{ formatNumber(row.cumulativeQuantity) }} {{ row.unit }}</template
+                  ><el-button link type="primary" @click="selectBom(row.bomId)">查看</el-button
+                  ><el-popconfirm
+                    v-if="canManage && !row.isCurrent"
+                    title="将切换该物料的当前版本；后端会校验有效期与循环依赖，是否继续？"
+                    confirm-button-text="确认生效"
+                    @confirm="releaseBom(row.bomId)"
+                    ><template #reference
+                      ><el-button :loading="versionSaving" link type="danger"
+                        >设为当前版本</el-button
+                      ></template
+                    ></el-popconfirm
+                  ></template
                 ></el-table-column
-              ><el-table-column
-                label="完整依赖路径"
-                min-width="360"
-                prop="path" /></el-table></template
-          ><EmptyState
-            v-else-if="!reverseLoading && reverseQueried"
-            title="暂无上层 BOM 引用"
-            description="所选查询范围内没有找到上层引用关系。" /><EmptyState
-            v-else-if="!reverseLoading"
-            title="选择物料后查询"
-            description="结果会展示完整上层路径、层级与累计理论用量。"
-        /></el-card>
-      </el-tab-pane>
-    </el-tabs>
+              ></el-table
+            >
+            <div class="section-heading">
+              <h3>组件明细</h3>
+              <el-button v-if="canManage" :icon="Plus" type="primary" @click="openComponentEditor()"
+                >新增明细</el-button
+              >
+            </div>
+            <el-table :data="currentBom.components" stripe
+              ><el-table-column label="行号" prop="lineNo" width="70" /><el-table-column
+                label="子项物料"
+                min-width="210"
+                ><template #default="{ row }"
+                  >{{ row.materialName }}<small>{{ row.materialCode }}</small></template
+                ></el-table-column
+              ><el-table-column label="用量" min-width="110"
+                ><template #default="{ row }"
+                  >{{ formatNumber(row.quantity) }} {{ row.unit }}</template
+                ></el-table-column
+              ><el-table-column label="损耗率" min-width="90"
+                ><template #default="{ row }"
+                  >{{ formatNumber(row.lossRate) }}%</template
+                ></el-table-column
+              ><el-table-column label="操作" min-width="150"
+                ><template #default="{ row }"
+                  ><el-button v-if="canManage" link type="primary" @click="openComponentEditor(row)"
+                    >编辑</el-button
+                  ><el-popconfirm
+                    v-if="canManage"
+                    title="移除后无法恢复，是否继续？"
+                    confirm-button-text="移除"
+                    @confirm="removeBomComponent(row.componentId)"
+                    ><template #reference
+                      ><el-button :loading="bomEditorSaving" link type="danger"
+                        >移除</el-button
+                      ></template
+                    ></el-popconfirm
+                  ></template
+                ></el-table-column
+              ></el-table
+            >
+          </template>
+        </template>
+      </el-card>
+    </template>
+
+    <template v-if="section === 'tree'">
+      <el-card shadow="never"
+        ><el-form inline
+          ><el-form-item label="BOM 版本"
+            ><el-select
+              v-model="treeBomId"
+              filterable
+              placeholder="选择 BOM 版本"
+              style="width: 360px"
+              ><el-option
+                v-for="bom in bomOptions"
+                :key="bom.bomId"
+                :label="`${bom.materialCode} · ${bom.version}`"
+                :value="bom.bomId" /></el-select></el-form-item
+          ><el-form-item
+            ><el-button
+              :disabled="!treeBomId"
+              :loading="treeLoading"
+              type="primary"
+              @click="loadTree"
+              >加载结构</el-button
+            ><el-button :disabled="!treeData.length" @click="toggleTree(true)">展开全部</el-button
+            ><el-button :disabled="!treeData.length" @click="toggleTree(false)"
+              >收起全部</el-button
+            ></el-form-item
+          ></el-form
+        ><el-alert
+          v-if="treeError"
+          :closable="false"
+          :title="treeError"
+          type="error" /><el-descriptions v-if="treeBom" border :column="2" class="tree-meta"
+          ><el-descriptions-item label="产品">{{ treeBom.materialName }}</el-descriptions-item
+          ><el-descriptions-item label="版本">{{
+            treeBom.version
+          }}</el-descriptions-item></el-descriptions
+        ><el-tree
+          v-if="treeData.length"
+          :key="treeKey"
+          class="bom-tree"
+          :data="treeData"
+          :default-expand-all="treeExpanded"
+          node-key="path"
+          :props="{ children: 'children', label: 'materialName' }"
+          ><template #default="{ data }"
+            ><span class="tree-node"
+              ><strong>{{ data.materialName }}</strong
+              ><small
+                >{{ data.materialCode }} · 层级 {{ data.level }} · 累计
+                {{ formatNumber(data.cumulativeQuantity) }} {{ data.unit }} ·
+                {{ data.isLeaf ? '叶子节点' : '组件' }}</small
+              ></span
+            ></template
+          ></el-tree
+        ><EmptyState
+          v-else-if="!treeLoading && !treeError"
+          title="暂无 BOM 树"
+          description="选择产品版本并加载后查看多层级结构。"
+      /></el-card>
+    </template>
+
+    <template v-if="section === 'analysis'">
+      <el-card class="table-card" shadow="never"
+        ><el-form inline
+          ><el-form-item label="产品 BOM"
+            ><el-select
+              v-model="analysisBomId"
+              filterable
+              placeholder="选择 BOM 版本"
+              style="width: 360px"
+              ><el-option
+                v-for="bom in bomOptions"
+                :key="bom.bomId"
+                :label="`${bom.materialCode} · ${bom.version}`"
+                :value="bom.bomId" /></el-select></el-form-item
+          ><el-form-item label="计划生产数量"
+            ><el-input-number v-model="plannedQuantity" :min="0.01" :precision="2" /></el-form-item
+          ><el-form-item
+            ><el-button
+              :disabled="!canManage || !analysisBomId || analysisRecordLoading"
+              :loading="analysisLoading"
+              type="primary"
+              @click="runAnalysis"
+              >计算理论用料</el-button
+            ></el-form-item
+          ></el-form
+        ><el-alert
+          v-if="analysisError"
+          :closable="false"
+          :title="analysisError"
+          type="error"
+        /><el-descriptions v-if="analysisBom" border :column="2" class="tree-meta"
+          ><el-descriptions-item label="产品">{{ analysisBom.materialName }}</el-descriptions-item
+          ><el-descriptions-item label="版本">{{
+            analysisBom.version
+          }}</el-descriptions-item></el-descriptions
+        >
+        <div v-if="analysisResult.length" class="section-heading">
+          <h3>用料汇总</h3>
+          <span
+            >包含各层组件；理论用量不含损耗和库存扣减，补偿后用量由后端逐层除以（1－损耗率）并向上取整。</span
+          >
+        </div>
+        <el-table v-if="analysisResult.length" :data="analysisResult" stripe
+          ><el-table-column label="物料" min-width="200"
+            ><template #default="{ row }"
+              >{{ row.materialName }}<small>{{ row.materialCode }}</small></template
+            ></el-table-column
+          ><el-table-column label="理论用量" min-width="120"
+            ><template #default="{ row }"
+              >{{ formatNumber(row.theoreticalQuantity) }} {{ row.unit }}</template
+            ></el-table-column
+          ><el-table-column label="补偿后用量" min-width="130"
+            ><template #default="{ row }"
+              >{{ formatNumber(row.withLossQuantity) }} {{ row.unit }}</template
+            ></el-table-column
+          ><el-table-column label="来源路径" min-width="300"
+            ><template #default="{ row }">{{ row.path }}</template></el-table-column
+          ></el-table
+        >
+        <EmptyState
+          v-if="analysisQueried && !analysisLoading && !analysisError && !analysisResult.length"
+          title="该版本没有可展开的子项"
+          description="请检查并维护该版本的 BOM 组件。"
+        />
+        <div class="section-heading">
+          <h3>所选版本最近一次净需求分析</h3>
+          <el-button
+            :disabled="!analysisBomId || analysisLoading"
+            :loading="analysisRecordLoading"
+            @click="loadAnalysisHistory"
+            >刷新记录</el-button
+          >
+          <el-button
+            v-if="canManage"
+            :disabled="!analysisBomId || analysisLoading"
+            :loading="analysisRecordLoading"
+            type="primary"
+            @click="saveAnalysisRecord"
+            >生成并保存净需求分析</el-button
+          >
+        </div>
+        <p class="form-hint">
+          净需求分析单独由后端结合库存、在途量和安全库存计算并保存。此处只展示该版本最新一条记录，不代表全部历史；理论用料计算不写入记录。
+        </p>
+        <el-alert
+          v-if="analysisRecordError"
+          :closable="false"
+          :title="analysisRecordError"
+          type="error"
+        />
+        <el-table v-loading="analysisRecordLoading" :data="analysisHistory" stripe
+          ><el-table-column label="分析编号" prop="id" /><el-table-column
+            label="产品"
+            prop="materialName"
+          /><el-table-column label="版本" prop="version" /><el-table-column
+            label="计划数量"
+            prop="plannedQuantity"
+          /><el-table-column label="执行时间"
+            ><template #default="{ row }">{{
+              formatDateTime(row.executedAt)
+            }}</template></el-table-column
+          ></el-table
+        ></el-card
+      >
+    </template>
+
+    <template v-if="section === 'trace'">
+      <el-card class="table-card" shadow="never"
+        ><el-form inline
+          ><el-form-item label="物料"
+            ><el-select
+              v-model="reverseMaterialCode"
+              filterable
+              placeholder="选择物料"
+              style="width: 360px"
+              @change="resetReverseTrace"
+              ><el-option
+                v-for="material in materialOptions"
+                :key="material.id"
+                :label="`${material.code} · ${material.name}`"
+                :value="material.code" /></el-select></el-form-item
+          ><el-form-item
+            ><el-checkbox v-model="reverseIncludeHistory">包含非当前版本</el-checkbox></el-form-item
+          ><el-form-item
+            ><el-button
+              :disabled="!reverseMaterialCode"
+              :loading="reverseLoading"
+              type="primary"
+              @click="loadReverseTrace"
+              >查询使用关系</el-button
+            ></el-form-item
+          ></el-form
+        ><el-alert v-if="reverseError" :closable="false" :title="reverseError" type="error"
+          ><template #default
+            ><el-button link type="primary" @click="loadReverseTrace">重新查询</el-button></template
+          ></el-alert
+        ><template v-else-if="reverseResult.length"
+          ><div class="section-heading">
+            <h3>上层物料引用</h3>
+            <span
+              >每行对应一个上层物料，包含中间组件；累计理论用量不含损耗，不将不同产品和层级相加。</span
+            >
+          </div>
+          <el-table :data="reverseResult" stripe
+            ><el-table-column label="上层物料" min-width="190"
+              ><template #default="{ row }"
+                >{{ row.productMaterialName }}<small>{{ row.productMaterialCode }}</small></template
+              ></el-table-column
+            ><el-table-column label="版本状态" min-width="120"
+              ><template #default="{ row }">{{
+                row.versionStatus === 'effective' ? '当前生效版本' : '非当前版本'
+              }}</template></el-table-column
+            ><el-table-column label="上层 BOM 版本" min-width="160"
+              ><template #default="{ row }">{{ row.version }}</template></el-table-column
+            ><el-table-column label="上溯层级" min-width="100"
+              ><template #default="{ row }">第 {{ row.level }} 层</template></el-table-column
+            ><el-table-column label="累计理论用量" min-width="140"
+              ><template #default="{ row }"
+                >{{ formatNumber(row.cumulativeQuantity) }} {{ row.unit }}</template
+              ></el-table-column
+            ><el-table-column
+              label="完整依赖路径"
+              min-width="360"
+              prop="path" /></el-table></template
+        ><EmptyState
+          v-else-if="!reverseLoading && reverseQueried"
+          title="暂无上层 BOM 引用"
+          description="所选查询范围内没有找到上层引用关系。" /><EmptyState
+          v-else-if="!reverseLoading"
+          title="选择物料后查询"
+          description="结果会展示完整上层路径、层级与累计理论用量。"
+      /></el-card>
+    </template>
 
     <el-drawer v-model="materialDrawer" size="560px" title="物料详情"
       ><el-descriptions v-if="currentMaterial" border :column="1"
@@ -1217,9 +1220,6 @@ watch(reverseIncludeHistory, resetReverseTrace)
 }
 .material-filter-form :deep(.el-form-item:last-child .el-button + .el-button) {
   margin-left: 0;
-}
-.material-tabs :deep(.el-tabs__content) {
-  overflow: visible;
 }
 .table-toolbar,
 .section-heading {

@@ -220,30 +220,6 @@ onMounted(() => void loadOverview())
   gap: 16px;
   margin-bottom: 16px;
 }
-.statistic-card {
-  min-width: 0;
-}
-.statistic-card p,
-.statistic-card small {
-  display: block;
-  margin: 0;
-  color: var(--el-text-color-secondary);
-}
-.statistic-card strong {
-  display: block;
-  margin: 12px 0 8px;
-  font-size: 28px;
-}
-.statistic-card--clickable {
-  cursor: pointer;
-  transition:
-    border-color 0.2s,
-    transform 0.2s;
-}
-.statistic-card--clickable:hover {
-  border-color: var(--el-color-primary);
-  transform: translateY(-2px);
-}
 .overview-card {
   margin-bottom: 16px;
   min-width: 0;

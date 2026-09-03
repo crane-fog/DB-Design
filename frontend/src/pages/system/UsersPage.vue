@@ -354,7 +354,7 @@ onMounted(() => void loadUsers())
       </el-form>
     </el-card>
 
-    <el-card class="user-table-card" shadow="never">
+    <el-card class="user-table-card table-card" shadow="never">
       <el-alert
         v-if="error"
         class="user-request-error"
@@ -577,10 +577,6 @@ onMounted(() => void loadUsers())
 
 .user-search-card :deep(.el-card__body) {
   padding-bottom: 2px;
-}
-
-.user-table-card :deep(.el-card__body) {
-  padding: 0;
 }
 
 .user-request-error {

@@ -524,7 +524,7 @@ onMounted(() => {
           </el-form>
         </el-card>
 
-        <el-card class="section-card" shadow="never">
+        <el-card class="section-card table-card" shadow="never">
           <el-alert
             v-if="externalError"
             class="request-error"
@@ -668,7 +668,7 @@ onMounted(() => {
             </el-form-item>
           </el-form>
         </el-card>
-        <el-card v-loading="estimateLoading" class="section-card" shadow="never">
+        <el-card v-loading="estimateLoading" class="section-card table-card" shadow="never">
           <el-alert v-if="estimateError" :closable="false" :title="estimateError" type="error" />
           <template v-else-if="estimateResult">
             <div class="metric-grid">
@@ -867,7 +867,7 @@ onMounted(() => {
       </el-tab-pane>
 
       <el-tab-pane v-if="canManageCapacity" label="产线状态与报工" name="status">
-        <el-card class="section-card" shadow="never">
+        <el-card class="section-card table-card" shadow="never">
           <el-table :data="lineOptions" stripe>
             <el-table-column label="生产线" min-width="100">
               <template #default="{ row }">#{{ row.lineId }}</template>

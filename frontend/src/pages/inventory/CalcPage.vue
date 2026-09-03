@@ -324,14 +324,14 @@ onBeforeUnmount(() => {
       >
     </el-alert>
 
-    <el-card class="result-card" shadow="never">
+    <el-card class="result-card table-card table-card--accent" shadow="never">
       <template #header>
-        <div class="section-heading result-heading">
+        <div class="section-heading result-heading table-card__header">
           <span>
             计算结果
             <small v-if="result">{{ formatDateTime(result.calculatedAt) }}</small>
           </span>
-          <div v-if="result" class="result-summary">
+          <div v-if="result" class="result-summary table-card__header-actions">
             <span
               >缺口物料 <strong>{{ shortageItems.length }}</strong> 项</span
             >
@@ -451,12 +451,6 @@ onBeforeUnmount(() => {
 .calculation-card,
 .request-error {
   margin-bottom: 16px;
-}
-.calculation-card {
-  border-top: 3px solid var(--primary-color);
-}
-.result-card {
-  border-top: 3px solid var(--border-color);
 }
 .section-heading,
 .result-summary,

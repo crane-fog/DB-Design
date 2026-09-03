@@ -24,15 +24,34 @@ import { useRoute } from 'vue-router'
 
 type TraceTab = 'consumption' | 'impact' | 'material' | 'product'
 
+const { section } = defineProps<{ section: TraceTab }>()
 const pageSize = 10
 const auth = useAuthStore()
 const route = useRoute()
 const canManage = computed(() => auth.hasPermission(PERMISSIONS.trace.manage))
-const activeTab = ref<TraceTab>('consumption')
 const references = ref<TraceConsumptionReferenceData>({})
 const suppliers = computed(() => references.value.suppliers ?? [])
 const referenceError = ref('')
 const referenceLoading = ref(false)
+const sectionMetadata: Record<TraceTab, { description: string; title: string }> = {
+  consumption: {
+    description: '维护生产订单与采购明细之间的真实批次消耗关系。',
+    title: '批次消耗',
+  },
+  impact: {
+    description: '根据问题采购明细或原材料批次分析受影响的产品与生产订单。',
+    title: '质量影响分析',
+  },
+  material: {
+    description: '从原材料采购批次反向查询受影响的产品批次与生产订单。',
+    title: '反向追溯',
+  },
+  product: {
+    description: '从成品批次或生产订单追溯所使用的原材料采购批次。',
+    title: '正向追溯',
+  },
+}
+const currentSection = computed(() => sectionMetadata[section])
 
 async function loadReferences() {
   referenceLoading.value = true
@@ -387,7 +406,14 @@ function resetImpactFilters() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadConsumption(), loadReferences()])
+  const initialRequests: Promise<void>[] = []
+  if (section === 'consumption') {
+    initialRequests.push(loadConsumption())
+  }
+  if (section === 'consumption' || section === 'material') {
+    initialRequests.push(loadReferences())
+  }
+  await Promise.all(initialRequests)
 
   let batchNo = ''
   let orderId = ''
@@ -397,8 +423,7 @@ onMounted(async () => {
   if (typeof route.query.orderId === 'string') {
     ;({ orderId } = route.query)
   }
-  if (route.query.tab === 'product' && (batchNo || parsePositiveInt(orderId))) {
-    activeTab.value = 'product'
+  if (section === 'product' && (batchNo || parsePositiveInt(orderId))) {
     Object.assign(productFilters, { batchNo, orderId })
     await traceProduct()
   }
@@ -407,10 +432,7 @@ onMounted(async () => {
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="质量追溯"
-      description="维护真实批次消耗关系，查询正反向追溯与质量影响分析。"
-    />
+    <PageHeader :title="currentSection.title" :description="currentSection.description" />
 
     <el-alert
       v-if="referenceError"
@@ -425,68 +447,181 @@ onMounted(async () => {
       >
     </el-alert>
 
-    <el-tabs v-model="activeTab" class="trace-tabs">
-      <el-tab-pane label="批次消耗" name="consumption">
-        <el-card class="trace-search-card" shadow="never">
-          <el-form :model="consumptionFilters" inline @submit.prevent="loadConsumption(1)">
-            <el-form-item label="生产订单 ID">
-              <el-input
-                v-model.trim="consumptionFilters.orderId"
-                clearable
-                placeholder="精确查询"
-              />
-            </el-form-item>
-            <el-form-item label="采购明细 ID">
-              <el-input v-model.trim="consumptionFilters.itemId" clearable placeholder="精确查询" />
-            </el-form-item>
-            <el-form-item label="原材料 ID">
-              <el-input
-                v-model.trim="consumptionFilters.materialId"
-                clearable
-                placeholder="精确查询"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button :loading="consumptionLoading" type="primary" @click="loadConsumption(1)"
-                >查询</el-button
+    <template v-if="section === 'consumption'">
+      <el-card class="trace-search-card" shadow="never">
+        <el-form :model="consumptionFilters" inline @submit.prevent="loadConsumption(1)">
+          <el-form-item label="生产订单 ID">
+            <el-input v-model.trim="consumptionFilters.orderId" clearable placeholder="精确查询" />
+          </el-form-item>
+          <el-form-item label="采购明细 ID">
+            <el-input v-model.trim="consumptionFilters.itemId" clearable placeholder="精确查询" />
+          </el-form-item>
+          <el-form-item label="原材料 ID">
+            <el-input
+              v-model.trim="consumptionFilters.materialId"
+              clearable
+              placeholder="精确查询"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button :loading="consumptionLoading" type="primary" @click="loadConsumption(1)"
+              >查询</el-button
+            >
+            <el-button
+              :disabled="consumptionLoading"
+              :icon="Refresh"
+              @click="resetConsumptionFilters"
+              >重置</el-button
+            >
+            <el-button v-if="canManage" :icon="Plus" type="primary" @click="openConsumptionCreate"
+              >新增消耗</el-button
+            >
+          </el-form-item>
+        </el-form>
+      </el-card>
+      <el-card class="trace-table-card table-card" shadow="never">
+        <el-alert
+          v-if="consumptionError"
+          class="trace-request-error"
+          :closable="false"
+          show-icon
+          :title="consumptionError"
+          type="error"
+        >
+          <el-button link type="primary" @click="loadConsumption(consumptionPage)"
+            >重新加载</el-button
+          >
+        </el-alert>
+        <el-table v-else v-loading="consumptionLoading" :data="consumptionResult.items" stripe>
+          <el-table-column label="消耗 ID" min-width="90" prop="consumptionId" />
+          <el-table-column label="生产订单 / 产品" min-width="180">
+            <template #default="{ row }">
+              <strong>#{{ row.orderId }}</strong>
+              <small class="cell-sub">{{ row.productMaterialName || '-' }}</small>
+            </template>
+          </el-table-column>
+          <el-table-column label="采购明细 / 原材料" min-width="185">
+            <template #default="{ row }">
+              <strong>明细 #{{ row.itemId }}</strong>
+              <small class="cell-sub">{{ row.materialName || '-' }}</small>
+            </template>
+          </el-table-column>
+          <el-table-column label="采购订单" min-width="120">
+            <template #default="{ row }">{{
+              row.purchaseOrderId ? '#' + row.purchaseOrderId : '-'
+            }}</template>
+          </el-table-column>
+          <el-table-column label="生产状态" min-width="110">
+            <template #default="{ row }">{{
+              getProductionStatusLabel(row.productionStatus)
+            }}</template>
+          </el-table-column>
+          <el-table-column label="消耗数量" min-width="120">
+            <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
+          </el-table-column>
+          <el-table-column fixed="right" label="操作" min-width="190">
+            <template #default="{ row }">
+              <el-button link type="primary" :icon="View" @click="openConsumptionDetail(row)"
+                >详情</el-button
               >
               <el-button
-                :disabled="consumptionLoading"
-                :icon="Refresh"
-                @click="resetConsumptionFilters"
-                >重置</el-button
+                v-if="canManage"
+                link
+                type="primary"
+                :icon="EditPen"
+                @click="openConsumptionEdit(row)"
+                >修改</el-button
               >
-              <el-button v-if="canManage" :icon="Plus" type="primary" @click="openConsumptionCreate"
-                >新增消耗</el-button
+              <el-button
+                v-if="canManage"
+                link
+                type="danger"
+                :icon="Delete"
+                :disabled="consumptionDeleting"
+                @click="removeConsumption(row)"
+                >删除</el-button
               >
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card class="trace-table-card" shadow="never">
-          <el-alert
-            v-if="consumptionError"
-            class="trace-request-error"
-            :closable="false"
-            show-icon
-            :title="consumptionError"
-            type="error"
-          >
-            <el-button link type="primary" @click="loadConsumption(consumptionPage)"
-              >重新加载</el-button
+            </template>
+          </el-table-column>
+        </el-table>
+        <div v-if="!consumptionError && consumptionResult.total > 0" class="trace-pagination">
+          <el-pagination
+            v-model:current-page="consumptionPage"
+            background
+            layout="total, prev, pager, next"
+            :page-size="pageSize"
+            :total="consumptionResult.total"
+            @current-change="loadConsumption"
+          />
+        </div>
+      </el-card>
+    </template>
+
+    <template v-if="section === 'product'">
+      <el-card class="trace-search-card" shadow="never">
+        <el-form :model="productFilters" inline @submit.prevent="traceProduct">
+          <el-form-item label="生产订单 ID">
+            <el-input
+              v-model.trim="productFilters.orderId"
+              clearable
+              placeholder="与批次号二选一"
+            />
+          </el-form-item>
+          <el-form-item label="成品批次号">
+            <el-input v-model.trim="productFilters.batchNo" clearable placeholder="与订单二选一" />
+          </el-form-item>
+          <el-form-item label="含供应商">
+            <el-switch v-model="productFilters.includeSupplier" />
+          </el-form-item>
+          <el-form-item>
+            <el-button :icon="Search" :loading="productLoading" type="primary" @click="traceProduct"
+              >追溯</el-button
             >
-          </el-alert>
-          <el-table v-else v-loading="consumptionLoading" :data="consumptionResult.items" stripe>
-            <el-table-column label="消耗 ID" min-width="90" prop="consumptionId" />
-            <el-table-column label="生产订单 / 产品" min-width="180">
-              <template #default="{ row }">
-                <strong>#{{ row.orderId }}</strong>
-                <small class="cell-sub">{{ row.productMaterialName || '-' }}</small>
-              </template>
-            </el-table-column>
-            <el-table-column label="采购明细 / 原材料" min-width="185">
+            <el-button :disabled="productLoading" :icon="Refresh" @click="resetProductFilters"
+              >重置</el-button
+            >
+          </el-form-item>
+        </el-form>
+      </el-card>
+      <el-card v-loading="productLoading" class="trace-table-card table-card" shadow="never">
+        <el-alert
+          v-if="productError"
+          :closable="false"
+          show-icon
+          :title="productError"
+          type="error"
+        />
+        <template v-else-if="productResult">
+          <el-descriptions border :column="3" class="trace-summary" title="成品批次">
+            <el-descriptions-item label="生产订单"
+              >#{{ productResult.orderId }}</el-descriptions-item
+            >
+            <el-descriptions-item label="成品批次">{{
+              productResult.batchNo || '-'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="产品">{{
+              productResult.materialName || '#' + productResult.materialId
+            }}</el-descriptions-item>
+            <el-descriptions-item v-if="productResult.bomVersion" label="BOM 版本">{{
+              productResult.bomVersion
+            }}</el-descriptions-item>
+            <el-descriptions-item v-if="productResult.planQty !== undefined" label="订单计划数量">{{
+              formatNumber(productResult.planQty)
+            }}</el-descriptions-item>
+            <el-descriptions-item
+              v-if="productResult.finishedQty !== undefined"
+              label="订单完工数量"
+              >{{ formatNumber(productResult.finishedQty) }}</el-descriptions-item
+            >
+            <el-descriptions-item v-if="productResult.producedAt" label="订单完工日期">{{
+              formatDateTime(productResult.producedAt)
+            }}</el-descriptions-item>
+          </el-descriptions>
+          <el-table :data="productResult.consumedBatches" stripe>
+            <el-table-column label="采购明细 / 原材料" min-width="190">
               <template #default="{ row }">
                 <strong>明细 #{{ row.itemId }}</strong>
-                <small class="cell-sub">{{ row.materialName || '-' }}</small>
+                <small class="cell-sub">{{ row.materialName || '#' + row.materialId }}</small>
               </template>
             </el-table-column>
             <el-table-column label="采购订单" min-width="120">
@@ -494,360 +629,128 @@ onMounted(async () => {
                 row.purchaseOrderId ? '#' + row.purchaseOrderId : '-'
               }}</template>
             </el-table-column>
-            <el-table-column label="生产状态" min-width="110">
-              <template #default="{ row }">{{
-                getProductionStatusLabel(row.productionStatus)
-              }}</template>
+            <el-table-column v-if="productFilters.includeSupplier" label="供应商" min-width="150">
+              <template #default="{ row }">{{ row.supplierName || '-' }}</template>
             </el-table-column>
-            <el-table-column label="消耗数量" min-width="120">
+            <el-table-column label="到货日期" min-width="125">
+              <template #default="{ row }">{{ formatDateTime(row.receiveDate) }}</template>
+            </el-table-column>
+            <el-table-column label="消耗数量" min-width="115">
               <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
             </el-table-column>
-            <el-table-column fixed="right" label="操作" min-width="190">
-              <template #default="{ row }">
-                <el-button link type="primary" :icon="View" @click="openConsumptionDetail(row)"
-                  >详情</el-button
-                >
-                <el-button
-                  v-if="canManage"
-                  link
-                  type="primary"
-                  :icon="EditPen"
-                  @click="openConsumptionEdit(row)"
-                  >修改</el-button
-                >
-                <el-button
-                  v-if="canManage"
-                  link
-                  type="danger"
-                  :icon="Delete"
-                  :disabled="consumptionDeleting"
-                  @click="removeConsumption(row)"
-                  >删除</el-button
-                >
-              </template>
-            </el-table-column>
           </el-table>
-          <div v-if="!consumptionError && consumptionResult.total > 0" class="trace-pagination">
-            <el-pagination
-              v-model:current-page="consumptionPage"
-              background
-              layout="total, prev, pager, next"
-              :page-size="pageSize"
-              :total="consumptionResult.total"
-              @current-change="loadConsumption"
-            />
-          </div>
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane label="正向追溯" name="product">
-        <el-card class="trace-search-card" shadow="never">
-          <el-form :model="productFilters" inline @submit.prevent="traceProduct">
-            <el-form-item label="生产订单 ID">
-              <el-input
-                v-model.trim="productFilters.orderId"
-                clearable
-                placeholder="与批次号二选一"
-              />
-            </el-form-item>
-            <el-form-item label="成品批次号">
-              <el-input
-                v-model.trim="productFilters.batchNo"
-                clearable
-                placeholder="与订单二选一"
-              />
-            </el-form-item>
-            <el-form-item label="含供应商">
-              <el-switch v-model="productFilters.includeSupplier" />
-            </el-form-item>
-            <el-form-item>
-              <el-button
-                :icon="Search"
-                :loading="productLoading"
-                type="primary"
-                @click="traceProduct"
-                >追溯</el-button
-              >
-              <el-button :disabled="productLoading" :icon="Refresh" @click="resetProductFilters"
-                >重置</el-button
-              >
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card v-loading="productLoading" class="trace-table-card" shadow="never">
-          <el-alert
-            v-if="productError"
-            :closable="false"
-            show-icon
-            :title="productError"
-            type="error"
-          />
-          <template v-else-if="productResult">
-            <el-descriptions border :column="3" class="trace-summary" title="成品批次">
-              <el-descriptions-item label="生产订单"
-                >#{{ productResult.orderId }}</el-descriptions-item
-              >
-              <el-descriptions-item label="成品批次">{{
-                productResult.batchNo || '-'
-              }}</el-descriptions-item>
-              <el-descriptions-item label="产品">{{
-                productResult.materialName || '#' + productResult.materialId
-              }}</el-descriptions-item>
-              <el-descriptions-item v-if="productResult.bomVersion" label="BOM 版本">{{
-                productResult.bomVersion
-              }}</el-descriptions-item>
-              <el-descriptions-item
-                v-if="productResult.planQty !== undefined"
-                label="订单计划数量"
-                >{{ formatNumber(productResult.planQty) }}</el-descriptions-item
-              >
-              <el-descriptions-item
-                v-if="productResult.finishedQty !== undefined"
-                label="订单完工数量"
-                >{{ formatNumber(productResult.finishedQty) }}</el-descriptions-item
-              >
-              <el-descriptions-item v-if="productResult.producedAt" label="订单完工日期">{{
-                formatDateTime(productResult.producedAt)
-              }}</el-descriptions-item>
-            </el-descriptions>
-            <el-table :data="productResult.consumedBatches" stripe>
-              <el-table-column label="采购明细 / 原材料" min-width="190">
-                <template #default="{ row }">
-                  <strong>明细 #{{ row.itemId }}</strong>
-                  <small class="cell-sub">{{ row.materialName || '#' + row.materialId }}</small>
-                </template>
+          <template v-if="productResult.inboundRecords">
+            <el-divider content-position="left">关联完工入库记录</el-divider>
+            <el-table :data="productResult.inboundRecords" stripe>
+              <el-table-column label="入库 ID" prop="inbound_id" min-width="90" />
+              <el-table-column label="成品批次" prop="batch_no" min-width="145" />
+              <el-table-column label="完工数量" min-width="110">
+                <template #default="{ row }">{{ formatNumber(row.finish_qty) }}</template>
               </el-table-column>
-              <el-table-column label="采购订单" min-width="120">
+              <el-table-column label="合格数量" min-width="110">
+                <template #default="{ row }">{{ formatNumber(row.qualified_qty) }}</template>
+              </el-table-column>
+              <el-table-column label="不合格数量" min-width="110">
                 <template #default="{ row }">{{
-                  row.purchaseOrderId ? '#' + row.purchaseOrderId : '-'
+                  formatNumber(row.finish_qty - row.qualified_qty)
                 }}</template>
               </el-table-column>
-              <el-table-column v-if="productFilters.includeSupplier" label="供应商" min-width="150">
-                <template #default="{ row }">{{ row.supplierName || '-' }}</template>
-              </el-table-column>
-              <el-table-column label="到货日期" min-width="125">
-                <template #default="{ row }">{{ formatDateTime(row.receiveDate) }}</template>
-              </el-table-column>
-              <el-table-column label="消耗数量" min-width="115">
-                <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
+              <el-table-column label="入库时间" min-width="170">
+                <template #default="{ row }">{{ formatDateTime(row.inbound_time) }}</template>
               </el-table-column>
             </el-table>
-            <template v-if="productResult.inboundRecords">
-              <el-divider content-position="left">关联完工入库记录</el-divider>
-              <el-table :data="productResult.inboundRecords" stripe>
-                <el-table-column label="入库 ID" prop="inbound_id" min-width="90" />
-                <el-table-column label="成品批次" prop="batch_no" min-width="145" />
-                <el-table-column label="完工数量" min-width="110">
-                  <template #default="{ row }">{{ formatNumber(row.finish_qty) }}</template>
-                </el-table-column>
-                <el-table-column label="合格数量" min-width="110">
-                  <template #default="{ row }">{{ formatNumber(row.qualified_qty) }}</template>
-                </el-table-column>
-                <el-table-column label="不合格数量" min-width="110">
-                  <template #default="{ row }">{{
-                    formatNumber(row.finish_qty - row.qualified_qty)
-                  }}</template>
-                </el-table-column>
-                <el-table-column label="入库时间" min-width="170">
-                  <template #default="{ row }">{{ formatDateTime(row.inbound_time) }}</template>
-                </el-table-column>
-              </el-table>
-            </template>
           </template>
-          <el-empty v-else-if="productSearched" description="未查询到匹配的成品批次" />
-          <el-empty v-else description="请输入生产订单 ID 或成品批次号后开始正向追溯" />
-        </el-card>
-      </el-tab-pane>
+        </template>
+        <el-empty v-else-if="productSearched" description="未查询到匹配的成品批次" />
+        <el-empty v-else description="请输入生产订单 ID 或成品批次号后开始正向追溯" />
+      </el-card>
+    </template>
 
-      <el-tab-pane label="反向追溯" name="material">
-        <el-card class="trace-search-card" shadow="never">
-          <el-form :model="materialFilters" inline @submit.prevent="traceMaterial">
-            <el-form-item label="采购明细 ID">
-              <el-input v-model.trim="materialFilters.itemId" clearable placeholder="可选" />
-            </el-form-item>
-            <el-form-item label="原材料 ID">
-              <el-input v-model.trim="materialFilters.materialId" clearable placeholder="可选" />
-            </el-form-item>
-            <el-form-item label="供应商筛选">
-              <el-select
-                v-if="references.suppliers"
-                v-model="materialFilters.supplierId"
-                clearable
-                filterable
-                :loading="referenceLoading"
-                placeholder="选择供应商"
-                style="width: 200px"
-              >
-                <el-option
-                  v-for="supplier in suppliers"
-                  :key="supplier.supplierId"
-                  :label="supplier.supplierName + ' · #' + supplier.supplierId"
-                  :value="supplier.supplierId"
-                />
-              </el-select>
-              <el-input-number
-                v-else
-                v-model="materialFilters.supplierId"
-                :min="1"
-                :precision="0"
-                :controls="false"
-                placeholder="供应商 ID（可选）"
-              />
-            </el-form-item>
-            <el-form-item label="到货日期">
-              <el-date-picker
-                v-model="materialFilters.receiveRange"
-                end-placeholder="结束日期"
-                range-separator="至"
-                start-placeholder="开始日期"
-                type="daterange"
-                value-format="YYYY-MM-DD"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button
-                :icon="Search"
-                :loading="materialLoading"
-                type="primary"
-                @click="traceMaterial"
-                >追溯</el-button
-              >
-              <el-button :disabled="materialLoading" :icon="Refresh" @click="resetMaterialFilters"
-                >重置</el-button
-              >
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card v-loading="materialLoading" class="trace-table-card" shadow="never">
-          <el-alert
-            v-if="materialError"
-            :closable="false"
-            show-icon
-            :title="materialError"
-            type="error"
-          />
-          <template v-else-if="materialResult.length">
-            <el-card
-              v-for="batch in materialResult"
-              :key="batch.itemId"
-              class="material-batch-card"
-              shadow="never"
+    <template v-if="section === 'material'">
+      <el-card class="trace-search-card" shadow="never">
+        <el-form :model="materialFilters" inline @submit.prevent="traceMaterial">
+          <el-form-item label="采购明细 ID">
+            <el-input v-model.trim="materialFilters.itemId" clearable placeholder="可选" />
+          </el-form-item>
+          <el-form-item label="原材料 ID">
+            <el-input v-model.trim="materialFilters.materialId" clearable placeholder="可选" />
+          </el-form-item>
+          <el-form-item label="供应商筛选">
+            <el-select
+              v-if="references.suppliers"
+              v-model="materialFilters.supplierId"
+              clearable
+              filterable
+              :loading="referenceLoading"
+              placeholder="选择供应商"
+              style="width: 200px"
             >
-              <template #header>
-                <div class="material-batch-header">
-                  <strong>{{ batch.materialName || '原材料 #' + batch.materialId }}</strong>
-                  <span>采购明细 #{{ batch.itemId }} · {{ batch.supplierName || '-' }}</span>
-                </div>
-              </template>
-              <el-table :data="batch.affectedProducts" stripe>
-                <el-table-column label="生产订单" min-width="110">
-                  <template #default="{ row }">#{{ row.orderId }}</template>
-                </el-table-column>
-                <el-table-column label="产品批次" min-width="155">
-                  <template #default="{ row }">{{ row.batchNo || '-' }}</template>
-                </el-table-column>
-                <el-table-column label="产品" min-width="180">
-                  <template #default="{ row }">{{
-                    row.productMaterialName || '#' + row.productMaterialId
-                  }}</template>
-                </el-table-column>
-                <el-table-column label="原料消耗数量" min-width="120">
-                  <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
-                </el-table-column>
-                <el-table-column label="生产状态" min-width="110">
-                  <template #default="{ row }">{{
-                    getProductionStatusLabel(row.productionStatus)
-                  }}</template>
-                </el-table-column>
-              </el-table>
-            </el-card>
-          </template>
-          <el-empty v-else-if="materialSearched" description="未查询到匹配的原材料批次" />
-          <el-empty v-else description="请输入查询条件后开始反向追溯" />
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane label="质量影响分析" name="impact">
-        <el-card class="trace-search-card" shadow="never">
-          <el-form :model="impactFilters" inline @submit.prevent="analyzeImpact">
-            <el-form-item label="问题采购明细">
-              <el-input
-                v-model.trim="impactFilters.itemIds"
-                clearable
-                placeholder="多个 ID 用逗号分隔"
+              <el-option
+                v-for="supplier in suppliers"
+                :key="supplier.supplierId"
+                :label="supplier.supplierName + ' · #' + supplier.supplierId"
+                :value="supplier.supplierId"
               />
-            </el-form-item>
-            <el-form-item label="原材料 ID">
-              <el-input v-model.trim="impactFilters.materialId" clearable placeholder="可选" />
-            </el-form-item>
-            <el-form-item label="到货日期">
-              <el-date-picker
-                v-model="impactFilters.receiveRange"
-                end-placeholder="结束日期"
-                range-separator="至"
-                start-placeholder="开始日期"
-                type="daterange"
-                value-format="YYYY-MM-DD"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button
-                :icon="Search"
-                :loading="impactLoading"
-                type="primary"
-                @click="analyzeImpact"
-                >分析</el-button
-              >
-              <el-button :disabled="impactLoading" :icon="Refresh" @click="resetImpactFilters"
-                >重置</el-button
-              >
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card v-loading="impactLoading" class="trace-table-card" shadow="never">
-          <el-alert
-            v-if="impactError"
-            :closable="false"
-            show-icon
-            :title="impactError"
-            type="error"
-          />
-          <template v-else-if="impactResult">
-            <div class="impact-summary">
-              <div
-                v-for="metric in [
-                  { label: '受影响订单', value: impactResult.affectedOrderCount },
-                  {
-                    label: '受影响批次（未入库按订单统计）',
-                    value: impactResult.affectedBatchCount,
-                  },
-                  {
-                    label: '受影响产品种类',
-                    value: new Set(
-                      impactResult.affectedProducts.map((product) => product.productMaterialId),
-                    ).size,
-                  },
-                ]"
-                :key="metric.label"
-                class="impact-metric"
-              >
-                <span>{{ metric.label }}</span>
-                <strong>{{ formatNumber(metric.value) }}</strong>
-              </div>
-            </div>
-            <el-alert
-              v-if="impactResult.suggestedAction"
-              class="trace-request-error"
-              :closable="false"
-              show-icon
-              :title="'后端分析建议：' + suggestedActionLabels[impactResult.suggestedAction]"
-              type="info"
+            </el-select>
+            <el-input-number
+              v-else
+              v-model="materialFilters.supplierId"
+              :min="1"
+              :precision="0"
+              :controls="false"
+              placeholder="供应商 ID（可选）"
             />
-            <el-table :data="impactResult.affectedProducts" stripe>
+          </el-form-item>
+          <el-form-item label="到货日期">
+            <el-date-picker
+              v-model="materialFilters.receiveRange"
+              end-placeholder="结束日期"
+              range-separator="至"
+              start-placeholder="开始日期"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button
+              :icon="Search"
+              :loading="materialLoading"
+              type="primary"
+              @click="traceMaterial"
+              >追溯</el-button
+            >
+            <el-button :disabled="materialLoading" :icon="Refresh" @click="resetMaterialFilters"
+              >重置</el-button
+            >
+          </el-form-item>
+        </el-form>
+      </el-card>
+      <el-card v-loading="materialLoading" class="trace-table-card table-card" shadow="never">
+        <el-alert
+          v-if="materialError"
+          :closable="false"
+          show-icon
+          :title="materialError"
+          type="error"
+        />
+        <template v-else-if="materialResult.length">
+          <el-card
+            v-for="batch in materialResult"
+            :key="batch.itemId"
+            class="material-batch-card table-card table-card--accent"
+            shadow="never"
+          >
+            <template #header>
+              <div class="material-batch-header table-card__header">
+                <strong>{{ batch.materialName || '原材料 #' + batch.materialId }}</strong>
+                <span>采购明细 #{{ batch.itemId }} · {{ batch.supplierName || '-' }}</span>
+              </div>
+            </template>
+            <el-table :data="batch.affectedProducts" stripe>
               <el-table-column label="生产订单" min-width="110">
                 <template #default="{ row }">#{{ row.orderId }}</template>
               </el-table-column>
-              <el-table-column label="产品批次" min-width="145">
+              <el-table-column label="产品批次" min-width="155">
                 <template #default="{ row }">{{ row.batchNo || '-' }}</template>
               </el-table-column>
               <el-table-column label="产品" min-width="180">
@@ -864,12 +767,111 @@ onMounted(async () => {
                 }}</template>
               </el-table-column>
             </el-table>
-          </template>
-          <el-empty v-else-if="impactSearched" description="未查询到质量影响分析结果" />
-          <el-empty v-else description="请输入问题批次条件后开始分析" />
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+          </el-card>
+        </template>
+        <el-empty v-else-if="materialSearched" description="未查询到匹配的原材料批次" />
+        <el-empty v-else description="请输入查询条件后开始反向追溯" />
+      </el-card>
+    </template>
+
+    <template v-if="section === 'impact'">
+      <el-card class="trace-search-card" shadow="never">
+        <el-form :model="impactFilters" inline @submit.prevent="analyzeImpact">
+          <el-form-item label="问题采购明细">
+            <el-input
+              v-model.trim="impactFilters.itemIds"
+              clearable
+              placeholder="多个 ID 用逗号分隔"
+            />
+          </el-form-item>
+          <el-form-item label="原材料 ID">
+            <el-input v-model.trim="impactFilters.materialId" clearable placeholder="可选" />
+          </el-form-item>
+          <el-form-item label="到货日期">
+            <el-date-picker
+              v-model="impactFilters.receiveRange"
+              end-placeholder="结束日期"
+              range-separator="至"
+              start-placeholder="开始日期"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button :icon="Search" :loading="impactLoading" type="primary" @click="analyzeImpact"
+              >分析</el-button
+            >
+            <el-button :disabled="impactLoading" :icon="Refresh" @click="resetImpactFilters"
+              >重置</el-button
+            >
+          </el-form-item>
+        </el-form>
+      </el-card>
+      <el-card v-loading="impactLoading" class="trace-table-card table-card" shadow="never">
+        <el-alert
+          v-if="impactError"
+          :closable="false"
+          show-icon
+          :title="impactError"
+          type="error"
+        />
+        <template v-else-if="impactResult">
+          <div class="impact-summary">
+            <div
+              v-for="metric in [
+                { label: '受影响订单', value: impactResult.affectedOrderCount },
+                {
+                  label: '受影响批次（未入库按订单统计）',
+                  value: impactResult.affectedBatchCount,
+                },
+                {
+                  label: '受影响产品种类',
+                  value: new Set(
+                    impactResult.affectedProducts.map((product) => product.productMaterialId),
+                  ).size,
+                },
+              ]"
+              :key="metric.label"
+              class="impact-metric"
+            >
+              <span>{{ metric.label }}</span>
+              <strong>{{ formatNumber(metric.value) }}</strong>
+            </div>
+          </div>
+          <el-alert
+            v-if="impactResult.suggestedAction"
+            class="trace-request-error"
+            :closable="false"
+            show-icon
+            :title="'后端分析建议：' + suggestedActionLabels[impactResult.suggestedAction]"
+            type="info"
+          />
+          <el-table :data="impactResult.affectedProducts" stripe>
+            <el-table-column label="生产订单" min-width="110">
+              <template #default="{ row }">#{{ row.orderId }}</template>
+            </el-table-column>
+            <el-table-column label="产品批次" min-width="145">
+              <template #default="{ row }">{{ row.batchNo || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="产品" min-width="180">
+              <template #default="{ row }">{{
+                row.productMaterialName || '#' + row.productMaterialId
+              }}</template>
+            </el-table-column>
+            <el-table-column label="原料消耗数量" min-width="120">
+              <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
+            </el-table-column>
+            <el-table-column label="生产状态" min-width="110">
+              <template #default="{ row }">{{
+                getProductionStatusLabel(row.productionStatus)
+              }}</template>
+            </el-table-column>
+          </el-table>
+        </template>
+        <el-empty v-else-if="impactSearched" description="未查询到质量影响分析结果" />
+        <el-empty v-else description="请输入问题批次条件后开始分析" />
+      </el-card>
+    </template>
 
     <el-dialog
       v-model="consumptionDialogVisible"
@@ -988,7 +990,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.trace-tabs,
 .trace-search-card,
 .trace-table-card {
   min-width: 0;

@@ -164,7 +164,7 @@ onMounted(() => void loadLines())
       </template>
     </PageHeader>
 
-    <el-card v-if="canViewLines" class="section-card" shadow="never">
+    <el-card v-if="canViewLines" class="section-card table-card" shadow="never">
       <el-form inline @submit.prevent="loadLines(1)">
         <el-form-item label="产线状态">
           <el-select

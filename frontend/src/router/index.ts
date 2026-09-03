@@ -13,6 +13,7 @@ declare module 'vue-router' {
     permission?: PermissionCode
     requiresAuth?: boolean
     showInMenu?: boolean
+    showOverviewInMenu?: boolean
     title?: string
   }
 }
@@ -32,7 +33,6 @@ const adminRoutes: RouteRecordRaw[] = [
     path: '',
   },
   {
-    component: () => import('@/pages/materials/MaterialsOverview.vue'),
     meta: {
       icon: 'materials',
       isModule: true,
@@ -45,6 +45,72 @@ const adminRoutes: RouteRecordRaw[] = [
     },
     name: 'materials',
     path: 'materials',
+    redirect: { name: 'materials-master-data' },
+  },
+  {
+    component: () => import('@/pages/materials/MaterialMasterPage.vue'),
+    meta: {
+      module: 'materials',
+      pageOrder: 2,
+      permission: PERMISSIONS.material.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '物料主数据',
+    },
+    name: 'materials-master-data',
+    path: 'materials/master-data',
+  },
+  {
+    component: () => import('@/pages/materials/BomMaintenancePage.vue'),
+    meta: {
+      module: 'materials',
+      pageOrder: 3,
+      permission: PERMISSIONS.material.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: 'BOM 维护与版本',
+    },
+    name: 'materials-bom-maintenance',
+    path: 'materials/bom-maintenance',
+  },
+  {
+    component: () => import('@/pages/materials/BomTreePage.vue'),
+    meta: {
+      module: 'materials',
+      pageOrder: 4,
+      permission: PERMISSIONS.material.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: 'BOM 结构树',
+    },
+    name: 'materials-bom-tree',
+    path: 'materials/bom-tree',
+  },
+  {
+    component: () => import('@/pages/materials/MaterialAnalysisPage.vue'),
+    meta: {
+      module: 'materials',
+      pageOrder: 5,
+      permission: PERMISSIONS.material.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '用料分析',
+    },
+    name: 'materials-analysis',
+    path: 'materials/analysis',
+  },
+  {
+    component: () => import('@/pages/materials/BomReverseTracePage.vue'),
+    meta: {
+      module: 'materials',
+      pageOrder: 6,
+      permission: PERMISSIONS.material.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: 'BOM 反向追溯',
+    },
+    name: 'materials-bom-reverse-trace',
+    path: 'materials/bom-reverse-trace',
   },
   {
     component: () => import('@/pages/inventory/InventoryOverview.vue'),
@@ -56,6 +122,7 @@ const adminRoutes: RouteRecordRaw[] = [
       permission: PERMISSIONS.inventory.view,
       requiresAuth: true,
       showInMenu: true,
+      showOverviewInMenu: true,
       title: '库存管理',
     },
     name: 'inventory',
@@ -128,6 +195,7 @@ const adminRoutes: RouteRecordRaw[] = [
       permission: PERMISSIONS.production.view,
       requiresAuth: true,
       showInMenu: true,
+      showOverviewInMenu: true,
       title: '生产管理',
     },
     name: 'production',
@@ -190,7 +258,6 @@ const adminRoutes: RouteRecordRaw[] = [
     path: 'production/operations',
   },
   {
-    component: () => import('@/pages/trace/TraceOverview.vue'),
     meta: {
       icon: 'trace',
       isModule: true,
@@ -203,6 +270,59 @@ const adminRoutes: RouteRecordRaw[] = [
     },
     name: 'trace',
     path: 'trace',
+    redirect: { name: 'trace-consumption' },
+  },
+  {
+    component: () => import('@/pages/trace/TraceConsumptionPage.vue'),
+    meta: {
+      module: 'trace',
+      pageOrder: 13,
+      permission: PERMISSIONS.trace.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '批次消耗',
+    },
+    name: 'trace-consumption',
+    path: 'trace/consumption',
+  },
+  {
+    component: () => import('@/pages/trace/ProductTracePage.vue'),
+    meta: {
+      module: 'trace',
+      pageOrder: 14,
+      permission: PERMISSIONS.trace.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '正向追溯',
+    },
+    name: 'trace-product',
+    path: 'trace/product',
+  },
+  {
+    component: () => import('@/pages/trace/MaterialTracePage.vue'),
+    meta: {
+      module: 'trace',
+      pageOrder: 15,
+      permission: PERMISSIONS.trace.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '反向追溯',
+    },
+    name: 'trace-material',
+    path: 'trace/material',
+  },
+  {
+    component: () => import('@/pages/trace/QualityImpactPage.vue'),
+    meta: {
+      module: 'trace',
+      pageOrder: 16,
+      permission: PERMISSIONS.trace.view,
+      requiresAuth: true,
+      showInMenu: true,
+      title: '质量影响分析',
+    },
+    name: 'trace-impact',
+    path: 'trace/impact',
   },
   {
     component: () => import('@/pages/system/SystemOverview.vue'),
@@ -214,6 +334,7 @@ const adminRoutes: RouteRecordRaw[] = [
       permission: PERMISSIONS.system.view,
       requiresAuth: true,
       showInMenu: true,
+      showOverviewInMenu: true,
       title: '系统管理',
     },
     name: 'system',

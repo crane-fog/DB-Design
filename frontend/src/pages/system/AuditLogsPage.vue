@@ -195,7 +195,7 @@ onMounted(() => void loadLoginLogs())
           </el-form>
         </el-card>
 
-        <el-card class="audit-table-card" shadow="never">
+        <el-card class="audit-table-card table-card" shadow="never">
           <el-alert
             v-if="loginError"
             class="audit-request-error"
@@ -306,7 +306,7 @@ onMounted(() => void loadLoginLogs())
           </el-form>
         </el-card>
 
-        <el-card class="audit-table-card" shadow="never">
+        <el-card class="audit-table-card table-card" shadow="never">
           <el-alert
             v-if="operationError"
             class="audit-request-error"
@@ -441,10 +441,6 @@ onMounted(() => void loadLoginLogs())
 
 .audit-search-card :deep(.el-card__body) {
   padding-bottom: 2px;
-}
-
-.audit-table-card :deep(.el-card__body) {
-  padding: 0;
 }
 
 .audit-request-error {
