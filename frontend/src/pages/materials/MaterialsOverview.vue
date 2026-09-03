@@ -501,7 +501,7 @@ watch(reverseIncludeHistory, resetReverseTrace)
 <template>
   <PageContainer>
     <PageHeader
-      title="物料与 BOM"
+      title="物料管理"
       description="维护物料主数据、BOM 版本和组件关系，并完成树形展开、用料分析与反向追溯。"
     >
       <template #actions>

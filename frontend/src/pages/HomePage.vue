@@ -295,7 +295,7 @@ onUnmounted(() => {
 }
 .dashboard-page :deep(.page-header) {
   align-items: center;
-  margin-bottom: 26px;
+  margin-bottom: 6px;
 }
 .dashboard-page :deep(.page-header h1) {
   margin: 0;

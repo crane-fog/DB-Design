@@ -7,16 +7,36 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: var(--page-gap);
+  margin-bottom: 6px;
 }
-.page-header h1 {
-  color: var(--text-color);
-  font-size: 28px;
-  line-height: 1.25;
-}
-.page-header p {
+.page-header-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
   margin-top: 8px;
-  color: var(--text-muted);
+  border: 2px solid currentcolor;
+  border-radius: 50%;
+  background: transparent;
+  color: #ffffff !important;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1;
+  cursor: help;
+  transition: color 0.2s ease;
+}
+.page-header-info:hover,
+.page-header-info:focus-visible {
+  color: #ffffff !important;
+  outline: none;
+}
+.page-header-description-tooltip {
+  max-width: min(420px, calc(100vw - 32px));
+  line-height: 1.6;
 }
 .page-header-actions,
 .search-panel-actions,
