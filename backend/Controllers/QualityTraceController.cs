@@ -49,6 +49,22 @@ public class QualityTraceController(
         });
     }
 
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("getBatchConsumption")]
+    public IActionResult GetConsumption([FromQuery(Name = "consumption_id")] long consumptionId)
+    {
+        if (EnsureLoggedIn() is { } unauth)
+        {
+            return Ok(Single(BatchConsumptionResponse.CodeEnum._401Enum, unauth, null));
+        }
+
+        var consumption = traceService.GetConsumption(consumptionId);
+        return consumption is null
+            ? Ok(Single(BatchConsumptionResponse.CodeEnum._404Enum, "批次消耗关系不存在", null))
+            : Ok(Single(BatchConsumptionResponse.CodeEnum._200Enum, "查询成功", consumption));
+    }
+
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
@@ -138,6 +154,7 @@ public class QualityTraceController(
     public IActionResult TraceMaterialBatch(
         [FromQuery(Name = "item_id")] long? itemId,
         [FromQuery(Name = "material_id")] long? materialId,
+        [FromQuery(Name = "supplier_id")] long? supplierId,
         [FromQuery(Name = "receive_date_start")] DateOnly? receiveDateStart,
         [FromQuery(Name = "receive_date_end")] DateOnly? receiveDateEnd)
     {
@@ -147,15 +164,20 @@ public class QualityTraceController(
         }
 
         var hasDateRange = receiveDateStart.HasValue && receiveDateEnd.HasValue;
-        if (itemId is null && materialId is null && !hasDateRange)
+        if (itemId is null && materialId is null && supplierId is null && !hasDateRange)
         {
             return Ok(MaterialResp(
                 MaterialBatchTraceResponse.CodeEnum._400Enum,
-                "item_id、material_id 或到货日期范围至少提供一种",
+                "item_id、material_id、supplier_id 或到货日期范围至少提供一种",
                 null));
         }
 
-        var results = traceService.TraceMaterialBatch(itemId, materialId, receiveDateStart, receiveDateEnd);
+        var results = traceService.TraceMaterialBatch(
+            itemId,
+            materialId,
+            supplierId,
+            receiveDateStart,
+            receiveDateEnd);
         return Ok(MaterialResp(MaterialBatchTraceResponse.CodeEnum._200Enum, "追溯成功", results));
     }
 

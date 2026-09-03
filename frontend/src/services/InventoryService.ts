@@ -14,7 +14,7 @@ import type {
   InventoryAlertEvent,
   Material,
   MaterialShortageCalculateResponseAllOfData,
-  MaterialStock,
+  MaterialStockDetail,
   MaterialStockLockData,
   ObsoleteMaterialDetection,
   ProductionOrderDetail,
@@ -163,77 +163,19 @@ function toShortage(item: ApiMaterialShortageItem) {
   }
 }
 
-function toStockStatus(availableQty: number, lockedQty: number, safetyStock: number) {
-  if (availableQty <= 0) {
-    return 'zero' as const
-  }
-  if (availableQty < safetyStock) {
-    return 'low' as const
-  }
-  if (lockedQty > 0) {
-    return 'locked' as const
-  }
-  return 'normal' as const
-}
-
-function toStock(material: Material, stock?: MaterialStock): InventoryStockItem | undefined {
-  if (material.material_id === undefined || !material.material_name || !material.material_type) {
-    return undefined
-  }
-  const availableQty = stock?.available_qty ?? 0
-  const lockedQty = stock?.locked_qty ?? 0
-  const safetyStock = material.safety_stock ?? 0
+function toStock(item: MaterialStockDetail): InventoryStockItem {
   return {
-    availableQty,
-    lastInDate: optionalText(stock?.last_in_date),
-    lastOutDate: optionalText(stock?.last_out_date),
-    lockedQty,
-    materialId: material.material_id,
-    materialName: material.material_name,
-    materialType: material.material_type,
-    safetyStock,
-    status: toStockStatus(availableQty, lockedQty, safetyStock),
-    unit: material.unit,
+    availableQty: item.available_qty,
+    lastInDate: optionalText(item.last_in_date),
+    lastOutDate: optionalText(item.last_out_date),
+    lockedQty: item.locked_qty,
+    materialId: item.material_id,
+    materialName: item.material_name,
+    materialType: item.material_type,
+    safetyStock: item.safety_stock,
+    status: item.status,
+    unit: item.unit,
   }
-}
-
-function paginateItems<TItem>(items: TItem[], page: number, pageSize: number): PageResult<TItem> {
-  const safePage = Math.max(1, page)
-  const safePageSize = Math.max(1, pageSize)
-  const start = (safePage - 1) * safePageSize
-  return {
-    items: items.slice(start, start + safePageSize),
-    page: safePage,
-    pageSize: safePageSize,
-    total: items.length,
-  }
-}
-
-async function findPagedRecord<TItem>(
-  loadPage: (page: number, pageSize: number) => Promise<PageResult<TItem>>,
-  matches: (item: TItem) => boolean,
-  notFoundMessage: string,
-) {
-  const pageSize = 100
-  const firstPage = await loadPage(1, pageSize)
-  const firstMatch = firstPage.items.find(matches)
-  if (firstMatch) {
-    return firstMatch
-  }
-  const pageCount = Math.ceil(firstPage.total / pageSize)
-  const pages = await Promise.all(
-    Array.from({ length: Math.max(0, pageCount - 1) }, (unusedValue, index) => {
-      void unusedValue
-      return loadPage(index + 2, pageSize)
-    }),
-  )
-  for (const result of pages) {
-    const match = result.items.find(matches)
-    if (match) {
-      return match
-    }
-  }
-  throw new Error(notFoundMessage)
 }
 
 function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
@@ -278,39 +220,6 @@ async function loadAllPageItems<TItem>(
   ]
 }
 
-let stockCatalogPromise: Promise<InventoryStockItem[]> | undefined = undefined
-
-function invalidateStockCatalog() {
-  stockCatalogPromise = undefined
-}
-
-async function loadStockCatalog() {
-  if (!stockCatalogPromise) {
-    stockCatalogPromise = (async () => {
-      const materials = await loadAllPageItems<Material>((page, pageSize) =>
-        materialBomApi.listMaterialData({ page, pageSize }),
-      )
-      const stockResults = await Promise.all(
-        materials.map(async (material) => {
-          if (material.material_id === undefined) {
-            return undefined
-          }
-          const response = await materialBomApi.getMaterialStockData({
-            materialId: material.material_id,
-          })
-          const stock = requireData(response.data as ApiEnvelope<MaterialStock | undefined>)
-          return toStock(material, stock)
-        }),
-      )
-      return stockResults.filter((item): item is InventoryStockItem => item !== undefined)
-    })().catch((error: unknown) => {
-      stockCatalogPromise = undefined
-      throw error
-    })
-  }
-  return stockCatalogPromise
-}
-
 export const inventoryService = {
   async addCompletionInbound(form: CompletionInboundFormData) {
     const response = await inventoryApi.addCompletionInbound({
@@ -325,7 +234,6 @@ export const inventoryService = {
       },
     })
     const data = requireData(response.data as ApiEnvelope<CompletionInboundOrder>)
-    invalidateStockCatalog()
     return toInbound(data)
   },
 
@@ -387,11 +295,8 @@ export const inventoryService = {
   async getAlertDetail(
     alertId: number,
   ): Promise<Omit<InventoryAlertDetail, 'stock'> & { stock: InventoryStockData }> {
-    const alert = await findPagedRecord(
-      (page, pageSize) => this.listAlerts({ page, pageSize }),
-      (item) => item.alertId === alertId,
-      '库存预警记录不存在或已删除',
-    )
+    const response = await inventoryApi.getInventoryAlert({ alertId })
+    const alert = toAlert(requireData(response.data as ApiEnvelope<InventoryAlertEvent>))
     const stock = await this.getStockDetail(alert.materialId)
     let recommendedAction = '请复核可用库存与安全库存，并按实际情况补充或调整库存。'
     if (stock.status === 'zero') {
@@ -405,11 +310,8 @@ export const inventoryService = {
   },
 
   async getCompletionInboundDetail(inboundId: number): Promise<CompletionInboundDetail> {
-    const item = await findPagedRecord(
-      (page, pageSize) => this.listCompletionInbound({ page, pageSize }),
-      (record) => record.inboundId === inboundId,
-      '完工入库记录不存在或已删除',
-    )
+    const response = await inventoryApi.getCompletionInbound({ inboundId })
+    const item = toInbound(requireData(response.data as ApiEnvelope<CompletionInboundOrder>))
     const references = await this.getReferenceData()
     const version = references.bomVersions.find((record) => record.versionId === item.versionId)
     const order = references.productionOrders.find((record) => record.orderId === item.orderId)
@@ -432,11 +334,8 @@ export const inventoryService = {
       stock: InventoryStockData
     }
   > {
-    const item = await findPagedRecord(
-      (page, pageSize) => this.listObsolete({ page, pageSize }),
-      (record) => record.detectionId === detectionId,
-      '呆滞物料检测记录不存在或已删除',
-    )
+    const response = await inventoryApi.getObsoleteMaterialDetection({ detectionId })
+    const item = toObsolete(requireData(response.data as ApiEnvelope<ObsoleteMaterialDetection>))
     const stock = await this.getStockDetail(item.materialId)
     return {
       ...item,
@@ -566,25 +465,17 @@ export const inventoryService = {
   },
 
   async getStockDetail(materialId: number): Promise<InventoryStockData> {
-    const response = await materialBomApi.getMaterialStockData({ materialId })
-    const stock = requireData(response.data as ApiEnvelope<MaterialStock>)
-    if (canReadMaterialReferences()) {
-      const materialResponse = await materialBomApi.getMaterialData({ materialId })
-      const material = requireData(materialResponse.data as ApiEnvelope<Material>)
-      const item = toStock(material, stock)
-      if (!item) {
-        throw new Error('物料数据无效')
-      }
-      return item
-    }
-    return {
-      availableQty: stock.available_qty ?? 0,
-      lastInDate: optionalText(stock.last_in_date),
-      lastOutDate: optionalText(stock.last_out_date),
-      lockedQty: stock.locked_qty ?? 0,
+    const response = await inventoryApi.listMaterialStockData({
       materialId,
-      materialName: `物料 #${materialId}`,
+      page: 1,
+      pageSize: 1,
+    })
+    const payload = requireData(response.data as ApiEnvelope<unknown>)
+    const [item] = getPageItems<MaterialStockDetail>(payload)
+    if (!item) {
+      throw new Error('物料库存数据不存在或已删除')
     }
+    return toStock(item)
   },
 
   async handleAlert(alertId: number, status: 'handled' | 'ignored', handlerId: number) {
@@ -683,23 +574,17 @@ export const inventoryService = {
   },
 
   async listStocks(query: InventoryStockQuery): Promise<PageResult<InventoryStockData>> {
-    if (!canReadMaterialReferences()) {
-      const items: InventoryStockData[] = []
-      if (query.materialId) {
-        items.push(await this.getStockDetail(query.materialId))
-      }
-      return paginateItems(items, query.page, query.pageSize)
-    }
-    const items = await loadStockCatalog()
-    const materialName = query.materialName?.trim().toLowerCase()
-    const filteredItems = items.filter(
-      (item) =>
-        (!query.materialId || item.materialId === query.materialId) &&
-        (!materialName || item.materialName.toLowerCase().includes(materialName)) &&
-        (!query.materialType || item.materialType === query.materialType) &&
-        (!query.status || item.status === query.status),
-    )
-    return paginateItems(filteredItems, query.page, query.pageSize)
+    const normalizedQuery = cleanQuery(query)
+    const response = await inventoryApi.listMaterialStockData({
+      materialId: normalizedQuery.materialId,
+      materialName: normalizedQuery.materialName,
+      materialType: normalizedQuery.materialType,
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
+      status: normalizedQuery.status,
+    })
+    const payload = requireData(response.data as ApiEnvelope<unknown>)
+    return mapPageResult<MaterialStockDetail, InventoryStockItem>(payload, normalizedQuery, toStock)
   },
 
   async lockStock(form: StockLockFormData): Promise<StockLockResult> {
@@ -726,14 +611,7 @@ export const inventoryService = {
       })),
       success: data.success,
     }
-    if (result.success) {
-      invalidateStockCatalog()
-    }
     return result
-  },
-
-  refreshStockCatalog() {
-    invalidateStockCatalog()
   },
 
   async releaseLock(lockId: number, operatorId: number) {
@@ -741,7 +619,6 @@ export const inventoryService = {
       materialStockReleaseRequest: { lock_id: lockId, operator_id: operatorId },
     })
     const data = requireData(response.data as ApiEnvelope<StockLockRecord>)
-    invalidateStockCatalog()
     return toLock(data)
   },
 }

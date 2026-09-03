@@ -181,7 +181,6 @@ async function loadStocks() {
 }
 
 function refreshAll() {
-  inventoryService.refreshStockCatalog()
   void Promise.all([loadOverview(), loadStocks()])
 }
 

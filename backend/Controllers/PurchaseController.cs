@@ -17,6 +17,106 @@ public class PurchaseController(
     PurchaseService purchaseService,
     UserContextService userContext) : ControllerBase
 {
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("listSupplierData")]
+    public IActionResult ListSuppliers(
+        [FromQuery(Name = "page")] int? page,
+        [FromQuery(Name = "page_size")] int? pageSize,
+        [FromQuery(Name = "supplier_id")] long? supplierId,
+        [FromQuery(Name = "supplier_name")] string? supplierName)
+    {
+        var user = userContext.Resolve(User.GetEmployeeNo());
+        if (user is null)
+        {
+            return Ok(new SupplierPageResponse
+            {
+                Code = SupplierPageResponse.CodeEnum._401Enum,
+                Message = "登录状态无效",
+                Data = null!,
+            });
+        }
+
+        if (!user.IsPurchaser && !user.IsProductionManager)
+        {
+            return Ok(new SupplierPageResponse
+            {
+                Code = SupplierPageResponse.CodeEnum._403Enum,
+                Message = "无权查看供应商数据",
+                Data = null!,
+            });
+        }
+
+        var (currentPage, size) = Paging.Normalize(page, pageSize);
+        var (records, total) = purchaseService.ListSuppliers(
+            currentPage,
+            size,
+            supplierId,
+            supplierName);
+        return Ok(new SupplierPageResponse
+        {
+            Code = SupplierPageResponse.CodeEnum._200Enum,
+            Message = "查询成功",
+            Data = new SupplierPageData
+            {
+                Total = total,
+                Page = currentPage,
+                PageSize = size,
+                Records = records,
+            },
+        });
+    }
+
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("listPurchaseBuyerData")]
+    public IActionResult ListBuyers(
+        [FromQuery(Name = "page")] int? page,
+        [FromQuery(Name = "page_size")] int? pageSize,
+        [FromQuery(Name = "buyer_id")] long? buyerId,
+        [FromQuery(Name = "buyer_name")] string? buyerName)
+    {
+        var user = userContext.Resolve(User.GetEmployeeNo());
+        if (user is null)
+        {
+            return Ok(new PurchaseBuyerPageResponse
+            {
+                Code = PurchaseBuyerPageResponse.CodeEnum._401Enum,
+                Message = "登录状态无效",
+                Data = null!,
+            });
+        }
+
+        if (!user.IsPurchaser)
+        {
+            return Ok(new PurchaseBuyerPageResponse
+            {
+                Code = PurchaseBuyerPageResponse.CodeEnum._403Enum,
+                Message = "无权查看采购员数据",
+                Data = null!,
+            });
+        }
+
+        var (currentPage, size) = Paging.Normalize(page, pageSize);
+        var (records, total) = purchaseService.ListBuyers(
+            currentPage,
+            size,
+            buyerId,
+            buyerName);
+        return Ok(new PurchaseBuyerPageResponse
+        {
+            Code = PurchaseBuyerPageResponse.CodeEnum._200Enum,
+            Message = "查询成功",
+            Data = new PurchaseBuyerPageData
+            {
+                Total = total,
+                Page = currentPage,
+                PageSize = size,
+                Records = records,
+            },
+        });
+    }
+
     // ═══════════════════════════════════════════════════════════════
     //  GET /api/listPurchaseOrder
     // ═══════════════════════════════════════════════════════════════

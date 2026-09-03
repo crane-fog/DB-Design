@@ -106,6 +106,13 @@ public class QualityTraceService(string connString)
         return (records, total);
     }
 
+    public BatchConsumption? GetConsumption(long consumptionId)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+        return GetConsumption(conn, consumptionId);
+    }
+
     public BatchConsumptionResult AddConsumption(BatchConsumptionCreateRequest request)
     {
         if (request.ConsumeQty <= 0)
@@ -342,6 +349,7 @@ public class QualityTraceService(string connString)
     public List<MaterialBatchTraceResult> TraceMaterialBatch(
         long? itemId,
         long? materialId,
+        long? supplierId,
         DateOnly? receiveDateStart,
         DateOnly? receiveDateEnd)
     {
@@ -357,6 +365,11 @@ public class QualityTraceService(string connString)
         if (materialId.HasValue)
         {
             where.Add("poi.MATERIAL_ID = :materialId");
+        }
+
+        if (supplierId.HasValue)
+        {
+            where.Add("pur.SUPPLIER_ID = :supplierId");
         }
 
         if (receiveDateStart.HasValue && receiveDateEnd.HasValue)
@@ -391,6 +404,11 @@ public class QualityTraceService(string connString)
                 cmd.Parameters.Add(new OracleParameter("materialId", materialId.Value));
             }
 
+            if (supplierId.HasValue)
+            {
+                cmd.Parameters.Add(new OracleParameter("supplierId", supplierId.Value));
+            }
+
             if (receiveDateStart.HasValue && receiveDateEnd.HasValue)
             {
                 cmd.Parameters.Add(new OracleParameter("receiveStart", receiveDateStart.Value.ToDateTime(TimeOnly.MinValue)));
@@ -412,9 +430,10 @@ public class QualityTraceService(string connString)
             }
         }
 
+        var affectedByItem = QueryAffectedProducts(conn, results.Select(result => result.ItemId));
         foreach (var result in results)
         {
-            result.AffectedProducts = QueryAffectedProducts(conn, result.ItemId);
+            result.AffectedProducts = affectedByItem.GetValueOrDefault(result.ItemId) ?? [];
         }
 
         return results;
@@ -429,20 +448,19 @@ public class QualityTraceService(string connString)
         conn.Open();
 
         var itemIds = ResolveImpactItemIds(conn, request);
-        var affected = new List<AffectedProductBatch>();
+        var affected = QueryAffectedProducts(conn, itemIds)
+            .Values
+            .SelectMany(products => products)
+            .ToList();
         var seenOrders = new HashSet<long>();
         var seenBatches = new HashSet<string>();
 
-        foreach (var itemId in itemIds)
+        foreach (var product in affected)
         {
-            foreach (var product in QueryAffectedProducts(conn, itemId))
-            {
-                affected.Add(product);
-                seenOrders.Add(product.OrderId);
-                seenBatches.Add(!string.IsNullOrEmpty(product.BatchNo)
-                    ? product.BatchNo
-                    : $"order:{product.OrderId}");
-            }
+            seenOrders.Add(product.OrderId);
+            seenBatches.Add(!string.IsNullOrEmpty(product.BatchNo)
+                ? product.BatchNo
+                : $"order:{product.OrderId}");
         }
 
         var orderCount = seenOrders.Count;
@@ -520,38 +538,52 @@ public class QualityTraceService(string connString)
         return ids;
     }
 
-    private static List<AffectedProductBatch> QueryAffectedProducts(OracleConnection conn, long itemId)
+    private static Dictionary<long, List<AffectedProductBatch>> QueryAffectedProducts(
+        OracleConnection conn,
+        IEnumerable<long> itemIds)
     {
-        var products = new List<AffectedProductBatch>();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT bc.ORDER_ID,
-                   (SELECT MAX(fi.BATCH_NO) FROM FINISH_INBOUND fi WHERE fi.ORDER_ID = bc.ORDER_ID) AS BATCH_NO,
-                   po.MATERIAL_ID, m.MATERIAL_NAME, po.STATUS, bc.CONSUME_QTY
-            FROM BATCH_CONSUMPTION bc
-            LEFT JOIN PRODUCTION_ORDER po ON po.ORDER_ID = bc.ORDER_ID
-            LEFT JOIN MATERIAL m ON m.MATERIAL_ID = po.MATERIAL_ID
-            WHERE bc.ITEM_ID = :itemId
-            ORDER BY bc.ORDER_ID";
-        cmd.Parameters.Add(new OracleParameter("itemId", itemId));
-
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
+        var ids = itemIds.Distinct().ToList();
+        var productsByItem = ids.ToDictionary(id => id, _ => new List<AffectedProductBatch>());
+        foreach (var chunk in ids.Chunk(900))
         {
-            products.Add(new AffectedProductBatch
+            using var cmd = conn.CreateCommand();
+            var placeholders = new List<string>();
+            for (var index = 0; index < chunk.Length; index++)
             {
-                OrderId = Convert.ToInt64(reader.GetValue(0)),
-                BatchNo = reader.IsDBNull(1) ? null! : reader.GetString(1),
-                ProductMaterialId = reader.IsDBNull(2) ? 0 : Convert.ToInt64(reader.GetValue(2)),
-                ProductMaterialName = reader.IsDBNull(3) ? null! : reader.GetString(3),
-                ProductionStatus = reader.IsDBNull(4)
-                    ? ProductionOrderStatus.PendingReviewEnum
-                    : ProductionStatusMap.FromDb(reader.GetString(4)),
-                ConsumeQty = reader.GetDecimal(5),
-            });
+                var name = $"itemId{index}";
+                placeholders.Add($":{name}");
+                cmd.Parameters.Add(new OracleParameter(name, chunk[index]));
+            }
+
+            cmd.CommandText = $@"
+                SELECT bc.ITEM_ID, bc.ORDER_ID,
+                       (SELECT MAX(fi.BATCH_NO) FROM FINISH_INBOUND fi WHERE fi.ORDER_ID = bc.ORDER_ID) AS BATCH_NO,
+                       po.MATERIAL_ID, m.MATERIAL_NAME, po.STATUS, bc.CONSUME_QTY
+                FROM BATCH_CONSUMPTION bc
+                LEFT JOIN PRODUCTION_ORDER po ON po.ORDER_ID = bc.ORDER_ID
+                LEFT JOIN MATERIAL m ON m.MATERIAL_ID = po.MATERIAL_ID
+                WHERE bc.ITEM_ID IN ({string.Join(", ", placeholders)})
+                ORDER BY bc.ITEM_ID, bc.ORDER_ID";
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var itemId = Convert.ToInt64(reader.GetValue(0));
+                productsByItem[itemId].Add(new AffectedProductBatch
+                {
+                    OrderId = Convert.ToInt64(reader.GetValue(1)),
+                    BatchNo = reader.IsDBNull(2) ? null! : reader.GetString(2),
+                    ProductMaterialId = reader.IsDBNull(3) ? 0 : Convert.ToInt64(reader.GetValue(3)),
+                    ProductMaterialName = reader.IsDBNull(4) ? null! : reader.GetString(4),
+                    ProductionStatus = reader.IsDBNull(5)
+                        ? ProductionOrderStatus.PendingReviewEnum
+                        : ProductionStatusMap.FromDb(reader.GetString(5)),
+                    ConsumeQty = reader.GetDecimal(6),
+                });
+            }
         }
 
-        return products;
+        return productsByItem;
     }
 
     private static BatchConsumption? GetConsumption(OracleConnection conn, long consumptionId)

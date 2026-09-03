@@ -103,28 +103,25 @@ public class RolePermissionService(string connString)
         }
 
         // 3. 事务内批量插入；任一项失败回滚全部修改
+        var existingAssignments = LoadAssignedPermissionIds(conn, roleId, distinctIds);
+        var idsToAssign = distinctIds.Where(id => !existingAssignments.Contains(id)).ToList();
         using var tx = conn.BeginTransaction();
-        var assigned = new List<RolePermission>();
+        var assigned = idsToAssign
+            .Select(permissionId => new RolePermission { RoleId = roleId, PermissionId = permissionId })
+            .ToList();
         try
         {
-            foreach (var permissionId in distinctIds)
+            if (idsToAssign.Count > 0)
             {
                 using var insertCmd = conn.CreateCommand();
                 insertCmd.Transaction = tx;
+                insertCmd.ArrayBindCount = idsToAssign.Count;
                 insertCmd.CommandText = @"INSERT INTO SYS_ROLE_PERMISSION (ROLE_ID, PERMISSION_ID)
                                           VALUES (:roleId, :permissionId)";
-                insertCmd.Parameters.Add(new OracleParameter("roleId", roleId));
-                insertCmd.Parameters.Add(new OracleParameter("permissionId", permissionId));
-
-                try
-                {
-                    insertCmd.ExecuteNonQuery();
-                    assigned.Add(new RolePermission { RoleId = roleId, PermissionId = permissionId });
-                }
-                catch (OracleException ex) when (ex.Number == 1)
-                {
-                    // 已存在的关联，跳过
-                }
+                insertCmd.Parameters.Add("roleId", OracleDbType.Int32).Value =
+                    Enumerable.Repeat(roleId, idsToAssign.Count).ToArray();
+                insertCmd.Parameters.Add("permissionId", OracleDbType.Int32).Value = idsToAssign.ToArray();
+                insertCmd.ExecuteNonQuery();
             }
 
             tx.Commit();
@@ -135,6 +132,40 @@ public class RolePermissionService(string connString)
             tx.Rollback();
             throw;
         }
+    }
+
+    private static HashSet<int> LoadAssignedPermissionIds(
+        OracleConnection conn,
+        int roleId,
+        IReadOnlyList<int> permissionIds)
+    {
+        var result = new HashSet<int>();
+        if (permissionIds.Count == 0)
+        {
+            return result;
+        }
+
+        using var cmd = conn.CreateCommand();
+        var binds = new List<string>();
+        for (var index = 0; index < permissionIds.Count; index++)
+        {
+            var name = $"assignedPermissionId{index}";
+            binds.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, permissionIds[index]));
+        }
+
+        cmd.CommandText = $@"SELECT PERMISSION_ID
+                             FROM SYS_ROLE_PERMISSION
+                             WHERE ROLE_ID = :roleId
+                               AND PERMISSION_ID IN ({string.Join(", ", binds)})";
+        cmd.Parameters.Add(new OracleParameter("roleId", roleId));
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(Convert.ToInt32(reader.GetValue(0)));
+        }
+
+        return result;
     }
 
     /// <summary>一次查询所有目标权限 ID，避免逐项查询的 N+1 模式。</summary>

@@ -899,49 +899,48 @@ public sealed class CapacityService(
         DateOnly startDate,
         DateOnly horizon)
     {
-        using OracleCommand configCommand = OracleCommandFactory.Create(
+        using OracleCommand command = OracleCommandFactory.Create(
             connection,
-            @"SELECT CONFIG_ID, TYPE_ID, UNIT_TIME
-              FROM CAPACITY_CONFIG
-              WHERE MATERIAL_ID = :materialId
-              ORDER BY UNIT_TIME, CONFIG_ID");
-        configCommand.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
+            @"SELECT cc.CONFIG_ID, cc.TYPE_ID, cc.UNIT_TIME,
+                     pc.CALENDAR_DATE, pl.LINE_ID
+              FROM CAPACITY_CONFIG cc
+              LEFT JOIN PRODUCTION_CALENDAR pc
+                ON pc.CONFIG_ID = cc.CONFIG_ID
+               AND pc.CALENDAR_DATE >= :startDate
+               AND pc.CALENDAR_DATE <= :horizon
+              LEFT JOIN PRODUCTION_LINE pl
+                ON pl.LINE_ID = pc.LINE_ID
+               AND pl.TYPE_ID = cc.TYPE_ID
+              WHERE cc.MATERIAL_ID = :materialId
+              ORDER BY cc.UNIT_TIME, cc.CONFIG_ID, pc.CALENDAR_DATE, pc.LINE_ID");
+        command.Parameters.Add("startDate", OracleDbType.Date).Value =
+            startDate.ToDateTime(TimeOnly.MinValue);
+        command.Parameters.Add("horizon", OracleDbType.Date).Value =
+            horizon.ToDateTime(TimeOnly.MaxValue);
+        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
 
         List<CapacityPlan> plans = [];
-        using (OracleDataReader reader = configCommand.ExecuteReader())
+        var plansByConfig = new Dictionary<long, CapacityPlan>();
+        using (OracleDataReader reader = command.ExecuteReader())
         {
             while (reader.Read())
             {
-                plans.Add(new CapacityPlan(
-                    Convert.ToInt64(reader.GetValue(0)),
-                    Convert.ToInt64(reader.GetValue(1)),
-                    Convert.ToDecimal(reader.GetValue(2)),
-                    []));
-            }
-        }
+                long configId = Convert.ToInt64(reader.GetValue(0));
+                if (!plansByConfig.TryGetValue(configId, out CapacityPlan? plan))
+                {
+                    plan = new CapacityPlan(
+                        configId,
+                        Convert.ToInt64(reader.GetValue(1)),
+                        Convert.ToDecimal(reader.GetValue(2)),
+                        []);
+                    plansByConfig.Add(configId, plan);
+                    plans.Add(plan);
+                }
 
-        foreach (CapacityPlan plan in plans)
-        {
-            using OracleCommand calendarCommand = OracleCommandFactory.Create(
-                connection,
-                @"SELECT pc.CALENDAR_DATE
-                  FROM PRODUCTION_CALENDAR pc
-                  JOIN PRODUCTION_LINE pl ON pl.LINE_ID = pc.LINE_ID
-                  WHERE pc.CONFIG_ID = :configId
-                    AND pl.TYPE_ID = :typeId
-                    AND pc.CALENDAR_DATE >= :startDate
-                    AND pc.CALENDAR_DATE <= :horizon
-                  ORDER BY pc.CALENDAR_DATE, pc.LINE_ID");
-            calendarCommand.Parameters.Add("configId", OracleDbType.Int64).Value = plan.ConfigId;
-            calendarCommand.Parameters.Add("typeId", OracleDbType.Int64).Value = plan.TypeId;
-            calendarCommand.Parameters.Add("startDate", OracleDbType.Date).Value =
-                startDate.ToDateTime(TimeOnly.MinValue);
-            calendarCommand.Parameters.Add("horizon", OracleDbType.Date).Value =
-                horizon.ToDateTime(TimeOnly.MaxValue);
-            using OracleDataReader reader = calendarCommand.ExecuteReader();
-            while (reader.Read())
-            {
-                plan.CalendarSlots.Add(DateOnly.FromDateTime(reader.GetDateTime(0)));
+                if (!reader.IsDBNull(3) && !reader.IsDBNull(4))
+                {
+                    plan.CalendarSlots.Add(DateOnly.FromDateTime(reader.GetDateTime(3)));
+                }
             }
         }
 

@@ -45,6 +45,41 @@ public class InventoryController(
             });
     }
 
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("listMaterialStockData")]
+    public IActionResult ListStockData(
+        [FromQuery(Name = "page")] int? page,
+        [FromQuery(Name = "page_size")] int? pageSize,
+        [FromQuery(Name = "material_id")] long? materialId,
+        [FromQuery(Name = "material_name")] string? materialName,
+        [FromQuery(Name = "material_type")] string? materialType,
+        [FromQuery(Name = "status")] string? status)
+    {
+        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+
+        var (currentPage, size) = Paging.Normalize(page, pageSize);
+        var (records, total) = inventoryService.ListStockData(
+            currentPage,
+            size,
+            materialId,
+            materialName,
+            materialType,
+            status);
+        return Ok(new MaterialStockPageResponse
+        {
+            Code = MaterialStockPageResponse.CodeEnum._200Enum,
+            Message = "查询成功",
+            Data = new MaterialStockPageData
+            {
+                Total = total,
+                Page = currentPage,
+                PageSize = size,
+                Records = records,
+            },
+        });
+    }
+
     // ═══════════════════════════════════════════════════════════════
     //  Inventory Alert
     // ═══════════════════════════════════════════════════════════════
@@ -79,6 +114,19 @@ public class InventoryController(
                 Records = records,
             },
         });
+    }
+
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("getInventoryAlert")]
+    public IActionResult GetAlert([FromQuery(Name = "alert_id")] long alertId)
+    {
+        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+
+        var alert = inventoryService.GetAlert(alertId);
+        return alert is null
+            ? Ok(AlertSingle(InventoryAlertResponse.CodeEnum._404Enum, "库存预警不存在", null))
+            : Ok(AlertSingle(InventoryAlertResponse.CodeEnum._200Enum, "查询成功", alert));
     }
 
     [HttpPost]
@@ -285,6 +333,19 @@ public class InventoryController(
         });
     }
 
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("getObsoleteMaterialDetection")]
+    public IActionResult GetDetection([FromQuery(Name = "detection_id")] long detectionId)
+    {
+        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+
+        var detection = inventoryService.GetDetection(detectionId);
+        return detection is null
+            ? Ok(ObsoleteSingle(ObsoleteMaterialResponse.CodeEnum._404Enum, "废弃物料检测记录不存在", null))
+            : Ok(ObsoleteSingle(ObsoleteMaterialResponse.CodeEnum._200Enum, "查询成功", detection));
+    }
+
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
@@ -370,6 +431,19 @@ public class InventoryController(
                 Records = records,
             },
         });
+    }
+
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("getCompletionInbound")]
+    public IActionResult GetInbound([FromQuery(Name = "inbound_id")] long inboundId)
+    {
+        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+
+        var inbound = inventoryService.GetInbound(inboundId);
+        return inbound is null
+            ? Ok(InboundSingle(CompletionInboundResponse.CodeEnum._404Enum, "成品入库记录不存在", null))
+            : Ok(InboundSingle(CompletionInboundResponse.CodeEnum._200Enum, "查询成功", inbound));
     }
 
     // ═══════════════════════════════════════════════════════════════

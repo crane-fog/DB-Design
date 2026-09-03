@@ -168,7 +168,134 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
             cmd.Parameters.Add(new OracleParameter("take", pageSize));
 
             using var reader = cmd.ExecuteReader();
-            while (reader.Read()) records.Add(MapOrder(reader, conn));
+            while (reader.Read()) records.Add(MapOrder(reader, []));
+        }
+
+        var detailsByOrder = GetOrderItems(conn, records.Select(record => record.OrderId));
+        foreach (var record in records)
+        {
+            ApplyOrderDetails(
+                record,
+                detailsByOrder.GetValueOrDefault(record.OrderId) ?? []);
+        }
+
+        return (records, total);
+    }
+
+    public (List<SupplierDetail> Records, int Total) ListSuppliers(
+        int page,
+        int pageSize,
+        long? supplierId,
+        string? supplierName)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+
+        var where = new List<string>();
+        if (supplierId.HasValue) where.Add("s.SUPPLIER_ID = :supplierId");
+        if (!string.IsNullOrWhiteSpace(supplierName))
+            where.Add("s.SUPPLIER_NAME LIKE :supplierName");
+        var whereClause = where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : string.Empty;
+
+        void AddFilters(OracleCommand command)
+        {
+            if (supplierId.HasValue)
+                command.Parameters.Add(new OracleParameter("supplierId", supplierId.Value));
+            if (!string.IsNullOrWhiteSpace(supplierName))
+                command.Parameters.Add(new OracleParameter("supplierName", $"%{supplierName.Trim()}%"));
+        }
+
+        int total;
+        using (var countCommand = conn.CreateCommand())
+        {
+            countCommand.CommandText = "SELECT COUNT(*) FROM SUPPLIER s" + whereClause;
+            AddFilters(countCommand);
+            total = Convert.ToInt32(countCommand.ExecuteScalar());
+        }
+
+        var records = new List<SupplierDetail>();
+        using (var command = conn.CreateCommand())
+        {
+            command.CommandText = @"SELECT s.SUPPLIER_ID, s.SUPPLIER_NAME,
+                                           s.CONTACT_PERSON, s.CONTACT_PHONE
+                                    FROM SUPPLIER s" + whereClause +
+                @" ORDER BY s.SUPPLIER_ID
+                   OFFSET :skip ROWS FETCH NEXT :take ROWS ONLY";
+            AddFilters(command);
+            command.Parameters.Add(new OracleParameter("skip", (page - 1) * pageSize));
+            command.Parameters.Add(new OracleParameter("take", pageSize));
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                records.Add(new SupplierDetail
+                {
+                    SupplierId = Convert.ToInt64(reader.GetValue(0)),
+                    SupplierName = reader.GetString(1),
+                    ContactPerson = reader.IsDBNull(2) ? null! : reader.GetString(2),
+                    ContactPhone = reader.IsDBNull(3) ? null! : reader.GetString(3),
+                });
+            }
+        }
+
+        return (records, total);
+    }
+
+    public (List<PurchaseBuyerBrief> Records, int Total) ListBuyers(
+        int page,
+        int pageSize,
+        long? buyerId,
+        string? buyerName)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+
+        var where = new List<string>
+        {
+            "u.STATUS = 'valid'",
+            "r.STATUS = 'valid'",
+            "r.ROLE_NAME IN ('采购员', '采购主管', '系统管理员')",
+        };
+        if (buyerId.HasValue) where.Add("u.USER_ID = :buyerId");
+        if (!string.IsNullOrWhiteSpace(buyerName)) where.Add("u.USER_NAME LIKE :buyerName");
+        var whereClause = " WHERE " + string.Join(" AND ", where);
+        const string fromClause = @" FROM SYS_USER u
+            JOIN SYS_USER_ROLE ur ON ur.USER_ID = u.USER_ID
+            JOIN SYS_ROLE r ON r.ROLE_ID = ur.ROLE_ID";
+
+        void AddFilters(OracleCommand command)
+        {
+            if (buyerId.HasValue)
+                command.Parameters.Add(new OracleParameter("buyerId", buyerId.Value));
+            if (!string.IsNullOrWhiteSpace(buyerName))
+                command.Parameters.Add(new OracleParameter("buyerName", $"%{buyerName.Trim()}%"));
+        }
+
+        int total;
+        using (var countCommand = conn.CreateCommand())
+        {
+            countCommand.CommandText = "SELECT COUNT(DISTINCT u.USER_ID)" + fromClause + whereClause;
+            AddFilters(countCommand);
+            total = Convert.ToInt32(countCommand.ExecuteScalar());
+        }
+
+        var records = new List<PurchaseBuyerBrief>();
+        using (var command = conn.CreateCommand())
+        {
+            command.CommandText = "SELECT DISTINCT u.USER_ID, u.USER_NAME" + fromClause + whereClause +
+                @" ORDER BY u.USER_ID
+                   OFFSET :skip ROWS FETCH NEXT :take ROWS ONLY";
+            AddFilters(command);
+            command.Parameters.Add(new OracleParameter("skip", (page - 1) * pageSize));
+            command.Parameters.Add(new OracleParameter("take", pageSize));
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                records.Add(new PurchaseBuyerBrief
+                {
+                    BuyerId = Convert.ToInt64(reader.GetValue(0)),
+                    BuyerName = reader.GetString(1),
+                });
+            }
         }
 
         return (records, total);
@@ -197,9 +324,13 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         {
             if (d.Quantity <= 0)
                 return PurchaseResult.Fail(400, $"物料 {d.MaterialId} 数量必须大于 0");
-            if (!MaterialExists(conn, d.MaterialId))
-                return PurchaseResult.Fail(400, $"物料 {d.MaterialId} 不存在");
         }
+
+        var materialIds = request.Details.Select(detail => detail.MaterialId).Distinct().ToList();
+        var existingMaterialIds = GetMaterialDefaultSuppliers(conn, materialIds).Keys.ToHashSet();
+        var missingMaterialIds = materialIds.Where(id => !existingMaterialIds.Contains(id)).ToList();
+        if (missingMaterialIds.Count > 0)
+            return PurchaseResult.Fail(400, $"物料 {missingMaterialIds[0]} 不存在");
 
         if (!SupplierExists(conn, request.SupplierId))
             return PurchaseResult.Fail(400, "供应商不存在");
@@ -232,19 +363,12 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                     newOrderId = Convert.ToInt64(idParam.Value.ToString());
                 }
 
-                foreach (var d in request.Details)
-                {
-                    using var cmd = conn.CreateCommand();
-                    cmd.Transaction = tx;
-                    cmd.CommandText = @"INSERT INTO PURCHASE_ORDER_ITEM
-                        (ORDER_ID, MATERIAL_ID, QUANTITY, RECEIVED_QTY, UNIT_PRICE)
-                        VALUES (:orderId,  :materialId, :qty, 0, :price)";
-                    cmd.Parameters.Add(new OracleParameter("orderId", newOrderId));
-                    cmd.Parameters.Add(new OracleParameter("materialId", d.MaterialId));
-                    cmd.Parameters.Add(new OracleParameter("qty", d.Quantity));
-                    cmd.Parameters.Add(new OracleParameter("price", d.UnitPrice));
-                    cmd.ExecuteNonQuery();
-                }
+                InsertPurchaseItems(
+                    conn,
+                    tx,
+                    newOrderId,
+                    request.Details.Select(detail =>
+                        (detail.MaterialId, detail.Quantity, detail.UnitPrice)).ToList());
 
                 tx.Commit();
             }
@@ -277,21 +401,31 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
             {
                 if (item.PurchaseQty <= 0)
                     return PurchaseDraftResult.Fail(400, $"物料 {item.MaterialId} 采购数量必须大于 0");
+            }
 
-                if (!MaterialExists(conn, item.MaterialId))
-                    return PurchaseDraftResult.Fail(400, $"物料 {item.MaterialId} 不存在");
+            var materialIds = request.Items.Select(item => item.MaterialId).Distinct().ToList();
+            var defaultSuppliers = GetMaterialDefaultSuppliers(conn, materialIds);
+            var missingMaterialIds = materialIds.Where(id => !defaultSuppliers.ContainsKey(id)).ToList();
+            if (missingMaterialIds.Count > 0)
+                return PurchaseDraftResult.Fail(400, $"物料 {missingMaterialIds[0]} 不存在");
 
+            var resolvedItems = request.Items.Select(item =>
+            {
+                var supplierId = item.SupplierId is > 0
+                    ? item.SupplierId.Value
+                    : defaultSuppliers[item.MaterialId] ?? 0;
+                return (item.MaterialId, item.PurchaseQty, SupplierId: supplierId);
+            }).ToList();
+            var existingSupplierIds = GetExistingSupplierIds(
+                conn,
+                resolvedItems.Where(item => item.SupplierId > 0).Select(item => item.SupplierId));
+
+            foreach (var item in resolvedItems)
+            {
                 long supplierId;
-                if (item.SupplierId.HasValue && item.SupplierId.Value > 0)
-                {
-                    supplierId = item.SupplierId.Value;
-                }
-                else
-                {
-                    supplierId = GetDefaultSupplier(conn, item.MaterialId);
-                }
+                supplierId = item.SupplierId;
 
-                if (supplierId == 0 || !SupplierExists(conn, supplierId))
+                if (supplierId == 0 || !existingSupplierIds.Contains(supplierId))
                 {
                     unassigned.Add(new PurchaseDraftFromShortageResponseAllOfDataUnassignedItems
                     {
@@ -310,8 +444,13 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
             if (supplierGroups.Count == 0)
                 return PurchaseDraftResult.Success(new List<PurchaseOrder>(), unassigned);
 
-            var createdOrders = new List<PurchaseOrder>();
+            var createdOrderIds = new List<long>();
             tx = conn.BeginTransaction();
+            var prices = GetCurrentPrices(
+                conn,
+                tx,
+                supplierGroups.SelectMany(group =>
+                    group.Value.Select(item => (item.MaterialId, SupplierId: group.Key))));
 
             foreach (var (supId, items) in supplierGroups)
             {
@@ -320,7 +459,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
 
                 foreach (var (materialId, qty) in items)
                 {
-                    var price = GetCurrentPriceForMaterial(conn, tx, materialId, supId) ?? 0m;
+                    var price = prices.GetValueOrDefault((materialId, supId));
                     pricedItems.Add((materialId, qty, price));
                     totalAmount += qty * price;
                 }
@@ -347,28 +486,15 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                     newOrderId = Convert.ToInt64(idParam.Value.ToString());
                 }
 
-                foreach (var (materialId, qty, price) in pricedItems)
-                {
-                    using var cmd = conn.CreateCommand();
-                    cmd.Transaction = tx;
-                    cmd.CommandText = @"INSERT INTO PURCHASE_ORDER_ITEM
-                        (ORDER_ID, MATERIAL_ID, QUANTITY, RECEIVED_QTY, UNIT_PRICE)
-                        VALUES (:orderId,  :materialId, :qty, 0, :price)";
-                    cmd.Parameters.Add(new OracleParameter("orderId", newOrderId));
-                    cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-                    cmd.Parameters.Add(new OracleParameter("qty", qty));
-                    cmd.Parameters.Add(new OracleParameter("price", price));
-                    cmd.ExecuteNonQuery();
-                }
+                InsertPurchaseItems(conn, tx, newOrderId, pricedItems);
+                createdOrderIds.Add(newOrderId);
+            }
 
-                var createdOrder = GetOrderInternal(conn, newOrderId, tx);
-                if (createdOrder is null)
-                {
-                    tx.Rollback();
-                    return PurchaseDraftResult.Fail(500, "生成采购订单草稿失败，请稍后重试");
-                }
-
-                createdOrders.Add(createdOrder);
+            var createdOrders = GetOrdersInternal(conn, createdOrderIds, tx);
+            if (createdOrders.Count != createdOrderIds.Count)
+            {
+                tx.Rollback();
+                return PurchaseDraftResult.Fail(500, "生成采购订单草稿失败，请稍后重试");
             }
 
             tx.Commit();
@@ -642,10 +768,18 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                 FROM PURCHASE_ORDER o
                 WHERE o.STATUS NOT IN (:completed, :cancelled)
                   AND o.EXPECTED_DATE < :today
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM OVERDUE_REMINDER r
+                      WHERE r.ORDER_ID = o.ORDER_ID
+                        AND r.STATUS = :pendingUrge)
                   {filterClause}";
             queryCmd.Parameters.Add(new OracleParameter("completed", PurchaseOrderStatusMap.Db.Completed));
             queryCmd.Parameters.Add(new OracleParameter("cancelled", PurchaseOrderStatusMap.Db.Cancelled));
             queryCmd.Parameters.Add(new OracleParameter("today", today.ToDateTime(TimeOnly.MinValue)));
+            queryCmd.Parameters.Add(new OracleParameter(
+                "pendingUrge",
+                PurchaseOverdueReminderStatusMap.Db.PendingUrge));
             if (orderId.HasValue)
                 queryCmd.Parameters.Add(new OracleParameter("orderId", orderId.Value));
 
@@ -660,14 +794,6 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
 
             foreach (var (ordId, expectedDate) in candidates)
             {
-                using var checkCmd = conn.CreateCommand();
-                checkCmd.CommandText = @"SELECT COUNT(*) FROM OVERDUE_REMINDER
-                    WHERE ORDER_ID = :orderId AND STATUS = :pendingUrge";
-                checkCmd.Parameters.Add(new OracleParameter("orderId", ordId));
-                checkCmd.Parameters.Add(new OracleParameter("pendingUrge", PurchaseOverdueReminderStatusMap.Db.PendingUrge));
-                if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
-                    continue;
-
                 int overdueDays = (today.DayNumber - expectedDate.DayNumber);
 
                 long newId;
@@ -798,8 +924,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
 
     private static PurchaseOrder MapOrder(
         OracleDataReader reader,
-        OracleConnection conn,
-        OracleTransaction? tx = null)
+        List<PurchaseOrderDetailLine> details)
     {
         var orderId = Convert.ToInt64(reader.GetValue(0));
         var statusDb = reader.GetString(1);
@@ -813,7 +938,6 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
             ContactPhone = reader.IsDBNull(5) ? null! : reader.GetString(5),
         };
 
-        var details = GetOrderItems(conn, orderId, tx);
         decimal totalReceived = details.Sum(d => d.ReceivedQty);
         decimal totalOrdered = details.Sum(d => d.Quantity);
         decimal receiveProgress = totalOrdered > 0 ? totalReceived / totalOrdered : 0;
@@ -879,6 +1003,110 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         return items;
     }
 
+    private static Dictionary<long, List<PurchaseOrderDetailLine>> GetOrderItems(
+        OracleConnection conn,
+        IEnumerable<long> orderIds,
+        OracleTransaction? tx = null)
+    {
+        var ids = orderIds.Distinct().ToList();
+        var itemsByOrder = ids.ToDictionary(id => id, _ => new List<PurchaseOrderDetailLine>());
+        if (ids.Count == 0)
+        {
+            return itemsByOrder;
+        }
+
+        using var cmd = conn.CreateCommand();
+        if (tx is not null) cmd.Transaction = tx;
+        var placeholders = new List<string>();
+        for (var index = 0; index < ids.Count; index++)
+        {
+            var name = $"orderId{index}";
+            placeholders.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, ids[index]));
+        }
+
+        cmd.CommandText = ItemColumns +
+            $" WHERE i.ORDER_ID IN ({string.Join(", ", placeholders)}) ORDER BY i.ORDER_ID, i.ITEM_ID";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var item = MapOrderItem(reader);
+            itemsByOrder[item.OrderId].Add(item);
+        }
+
+        return itemsByOrder;
+    }
+
+    private static List<PurchaseOrder> GetOrdersInternal(
+        OracleConnection conn,
+        IReadOnlyList<long> orderIds,
+        OracleTransaction? tx = null)
+    {
+        if (orderIds.Count == 0)
+        {
+            return [];
+        }
+
+        using var cmd = conn.CreateCommand();
+        if (tx is not null) cmd.Transaction = tx;
+        var placeholders = new List<string>();
+        for (var index = 0; index < orderIds.Count; index++)
+        {
+            var name = $"createdOrderId{index}";
+            placeholders.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, orderIds[index]));
+        }
+
+        cmd.CommandText = OrderColumns +
+            $" WHERE o.ORDER_ID IN ({string.Join(", ", placeholders)}) ORDER BY o.ORDER_ID";
+        var orders = new List<PurchaseOrder>();
+        using (var reader = cmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                orders.Add(MapOrder(reader, []));
+            }
+        }
+
+        var detailsByOrder = GetOrderItems(conn, orderIds, tx);
+        foreach (var order in orders)
+        {
+            ApplyOrderDetails(order, detailsByOrder.GetValueOrDefault(order.OrderId) ?? []);
+        }
+
+        return orders;
+    }
+
+    private static PurchaseOrderDetailLine MapOrderItem(OracleDataReader reader)
+    {
+        var qty = reader.GetDecimal(4);
+        var received = reader.GetDecimal(5);
+        var price = reader.GetDecimal(6);
+        return new PurchaseOrderDetailLine
+        {
+            ItemId = Convert.ToInt64(reader.GetValue(0)),
+            OrderId = Convert.ToInt64(reader.GetValue(1)),
+            MaterialId = Convert.ToInt64(reader.GetValue(2)),
+            MaterialName = reader.IsDBNull(3) ? null! : reader.GetString(3),
+            Quantity = qty,
+            ReceivedQty = received,
+            UnitPrice = price,
+            LineAmount = qty * price,
+            ReceiveProgress = qty > 0 ? received / qty : 0,
+        };
+    }
+
+    private static void ApplyOrderDetails(
+        PurchaseOrder order,
+        List<PurchaseOrderDetailLine> details)
+    {
+        order.Details = details;
+        var totalOrdered = details.Sum(detail => detail.Quantity);
+        order.ReceiveProgress = totalOrdered > 0
+            ? details.Sum(detail => detail.ReceivedQty) / totalOrdered
+            : 0;
+    }
+
     private static PurchaseReceipt MapReceipt(OracleDataReader reader) => new()
     {
         ReceiveId = Convert.ToInt64(reader.GetValue(0)),
@@ -911,7 +1139,15 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         cmd.Parameters.Add(new OracleParameter("orderId", orderId));
 
         using var reader = cmd.ExecuteReader();
-        return reader.Read() ? MapOrder(reader, conn, tx) : null;
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        var order = MapOrder(reader, []);
+        reader.Close();
+        ApplyOrderDetails(order, GetOrderItems(conn, orderId, tx));
+        return order;
     }
 
     private static PurchaseReceipt? GetReceiptInternal(OracleConnection conn, long receiptId)
@@ -965,12 +1201,37 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         return value is null or DBNull ? null : value.ToString();
     }
 
-    private static bool MaterialExists(OracleConnection conn, long materialId)
+    private static Dictionary<long, long?> GetMaterialDefaultSuppliers(
+        OracleConnection conn,
+        IReadOnlyList<long> materialIds)
     {
+        var result = new Dictionary<long, long?>();
+        if (materialIds.Count == 0)
+        {
+            return result;
+        }
+
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+        var placeholders = new List<string>();
+        for (var index = 0; index < materialIds.Count; index++)
+        {
+            var name = $"materialId{index}";
+            placeholders.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, materialIds[index]));
+        }
+
+        cmd.CommandText = $@"SELECT MATERIAL_ID, DEFAULT_SUPPLIER_ID
+                             FROM MATERIAL
+                             WHERE MATERIAL_ID IN ({string.Join(", ", placeholders)})";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result[Convert.ToInt64(reader.GetValue(0))] = reader.IsDBNull(1)
+                ? null
+                : Convert.ToInt64(reader.GetValue(1));
+        }
+
+        return result;
     }
 
     private static bool SupplierExists(OracleConnection conn, long supplierId)
@@ -981,35 +1242,110 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
-    private static long GetDefaultSupplier(OracleConnection conn, long materialId)
+    private static HashSet<long> GetExistingSupplierIds(
+        OracleConnection conn,
+        IEnumerable<long> supplierIds)
     {
+        var ids = supplierIds.Distinct().ToList();
+        var result = new HashSet<long>();
+        if (ids.Count == 0)
+        {
+            return result;
+        }
+
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT DEFAULT_SUPPLIER_ID FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        var result = cmd.ExecuteScalar();
-        return result is null or DBNull ? 0 : Convert.ToInt64(result);
+        var placeholders = new List<string>();
+        for (var index = 0; index < ids.Count; index++)
+        {
+            var name = $"supplierId{index}";
+            placeholders.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, ids[index]));
+        }
+
+        cmd.CommandText = $"SELECT SUPPLIER_ID FROM SUPPLIER WHERE SUPPLIER_ID IN ({string.Join(", ", placeholders)})";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(Convert.ToInt64(reader.GetValue(0)));
+        }
+
+        return result;
     }
 
-    private static decimal? GetCurrentPriceForMaterial(
+    private static Dictionary<(long MaterialId, long SupplierId), decimal> GetCurrentPrices(
         OracleConnection conn,
         OracleTransaction tx,
-        long materialId,
-        long supplierId)
+        IEnumerable<(long MaterialId, long SupplierId)> materialSuppliers)
     {
+        var pairs = materialSuppliers.Distinct().ToList();
+        var result = new Dictionary<(long MaterialId, long SupplierId), decimal>();
+        if (pairs.Count == 0)
+        {
+            return result;
+        }
+
         using var cmd = conn.CreateCommand();
         cmd.Transaction = tx;
-        cmd.CommandText = @"
-            SELECT PRICE FROM SUPPLIER_PRICE
-            WHERE MATERIAL_ID =  :materialId
-              AND SUPPLIER_ID = :supplierId
-              AND VALID_FROM <= SYSDATE
-              AND (VALID_TO IS NULL OR VALID_TO >= SYSDATE)
-            ORDER BY VALID_FROM DESC
-            FETCH FIRST 1 ROW ONLY";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        cmd.Parameters.Add(new OracleParameter("supplierId", supplierId));
-        var result = cmd.ExecuteScalar();
-        return result is null or DBNull ? null : Convert.ToDecimal(result);
+        var pairFilters = new List<string>();
+        for (var index = 0; index < pairs.Count; index++)
+        {
+            var materialName = $"priceMaterialId{index}";
+            var supplierName = $"priceSupplierId{index}";
+            pairFilters.Add($"(MATERIAL_ID = :{materialName} AND SUPPLIER_ID = :{supplierName})");
+            cmd.Parameters.Add(new OracleParameter(materialName, pairs[index].MaterialId));
+            cmd.Parameters.Add(new OracleParameter(supplierName, pairs[index].SupplierId));
+        }
+
+        cmd.CommandText = $@"
+            SELECT MATERIAL_ID, SUPPLIER_ID, PRICE
+            FROM (
+                SELECT MATERIAL_ID, SUPPLIER_ID, PRICE,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY MATERIAL_ID, SUPPLIER_ID
+                           ORDER BY VALID_FROM DESC) AS RN
+                FROM SUPPLIER_PRICE
+                WHERE VALID_FROM <= SYSDATE
+                  AND (VALID_TO IS NULL OR VALID_TO >= SYSDATE)
+                  AND ({string.Join(" OR ", pairFilters)})
+            )
+            WHERE RN = 1";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result[(
+                Convert.ToInt64(reader.GetValue(0)),
+                Convert.ToInt64(reader.GetValue(1)))] = reader.GetDecimal(2);
+        }
+
+        return result;
+    }
+
+    private static void InsertPurchaseItems(
+        OracleConnection conn,
+        OracleTransaction tx,
+        long orderId,
+        IReadOnlyList<(long MaterialId, decimal Quantity, decimal UnitPrice)> items)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.ArrayBindCount = items.Count;
+        cmd.CommandText = @"INSERT INTO PURCHASE_ORDER_ITEM
+            (ORDER_ID, MATERIAL_ID, QUANTITY, RECEIVED_QTY, UNIT_PRICE)
+            VALUES (:orderId, :materialId, :qty, 0, :price)";
+        cmd.Parameters.Add("orderId", OracleDbType.Int64).Value =
+            Enumerable.Repeat(orderId, items.Count).ToArray();
+        cmd.Parameters.Add("materialId", OracleDbType.Int64).Value =
+            items.Select(item => item.MaterialId).ToArray();
+        cmd.Parameters.Add("qty", OracleDbType.Decimal).Value =
+            items.Select(item => item.Quantity).ToArray();
+        cmd.Parameters.Add("price", OracleDbType.Decimal).Value =
+            items.Select(item => item.UnitPrice).ToArray();
+        cmd.ExecuteNonQuery();
     }
 
     private static void EnsureMaterialStockExists(OracleConnection conn, long materialId, OracleTransaction tx)
