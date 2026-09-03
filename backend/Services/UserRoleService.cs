@@ -109,28 +109,25 @@ public class UserRoleService(string connString)
         }
 
         // 3. 事务内批量插入；任一项失败回滚全部修改
+        var existingAssignments = LoadAssignedRoleIds(conn, userId, distinctIds);
+        var idsToAssign = distinctIds.Where(id => !existingAssignments.Contains(id)).ToList();
         using var tx = conn.BeginTransaction();
-        var assigned = new List<UserRole>();
+        var assigned = idsToAssign
+            .Select(roleId => new UserRole { UserId = userId, RoleId = roleId })
+            .ToList();
         try
         {
-            foreach (var roleId in distinctIds)
+            if (idsToAssign.Count > 0)
             {
                 using var insertCmd = conn.CreateCommand();
                 insertCmd.Transaction = tx;
+                insertCmd.ArrayBindCount = idsToAssign.Count;
                 insertCmd.CommandText = @"INSERT INTO SYS_USER_ROLE (USER_ID, ROLE_ID)
                                           VALUES (:userId, :roleId)";
-                insertCmd.Parameters.Add(new OracleParameter("userId", userId));
-                insertCmd.Parameters.Add(new OracleParameter("roleId", roleId));
-
-                try
-                {
-                    insertCmd.ExecuteNonQuery();
-                    assigned.Add(new UserRole { UserId = userId, RoleId = roleId });
-                }
-                catch (OracleException ex) when (ex.Number == 1)
-                {
-                    // 已存在的关联，跳过
-                }
+                insertCmd.Parameters.Add("userId", OracleDbType.Int32).Value =
+                    Enumerable.Repeat(userId, idsToAssign.Count).ToArray();
+                insertCmd.Parameters.Add("roleId", OracleDbType.Int32).Value = idsToAssign.ToArray();
+                insertCmd.ExecuteNonQuery();
             }
 
             tx.Commit();
@@ -141,6 +138,40 @@ public class UserRoleService(string connString)
             tx.Rollback();
             throw;
         }
+    }
+
+    private static HashSet<int> LoadAssignedRoleIds(
+        OracleConnection conn,
+        int userId,
+        IReadOnlyList<int> roleIds)
+    {
+        var result = new HashSet<int>();
+        if (roleIds.Count == 0)
+        {
+            return result;
+        }
+
+        using var cmd = conn.CreateCommand();
+        var binds = new List<string>();
+        for (var index = 0; index < roleIds.Count; index++)
+        {
+            var name = $"assignedRoleId{index}";
+            binds.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, roleIds[index]));
+        }
+
+        cmd.CommandText = $@"SELECT ROLE_ID
+                             FROM SYS_USER_ROLE
+                             WHERE USER_ID = :userId
+                               AND ROLE_ID IN ({string.Join(", ", binds)})";
+        cmd.Parameters.Add(new OracleParameter("userId", userId));
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(Convert.ToInt32(reader.GetValue(0)));
+        }
+
+        return result;
     }
 
     /// <summary>一次查询所有目标角色的状态（角色 ID → status），避免逐项查询的 N+1 模式。</summary>

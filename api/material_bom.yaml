@@ -664,7 +664,7 @@ paths:
   /api/getMaterialStockData:
     get:
       summary: 查询物料库存
-      description: 查询指定物料库存。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 查询指定物料库存。需登录；库存管理员、生产管理员、系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: getMaterialStockData
       tags:
         - material_bom

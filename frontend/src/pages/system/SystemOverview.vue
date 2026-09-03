@@ -166,9 +166,9 @@ onUnmounted(() => {
       </div>
     </el-card>
 
-    <el-card class="overview-card" shadow="never">
+    <el-card class="overview-card table-card table-card--accent" shadow="never">
       <template #header>
-        <div class="card-header">
+        <div class="card-header table-card__header">
           <span>最近系统操作</span
           ><el-button
             v-if="canAccess('system:audit:view')"
@@ -211,30 +211,6 @@ onUnmounted(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 16px;
-}
-.statistic-card {
-  min-width: 0;
-}
-.statistic-card p,
-.statistic-card small {
-  display: block;
-  margin: 0;
-  color: var(--el-text-color-secondary);
-}
-.statistic-card strong {
-  display: block;
-  margin: 12px 0 8px;
-  font-size: 28px;
-}
-.statistic-card--clickable {
-  cursor: pointer;
-  transition:
-    border-color 0.2s,
-    transform 0.2s;
-}
-.statistic-card--clickable:hover {
-  border-color: var(--el-color-primary);
-  transform: translateY(-2px);
 }
 .overview-card {
   margin-bottom: 16px;

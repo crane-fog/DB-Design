@@ -11,11 +11,12 @@ import {
 } from '@/services/pagination'
 import type {
   Material,
-  MaterialDetail,
+  PurchaseBuyerBrief,
   PurchaseDraftFromShortageResponseAllOfData,
   PurchaseOrder,
   PurchaseOverdueReminder,
   PurchaseReceipt,
+  SupplierDetail,
 } from '@/api'
 import type {
   PurchaseDraftItem,
@@ -164,11 +165,13 @@ function validateOrderForm(form: PurchaseOrderFormData) {
   }
 }
 
-async function loadAllMaterials() {
+async function loadAllRecords<TRecord>(
+  request: (page: number, pageSize: number) => Promise<{ data: unknown }>,
+) {
   const pageSize = 100
-  const firstResponse = await materialBomApi.listMaterialData({ page: 1, pageSize })
+  const firstResponse = await request(1, pageSize)
   const firstPayload = requireData(firstResponse.data as ApiEnvelope<unknown>)
-  const firstItems = getPageItems<Material>(firstPayload)
+  const firstItems = getPageItems<TRecord>(firstPayload)
   const metadata = getPageMetadata(firstPayload, { page: 1, pageSize, total: firstItems.length })
   const remainingPageCount = Math.ceil(metadata.total / metadata.pageSize) - 1
   if (remainingPageCount <= 0) {
@@ -177,48 +180,16 @@ async function loadAllMaterials() {
   const remainingResponses = await Promise.all(
     Array.from({ length: remainingPageCount }, (unusedValue, index) => {
       void unusedValue
-      return materialBomApi.listMaterialData({
-        page: index + 2,
-        pageSize: metadata.pageSize,
-      })
+      return request(index + 2, metadata.pageSize)
     }),
   )
   return [
     ...firstItems,
     ...remainingResponses.flatMap((response) => {
       const payload = requireData(response.data as ApiEnvelope<unknown>)
-      return getPageItems<Material>(payload)
+      return getPageItems<TRecord>(payload)
     }),
   ]
-}
-
-async function loadSupplierOptions(
-  materials: PurchaseReferenceData['materials'],
-  orders: PurchaseOrderItem[],
-) {
-  const supplierMap = new Map(
-    orders.map((order) => [order.supplier.supplierId, order.supplier] as const),
-  )
-  const representativeMaterialBySupplier = new Map<number, number>()
-  for (const material of materials) {
-    if (material.defaultSupplierId && !supplierMap.has(material.defaultSupplierId)) {
-      representativeMaterialBySupplier.set(material.defaultSupplierId, material.materialId)
-    }
-  }
-  const supplierDetails = await Promise.all(
-    [...representativeMaterialBySupplier.entries()].map(async ([supplierId, materialId]) => {
-      const response = await materialBomApi.getMaterialData({ materialId })
-      const detail = requireData(response.data as ApiEnvelope<MaterialDetail | undefined>)
-      return {
-        supplierId,
-        supplierName: optionalText(detail?.supplier_name) ?? `供应商 #${supplierId}`,
-      }
-    }),
-  )
-  for (const supplier of supplierDetails) {
-    supplierMap.set(supplier.supplierId, supplier)
-  }
-  return [...supplierMap.values()]
 }
 
 export const purchaseService = {
@@ -365,11 +336,21 @@ export const purchaseService = {
     )
     let materialsPromise = Promise.resolve<Material[]>([])
     if (canReadMaterials) {
-      materialsPromise = loadAllMaterials()
+      materialsPromise = loadAllRecords<Material>((page, pageSize) =>
+        materialBomApi.listMaterialData({ page, pageSize }),
+      )
     }
-    const [materialItems, firstOrderPage] = await Promise.all([
+    const buyersPromise = loadAllRecords<PurchaseBuyerBrief>((page, pageSize) =>
+      purchaseApi.listPurchaseBuyerData({ page, pageSize }),
+    )
+    const suppliersPromise = loadAllRecords<SupplierDetail>((page, pageSize) =>
+      purchaseApi.listSupplierData({ page, pageSize }),
+    )
+    const [materialItems, firstOrderPage, buyerItems, supplierItems] = await Promise.all([
       materialsPromise,
       this.listOrders({ page: 1, pageSize: 100 }),
+      buyersPromise,
+      suppliersPromise,
     ])
     const remainingPageCount = Math.ceil(firstOrderPage.total / firstOrderPage.pageSize) - 1
     let orders = [...firstOrderPage.items]
@@ -405,10 +386,15 @@ export const purchaseService = {
       }
       materials.push(...materialMap.values())
     }
-    const suppliers = await loadSupplierOptions(materials, orders)
-    const buyers = [...new Set(orders.map((order) => order.buyerId))].map((buyerId) => ({
-      buyerId,
-      buyerName: `采购员 #${buyerId}`,
+    const suppliers = supplierItems.map((supplier) => ({
+      contactPerson: optionalText(supplier.contact_person),
+      contactPhone: optionalText(supplier.contact_phone),
+      supplierId: supplier.supplier_id,
+      supplierName: supplier.supplier_name,
+    }))
+    const buyers = buyerItems.map((buyer) => ({
+      buyerId: buyer.buyer_id,
+      buyerName: buyer.buyer_name,
     }))
     if (auth.currentUser?.id && !buyers.some((buyer) => buyer.buyerId === auth.currentUser?.id)) {
       buyers.unshift({

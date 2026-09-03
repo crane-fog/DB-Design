@@ -512,54 +512,56 @@ onMounted(() => {
           </el-form>
         </el-card>
 
-        <el-alert
-          v-if="configError"
-          class="section-error"
-          :closable="false"
-          show-icon
-          :title="configError"
-          type="error"
-        >
-          <template #default>
-            <el-button link type="primary" @click="loadConfigs(configPage)">重新加载</el-button>
-          </template>
-        </el-alert>
-
-        <el-table v-else v-loading="configLoading" :data="configResult.items" stripe>
-          <el-table-column label="配置 ID" min-width="90" prop="configId" />
-          <el-table-column label="产品" min-width="160">
-            <template #default="{ row }">{{
-              row.materialName || `物料 #${row.materialId}`
-            }}</template>
-          </el-table-column>
-          <el-table-column label="生产线类型" min-width="150">
-            <template #default="{ row }">{{ row.typeName || `#${row.typeId}` }}</template>
-          </el-table-column>
-          <el-table-column label="单件工时" min-width="110" prop="unitTime" />
-          <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
-            <template #default="{ row }">
-              <el-button link type="primary" :icon="EditPen" @click="openConfigEdit(row)">
-                修改
-              </el-button>
+        <el-card class="table-card" shadow="never">
+          <el-alert
+            v-if="configError"
+            class="section-error"
+            :closable="false"
+            show-icon
+            :title="configError"
+            type="error"
+          >
+            <template #default>
+              <el-button link type="primary" @click="loadConfigs(configPage)">重新加载</el-button>
             </template>
-          </el-table-column>
-        </el-table>
+          </el-alert>
 
-        <el-empty
-          v-if="!configLoading && !configError && !configResult.items.length"
-          description="暂无产能配置数据"
-        />
+          <el-table v-else v-loading="configLoading" :data="configResult.items" stripe>
+            <el-table-column label="配置 ID" min-width="90" prop="configId" />
+            <el-table-column label="产品" min-width="160">
+              <template #default="{ row }">{{
+                row.materialName || `物料 #${row.materialId}`
+              }}</template>
+            </el-table-column>
+            <el-table-column label="生产线类型" min-width="150">
+              <template #default="{ row }">{{ row.typeName || `#${row.typeId}` }}</template>
+            </el-table-column>
+            <el-table-column label="单件工时" min-width="110" prop="unitTime" />
+            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+              <template #default="{ row }">
+                <el-button link type="primary" :icon="EditPen" @click="openConfigEdit(row)">
+                  修改
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
 
-        <div v-if="!configError && configResult.total > 0" class="pagination">
-          <el-pagination
-            v-model:current-page="configPage"
-            background
-            layout="total, prev, pager, next"
-            :page-size="pageSize"
-            :total="configResult.total"
-            @current-change="loadConfigs"
+          <el-empty
+            v-if="!configLoading && !configError && !configResult.items.length"
+            description="暂无产能配置数据"
           />
-        </div>
+
+          <div v-if="!configError && configResult.total > 0" class="pagination">
+            <el-pagination
+              v-model:current-page="configPage"
+              background
+              layout="total, prev, pager, next"
+              :page-size="pageSize"
+              :total="configResult.total"
+              @current-change="loadConfigs"
+            />
+          </div>
+        </el-card>
       </el-tab-pane>
 
       <!-- 生产线 -->
@@ -607,61 +609,63 @@ onMounted(() => {
           </el-form>
         </el-card>
 
-        <el-alert
-          v-if="lineError"
-          class="section-error"
-          :closable="false"
-          show-icon
-          :title="lineError"
-          type="error"
-        >
-          <template #default>
-            <el-button link type="primary" @click="loadLines(linePage)">重新加载</el-button>
-          </template>
-        </el-alert>
-
-        <el-table v-else v-loading="lineLoading" :data="lineResult.items" stripe>
-          <el-table-column label="生产线 ID" min-width="100" prop="lineId" />
-          <el-table-column label="生产线类型" min-width="150">
-            <template #default="{ row }">{{ row.typeName || `#${row.typeId}` }}</template>
-          </el-table-column>
-          <el-table-column label="负责人" min-width="140">
-            <template #default="{ row }">{{
-              row.managerName || `用户 #${row.managerId}`
-            }}</template>
-          </el-table-column>
-          <el-table-column label="启用日期" min-width="130">
-            <template #default="{ row }">{{ row.startDate || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="运行状态" min-width="110">
-            <template #default="{ row }">
-              <StatusTag :labels="lineStatusLabels" :value="row.status" />
+        <el-card class="table-card" shadow="never">
+          <el-alert
+            v-if="lineError"
+            class="section-error"
+            :closable="false"
+            show-icon
+            :title="lineError"
+            type="error"
+          >
+            <template #default>
+              <el-button link type="primary" @click="loadLines(linePage)">重新加载</el-button>
             </template>
-          </el-table-column>
-          <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
-            <template #default="{ row }">
-              <el-button link type="primary" :icon="EditPen" @click="openLineEdit(row)">
-                修改
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          </el-alert>
 
-        <el-empty
-          v-if="!lineLoading && !lineError && !lineResult.items.length"
-          description="暂无生产线数据"
-        />
+          <el-table v-else v-loading="lineLoading" :data="lineResult.items" stripe>
+            <el-table-column label="生产线 ID" min-width="100" prop="lineId" />
+            <el-table-column label="生产线类型" min-width="150">
+              <template #default="{ row }">{{ row.typeName || `#${row.typeId}` }}</template>
+            </el-table-column>
+            <el-table-column label="负责人" min-width="140">
+              <template #default="{ row }">{{
+                row.managerName || `用户 #${row.managerId}`
+              }}</template>
+            </el-table-column>
+            <el-table-column label="启用日期" min-width="130">
+              <template #default="{ row }">{{ row.startDate || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="运行状态" min-width="110">
+              <template #default="{ row }">
+                <StatusTag :labels="lineStatusLabels" :value="row.status" />
+              </template>
+            </el-table-column>
+            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+              <template #default="{ row }">
+                <el-button link type="primary" :icon="EditPen" @click="openLineEdit(row)">
+                  修改
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
 
-        <div v-if="!lineError && lineResult.total > 0" class="pagination">
-          <el-pagination
-            v-model:current-page="linePage"
-            background
-            layout="total, prev, pager, next"
-            :page-size="pageSize"
-            :total="lineResult.total"
-            @current-change="loadLines"
+          <el-empty
+            v-if="!lineLoading && !lineError && !lineResult.items.length"
+            description="暂无生产线数据"
           />
-        </div>
+
+          <div v-if="!lineError && lineResult.total > 0" class="pagination">
+            <el-pagination
+              v-model:current-page="linePage"
+              background
+              layout="total, prev, pager, next"
+              :page-size="pageSize"
+              :total="lineResult.total"
+              @current-change="loadLines"
+            />
+          </div>
+        </el-card>
       </el-tab-pane>
 
       <!-- 生产线类型 -->
@@ -685,46 +689,48 @@ onMounted(() => {
           </el-form>
         </el-card>
 
-        <el-alert
-          v-if="typeError"
-          class="section-error"
-          :closable="false"
-          show-icon
-          :title="typeError"
-          type="error"
-        >
-          <template #default>
-            <el-button link type="primary" @click="loadTypes(typePage)">重新加载</el-button>
-          </template>
-        </el-alert>
-
-        <el-table v-else v-loading="typeLoading" :data="typeResult.items" stripe>
-          <el-table-column label="类型 ID" min-width="100" prop="typeId" />
-          <el-table-column label="类型名称" min-width="200" prop="typeName" />
-          <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
-            <template #default="{ row }">
-              <el-button link type="primary" :icon="EditPen" @click="openTypeEdit(row)">
-                修改
-              </el-button>
+        <el-card class="table-card" shadow="never">
+          <el-alert
+            v-if="typeError"
+            class="section-error"
+            :closable="false"
+            show-icon
+            :title="typeError"
+            type="error"
+          >
+            <template #default>
+              <el-button link type="primary" @click="loadTypes(typePage)">重新加载</el-button>
             </template>
-          </el-table-column>
-        </el-table>
+          </el-alert>
 
-        <el-empty
-          v-if="!typeLoading && !typeError && !typeResult.items.length"
-          description="暂无生产线类型数据"
-        />
+          <el-table v-else v-loading="typeLoading" :data="typeResult.items" stripe>
+            <el-table-column label="类型 ID" min-width="100" prop="typeId" />
+            <el-table-column label="类型名称" min-width="200" prop="typeName" />
+            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+              <template #default="{ row }">
+                <el-button link type="primary" :icon="EditPen" @click="openTypeEdit(row)">
+                  修改
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
 
-        <div v-if="!typeError && typeResult.total > 0" class="pagination">
-          <el-pagination
-            v-model:current-page="typePage"
-            background
-            layout="total, prev, pager, next"
-            :page-size="pageSize"
-            :total="typeResult.total"
-            @current-change="loadTypes"
+          <el-empty
+            v-if="!typeLoading && !typeError && !typeResult.items.length"
+            description="暂无生产线类型数据"
           />
-        </div>
+
+          <div v-if="!typeError && typeResult.total > 0" class="pagination">
+            <el-pagination
+              v-model:current-page="typePage"
+              background
+              layout="total, prev, pager, next"
+              :page-size="pageSize"
+              :total="typeResult.total"
+              @current-change="loadTypes"
+            />
+          </div>
+        </el-card>
       </el-tab-pane>
 
       <!-- 生产日历 -->
@@ -768,67 +774,69 @@ onMounted(() => {
           </el-form>
         </el-card>
 
-        <el-alert
-          v-if="calendarError"
-          class="section-error"
-          :closable="false"
-          show-icon
-          :title="calendarError"
-          type="error"
-        >
-          <template #default>
-            <el-button link type="primary" @click="loadCalendars(calendarPage)">
-              重新加载
-            </el-button>
-          </template>
-        </el-alert>
-
-        <el-table v-else v-loading="calendarLoading" :data="calendarResult.items" stripe>
-          <el-table-column label="排产日期" min-width="130" prop="calendarDate" />
-          <el-table-column label="生产线" min-width="150">
-            <template #default="{ row }">{{ row.lineName || `生产线 #${row.lineId}` }}</template>
-          </el-table-column>
-          <el-table-column label="产能配置 ID" min-width="110" prop="configId" />
-          <el-table-column label="产品" min-width="150">
-            <template #default="{ row }">
-              {{ row.materialName || (row.materialId ? `物料 #${row.materialId}` : '-') }}
-            </template>
-          </el-table-column>
-          <el-table-column label="生产线类型" min-width="140">
-            <template #default="{ row }">
-              {{ row.typeName || (row.typeId ? `#${row.typeId}` : '-') }}
-            </template>
-          </el-table-column>
-          <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
-            <template #default="{ row }">
-              <el-button
-                link
-                :disabled="calendarDeleting"
-                :icon="Delete"
-                type="danger"
-                @click="removeCalendar(row)"
-              >
-                删除
+        <el-card class="table-card" shadow="never">
+          <el-alert
+            v-if="calendarError"
+            class="section-error"
+            :closable="false"
+            show-icon
+            :title="calendarError"
+            type="error"
+          >
+            <template #default>
+              <el-button link type="primary" @click="loadCalendars(calendarPage)">
+                重新加载
               </el-button>
             </template>
-          </el-table-column>
-        </el-table>
+          </el-alert>
 
-        <el-empty
-          v-if="!calendarLoading && !calendarError && !calendarResult.items.length"
-          description="暂无排产日历数据"
-        />
+          <el-table v-else v-loading="calendarLoading" :data="calendarResult.items" stripe>
+            <el-table-column label="排产日期" min-width="130" prop="calendarDate" />
+            <el-table-column label="生产线" min-width="150">
+              <template #default="{ row }">{{ row.lineName || `生产线 #${row.lineId}` }}</template>
+            </el-table-column>
+            <el-table-column label="产能配置 ID" min-width="110" prop="configId" />
+            <el-table-column label="产品" min-width="150">
+              <template #default="{ row }">
+                {{ row.materialName || (row.materialId ? `物料 #${row.materialId}` : '-') }}
+              </template>
+            </el-table-column>
+            <el-table-column label="生产线类型" min-width="140">
+              <template #default="{ row }">
+                {{ row.typeName || (row.typeId ? `#${row.typeId}` : '-') }}
+              </template>
+            </el-table-column>
+            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+              <template #default="{ row }">
+                <el-button
+                  link
+                  :disabled="calendarDeleting"
+                  :icon="Delete"
+                  type="danger"
+                  @click="removeCalendar(row)"
+                >
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
 
-        <div v-if="!calendarError && calendarResult.total > 0" class="pagination">
-          <el-pagination
-            v-model:current-page="calendarPage"
-            background
-            layout="total, prev, pager, next"
-            :page-size="pageSize"
-            :total="calendarResult.total"
-            @current-change="loadCalendars"
+          <el-empty
+            v-if="!calendarLoading && !calendarError && !calendarResult.items.length"
+            description="暂无排产日历数据"
           />
-        </div>
+
+          <div v-if="!calendarError && calendarResult.total > 0" class="pagination">
+            <el-pagination
+              v-model:current-page="calendarPage"
+              background
+              layout="total, prev, pager, next"
+              :page-size="pageSize"
+              :total="calendarResult.total"
+              @current-change="loadCalendars"
+            />
+          </div>
+        </el-card>
       </el-tab-pane>
     </el-tabs>
 

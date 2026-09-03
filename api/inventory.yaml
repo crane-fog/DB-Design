@@ -28,6 +28,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaterialShortageCalculateResponse'
+  /api/listMaterialStockData:
+    get:
+      summary: 分页查询物料库存
+      description: 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      operationId: listMaterialStockData
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: material_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: material_name
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: material_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [raw_material, semi_finished, finished, auxiliary]
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/MaterialStockStatus'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialStockPageResponse'
   /api/listInventoryAlert:
     get:
       summary: 查询库存预警事件
@@ -69,6 +109,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InventoryAlertPageResponse'
+  /api/getInventoryAlert:
+    get:
+      summary: 查询库存预警详情
+      description: 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      operationId: getInventoryAlert
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: alert_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryAlertResponse'
   /api/generateInventoryAlert:
     post:
       summary: 生成库存预警事件
@@ -250,6 +312,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObsoleteMaterialPageResponse'
+  /api/getObsoleteMaterialDetection:
+    get:
+      summary: 查询废弃物料检测详情
+      description: 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      operationId: getObsoleteMaterialDetection
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: detection_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObsoleteMaterialResponse'
   /api/handleObsoleteMaterialDetection:
     post:
       summary: 处理废弃物料检测结果
@@ -334,6 +418,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CompletionInboundPageResponse'
+  /api/getCompletionInbound:
+    get:
+      summary: 查询完工入库详情
+      description: 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      operationId: getCompletionInbound
+      tags: [inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inbound_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionInboundResponse'
 components:
   schemas:
     InventoryAlertStatus:
@@ -348,6 +454,10 @@ components:
       type: string
       description: 废弃物料检测状态。pending 待处理，可处理或忽略；handled 已处理，流程结束；ignored 已忽略，流程结束。允许流转：pending -> handled/ignored。
       enum: [pending, handled, ignored]
+    MaterialStockStatus:
+      type: string
+      description: 库存状态。zero 表示可用库存小于等于 0；low 表示可用库存低于安全库存；locked 表示存在锁定库存；normal 表示库存正常。按 zero、low、locked、normal 的优先级判定。
+      enum: [normal, low, zero, locked]
     MaterialShortageCalculateRequest:
       type: object
       required: [items]
@@ -439,6 +549,41 @@ components:
             建议采购数量，由后端基于 net_shortage_qty 得到，当前口径为 suggested_purchase_qty = net_shortage_qty。
             单位与物料 material.unit 一致，保留两位小数，取值范围大于等于 0；后续如引入最小采购批量或包装规格，
             应在后端统一调整该字段计算逻辑。
+    MaterialStockDetail:
+      type: object
+      required: [material_id, material_name, material_type, unit, safety_stock, available_qty, locked_qty, status]
+      properties:
+        material_id:
+          type: integer
+          format: int64
+        material_name:
+          type: string
+        material_type:
+          type: string
+          enum: [raw_material, semi_finished, finished, auxiliary]
+        unit:
+          type: string
+        safety_stock:
+          type: number
+          format: decimal
+          minimum: 0
+        available_qty:
+          type: number
+          format: decimal
+        locked_qty:
+          type: number
+          format: decimal
+          minimum: 0
+        last_in_date:
+          type: string
+          format: date-time
+          nullable: true
+        last_out_date:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          $ref: '#/components/schemas/MaterialStockStatus'
     InventoryAlertEvent:
       type: object
       required: [alert_id, material_id, alert_type, available_qty, threshold, alert_time, status]
@@ -753,6 +898,25 @@ components:
               allOf:
                 - $ref: '#/components/schemas/InventoryAlertEvent'
               nullable: true
+    MaterialStockPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/MaterialStockPageData'
+              nullable: true
+    MaterialStockPageData:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageResult'
+        - type: object
+          properties:
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/MaterialStockDetail'
     InventoryAlertPageResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'

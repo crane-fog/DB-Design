@@ -203,8 +203,8 @@ function openBatchTrace() {
     return
   }
   void router.push({
-    path: '/trace',
-    query: { batchNo: inbound.batchNo, orderId: String(inbound.orderId), tab: 'product' },
+    path: '/trace/product',
+    query: { batchNo: inbound.batchNo, orderId: String(inbound.orderId) },
   })
 }
 
@@ -342,8 +342,10 @@ onBeforeUnmount(() => {
       >
     </el-alert>
 
-    <el-card class="records-card" shadow="never">
-      <template #header><span>入库记录</span></template>
+    <el-card class="records-card table-card table-card--accent" shadow="never">
+      <template #header
+        ><div class="table-card__header"><span>入库记录</span></div></template
+      >
       <div v-loading="loading" class="records-area">
         <EmptyState
           v-if="!loading && !error && !items.length"
@@ -591,12 +593,6 @@ onBeforeUnmount(() => {
 }
 .inbound-detail-area {
   min-height: 180px;
-}
-.query-card {
-  border-top: 3px solid var(--primary-color);
-}
-.records-card {
-  border-top: 3px solid var(--border-color);
 }
 .query-bar {
   display: flex;

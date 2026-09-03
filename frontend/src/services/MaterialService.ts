@@ -294,18 +294,17 @@ export const materialService = {
 
   async getBomDetail(bomId: string): Promise<MaterialBomDetail> {
     const version = await getVersion(bomId)
-    const [material, rows] = await Promise.all([
-      getMaterial(String(idNumber(version.material_id, '父项物料编号'))),
+    const [materials, rows] = await Promise.all([
+      listAll<MaterialDetail>((page) => materialBomApi.listMaterialData({ page, pageSize })),
       listAll<Bom>((page) =>
         materialBomApi.listBomData({ page, pageSize, versionId: idNumber(bomId, '版本编号') }),
       ),
     ])
-    const children = await Promise.all(
-      [...new Set(rows.map((row) => idNumber(row.child_material_id, '子项物料编号')))].map((id) =>
-        getMaterial(String(id)),
-      ),
-    )
-    const byId = new Map(children.map((child) => [child.id, child]))
+    const byId = new Map(materials.map(mapMaterial).map((item) => [item.id, item]))
+    const material = byId.get(String(idNumber(version.material_id, '父项物料编号')))
+    if (!material) {
+      throw new Error('BOM 父项物料不存在')
+    }
     return {
       ...mapVersion(version, material),
       components: rows.map((row, index) => {

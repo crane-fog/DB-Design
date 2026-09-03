@@ -216,6 +216,10 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
             return ExternalOrderConvertOutcome.Fail(409, "仅已接受外部订单可转换");
         }
 
+        var references = GetProductionOrderReferences(
+            conn,
+            request.ProductionOrders.Select(order => order.MaterialId).Distinct().ToList());
+
         // 预校验所有生产订单请求，避免部分提交后才发现非法输入。
         foreach (var po in request.ProductionOrders)
         {
@@ -229,12 +233,12 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
                 return ExternalOrderConvertOutcome.Fail(400, "计划完工日期不得早于计划开始日期");
             }
 
-            if (!MaterialExists(conn, po.MaterialId))
+            if (!references.MaterialNames.ContainsKey(po.MaterialId))
             {
                 return ExternalOrderConvertOutcome.Fail(400, "产品不存在");
             }
 
-            if (!BomVersionExists(conn, po.VersionId, po.MaterialId))
+            if (!references.BomVersions.Contains((po.VersionId, po.MaterialId)))
             {
                 return ExternalOrderConvertOutcome.Fail(400, "BOM 版本不存在或与产品不匹配");
             }
@@ -285,7 +289,7 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
                 {
                     OrderId = orderId,
                     MaterialId = po.MaterialId,
-                    MaterialName = GetMaterialName(conn, tx, po.MaterialId),
+                    MaterialName = references.MaterialNames[po.MaterialId],
                     PlanQty = po.PlanQty,
                     FinishedQty = 0,
                     Status = ProductionOrderStatus.PendingReviewEnum,
@@ -364,30 +368,48 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
         return value is null or DBNull ? null : value.ToString();
     }
 
-    private static string GetMaterialName(OracleConnection conn, OracleTransaction tx, long materialId)
+    private static ProductionOrderReferences GetProductionOrderReferences(
+        OracleConnection conn,
+        IReadOnlyList<long> materialIds)
     {
+        var materialNames = new Dictionary<long, string>();
+        var bomVersions = new HashSet<(long VersionId, long MaterialId)>();
+        if (materialIds.Count == 0)
+        {
+            return new ProductionOrderReferences(materialNames, bomVersions);
+        }
+
         using var cmd = conn.CreateCommand();
-        cmd.Transaction = tx;
-        cmd.CommandText = "SELECT MATERIAL_NAME FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        var value = cmd.ExecuteScalar();
-        return value is null or DBNull ? null! : value.ToString()!;
+        var placeholders = new List<string>();
+        for (var index = 0; index < materialIds.Count; index++)
+        {
+            var name = $"materialId{index}";
+            placeholders.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, materialIds[index]));
+        }
+
+        cmd.CommandText = $@"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, bv.VERSION_ID
+                             FROM MATERIAL m
+                             LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
+                             WHERE m.MATERIAL_ID IN ({string.Join(", ", placeholders)})";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var materialId = Convert.ToInt64(reader.GetValue(0));
+            materialNames[materialId] = reader.GetString(1);
+            if (!reader.IsDBNull(2))
+            {
+                bomVersions.Add((Convert.ToInt64(reader.GetValue(2)), materialId));
+            }
+        }
+
+        return new ProductionOrderReferences(materialNames, bomVersions);
     }
 
     private static bool MaterialExists(OracleConnection conn, long materialId)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
-
-    private static bool BomVersionExists(OracleConnection conn, long versionId, long materialId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"SELECT COUNT(*) FROM BOM_VERSION
-                            WHERE VERSION_ID = :versionId AND MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("versionId", versionId));
         cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
@@ -410,4 +432,8 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
         SubmitTime = reader.GetDateTime(10),
         ReviewComment = reader.IsDBNull(11) ? null! : reader.GetString(11),
     };
+
+    private sealed record ProductionOrderReferences(
+        Dictionary<long, string> MaterialNames,
+        HashSet<(long VersionId, long MaterialId)> BomVersions);
 }

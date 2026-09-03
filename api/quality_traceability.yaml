@@ -44,6 +44,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BatchConsumptionPageResponse'
+  /api/getBatchConsumption:
+    get:
+      summary: 查询批次消耗详情
+      description: 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。权限：质量管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      operationId: getBatchConsumption
+      tags: [quality_traceability]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: consumption_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchConsumptionResponse'
   /api/addBatchConsumption:
     post:
       summary: 新增批次消耗关系
@@ -144,7 +166,7 @@ paths:
   /api/traceMaterialBatch:
     get:
       summary: 反向追溯原材料批次
-      description: 从采购订单明细、原材料编号或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id 或到货日期范围至少提供一种。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
       operationId: traceMaterialBatch
       tags: [quality_traceability]
       security:
@@ -162,16 +184,24 @@ paths:
           schema:
             type: integer
             format: int64
+        - name: supplier_id
+          in: query
+          required: false
+          description: 供应商唯一标识，后端直接关联采购订单过滤，避免客户端先查询采购订单再按明细逐条发起追溯请求。
+          schema:
+            type: integer
+            format: int64
         - name: receive_date_start
           in: query
           required: false
+          description: 到货日期开始。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种，由后端校验。
           schema:
             type: string
             format: date
         - name: receive_date_end
           in: query
           required: false
-          description: 到货日期结束。item_id、material_id 或完整到货日期范围至少提供一种，由后端校验。
+          description: 到货日期结束。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种，由后端校验。
           schema:
             type: string
             format: date

@@ -94,6 +94,13 @@ public class InventoryService(
     MaterialRequirementNettingService requirementNetting)
     : IStockOperationService
 {
+    private const string MaterialStockStatusSql = @"CASE
+        WHEN NVL(ms.AVAILABLE_QTY, 0) <= 0 THEN 'zero'
+        WHEN NVL(ms.AVAILABLE_QTY, 0) < NVL(m.SAFETY_STOCK, 0) THEN 'low'
+        WHEN NVL(ms.LOCKED_QTY, 0) > 0 THEN 'locked'
+        ELSE 'normal'
+    END";
+
     // ── material_stock ────────────────────────────────────────────
     private const string MaterialStockColumns = @"
         SELECT MATERIAL_ID, AVAILABLE_QTY, LOCKED_QTY, LAST_IN_DATE, LAST_OUT_DATE
@@ -144,6 +151,104 @@ public class InventoryService(
 
         using var reader = cmd.ExecuteReader();
         return reader.Read() ? MapMaterialStock(reader) : null;
+    }
+
+    public (List<MaterialStockDetail> Records, int Total) ListStockData(
+        int page,
+        int pageSize,
+        long? materialId,
+        string? materialName,
+        string? materialType,
+        string? status)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+
+        var dbMaterialType = ToDbMaterialType(materialType);
+        var where = new List<string>();
+        if (materialId.HasValue) where.Add("m.MATERIAL_ID = :materialId");
+        if (!string.IsNullOrWhiteSpace(materialName)) where.Add("m.MATERIAL_NAME LIKE :materialName");
+        if (!string.IsNullOrEmpty(dbMaterialType)) where.Add("m.MATERIAL_TYPE = :materialType");
+        if (!string.IsNullOrEmpty(status)) where.Add($"{MaterialStockStatusSql} = :status");
+        var whereClause = where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : string.Empty;
+
+        void AddFilters(OracleCommand command)
+        {
+            if (materialId.HasValue)
+                command.Parameters.Add(new OracleParameter("materialId", materialId.Value));
+            if (!string.IsNullOrWhiteSpace(materialName))
+                command.Parameters.Add(new OracleParameter("materialName", $"%{materialName.Trim()}%"));
+            if (!string.IsNullOrEmpty(dbMaterialType))
+                command.Parameters.Add(new OracleParameter("materialType", dbMaterialType));
+            if (!string.IsNullOrEmpty(status))
+                command.Parameters.Add(new OracleParameter("status", status));
+        }
+
+        const string fromClause = @" FROM MATERIAL m
+            LEFT JOIN MATERIAL_STOCK ms ON ms.MATERIAL_ID = m.MATERIAL_ID";
+        int total;
+        using (var countCommand = conn.CreateCommand())
+        {
+            countCommand.CommandText = "SELECT COUNT(*)" + fromClause + whereClause;
+            AddFilters(countCommand);
+            total = Convert.ToInt32(countCommand.ExecuteScalar());
+        }
+
+        var records = new List<MaterialStockDetail>();
+        using (var command = conn.CreateCommand())
+        {
+            command.CommandText = $@"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MATERIAL_TYPE,
+                                            m.UNIT, NVL(m.SAFETY_STOCK, 0),
+                                            NVL(ms.AVAILABLE_QTY, 0), NVL(ms.LOCKED_QTY, 0),
+                                            ms.LAST_IN_DATE, ms.LAST_OUT_DATE,
+                                            {MaterialStockStatusSql} AS STOCK_STATUS" +
+                fromClause + whereClause +
+                @" ORDER BY m.MATERIAL_ID
+                   OFFSET :skip ROWS FETCH NEXT :take ROWS ONLY";
+            AddFilters(command);
+            command.Parameters.Add(new OracleParameter("skip", (page - 1) * pageSize));
+            command.Parameters.Add(new OracleParameter("take", pageSize));
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                records.Add(new MaterialStockDetail
+                {
+                    MaterialId = Convert.ToInt64(reader.GetValue(0)),
+                    MaterialName = reader.GetString(1),
+                    MaterialType = ToStockMaterialType(reader.GetString(2)),
+                    Unit = reader.GetString(3),
+                    SafetyStock = reader.GetDecimal(4),
+                    AvailableQty = reader.GetDecimal(5),
+                    LockedQty = reader.GetDecimal(6),
+                    LastInDate = reader.IsDBNull(7) ? null : reader.GetDateTime(7),
+                    LastOutDate = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
+                    Status = ToMaterialStockStatus(reader.GetString(9)),
+                });
+            }
+        }
+
+        return (records, total);
+    }
+
+    public InventoryAlertEvent? GetAlert(long alertId)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+        return GetAlertInternal(conn, alertId);
+    }
+
+    public ObsoleteMaterialDetection? GetDetection(long detectionId)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+        return GetDetectionInternal(conn, detectionId);
+    }
+
+    public CompletionInboundOrder? GetInbound(long inboundId)
+    {
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+        return GetInboundInternal(conn, inboundId);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -206,34 +311,42 @@ public class InventoryService(
         var generated = new List<InventoryAlertEvent>();
         int skipped = 0;
 
-        string filterClause = materialId.HasValue ? "WHERE ms.MATERIAL_ID = :materialId" : "";
         using (var queryCmd = conn.CreateCommand())
         {
             queryCmd.CommandText = $@"
-                SELECT ms.MATERIAL_ID, ms.AVAILABLE_QTY, m.SAFETY_STOCK
+                SELECT ms.MATERIAL_ID, ms.AVAILABLE_QTY, m.SAFETY_STOCK,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM STOCK_ALERT a
+                           WHERE a.MATERIAL_ID = ms.MATERIAL_ID
+                             AND a.STATUS = :pending)
+                       THEN 1 ELSE 0 END AS HAS_PENDING
                 FROM MATERIAL_STOCK ms
                 JOIN MATERIAL m ON m.MATERIAL_ID = ms.MATERIAL_ID
-                {filterClause}";
+                WHERE ms.AVAILABLE_QTY < m.SAFETY_STOCK
+                {(materialId.HasValue ? "AND ms.MATERIAL_ID = :materialId" : string.Empty)}";
+            queryCmd.Parameters.Add(new OracleParameter("pending", InventoryAlertStatusMap.Db.Pending));
             if (materialId.HasValue)
                 queryCmd.Parameters.Add(new OracleParameter("materialId", materialId.Value));
 
             using var reader = queryCmd.ExecuteReader();
-            var candidates = new List<(long MaterialId, decimal AvailableQty, decimal SafetyStock)>();
+            var candidates = new List<(
+                long MaterialId,
+                decimal AvailableQty,
+                decimal SafetyStock,
+                bool HasPending)>();
             while (reader.Read())
             {
-                candidates.Add((Convert.ToInt64(reader.GetValue(0)), reader.GetDecimal(1), reader.GetDecimal(2)));
+                candidates.Add((
+                    Convert.ToInt64(reader.GetValue(0)),
+                    reader.GetDecimal(1),
+                    reader.GetDecimal(2),
+                    Convert.ToInt32(reader.GetValue(3)) != 0));
             }
             reader.Close();
 
-            foreach (var (matId, availableQty, safetyStock) in candidates)
+            foreach (var (matId, availableQty, safetyStock, hasPending) in candidates)
             {
-                if (availableQty >= safetyStock) continue;
-
-                using var checkCmd = conn.CreateCommand();
-                checkCmd.CommandText = "SELECT COUNT(*) FROM STOCK_ALERT WHERE MATERIAL_ID = :materialId AND STATUS = :pending";
-                checkCmd.Parameters.Add(new OracleParameter("materialId", matId));
-                checkCmd.Parameters.Add(new OracleParameter("pending", InventoryAlertStatusMap.Db.Pending));
-                if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
+                if (hasPending)
                 {
                     skipped++;
                     continue;
@@ -381,18 +494,33 @@ public class InventoryService(
             var shortages = new List<MaterialStockLockDataShortagesInner>();
 
             // 第一阶段只锁行并校验全部物料，不修改库存，也不创建锁记录。
+            var availableByMaterial = new Dictionary<long, decimal>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                var placeholders = new List<string>();
+                for (var index = 0; index < lockItems.Count; index++)
+                {
+                    var name = $"materialId{index}";
+                    placeholders.Add($":{name}");
+                    cmd.Parameters.Add(new OracleParameter(name, lockItems[index].MaterialId));
+                }
+
+                cmd.CommandText = $@"SELECT MATERIAL_ID, AVAILABLE_QTY
+                                     FROM MATERIAL_STOCK
+                                     WHERE MATERIAL_ID IN ({string.Join(", ", placeholders)})
+                                     ORDER BY MATERIAL_ID
+                                     FOR UPDATE";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    availableByMaterial[Convert.ToInt64(reader.GetValue(0))] = reader.GetDecimal(1);
+                }
+            }
+
             foreach (var item in lockItems)
             {
-                decimal availableQty;
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.Transaction = tx;
-                    cmd.CommandText = @"SELECT AVAILABLE_QTY FROM MATERIAL_STOCK
-                        WHERE MATERIAL_ID = :materialId FOR UPDATE";
-                    cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
-                    var result = cmd.ExecuteScalar();
-                    availableQty = result is null or DBNull ? 0m : Convert.ToDecimal(result);
-                }
+                var availableQty = availableByMaterial.GetValueOrDefault(item.MaterialId);
 
                 if (availableQty < item.LockQty)
                 {
@@ -418,24 +546,26 @@ public class InventoryService(
             }
 
             // 第二阶段仅在所有物料都充足时写入；行锁保证校验值仍然有效。
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.ArrayBindCount = lockItems.Count;
+                cmd.CommandText = @"UPDATE MATERIAL_STOCK
+                    SET AVAILABLE_QTY = AVAILABLE_QTY - :qtyDeduct,
+                        LOCKED_QTY = LOCKED_QTY + :qtyAdd,
+                        LAST_OUT_DATE = SYSDATE
+                    WHERE MATERIAL_ID = :materialId";
+                var quantities = lockItems.Select(item => item.LockQty).ToArray();
+                cmd.Parameters.Add("qtyDeduct", OracleDbType.Decimal).Value = quantities;
+                cmd.Parameters.Add("qtyAdd", OracleDbType.Decimal).Value = quantities;
+                cmd.Parameters.Add("materialId", OracleDbType.Int64).Value =
+                    lockItems.Select(item => item.MaterialId).ToArray();
+                cmd.ExecuteNonQuery();
+            }
+
             var lockRecords = new List<StockLockRecord>();
             foreach (var item in lockItems)
             {
-
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.Transaction = tx;
-                    cmd.CommandText = @"UPDATE MATERIAL_STOCK
-                        SET AVAILABLE_QTY = AVAILABLE_QTY - :qtyDeduct,
-                            LOCKED_QTY = LOCKED_QTY + :qtyAdd,
-                            LAST_OUT_DATE = SYSDATE
-                        WHERE MATERIAL_ID = :materialId";
-                    cmd.Parameters.Add(new OracleParameter("qtyDeduct", item.LockQty));
-                    cmd.Parameters.Add(new OracleParameter("qtyAdd", item.LockQty));
-                    cmd.Parameters.Add(new OracleParameter("materialId", item.MaterialId));
-                    cmd.ExecuteNonQuery();
-                }
-
                 long lockId;
                 var now = DateTime.Now;
                 using (var cmd = conn.CreateCommand())
@@ -629,8 +759,19 @@ public class InventoryService(
                 WHERE ms.LAST_OUT_DATE IS NOT NULL
                   AND ms.LAST_OUT_DATE <= :cutoff
                   AND ms.AVAILABLE_QTY > 0
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM BOM b
+                      JOIN BOM_VERSION bv ON bv.VERSION_ID = b.VERSION_ID
+                      JOIN PRODUCTION_ORDER po ON po.VERSION_ID = bv.VERSION_ID
+                      WHERE b.CHILD_MATERIAL_ID = ms.MATERIAL_ID
+                        AND bv.EXPIRE_DATE IS NULL
+                        AND po.STATUS IN (:inProgress, :pendingSchedule, :pendingReview))
                   {matFilter}";
             queryCmd.Parameters.Add(new OracleParameter("cutoff", cutoff));
+            queryCmd.Parameters.Add(new OracleParameter("inProgress", ProductionStatusMap.Db.InProgress));
+            queryCmd.Parameters.Add(new OracleParameter("pendingSchedule", ProductionStatusMap.Db.PendingSchedule));
+            queryCmd.Parameters.Add(new OracleParameter("pendingReview", ProductionStatusMap.Db.PendingReview));
             if (materialId.HasValue)
                 queryCmd.Parameters.Add(new OracleParameter("materialId", materialId.Value));
 
@@ -647,8 +788,6 @@ public class InventoryService(
 
             foreach (var (matId, availableQty, lastOutDate) in candidates)
             {
-                if (IsMaterialActive(conn, matId)) continue;
-
                 int idleDays = lastOutDate.HasValue
                     ? (int)(now - lastOutDate.Value).TotalDays
                     : 0;
@@ -774,7 +913,13 @@ public class InventoryService(
             cmd.Parameters.Add(new OracleParameter("take", pageSize));
 
             using var reader = cmd.ExecuteReader();
-            while (reader.Read()) records.Add(MapInbound(reader, conn));
+            while (reader.Read()) records.Add(MapInbound(reader, []));
+        }
+
+        var locksByOrder = GetConsumedLocks(conn, records.Select(record => record.OrderId));
+        foreach (var record in records)
+        {
+            record.ConsumedLockRecords = locksByOrder.GetValueOrDefault(record.OrderId) ?? [];
         }
 
         return (records, total);
@@ -872,15 +1017,18 @@ public class InventoryService(
                     updCmd.ExecuteNonQuery();
                 }
 
-                foreach (var (materialId, qty) in lockQuantities)
+                if (lockQuantities.Count > 0)
                 {
                     using var stockCmd = conn.CreateCommand();
                     stockCmd.Transaction = tx;
+                    stockCmd.ArrayBindCount = lockQuantities.Count;
                     stockCmd.CommandText = @"UPDATE MATERIAL_STOCK
                         SET LOCKED_QTY = LOCKED_QTY - :lockQtyDeduct
                         WHERE MATERIAL_ID = :materialId";
-                    stockCmd.Parameters.Add(new OracleParameter("lockQtyDeduct", qty));
-                    stockCmd.Parameters.Add(new OracleParameter("materialId", materialId));
+                    stockCmd.Parameters.Add("lockQtyDeduct", OracleDbType.Decimal).Value =
+                        lockQuantities.Values.ToArray();
+                    stockCmd.Parameters.Add("materialId", OracleDbType.Int64).Value =
+                        lockQuantities.Keys.ToArray();
                     stockCmd.ExecuteNonQuery();
                 }
 
@@ -1048,10 +1196,11 @@ public class InventoryService(
         HandlerId = reader.IsDBNull(8) ? null : Convert.ToInt64(reader.GetValue(8)),
     };
 
-    private static CompletionInboundOrder MapInbound(OracleDataReader reader, OracleConnection conn)
+    private static CompletionInboundOrder MapInbound(
+        OracleDataReader reader,
+        List<StockLockRecord> consumedLocks)
     {
         var orderId = Convert.ToInt64(reader.GetValue(1));
-        var consumedLocks = GetConsumedLocks(conn, orderId);
 
         return new CompletionInboundOrder
         {
@@ -1095,6 +1244,40 @@ public class InventoryService(
         return locks;
     }
 
+    private static Dictionary<long, List<StockLockRecord>> GetConsumedLocks(
+        OracleConnection conn,
+        IEnumerable<long> orderIds)
+    {
+        var ids = orderIds.Distinct().ToList();
+        var locksByOrder = ids.ToDictionary(id => id, _ => new List<StockLockRecord>());
+        if (ids.Count == 0)
+        {
+            return locksByOrder;
+        }
+
+        using var cmd = conn.CreateCommand();
+        var placeholders = new List<string>();
+        for (var index = 0; index < ids.Count; index++)
+        {
+            var name = $"orderId{index}";
+            placeholders.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, ids[index]));
+        }
+
+        cmd.CommandText = LockColumns +
+            $" WHERE l.ORDER_ID IN ({string.Join(", ", placeholders)})" +
+            " AND l.STATUS = :status ORDER BY l.ORDER_ID, l.LOCK_ID";
+        cmd.Parameters.Add(new OracleParameter("status", StockLockStatusMap.Db.Consumed));
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var record = MapLock(reader);
+            locksByOrder[record.OrderId].Add(record);
+        }
+
+        return locksByOrder;
+    }
+
     private static InventoryAlertEvent? GetAlertInternal(OracleConnection conn, long alertId)
     {
         using var cmd = conn.CreateCommand();
@@ -1129,7 +1312,15 @@ public class InventoryService(
         cmd.Parameters.Add(new OracleParameter("inboundId", inboundId));
 
         using var reader = cmd.ExecuteReader();
-        return reader.Read() ? MapInbound(reader, conn) : null;
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        var inbound = MapInbound(reader, []);
+        reader.Close();
+        inbound.ConsumedLockRecords = GetConsumedLocks(conn, inbound.OrderId);
+        return inbound;
     }
 
     private static string? GetRawAlertStatus(OracleConnection conn, long alertId)
@@ -1159,24 +1350,29 @@ public class InventoryService(
         return value is null or DBNull ? null : value.ToString();
     }
 
-    /// <summary>
-    /// 检查物料是否仍在有效 BOM 版本中被引用且有关联的活跃生产订单。
-    /// 返回 true 表示物料仍在使用中，不应标记为废弃。
-    /// </summary>
-    private static bool IsMaterialActive(OracleConnection conn, long materialId)
+    private static string? ToDbMaterialType(string? materialType) => materialType switch
     {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT COUNT(*) FROM BOM b
-            JOIN BOM_VERSION bv ON bv.VERSION_ID = b.VERSION_ID
-            JOIN PRODUCTION_ORDER po ON po.VERSION_ID = bv.VERSION_ID
-            WHERE b.CHILD_MATERIAL_ID =  :materialId
-              AND bv.EXPIRE_DATE IS NULL
-              AND po.STATUS IN (:inProgress, :pendingSchedule, :pendingReview)";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        cmd.Parameters.Add(new OracleParameter("inProgress", ProductionStatusMap.Db.InProgress));
-        cmd.Parameters.Add(new OracleParameter("pendingSchedule", ProductionStatusMap.Db.PendingSchedule));
-        cmd.Parameters.Add(new OracleParameter("pendingReview", ProductionStatusMap.Db.PendingReview));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
+        "raw_material" => "原材料",
+        "semi_finished" => "半成品",
+        "finished" => "成品",
+        "auxiliary" => "辅料",
+        _ => null,
+    };
+
+    private static MaterialStockDetail.MaterialTypeEnum ToStockMaterialType(string materialType) =>
+        materialType switch
+        {
+            "半成品" => MaterialStockDetail.MaterialTypeEnum.SemiFinishedEnum,
+            "成品" => MaterialStockDetail.MaterialTypeEnum.FinishedEnum,
+            "辅料" => MaterialStockDetail.MaterialTypeEnum.AuxiliaryEnum,
+            _ => MaterialStockDetail.MaterialTypeEnum.RawMaterialEnum,
+        };
+
+    private static MaterialStockStatus ToMaterialStockStatus(string status) => status switch
+    {
+        "zero" => MaterialStockStatus.ZeroEnum,
+        "low" => MaterialStockStatus.LowEnum,
+        "locked" => MaterialStockStatus.LockedEnum,
+        _ => MaterialStockStatus.NormalEnum,
+    };
 }

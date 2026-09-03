@@ -512,7 +512,7 @@ onBeforeUnmount(() => {
       </template>
     </el-alert>
 
-    <el-card class="monitor-card" shadow="never">
+    <el-card class="monitor-card table-card" shadow="never">
       <el-tabs v-model="activeTab">
         <el-tab-pane name="alerts">
           <template #label
@@ -1089,7 +1089,6 @@ onBeforeUnmount(() => {
 .monitor-card {
   min-width: 0;
   overflow: hidden;
-  border-top: 3px solid var(--primary-color);
 }
 .tab-label,
 .toolbar,

@@ -46,7 +46,7 @@ export const homeDashboardShortcuts: readonly DashboardShortcut[] = [
     icon: 'materials',
     permission: PERMISSIONS.material.view,
     route: '/materials',
-    title: '物料 BOM',
+    title: '物料管理',
   },
 ]
 

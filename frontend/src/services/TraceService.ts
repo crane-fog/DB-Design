@@ -7,6 +7,7 @@ import type {
   ProductionOrderBrief,
   ProductionOrderStatus,
   PurchaseOrder,
+  SupplierDetail,
 } from '@/api'
 import {
   type ApiEnvelope,
@@ -283,14 +284,9 @@ export const traceService = {
     query: Pick<BatchConsumptionQuery, 'itemId' | 'orderId'> = {},
   ): Promise<BatchConsumptionItem> {
     assertConsumptionId(consumptionId)
-    const records = await readAllPages<BatchConsumption>((page, pageSize) =>
-      qualityTraceabilityApi.listBatchConsumption({ ...query, page, pageSize }),
-    )
-    const record = records.find((item) => item.consumption_id === consumptionId)
-    if (!record) {
-      throw new Error('批次消耗记录不存在或已删除')
-    }
-    return toBatchConsumption(record)
+    void query
+    const response = await qualityTraceabilityApi.getBatchConsumption({ consumptionId })
+    return toBatchConsumption(requireData(response.data))
   },
 
   async listBatchConsumption(
@@ -321,9 +317,14 @@ export const traceService = {
       }))
     }
     if (canReadPurchase()) {
-      const orders = await readAllPages<PurchaseOrder>((page, pageSize) =>
-        purchaseApi.listPurchaseOrder({ page, pageSize }),
-      )
+      const [orders, suppliers] = await Promise.all([
+        readAllPages<PurchaseOrder>((page, pageSize) =>
+          purchaseApi.listPurchaseOrder({ page, pageSize }),
+        ),
+        readAllPages<SupplierDetail>((page, pageSize) =>
+          purchaseApi.listSupplierData({ page, pageSize }),
+        ),
+      ])
       references.purchaseItems = orders.flatMap((order) =>
         (order.details ?? []).map((item) => ({
           itemId: item.item_id,
@@ -332,50 +333,31 @@ export const traceService = {
           supplierName: optionalText(order.supplier?.supplier_name),
         })),
       )
-      references.suppliers = [
-        ...new Map(
-          orders
-            .filter((order) => order.supplier?.supplier_id)
-            .map((order) => [
-              order.supplier.supplier_id,
-              {
-                supplierId: order.supplier.supplier_id,
-                supplierName: order.supplier.supplier_name || `#${order.supplier.supplier_id}`,
-              },
-            ]),
-        ).values(),
-      ]
+      references.suppliers = suppliers.map((supplier) => ({
+        supplierId: supplier.supplier_id,
+        supplierName: supplier.supplier_name,
+      }))
     }
     return references
   },
 
   async traceMaterialBatch(query: MaterialBatchTraceQuery): Promise<MaterialBatchTraceItem[]> {
     const hasTraceFilter =
-      query.itemId || query.materialId || (query.receiveDateStart && query.receiveDateEnd)
-    if (!hasTraceFilter && query.supplierId) {
-      if (!canReadPurchase()) {
-        throw new Error('请同时提供采购明细、原材料 ID 或完整到货日期范围')
-      }
-      const orders = await readAllPages<PurchaseOrder>((page, pageSize) =>
-        purchaseApi.listPurchaseOrder({ page, pageSize, supplierId: query.supplierId }),
-      )
-      const itemIds = new Set(
-        orders.flatMap((order) => (order.details ?? []).map((item) => item.item_id)),
-      )
-      const results = await Promise.all(
-        [...itemIds].map((itemId) => traceService.traceMaterialBatch({ ...query, itemId })),
-      )
-      return results.flat()
+      query.itemId ||
+      query.materialId ||
+      query.supplierId ||
+      (query.receiveDateStart && query.receiveDateEnd)
+    if (!hasTraceFilter) {
+      throw new Error('请提供采购明细、原材料、供应商或完整到货日期范围')
     }
     const response = await qualityTraceabilityApi.traceMaterialBatch({
       itemId: query.itemId,
       materialId: query.materialId,
       receiveDateEnd: query.receiveDateEnd,
       receiveDateStart: query.receiveDateStart,
+      supplierId: query.supplierId,
     })
-    return requireData(response.data)
-      .map(toMaterialBatchTrace)
-      .filter((item) => query.supplierId === undefined || item.supplierId === query.supplierId)
+    return requireData(response.data).map(toMaterialBatchTrace)
   },
 
   async traceProductBatch(query: ProductBatchTraceQuery): Promise<ProductBatchTraceItem> {

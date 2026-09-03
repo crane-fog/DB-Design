@@ -292,7 +292,7 @@ onMounted(() => void loadRoles())
       </el-form>
     </el-card>
 
-    <el-card class="role-table-card" shadow="never">
+    <el-card class="role-table-card table-card" shadow="never">
       <el-alert
         v-if="error"
         class="role-request-error"
@@ -498,10 +498,6 @@ onMounted(() => void loadRoles())
 
 .role-search-card :deep(.el-card__body) {
   padding-bottom: 2px;
-}
-
-.role-table-card :deep(.el-card__body) {
-  padding: 0;
 }
 
 .role-request-error {

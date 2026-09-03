@@ -69,6 +69,8 @@ paths:
     $ref: './material_bom.yaml#/paths/~1api~1calculateLossCompensation'
   /api/getMaterialStockData:
     $ref: './material_bom.yaml#/paths/~1api~1getMaterialStockData'
+  /api/listMaterialStockData:
+    $ref: './inventory.yaml#/paths/~1api~1listMaterialStockData'
   /api/addRequirementAnalysis:
     $ref: './material_bom.yaml#/paths/~1api~1addRequirementAnalysis'
   /api/getRequirementAnalysis:
@@ -77,6 +79,8 @@ paths:
     $ref: './inventory.yaml#/paths/~1api~1calculateMaterialShortage'
   /api/listInventoryAlert:
     $ref: './inventory.yaml#/paths/~1api~1listInventoryAlert'
+  /api/getInventoryAlert:
+    $ref: './inventory.yaml#/paths/~1api~1getInventoryAlert'
   /api/generateInventoryAlert:
     $ref: './inventory.yaml#/paths/~1api~1generateInventoryAlert'
   /api/handleInventoryAlert:
@@ -91,12 +95,20 @@ paths:
     $ref: './inventory.yaml#/paths/~1api~1detectObsoleteMaterial'
   /api/listObsoleteMaterialDetection:
     $ref: './inventory.yaml#/paths/~1api~1listObsoleteMaterialDetection'
+  /api/getObsoleteMaterialDetection:
+    $ref: './inventory.yaml#/paths/~1api~1getObsoleteMaterialDetection'
   /api/handleObsoleteMaterialDetection:
     $ref: './inventory.yaml#/paths/~1api~1handleObsoleteMaterialDetection'
   /api/addCompletionInbound:
     $ref: './inventory.yaml#/paths/~1api~1addCompletionInbound'
   /api/listCompletionInbound:
     $ref: './inventory.yaml#/paths/~1api~1listCompletionInbound'
+  /api/getCompletionInbound:
+    $ref: './inventory.yaml#/paths/~1api~1getCompletionInbound'
+  /api/listSupplierData:
+    $ref: './purchase.yaml#/paths/~1api~1listSupplierData'
+  /api/listPurchaseBuyerData:
+    $ref: './purchase.yaml#/paths/~1api~1listPurchaseBuyerData'
   /api/listPurchaseOrder:
     $ref: './purchase.yaml#/paths/~1api~1listPurchaseOrder'
   /api/getPurchaseOrder:
@@ -177,6 +189,8 @@ paths:
     $ref: './production.yaml#/paths/~1api~1updateProductionLineStatus'
   /api/listBatchConsumption:
     $ref: './quality_traceability.yaml#/paths/~1api~1listBatchConsumption'
+  /api/getBatchConsumption:
+    $ref: './quality_traceability.yaml#/paths/~1api~1getBatchConsumption'
   /api/addBatchConsumption:
     $ref: './quality_traceability.yaml#/paths/~1api~1addBatchConsumption'
   /api/updateBatchConsumption:

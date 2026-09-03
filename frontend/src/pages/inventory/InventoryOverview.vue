@@ -67,42 +67,34 @@ const shortcuts = [
 const statistics = computed(() => [
   {
     label: '物料总数',
-    tone: 'blue',
     value: summary.value?.materialCount,
   },
   {
     label: '有库存物料',
-    tone: 'pink',
     value: summary.value?.availableMaterialCount,
   },
   {
     label: '已锁定物料',
-    tone: 'blue',
     value: summary.value?.lockedMaterialCount,
   },
   {
     label: '低库存物料',
-    tone: 'pink',
     value: summary.value?.lowStockCount,
   },
   {
     label: '零库存物料',
-    tone: 'blue',
     value: summary.value?.zeroStockCount,
   },
   {
     label: '待处理预警',
-    tone: 'pink',
     value: summary.value?.pendingAlertCount,
   },
   {
     label: '待处理呆滞物料',
-    tone: 'blue',
     value: summary.value?.obsoletePendingCount,
   },
   {
     label: '累计完工入库',
-    tone: 'pink',
     value: summary.value?.inboundCount,
   },
 ])
@@ -181,7 +173,6 @@ async function loadStocks() {
 }
 
 function refreshAll() {
-  inventoryService.refreshStockCatalog()
   void Promise.all([loadOverview(), loadStocks()])
 }
 
@@ -259,11 +250,10 @@ onBeforeUnmount(() => {
         v-for="statistic in statistics"
         :key="statistic.label"
         v-loading="loading"
-        class="inventory-statistic"
-        :class="`inventory-statistic--${statistic.tone}`"
+        class="inventory-statistic statistic-card"
         shadow="never"
       >
-        <span>{{ statistic.label }}</span>
+        <span class="statistic-card__title">{{ statistic.label }}</span>
         <strong>{{ formatNumber(statistic.value) }}</strong>
       </el-card>
     </section>
@@ -322,7 +312,7 @@ onBeforeUnmount(() => {
       </template>
     </el-alert>
 
-    <el-card class="stock-card" shadow="never">
+    <el-card class="stock-card table-card table-card--accent" shadow="never">
       <template #header>
         <div class="card-title">
           <el-icon><Box /></el-icon><span>物料库存台账</span>
@@ -543,26 +533,6 @@ onBeforeUnmount(() => {
 :deep(.el-pagination) {
   justify-content: flex-end;
   margin-top: 16px;
-}
-.inventory-statistic {
-  min-width: 0;
-  border-top-width: 3px;
-}
-.inventory-statistic--blue {
-  border-top-color: var(--primary-color);
-  background: var(--app-background);
-}
-.inventory-statistic--pink {
-  border-top-color: var(--border-color);
-  background: var(--card-background);
-}
-.inventory-statistic span {
-  color: var(--el-text-color-secondary);
-}
-.inventory-statistic strong {
-  display: block;
-  margin-top: 10px;
-  font-size: 28px;
 }
 .card-title,
 .flow-note {
