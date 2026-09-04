@@ -17,6 +17,8 @@ import type {
 import { EditPen, Plus, Refresh, Search, View } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
+import BomTreeDiagram from '@/components/materials/BomTreeDiagram.vue'
+import BomVersionSelect from '@/components/materials/BomVersionSelect.vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
@@ -62,7 +64,6 @@ const materialForm = reactive<MaterialForm>({
   unit: '',
 })
 
-const bomResult = ref<MaterialBomListItem[]>([])
 const selectedBomId = ref('')
 const currentBom = ref<MaterialBomDetail>()
 const versionList = ref<MaterialBomListItem[]>([])
@@ -79,6 +80,10 @@ const versionForm = reactive<BomVersionForm>({
   reason: '',
   version: '',
 })
+const versionDateEditorOpen = ref(false)
+const versionDateSaving = ref(false)
+const versionDateEditing = ref<MaterialBomListItem>()
+const versionExpireDate = ref('')
 
 const treeBomId = ref('')
 const treeLoading = ref(false)
@@ -96,7 +101,7 @@ const analysisHistory = ref<BomAnalysisRecord[]>([])
 const analysisRecordLoading = ref(false)
 const analysisRecordError = ref('')
 const analysisQueried = ref(false)
-const reverseMaterialCode = ref('')
+const reverseBomId = ref('')
 const reverseIncludeHistory = ref(false)
 const reverseLoading = ref(false)
 const reverseResult = ref<BomReverseTraceResult[]>([])
@@ -110,6 +115,7 @@ const treeBom = computed(() => bomOptions.value.find((bom) => bom.bomId === tree
 const analysisBom = computed(() =>
   bomOptions.value.find((bom) => bom.bomId === analysisBomId.value),
 )
+const reverseBom = computed(() => bomOptions.value.find((bom) => bom.bomId === reverseBomId.value))
 const materialDialogTitle = computed(() => {
   if (materialEditingId.value) {
     return '编辑物料'
@@ -190,7 +196,6 @@ async function loadOptions() {
   categories.value = categoryData
   materialOptions.value = options.materials
   bomOptions.value = options.boms
-  bomResult.value = options.boms
 }
 
 async function refreshAll() {
@@ -391,6 +396,40 @@ async function saveVersion() {
   }
 }
 
+function openVersionDateEditor(version: MaterialBomListItem) {
+  versionDateEditing.value = version
+  versionExpireDate.value = version.expireDate ?? ''
+  versionDateEditorOpen.value = true
+}
+
+function disableVersionExpireDate(date: Date) {
+  const effectiveDate = versionDateEditing.value?.effectiveDate
+  if (!effectiveDate) {
+    return false
+  }
+  return date < new Date(`${effectiveDate}T00:00:00`)
+}
+
+async function saveVersionExpireDate() {
+  if (!versionDateEditing.value) {
+    return
+  }
+  versionDateSaving.value = true
+  try {
+    await materialService.updateBomVersionExpireDate(
+      versionDateEditing.value.bomId,
+      versionExpireDate.value,
+    )
+    versionDateEditorOpen.value = false
+    ElMessage.success('BOM 版本失效日期已更新')
+    await refreshAll()
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, 'BOM 版本失效日期更新失败'))
+  } finally {
+    versionDateSaving.value = false
+  }
+}
+
 async function releaseBom(bomId: string) {
   versionSaving.value = true
   try {
@@ -491,12 +530,15 @@ function resetAnalysis() {
 }
 
 async function loadReverseTrace() {
+  if (!reverseBom.value) {
+    return
+  }
   reverseLoading.value = true
   reverseError.value = ''
   reverseQueried.value = true
   try {
     reverseResult.value = await materialService.getReverseTrace(
-      reverseMaterialCode.value,
+      reverseBom.value.materialCode,
       reverseIncludeHistory.value,
     )
   } catch (requestError) {
@@ -662,25 +704,18 @@ watch(reverseIncludeHistory, resetReverseTrace)
 
     <template v-if="section === 'bom'">
       <el-card class="table-card" shadow="never">
-        <el-form inline
-          ><el-form-item label="BOM 版本"
-            ><el-select
-              v-model="selectedBomId"
-              filterable
-              placeholder="选择 BOM 版本"
-              style="width: 360px"
-              @change="selectBom"
-              ><el-option
-                v-for="bom in bomResult"
-                :key="bom.bomId"
-                :label="`${bom.materialCode} · ${bom.version} · ${bom.materialName}`"
-                :value="bom.bomId" /></el-select></el-form-item
-          ><el-form-item
-            ><el-button v-if="canManage" :icon="Plus" type="primary" @click="openVersionEditor"
-              >创建版本</el-button
-            ></el-form-item
-          ></el-form
-        >
+        <el-form inline>
+          <BomVersionSelect
+            v-model="selectedBomId"
+            :options="bomOptions"
+            @change="selectBom"
+          ></BomVersionSelect>
+          <el-form-item>
+            <el-button v-if="canManage" :icon="Plus" type="primary" @click="openVersionEditor">
+              创建版本
+            </el-button>
+          </el-form-item>
+        </el-form>
         <EmptyState
           v-if="!selectedBomId"
           title="请选择一个 BOM 版本"
@@ -728,9 +763,20 @@ watch(reverseIncludeHistory, resetReverseTrace)
                 ><template #default="{ row }">{{
                   row.expireDate || '无'
                 }}</template></el-table-column
-              ><el-table-column label="操作" min-width="170"
+              ><el-table-column label="操作" min-width="280"
                 ><template #default="{ row }"
-                  ><el-button link type="primary" @click="selectBom(row.bomId)">查看</el-button
+                  ><el-button
+                    v-if="!row.isCurrent"
+                    link
+                    type="primary"
+                    @click="selectBom(row.bomId)"
+                    >查看</el-button
+                  ><el-button
+                    v-if="canManage"
+                    link
+                    type="primary"
+                    @click="openVersionDateEditor(row)"
+                    >修改失效日期</el-button
                   ><el-popconfirm
                     v-if="canManage && !row.isCurrent"
                     title="将切换该物料的当前版本；后端会校验有效期与循环依赖，是否继续？"
@@ -790,32 +836,25 @@ watch(reverseIncludeHistory, resetReverseTrace)
     </template>
 
     <template v-if="section === 'tree'">
-      <el-card shadow="never"
-        ><el-form inline
-          ><el-form-item label="BOM 版本"
-            ><el-select
-              v-model="treeBomId"
-              filterable
-              placeholder="选择 BOM 版本"
-              style="width: 360px"
-              ><el-option
-                v-for="bom in bomOptions"
-                :key="bom.bomId"
-                :label="`${bom.materialCode} · ${bom.version}`"
-                :value="bom.bomId" /></el-select></el-form-item
-          ><el-form-item
-            ><el-button
+      <el-card shadow="never">
+        <el-form inline>
+          <BomVersionSelect v-model="treeBomId" :options="bomOptions"></BomVersionSelect>
+          <el-form-item>
+            <el-button
               :disabled="!treeBomId"
               :loading="treeLoading"
               type="primary"
               @click="loadTree"
-              >加载结构</el-button
-            ><el-button :disabled="!treeData.length" @click="toggleTree(true)">展开全部</el-button
-            ><el-button :disabled="!treeData.length" @click="toggleTree(false)"
-              >收起全部</el-button
-            ></el-form-item
-          ></el-form
-        ><el-alert
+            >
+              加载结构
+            </el-button>
+            <el-button :disabled="!treeData.length" @click="toggleTree(true)">展开全部</el-button>
+            <el-button :disabled="!treeData.length" @click="toggleTree(false)">
+              收起全部
+            </el-button>
+          </el-form-item>
+        </el-form>
+        <el-alert
           v-if="treeError"
           :closable="false"
           :title="treeError"
@@ -824,25 +863,11 @@ watch(reverseIncludeHistory, resetReverseTrace)
           ><el-descriptions-item label="版本">{{
             treeBom.version
           }}</el-descriptions-item></el-descriptions
-        ><el-tree
+        ><BomTreeDiagram
           v-if="treeData.length"
           :key="treeKey"
-          class="bom-tree"
-          :data="treeData"
-          :default-expand-all="treeExpanded"
-          node-key="path"
-          :props="{ children: 'children', label: 'materialName' }"
-          ><template #default="{ data }"
-            ><span class="tree-node"
-              ><strong>{{ data.materialName }}</strong
-              ><small
-                >{{ data.materialCode }} · 层级 {{ data.level }} · 累计
-                {{ formatNumber(data.cumulativeQuantity) }} {{ data.unit }} ·
-                {{ data.isLeaf ? '叶子节点' : '组件' }}</small
-              ></span
-            ></template
-          ></el-tree
-        ><EmptyState
+          :default-expanded="treeExpanded"
+          :nodes="treeData" /><EmptyState
           v-else-if="!treeLoading && !treeError"
           title="暂无 BOM 树"
           description="选择产品版本并加载后查看多层级结构。"
@@ -850,31 +875,24 @@ watch(reverseIncludeHistory, resetReverseTrace)
     </template>
 
     <template v-if="section === 'analysis'">
-      <el-card class="table-card" shadow="never"
-        ><el-form inline
-          ><el-form-item label="产品 BOM"
-            ><el-select
-              v-model="analysisBomId"
-              filterable
-              placeholder="选择 BOM 版本"
-              style="width: 360px"
-              ><el-option
-                v-for="bom in bomOptions"
-                :key="bom.bomId"
-                :label="`${bom.materialCode} · ${bom.version}`"
-                :value="bom.bomId" /></el-select></el-form-item
-          ><el-form-item label="计划生产数量"
-            ><el-input-number v-model="plannedQuantity" :min="0.01" :precision="2" /></el-form-item
-          ><el-form-item
-            ><el-button
+      <el-card class="table-card" shadow="never">
+        <el-form inline>
+          <BomVersionSelect v-model="analysisBomId" :options="bomOptions" />
+          <el-form-item label="计划生产数量">
+            <el-input-number v-model="plannedQuantity" :min="0.01" :precision="2" />
+          </el-form-item>
+          <el-form-item>
+            <el-button
               :disabled="!canManage || !analysisBomId || analysisRecordLoading"
               :loading="analysisLoading"
               type="primary"
               @click="runAnalysis"
-              >计算理论用料</el-button
-            ></el-form-item
-          ></el-form
-        ><el-alert
+            >
+              计算理论用料
+            </el-button>
+          </el-form-item>
+        </el-form>
+        <el-alert
           v-if="analysisError"
           :closable="false"
           :title="analysisError"
@@ -951,37 +969,33 @@ watch(reverseIncludeHistory, resetReverseTrace)
               formatDateTime(row.executedAt)
             }}</template></el-table-column
           ></el-table
-        ></el-card
-      >
+        >
+      </el-card>
     </template>
 
     <template v-if="section === 'trace'">
-      <el-card class="table-card" shadow="never"
-        ><el-form inline
-          ><el-form-item label="物料"
-            ><el-select
-              v-model="reverseMaterialCode"
-              filterable
-              placeholder="选择物料"
-              style="width: 360px"
-              @change="resetReverseTrace"
-              ><el-option
-                v-for="material in materialOptions"
-                :key="material.id"
-                :label="`${material.code} · ${material.name}`"
-                :value="material.code" /></el-select></el-form-item
-          ><el-form-item
-            ><el-checkbox v-model="reverseIncludeHistory">包含非当前版本</el-checkbox></el-form-item
-          ><el-form-item
-            ><el-button
-              :disabled="!reverseMaterialCode"
+      <el-card class="table-card" shadow="never">
+        <el-form inline>
+          <BomVersionSelect
+            v-model="reverseBomId"
+            :options="bomOptions"
+            @change="resetReverseTrace"
+          />
+          <el-form-item>
+            <el-checkbox v-model="reverseIncludeHistory">包含非当前版本</el-checkbox>
+          </el-form-item>
+          <el-form-item>
+            <el-button
+              :disabled="!reverseBomId"
               :loading="reverseLoading"
               type="primary"
               @click="loadReverseTrace"
-              >查询使用关系</el-button
-            ></el-form-item
-          ></el-form
-        ><el-alert v-if="reverseError" :closable="false" :title="reverseError" type="error"
+            >
+              查询使用关系
+            </el-button>
+          </el-form-item>
+        </el-form>
+        <el-alert v-if="reverseError" :closable="false" :title="reverseError" type="error"
           ><template #default
             ><el-button link type="primary" @click="loadReverseTrace">重新查询</el-button></template
           ></el-alert
@@ -1018,7 +1032,7 @@ watch(reverseIncludeHistory, resetReverseTrace)
           title="暂无上层 BOM 引用"
           description="所选查询范围内没有找到上层引用关系。" /><EmptyState
           v-else-if="!reverseLoading"
-          title="选择物料后查询"
+          title="选择产品 BOM 版本后查询"
           description="结果会展示完整上层路径、层级与累计理论用量。"
       /></el-card>
     </template>
@@ -1154,6 +1168,33 @@ watch(reverseIncludeHistory, resetReverseTrace)
         ></template
       ></el-dialog
     >
+
+    <el-dialog v-model="versionDateEditorOpen" title="修改 BOM 版本失效日期" width="480px"
+      ><el-form label-width="92px"
+        ><el-form-item label="版本"
+          ><el-input :model-value="versionDateEditing?.version ?? ''" disabled /></el-form-item
+        ><el-form-item label="生效日期"
+          ><el-input
+            :model-value="versionDateEditing?.effectiveDate ?? ''"
+            disabled /></el-form-item
+        ><el-form-item label="失效日期"
+          ><el-date-picker
+            v-model="versionExpireDate"
+            clearable
+            :disabled-date="disableVersionExpireDate"
+            placeholder="不设置则长期有效"
+            style="width: 100%"
+            type="date"
+            value-format="YYYY-MM-DD"
+        /></el-form-item>
+        <p class="form-hint">失效日期不能早于生效日期；清空后该版本不设置失效日期。</p></el-form
+      ><template #footer
+        ><el-button @click="versionDateEditorOpen = false">取消</el-button
+        ><el-button :loading="versionDateSaving" type="primary" @click="saveVersionExpireDate"
+          >保存</el-button
+        ></template
+      ></el-dialog
+    >
   </PageContainer>
 </template>
 
@@ -1247,31 +1288,6 @@ small {
 }
 .tree-meta {
   margin: 12px 0;
-}
-.bom-tree {
-  max-height: min(60vh, 720px);
-  overflow-y: auto;
-  padding: 4px 0;
-}
-.bom-tree :deep(.el-tree-node__content) {
-  box-sizing: border-box;
-  height: auto;
-  min-height: 52px;
-  overflow: visible;
-  padding-top: 2px;
-  padding-bottom: 2px;
-}
-.tree-node {
-  display: grid;
-  gap: 2px;
-  line-height: 20px;
-  min-width: 0;
-  padding: 4px 0;
-}
-.tree-node strong,
-.tree-node small {
-  line-height: 20px;
-  overflow-wrap: anywhere;
 }
 .input-unit {
   margin-left: 8px;

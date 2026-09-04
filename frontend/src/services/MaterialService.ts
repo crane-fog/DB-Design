@@ -547,6 +547,29 @@ export const materialService = {
     requiredData<Bom>(response.data)
   },
 
+  async updateBomVersionExpireDate(bomId: string, expireDate: string): Promise<void> {
+    const version = await getVersion(bomId)
+    const effectiveDate = version.effective_date
+    const versionNo = version.version_no?.trim()
+    if (!effectiveDate || !versionNo) {
+      throw new Error('BOM 版本缺少版本号或生效日期，无法修改')
+    }
+    if (expireDate && expireDate < effectiveDate) {
+      throw new Error('失效日期不能早于生效日期')
+    }
+    const response = await materialBomApi.updateBomVersionData({
+      bomVersionUpdateRequest: {
+        change_reason: version.change_reason,
+        effective_date: effectiveDate,
+        expire_date: expireDate || undefined,
+        material_id: idNumber(version.material_id, '物料编号'),
+        version_id: idNumber(version.version_id, '版本编号'),
+        version_no: versionNo,
+      },
+    })
+    requiredData<BomVersion>(response.data)
+  },
+
   async updateMaterial(materialId: string, form: MaterialForm): Promise<MaterialRecord> {
     const material = await getMaterial(materialId)
     const response = await materialBomApi.updateMaterialData({
