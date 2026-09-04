@@ -588,7 +588,7 @@ paths:
   /api/getReverseTraceData:
     get:
       summary: 反向产品追溯
-      description: 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
       operationId: getReverseTraceData
       tags:
         - material_bom
@@ -597,6 +597,12 @@ paths:
           in: query
           required: true
           description: 需要追溯的子项物料唯一标识，支持精确匹配。
+          schema:
+            type: integer
+        - name: version_id
+          in: query
+          required: true
+          description: 限定反向追溯使用关系范围的 BOM 版本唯一标识。
           schema:
             type: integer
         - name: include_history
