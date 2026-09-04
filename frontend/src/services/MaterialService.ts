@@ -4,7 +4,6 @@ import type {
   Bom,
   BomCreateRequest,
   BomVersion,
-  DemandAnalysis,
   MaterialBomApiListMaterialDataRequest,
   MaterialCreateRequest,
   MaterialDetail,
@@ -12,7 +11,6 @@ import type {
 } from '@/api'
 import { type ApiEnvelope, type PageResult, mapPageResult, unwrap } from '@/services/pagination'
 import type {
-  BomAnalysisRecord,
   BomAnalysisResult,
   BomComponentForm,
   BomReverseTraceResult,
@@ -226,21 +224,6 @@ async function componentRequest(bomId: string, form: BomComponentForm): Promise<
   }
 }
 
-async function mapAnalysisRecord(data: DemandAnalysis): Promise<BomAnalysisRecord> {
-  const materialCode = String(idNumber(data.material_id, '物料编号'))
-  const bomId = String(idNumber(data.version_id, '版本编号'))
-  const [material, version] = await Promise.all([getMaterial(materialCode), getVersion(bomId)])
-  return {
-    bomId,
-    executedAt: data.analysis_time ?? '',
-    id: String(idNumber(data.analysis_id, '分析编号')),
-    materialCode,
-    materialName: material.name,
-    plannedQuantity: requiredNumber(data.production_qty, '计划数量'),
-    version: version.version_no ?? '',
-  }
-}
-
 /** 所有读取和写入均使用已生成的 materialBomApi，不缓存业务数据或伪造成功结果。 */
 export const materialService = {
   async addBomComponent(bomId: string, form: BomComponentForm): Promise<void> {
@@ -248,21 +231,6 @@ export const materialService = {
       bomCreateRequest: await componentRequest(bomId, form),
     })
     requiredData<Bom>(response.data)
-  },
-
-  async createAnalysisRecord(bomId: string, plannedQuantity: number): Promise<BomAnalysisRecord> {
-    if (!Number.isFinite(plannedQuantity) || plannedQuantity <= 0) {
-      throw new Error('计划生产数量必须大于 0')
-    }
-    const version = await getVersion(bomId)
-    const response = await materialBomApi.addRequirementAnalysis({
-      demandAnalysisCreateRequest: {
-        material_id: idNumber(version.material_id, '物料编号'),
-        production_qty: plannedQuantity,
-        version_id: idNumber(bomId, '版本编号'),
-      },
-    })
-    return mapAnalysisRecord(requiredData<DemandAnalysis>(response.data))
   },
 
   async createBomVersion(form: BomVersionForm): Promise<string> {
@@ -327,16 +295,6 @@ export const materialService = {
     }
   },
 
-  async getLatestAnalysis(bomId: string): Promise<BomAnalysisRecord | undefined> {
-    const response = await materialBomApi.getRequirementAnalysis({
-      versionId: idNumber(bomId, '版本编号'),
-    })
-    if (response.data.code === 404) {
-      return undefined
-    }
-    return mapAnalysisRecord(requiredData<DemandAnalysis>(response.data))
-  },
-
   getMaterial,
 
   async getOptions() {
@@ -358,6 +316,7 @@ export const materialService = {
 
   async getReverseTrace(
     materialCode: string,
+    bomId: string,
     includeHistory = false,
   ): Promise<BomReverseTraceResult[]> {
     const [material, response] = await Promise.all([
@@ -365,6 +324,7 @@ export const materialService = {
       materialBomApi.getReverseTraceData({
         includeHistory,
         materialId: idNumber(materialCode, '物料编号'),
+        versionId: idNumber(bomId, '版本编号'),
       }),
     ])
     return requiredData<NonNullable<typeof response.data.data>>(response.data).map((item) => {

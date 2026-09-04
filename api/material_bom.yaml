@@ -691,62 +691,6 @@ paths:
       security:
         - bearerAuth: []
 
-  /api/addRequirementAnalysis:
-    post:
-      summary: 新增需求分析
-      description: 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: addRequirementAnalysis
-      tags:
-        - material_bom
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DemandAnalysisCreateRequest'
-      responses:
-        '200':
-          description: 统一响应；成功时 data 为需求分析结果。
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DemandAnalysisResponse'
-      security:
-        - bearerAuth: []
-
-  /api/getRequirementAnalysis:
-    get:
-      summary: 查询需求分析结果
-      description: 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: getRequirementAnalysis
-      tags:
-        - material_bom
-      parameters:
-        - name: analysis_id
-          in: query
-          description: 分析编号；传入时按单条记录查询。
-          schema:
-            type: integer
-        - name: material_id
-          in: query
-          description: 分析产品物料唯一标识，支持精确匹配。
-          schema:
-            type: integer
-        - name: version_id
-          in: query
-          description: 使用的 BOM 版本编号。
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: 统一响应；成功时 data 为需求分析结果。
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DemandAnalysisResponse'
-      security:
-        - bearerAuth: []
-
 components:
   schemas:
     MaterialBrief:
@@ -1320,44 +1264,6 @@ components:
           readOnly: true
           description: 实际需求量，由后端按 net_quantity / (1 - loss_rate) 计算并按业务规则取整。
 
-    DemandAnalysis:
-      type: object
-      properties:
-        analysis_id:
-          type: integer
-          readOnly: true
-        material_id:
-          type: integer
-        version_id:
-          type: integer
-        production_qty:
-          type: number
-          format: double
-        demand_detail:
-          type: object
-          readOnly: true
-          description: 物料及净需求量 JSON，由后端递归展开 BOM 并扣减库存、在途量、安全库存后计算得到。
-          additionalProperties: true
-        analysis_time:
-          type: string
-          format: date-time
-          readOnly: true
-
-    DemandAnalysisCreateRequest:
-      type: object
-      required:
-        - material_id
-        - version_id
-        - production_qty
-      properties:
-        material_id:
-          type: integer
-        version_id:
-          type: integer
-        production_qty:
-          type: number
-          format: double
-
     MaterialResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
@@ -1534,17 +1440,6 @@ components:
               type: object
               allOf:
                 - $ref: '#/components/schemas/MaterialStock'
-              nullable: true
-
-    DemandAnalysisResponse:
-      allOf:
-        - $ref: './common.yaml#/components/schemas/ApiResponse'
-        - type: object
-          properties:
-            data:
-              type: object
-              allOf:
-                - $ref: '#/components/schemas/DemandAnalysis'
               nullable: true
 
   securitySchemes:

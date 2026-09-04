@@ -3,7 +3,7 @@ using Oracle.ManagedDataAccess.Client;
 namespace Backend.Services;
 
 // A/B 内部集成契约类型（见 A-B_内部集成契约说明.md）。
-// 与 A 侧（MaterialCatalogService / DemandAnalysisService）中的定义保持一致，
+// 与 A 侧（MaterialCatalogService / BOM 计算服务）中的定义保持一致，
 // 用于 A 模块合入前 B 侧独立编译；A 合入后应删除本文件以避免重复定义。
 
 /// <summary>B 模块库存快照契约。A 用它为物料详情补充库存信息。</summary>

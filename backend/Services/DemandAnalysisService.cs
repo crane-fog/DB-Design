@@ -1,5 +1,3 @@
-using Newtonsoft.Json;
-
 using Oracle.ManagedDataAccess.Client;
 
 using Org.OpenAPITools.Models;
@@ -68,8 +66,7 @@ public sealed class SupplierPriceIntegrationService(string connString) : IPriceQ
 
 public sealed class DemandAnalysisService(
     string connString,
-    IPriceQuery priceQuery,
-    MaterialRequirementNettingService requirementNetting) : IBomExpansionQuery
+    IPriceQuery priceQuery) : IBomExpansionQuery
 {
     public DemandAnalysisResult<List<LossCompensationItem>> CalculateLossCompensation(LossCompensationCalculateRequest request)
     {
@@ -127,88 +124,6 @@ public sealed class DemandAnalysisService(
         catch (DemandAnalysisBusinessException ex) { return DemandAnalysisResult<ProductCostResult>.Fail(ex.Error, ex.Message); }
     }
 
-    public DemandAnalysisResult<DemandAnalysis> AddRequirementAnalysis(DemandAnalysisCreateRequest request)
-    {
-        var error = ValidateInput(request.MaterialId, request.VersionId, request.ProductionQty, "生产数量");
-        if (error is not null) return DemandAnalysisResult<DemandAnalysis>.Fail(DemandAnalysisError.BadRequest, error);
-        try
-        {
-            using var conn = new OracleConnection(connString);
-            conn.Open();
-            using var transaction = conn.BeginTransaction();
-            var requirements = requirementNetting.Calculate(conn, transaction,
-                [new ProductionRequirement(request.MaterialId, request.VersionId,
-                    Convert.ToDecimal(request.ProductionQty))]).Items;
-            var detail = new Dictionary<string, object>
-            {
-                ["analysis_target"] = GetMaterialName(conn, transaction, request.MaterialId),
-                ["material_id"] = request.MaterialId,
-                ["version_id"] = request.VersionId,
-                ["production_qty"] = request.ProductionQty,
-                ["items"] = requirements.Select(item => new
-                {
-                    material_id = item.MaterialId,
-                    material_name = item.MaterialName,
-                    material_type = item.MaterialType,
-                    bom_net_quantity = item.BomNetQuantity,
-                    loss_rate = item.LossRates.Count == 1 ? item.LossRates[0] : (decimal?)null,
-                    loss_rates = item.LossRates,
-                    gross_quantity = item.GrossRequirement,
-                    available_qty = item.AvailableQuantity,
-                    in_transit_qty = item.InTransitQuantity,
-                    safety_stock = item.SafetyStock,
-                    net_quantity = item.NetRequirement,
-                    depth = item.Depth,
-                    path = item.Path,
-                    is_leaf = item.IsLeaf
-                }).ToList(),
-            };
-            long analysisId;
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.Transaction = transaction;
-                cmd.CommandText = @"INSERT INTO DEMAND_ANALYSIS (MATERIAL_ID, VERSION_ID, PRODUCTION_QTY, DEMAND_DETAIL)
-                                    VALUES (:materialId, :versionId, :productionQty, :demandDetail) RETURNING ANALYSIS_ID INTO :analysisId";
-                cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
-                cmd.Parameters.Add(new OracleParameter("versionId", request.VersionId));
-                cmd.Parameters.Add(new OracleParameter("productionQty", Convert.ToDecimal(request.ProductionQty)));
-                cmd.Parameters.Add(new OracleParameter("demandDetail", OracleDbType.Clob) { Value = JsonConvert.SerializeObject(detail) });
-                var id = new OracleParameter("analysisId", OracleDbType.Int64) { Direction = System.Data.ParameterDirection.Output };
-                cmd.Parameters.Add(id); cmd.ExecuteNonQuery(); analysisId = Convert.ToInt64(id.Value.ToString());
-            }
-
-            transaction.Commit();
-            return DemandAnalysisResult<DemandAnalysis>.Success(GetRequirementAnalysis(analysisId, null, null)!);
-        }
-        catch (DemandAnalysisBusinessException ex) { return DemandAnalysisResult<DemandAnalysis>.Fail(ex.Error, ex.Message); }
-        catch (MaterialPlanningException ex) { return DemandAnalysisResult<DemandAnalysis>.Fail((DemandAnalysisError)ex.Code, ex.Message); }
-        catch (OracleException ex) when (ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
-        { return DemandAnalysisResult<DemandAnalysis>.Fail(DemandAnalysisError.Conflict, "需求分析关联数据冲突"); }
-    }
-
-    public DemandAnalysis? GetRequirementAnalysis(long? analysisId, long? materialId, long? versionId)
-    {
-        if (analysisId is <= 0 || materialId is <= 0 || versionId is <= 0) return null;
-        using var conn = new OracleConnection(connString); conn.Open(); using var cmd = conn.CreateCommand();
-        var filters = new List<string>();
-        if (analysisId.HasValue) { filters.Add("ANALYSIS_ID = :analysisId"); cmd.Parameters.Add(new OracleParameter("analysisId", analysisId.Value)); }
-        if (materialId.HasValue) { filters.Add("MATERIAL_ID = :materialId"); cmd.Parameters.Add(new OracleParameter("materialId", materialId.Value)); }
-        if (versionId.HasValue) { filters.Add("VERSION_ID = :versionId"); cmd.Parameters.Add(new OracleParameter("versionId", versionId.Value)); }
-        cmd.CommandText = $@"SELECT ANALYSIS_ID, MATERIAL_ID, VERSION_ID, PRODUCTION_QTY, DEMAND_DETAIL, ANALYSIS_TIME FROM DEMAND_ANALYSIS
-                             {(filters.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", filters))}
-                             ORDER BY ANALYSIS_TIME DESC, ANALYSIS_ID DESC FETCH FIRST 1 ROW ONLY";
-        using var reader = cmd.ExecuteReader(); if (!reader.Read()) return null;
-        return new DemandAnalysis
-        {
-            AnalysisId = Convert.ToInt32(reader.GetValue(0)),
-            MaterialId = Convert.ToInt32(reader.GetValue(1)),
-            VersionId = Convert.ToInt32(reader.GetValue(2)),
-            ProductionQty = decimal.ToDouble(reader.GetDecimal(3)),
-            DemandDetail = JsonConvert.DeserializeObject<Dictionary<string, object>>(reader.IsDBNull(4) ? "{}" : reader.GetOracleClob(4).Value) ?? [],
-            AnalysisTime = reader.GetDateTime(5)
-        };
-    }
-
     public IReadOnlyList<BomDemandExpansionItem> ExpandDemand(long materialId, long versionId, decimal quantity, OracleConnection? connection = null, OracleTransaction? transaction = null)
     {
         var error = ValidateInput(materialId, versionId, quantity, "数量");
@@ -241,17 +156,6 @@ public sealed class DemandAnalysisService(
     {
         using var conn = new OracleConnection(connString); conn.Open(); using var cmd = conn.CreateCommand(); cmd.CommandText = "SELECT TRUNC(SYSDATE) FROM DUAL";
         return DateOnly.FromDateTime(Convert.ToDateTime(cmd.ExecuteScalar()));
-    }
-    private static string GetMaterialName(
-        OracleConnection conn,
-        OracleTransaction? transaction,
-        long materialId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.Transaction = transaction;
-        cmd.CommandText = "SELECT MATERIAL_NAME FROM MATERIAL WHERE MATERIAL_ID = :materialId";
-        cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        return cmd.ExecuteScalar()?.ToString() ?? throw new DemandAnalysisBusinessException(DemandAnalysisError.NotFound, "物料不存在");
     }
     private static string? ValidateInput(long materialId, long versionId, double quantity, string name) =>
         !double.IsFinite(quantity) ? $"{name}必须是有效数字" : ValidateInput(materialId, versionId, Convert.ToDecimal(quantity), name);

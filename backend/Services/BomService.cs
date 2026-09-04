@@ -248,11 +248,16 @@ public class BomService(string connString)
         return BomBusinessResult<List<BomTreeNode>>.Success(nodes);
     }
 
-    public BomBusinessResult<List<ReverseTraceItem>> GetReverseTrace(long materialId, bool includeHistory)
+    public BomBusinessResult<List<ReverseTraceItem>> GetReverseTrace(
+        long materialId,
+        long versionId,
+        bool includeHistory)
     {
-        if (materialId <= 0)
+        if (materialId <= 0 || versionId <= 0)
         {
-            return BomBusinessResult<List<ReverseTraceItem>>.Fail(BomBusinessError.BadRequest, "物料编号不能为空");
+            return BomBusinessResult<List<ReverseTraceItem>>.Fail(
+                BomBusinessError.BadRequest,
+                "物料和版本编号不能为空");
         }
 
         using var conn = new OracleConnection(connString);
@@ -261,6 +266,20 @@ public class BomService(string connString)
         if (!graph.Materials.ContainsKey(materialId))
         {
             return BomBusinessResult<List<ReverseTraceItem>>.Fail(BomBusinessError.NotFound, "物料不存在");
+        }
+
+        if (!graph.Versions.TryGetValue(versionId, out var selectedVersion))
+        {
+            return BomBusinessResult<List<ReverseTraceItem>>.Fail(
+                BomBusinessError.NotFound,
+                "BOM 版本不存在");
+        }
+
+        if (selectedVersion.MaterialId != materialId)
+        {
+            return BomBusinessResult<List<ReverseTraceItem>>.Fail(
+                BomBusinessError.BadRequest,
+                "BOM 版本不属于指定物料");
         }
 
         var incomingEdges = graph.Edges

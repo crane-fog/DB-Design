@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  BomAnalysisRecord,
   BomAnalysisResult,
   BomComponentForm,
   BomReverseTraceResult,
@@ -97,9 +96,6 @@ const plannedQuantity = ref<number>(1)
 const analysisLoading = ref(false)
 const analysisError = ref('')
 const analysisResult = ref<BomAnalysisResult[]>([])
-const analysisHistory = ref<BomAnalysisRecord[]>([])
-const analysisRecordLoading = ref(false)
-const analysisRecordError = ref('')
 const analysisQueried = ref(false)
 const reverseBomId = ref('')
 const reverseIncludeHistory = ref(false)
@@ -116,6 +112,9 @@ const analysisBom = computed(() =>
   bomOptions.value.find((bom) => bom.bomId === analysisBomId.value),
 )
 const reverseBom = computed(() => bomOptions.value.find((bom) => bom.bomId === reverseBomId.value))
+const materialNameByCode = computed(
+  () => new Map(materialOptions.value.map((material) => [material.code, material.name])),
+)
 const materialDialogTitle = computed(() => {
   if (materialEditingId.value) {
     return '编辑物料'
@@ -130,7 +129,7 @@ const materialTypeLabels: Record<MaterialType, string> = {
 }
 const sectionMetadata: Record<MaterialSection, { description: string; title: string }> = {
   analysis: {
-    description: '按产品、计划数量和 BOM 版本计算理论用料，并生成最新净需求分析。',
+    description: '按产品、计划数量和 BOM 版本计算理论用料与损耗补偿用量。',
     title: '用料分析',
   },
   bom: {
@@ -154,6 +153,28 @@ const currentSection = computed(() => sectionMetadata[section])
 
 function materialTypeLabel(type: MaterialType) {
   return materialTypeLabels[type]
+}
+
+function formatPath(path: string, reverseArrow = false) {
+  if (!path) {
+    return '-'
+  }
+  const paths = path.split('；').filter(Boolean)
+  if (!paths.length) {
+    return '-'
+  }
+  let separator = ' -> '
+  if (reverseArrow) {
+    separator = ' <- '
+  }
+  return paths
+    .map((singlePath) => {
+      const materialCodes = singlePath.split('/').filter(Boolean)
+      return materialCodes
+        .map((materialCode) => materialNameByCode.value.get(materialCode) ?? materialCode)
+        .join(separator)
+    })
+    .join('\n')
 }
 
 function makeMaterialQuery(): MaterialListQuery {
@@ -210,7 +231,6 @@ async function refreshAll() {
     if (selectedBomId.value) {
       await selectBom(selectedBomId.value)
     }
-    await loadAnalysisHistory()
   } catch (requestError) {
     currentBom.value = undefined
     versionList.value = []
@@ -484,45 +504,6 @@ async function runAnalysis() {
   }
 }
 
-async function loadAnalysisHistory() {
-  analysisHistory.value = []
-  analysisRecordError.value = ''
-  if (!analysisBomId.value) {
-    return
-  }
-  analysisRecordLoading.value = true
-  try {
-    const latest = await materialService.getLatestAnalysis(analysisBomId.value)
-    if (latest) {
-      analysisHistory.value = [latest]
-    }
-  } catch (requestError) {
-    analysisRecordError.value = getErrorMessage(requestError, '最近分析记录加载失败')
-  } finally {
-    analysisRecordLoading.value = false
-  }
-}
-
-async function saveAnalysisRecord() {
-  if (!analysisBomId.value) {
-    return
-  }
-  analysisRecordLoading.value = true
-  analysisRecordError.value = ''
-  try {
-    const record = await materialService.createAnalysisRecord(
-      analysisBomId.value,
-      plannedQuantity.value,
-    )
-    analysisHistory.value = [record]
-    ElMessage.success('净需求分析已由后端计算并保存')
-  } catch (requestError) {
-    analysisRecordError.value = getErrorMessage(requestError, '净需求分析保存失败')
-  } finally {
-    analysisRecordLoading.value = false
-  }
-}
-
 function resetAnalysis() {
   analysisResult.value = []
   analysisError.value = ''
@@ -539,6 +520,7 @@ async function loadReverseTrace() {
   try {
     reverseResult.value = await materialService.getReverseTrace(
       reverseBom.value.materialCode,
+      reverseBom.value.bomId,
       reverseIncludeHistory.value,
     )
   } catch (requestError) {
@@ -559,10 +541,17 @@ onMounted(() => void refreshAll())
 watch(treeBomId, () => {
   treeData.value = []
   treeError.value = ''
+  if (treeBomId.value) {
+    void loadTree()
+  }
 })
 watch([analysisBomId, plannedQuantity], resetAnalysis)
-watch(analysisBomId, () => void loadAnalysisHistory())
-watch(reverseIncludeHistory, resetReverseTrace)
+watch([reverseBomId, reverseIncludeHistory], () => {
+  resetReverseTrace()
+  if (reverseBomId.value) {
+    void loadReverseTrace()
+  }
+})
 </script>
 
 <template>
@@ -836,18 +825,10 @@ watch(reverseIncludeHistory, resetReverseTrace)
     </template>
 
     <template v-if="section === 'tree'">
-      <el-card shadow="never">
+      <el-card v-loading="treeLoading" shadow="never">
         <el-form inline>
           <BomVersionSelect v-model="treeBomId" :options="bomOptions"></BomVersionSelect>
           <el-form-item>
-            <el-button
-              :disabled="!treeBomId"
-              :loading="treeLoading"
-              type="primary"
-              @click="loadTree"
-            >
-              加载结构
-            </el-button>
             <el-button :disabled="!treeData.length" @click="toggleTree(true)">展开全部</el-button>
             <el-button :disabled="!treeData.length" @click="toggleTree(false)">
               收起全部
@@ -858,12 +839,7 @@ watch(reverseIncludeHistory, resetReverseTrace)
           v-if="treeError"
           :closable="false"
           :title="treeError"
-          type="error" /><el-descriptions v-if="treeBom" border :column="2" class="tree-meta"
-          ><el-descriptions-item label="产品">{{ treeBom.materialName }}</el-descriptions-item
-          ><el-descriptions-item label="版本">{{
-            treeBom.version
-          }}</el-descriptions-item></el-descriptions
-        ><BomTreeDiagram
+          type="error" /><BomTreeDiagram
           v-if="treeData.length"
           :key="treeKey"
           :default-expanded="treeExpanded"
@@ -883,7 +859,7 @@ watch(reverseIncludeHistory, resetReverseTrace)
           </el-form-item>
           <el-form-item>
             <el-button
-              :disabled="!canManage || !analysisBomId || analysisRecordLoading"
+              :disabled="!canManage || !analysisBomId"
               :loading="analysisLoading"
               type="primary"
               @click="runAnalysis"
@@ -892,17 +868,7 @@ watch(reverseIncludeHistory, resetReverseTrace)
             </el-button>
           </el-form-item>
         </el-form>
-        <el-alert
-          v-if="analysisError"
-          :closable="false"
-          :title="analysisError"
-          type="error"
-        /><el-descriptions v-if="analysisBom" border :column="2" class="tree-meta"
-          ><el-descriptions-item label="产品">{{ analysisBom.materialName }}</el-descriptions-item
-          ><el-descriptions-item label="版本">{{
-            analysisBom.version
-          }}</el-descriptions-item></el-descriptions
-        >
+        <el-alert v-if="analysisError" :closable="false" :title="analysisError" type="error" />
         <div v-if="analysisResult.length" class="section-heading">
           <h3>用料汇总</h3>
           <span
@@ -914,16 +880,18 @@ watch(reverseIncludeHistory, resetReverseTrace)
             ><template #default="{ row }"
               >{{ row.materialName }}<small>{{ row.materialCode }}</small></template
             ></el-table-column
-          ><el-table-column label="理论用量" min-width="120"
+          ><el-table-column label="累计理论用量" min-width="120"
             ><template #default="{ row }"
               >{{ formatNumber(row.theoreticalQuantity) }} {{ row.unit }}</template
             ></el-table-column
-          ><el-table-column label="补偿后用量" min-width="130"
+          ><el-table-column label="损耗补偿后用量" min-width="130"
             ><template #default="{ row }"
               >{{ formatNumber(row.withLossQuantity) }} {{ row.unit }}</template
             ></el-table-column
           ><el-table-column label="来源路径" min-width="300"
-            ><template #default="{ row }">{{ row.path }}</template></el-table-column
+            ><template #default="{ row }"
+              ><span class="reverse-path">{{ formatPath(row.path, true) }}</span></template
+            ></el-table-column
           ></el-table
         >
         <EmptyState
@@ -931,68 +899,15 @@ watch(reverseIncludeHistory, resetReverseTrace)
           title="该版本没有可展开的子项"
           description="请检查并维护该版本的 BOM 组件。"
         />
-        <div class="section-heading">
-          <h3>所选版本最近一次净需求分析</h3>
-          <el-button
-            :disabled="!analysisBomId || analysisLoading"
-            :loading="analysisRecordLoading"
-            @click="loadAnalysisHistory"
-            >刷新记录</el-button
-          >
-          <el-button
-            v-if="canManage"
-            :disabled="!analysisBomId || analysisLoading"
-            :loading="analysisRecordLoading"
-            type="primary"
-            @click="saveAnalysisRecord"
-            >生成并保存净需求分析</el-button
-          >
-        </div>
-        <p class="form-hint">
-          净需求分析单独由后端结合库存、在途量和安全库存计算并保存。此处只展示该版本最新一条记录，不代表全部历史；理论用料计算不写入记录。
-        </p>
-        <el-alert
-          v-if="analysisRecordError"
-          :closable="false"
-          :title="analysisRecordError"
-          type="error"
-        />
-        <el-table v-loading="analysisRecordLoading" :data="analysisHistory" stripe
-          ><el-table-column label="分析编号" prop="id" /><el-table-column
-            label="产品"
-            prop="materialName"
-          /><el-table-column label="版本" prop="version" /><el-table-column
-            label="计划数量"
-            prop="plannedQuantity"
-          /><el-table-column label="执行时间"
-            ><template #default="{ row }">{{
-              formatDateTime(row.executedAt)
-            }}</template></el-table-column
-          ></el-table
-        >
       </el-card>
     </template>
 
     <template v-if="section === 'trace'">
-      <el-card class="table-card" shadow="never">
+      <el-card v-loading="reverseLoading" class="table-card" shadow="never">
         <el-form inline>
-          <BomVersionSelect
-            v-model="reverseBomId"
-            :options="bomOptions"
-            @change="resetReverseTrace"
-          />
+          <BomVersionSelect v-model="reverseBomId" :options="bomOptions" />
           <el-form-item>
             <el-checkbox v-model="reverseIncludeHistory">包含非当前版本</el-checkbox>
-          </el-form-item>
-          <el-form-item>
-            <el-button
-              :disabled="!reverseBomId"
-              :loading="reverseLoading"
-              type="primary"
-              @click="loadReverseTrace"
-            >
-              查询使用关系
-            </el-button>
           </el-form-item>
         </el-form>
         <el-alert v-if="reverseError" :closable="false" :title="reverseError" type="error"
@@ -1023,10 +938,12 @@ watch(reverseIncludeHistory, resetReverseTrace)
               ><template #default="{ row }"
                 >{{ formatNumber(row.cumulativeQuantity) }} {{ row.unit }}</template
               ></el-table-column
-            ><el-table-column
-              label="完整依赖路径"
-              min-width="360"
-              prop="path" /></el-table></template
+            ><el-table-column label="来源路径" min-width="360"
+              ><template #default="{ row }"
+                ><span class="reverse-path">{{ formatPath(row.path) }}</span></template
+              ></el-table-column
+            ></el-table
+          ></template
         ><EmptyState
           v-else-if="!reverseLoading && reverseQueried"
           title="暂无上层 BOM 引用"
@@ -1201,6 +1118,14 @@ watch(reverseIncludeHistory, resetReverseTrace)
 <style scoped>
 .permission-tip {
   margin-bottom: 16px;
+}
+
+.reverse-path {
+  display: block;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.6;
 }
 .material-filter-form {
   display: flex;

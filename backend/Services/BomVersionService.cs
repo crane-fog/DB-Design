@@ -239,7 +239,6 @@ public class BomVersionService(string connString)
         }
 
         if (ExistsBySql(conn, "SELECT COUNT(*) FROM BOM WHERE VERSION_ID = :id", versionId)
-            || ExistsBySql(conn, "SELECT COUNT(*) FROM DEMAND_ANALYSIS WHERE VERSION_ID = :id", versionId)
             || ExistsBySql(conn, "SELECT COUNT(*) FROM PRODUCTION_ORDER WHERE VERSION_ID = :id", versionId)
             || ExistsBySql(conn, "SELECT COUNT(*) FROM FINISH_INBOUND WHERE VERSION_ID = :id", versionId))
         {

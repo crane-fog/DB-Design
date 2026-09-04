@@ -71,10 +71,6 @@ paths:
     $ref: './material_bom.yaml#/paths/~1api~1getMaterialStockData'
   /api/listMaterialStockData:
     $ref: './inventory.yaml#/paths/~1api~1listMaterialStockData'
-  /api/addRequirementAnalysis:
-    $ref: './material_bom.yaml#/paths/~1api~1addRequirementAnalysis'
-  /api/getRequirementAnalysis:
-    $ref: './material_bom.yaml#/paths/~1api~1getRequirementAnalysis'
   /api/calculateMaterialShortage:
     $ref: './inventory.yaml#/paths/~1api~1calculateMaterialShortage'
   /api/listInventoryAlert:

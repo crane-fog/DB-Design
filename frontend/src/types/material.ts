@@ -89,16 +89,6 @@ export interface BomTreeNode {
   unit: string
 }
 
-export interface BomAnalysisRecord {
-  bomId: string
-  executedAt: string
-  id: string
-  materialCode: string
-  materialName: string
-  plannedQuantity: number
-  version: string
-}
-
 export interface BomAnalysisResult {
   materialCode: string
   materialName: string
