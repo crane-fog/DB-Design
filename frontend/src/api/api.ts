@@ -776,46 +776,6 @@ export interface CurrentAccessUser {
      */
     'user_name': string;
 }
-export interface DemandAnalysis {
-    'analysis_id'?: number;
-    'material_id'?: number;
-    'version_id'?: number;
-    'production_qty'?: number;
-    /**
-     * 物料及净需求量 JSON，由后端递归展开 BOM 并扣减库存、在途量、安全库存后计算得到。
-     */
-    'demand_detail'?: { [key: string]: any; };
-    'analysis_time'?: string;
-}
-export interface DemandAnalysisCreateRequest {
-    'material_id': number;
-    'version_id': number;
-    'production_qty': number;
-}
-export interface DemandAnalysisResponse {
-    /**
-     * 业务状态码，只使用 200、400、401、403、404、409、500。
-     */
-    'code': DemandAnalysisResponseCodeEnum;
-    /**
-     * 返回结果说明。
-     */
-    'message': string;
-    'data': object | null;
-}
-
-export const DemandAnalysisResponseCodeEnum = {
-    NUMBER_200: 200,
-    NUMBER_400: 400,
-    NUMBER_401: 401,
-    NUMBER_403: 403,
-    NUMBER_404: 404,
-    NUMBER_409: 409,
-    NUMBER_500: 500,
-} as const;
-
-export type DemandAnalysisResponseCodeEnum = typeof DemandAnalysisResponseCodeEnum[keyof typeof DemandAnalysisResponseCodeEnum];
-
 export interface ErrorResponse {
     /**
      * 错误业务状态码，只使用 400、401、403、404、409、500。
@@ -5718,45 +5678,6 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 新增需求分析
-         * @param {DemandAnalysisCreateRequest} demandAnalysisCreateRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addRequirementAnalysis: async (demandAnalysisCreateRequest: DemandAnalysisCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'demandAnalysisCreateRequest' is not null or undefined
-            assertParamExists('addRequirementAnalysis', 'demandAnalysisCreateRequest', demandAnalysisCreateRequest)
-            const localVarPath = `/api/addRequirementAnalysis`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(demandAnalysisCreateRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
          * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 生产损耗补偿计算
          * @param {LossCompensationCalculateRequest} lossCompensationCalculateRequest 
@@ -6228,55 +6149,6 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
 
             if (materialId !== undefined) {
                 localVarQueryParameter['material_id'] = materialId;
-            }
-
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 查询需求分析结果
-         * @param {number} [analysisId] 分析编号；传入时按单条记录查询。
-         * @param {number} [materialId] 分析产品物料唯一标识，支持精确匹配。
-         * @param {number} [versionId] 使用的 BOM 版本编号。
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getRequirementAnalysis: async (analysisId?: number, materialId?: number, versionId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/api/getRequirementAnalysis`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            if (analysisId !== undefined) {
-                localVarQueryParameter['analysis_id'] = analysisId;
-            }
-
-            if (materialId !== undefined) {
-                localVarQueryParameter['material_id'] = materialId;
-            }
-
-            if (versionId !== undefined) {
-                localVarQueryParameter['version_id'] = versionId;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -6837,19 +6709,6 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 新增需求分析
-         * @param {DemandAnalysisCreateRequest} demandAnalysisCreateRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async addRequirementAnalysis(demandAnalysisCreateRequest: DemandAnalysisCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DemandAnalysisResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.addRequirementAnalysis(demandAnalysisCreateRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.addRequirementAnalysis']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
          * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 生产损耗补偿计算
          * @param {LossCompensationCalculateRequest} lossCompensationCalculateRequest 
@@ -7004,21 +6863,6 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.getMaterialStockData(materialId, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getMaterialStockData']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 查询需求分析结果
-         * @param {number} [analysisId] 分析编号；传入时按单条记录查询。
-         * @param {number} [materialId] 分析产品物料唯一标识，支持精确匹配。
-         * @param {number} [versionId] 使用的 BOM 版本编号。
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async getRequirementAnalysis(analysisId?: number, materialId?: number, versionId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DemandAnalysisResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getRequirementAnalysis(analysisId, materialId, versionId, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getRequirementAnalysis']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -7212,16 +7056,6 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.addMaterialData(requestParameters.materialCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 新增需求分析
-         * @param {MaterialBomApiAddRequirementAnalysisRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addRequirementAnalysis(requestParameters: MaterialBomApiAddRequirementAnalysisRequest, options?: RawAxiosRequestConfig): AxiosPromise<DemandAnalysisResponse> {
-            return localVarFp.addRequirementAnalysis(requestParameters.demandAnalysisCreateRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
          * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 生产损耗补偿计算
          * @param {MaterialBomApiCalculateLossCompensationRequest} requestParameters Request parameters.
@@ -7340,16 +7174,6 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
          */
         getMaterialStockData(requestParameters: MaterialBomApiGetMaterialStockDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<MaterialStockResponse> {
             return localVarFp.getMaterialStockData(requestParameters.materialId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 查询需求分析结果
-         * @param {MaterialBomApiGetRequirementAnalysisRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getRequirementAnalysis(requestParameters: MaterialBomApiGetRequirementAnalysisRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<DemandAnalysisResponse> {
-            return localVarFp.getRequirementAnalysis(requestParameters.analysisId, requestParameters.materialId, requestParameters.versionId, options).then((request) => request(axios, basePath));
         },
         /**
          * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
@@ -7473,13 +7297,6 @@ export interface MaterialBomApiAddMaterialDataRequest {
 }
 
 /**
- * Request parameters for addRequirementAnalysis operation in MaterialBomApi.
- */
-export interface MaterialBomApiAddRequirementAnalysisRequest {
-    readonly demandAnalysisCreateRequest: DemandAnalysisCreateRequest
-}
-
-/**
  * Request parameters for calculateLossCompensation operation in MaterialBomApi.
  */
 export interface MaterialBomApiCalculateLossCompensationRequest {
@@ -7581,26 +7398,6 @@ export interface MaterialBomApiGetMaterialStockDataRequest {
      * 物料唯一标识，支持精确匹配。
      */
     readonly materialId: number
-}
-
-/**
- * Request parameters for getRequirementAnalysis operation in MaterialBomApi.
- */
-export interface MaterialBomApiGetRequirementAnalysisRequest {
-    /**
-     * 分析编号；传入时按单条记录查询。
-     */
-    readonly analysisId?: number
-
-    /**
-     * 分析产品物料唯一标识，支持精确匹配。
-     */
-    readonly materialId?: number
-
-    /**
-     * 使用的 BOM 版本编号。
-     */
-    readonly versionId?: number
 }
 
 /**
@@ -7850,17 +7647,6 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 新增物料需求分析记录。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 新增需求分析
-     * @param {MaterialBomApiAddRequirementAnalysisRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public addRequirementAnalysis(requestParameters: MaterialBomApiAddRequirementAnalysisRequest, options?: RawAxiosRequestConfig) {
-        return MaterialBomApiFp(this.configuration).addRequirementAnalysis(requestParameters.demandAnalysisCreateRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
      * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
      * @summary 生产损耗补偿计算
      * @param {MaterialBomApiCalculateLossCompensationRequest} requestParameters Request parameters.
@@ -7990,17 +7776,6 @@ export class MaterialBomApi extends BaseAPI {
      */
     public getMaterialStockData(requestParameters: MaterialBomApiGetMaterialStockDataRequest, options?: RawAxiosRequestConfig) {
         return MaterialBomApiFp(this.configuration).getMaterialStockData(requestParameters.materialId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 查询物料需求分析记录。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 查询需求分析结果
-     * @param {MaterialBomApiGetRequirementAnalysisRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public getRequirementAnalysis(requestParameters: MaterialBomApiGetRequirementAnalysisRequest = {}, options?: RawAxiosRequestConfig) {
-        return MaterialBomApiFp(this.configuration).getRequirementAnalysis(requestParameters.analysisId, requestParameters.materialId, requestParameters.versionId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
