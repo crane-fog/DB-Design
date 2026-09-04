@@ -6291,16 +6291,19 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 反向产品追溯
          * @param {number} materialId 需要追溯的子项物料唯一标识，支持精确匹配。
+         * @param {number} versionId 限定反向追溯使用关系范围的 BOM 版本唯一标识。
          * @param {boolean} [includeHistory] 是否包含历史版本依赖关系。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getReverseTraceData: async (materialId: number, includeHistory?: boolean, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        getReverseTraceData: async (materialId: number, versionId: number, includeHistory?: boolean, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'materialId' is not null or undefined
             assertParamExists('getReverseTraceData', 'materialId', materialId)
+            // verify required parameter 'versionId' is not null or undefined
+            assertParamExists('getReverseTraceData', 'versionId', versionId)
             const localVarPath = `/api/getReverseTraceData`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -6319,6 +6322,10 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
 
             if (materialId !== undefined) {
                 localVarQueryParameter['material_id'] = materialId;
+            }
+
+            if (versionId !== undefined) {
+                localVarQueryParameter['version_id'] = versionId;
             }
 
             if (includeHistory !== undefined) {
@@ -7015,15 +7022,16 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 反向产品追溯
          * @param {number} materialId 需要追溯的子项物料唯一标识，支持精确匹配。
+         * @param {number} versionId 限定反向追溯使用关系范围的 BOM 版本唯一标识。
          * @param {boolean} [includeHistory] 是否包含历史版本依赖关系。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getReverseTraceData(materialId: number, includeHistory?: boolean, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ReverseTraceResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getReverseTraceData(materialId, includeHistory, options);
+        async getReverseTraceData(materialId: number, versionId: number, includeHistory?: boolean, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ReverseTraceResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getReverseTraceData(materialId, versionId, includeHistory, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['MaterialBomApi.getReverseTraceData']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -7344,14 +7352,14 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.getRequirementAnalysis(requestParameters.analysisId, requestParameters.materialId, requestParameters.versionId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
          * @summary 反向产品追溯
          * @param {MaterialBomApiGetReverseTraceDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
         getReverseTraceData(requestParameters: MaterialBomApiGetReverseTraceDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ReverseTraceResponse> {
-            return localVarFp.getReverseTraceData(requestParameters.materialId, requestParameters.includeHistory, options).then((request) => request(axios, basePath));
+            return localVarFp.getReverseTraceData(requestParameters.materialId, requestParameters.versionId, requestParameters.includeHistory, options).then((request) => request(axios, basePath));
         },
         /**
          * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
@@ -7603,6 +7611,11 @@ export interface MaterialBomApiGetReverseTraceDataRequest {
      * 需要追溯的子项物料唯一标识，支持精确匹配。
      */
     readonly materialId: number
+
+    /**
+     * 限定反向追溯使用关系范围的 BOM 版本唯一标识。
+     */
+    readonly versionId: number
 
     /**
      * 是否包含历史版本依赖关系。
@@ -7991,14 +8004,14 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 以指定物料为子项递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
      * @summary 反向产品追溯
      * @param {MaterialBomApiGetReverseTraceDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public getReverseTraceData(requestParameters: MaterialBomApiGetReverseTraceDataRequest, options?: RawAxiosRequestConfig) {
-        return MaterialBomApiFp(this.configuration).getReverseTraceData(requestParameters.materialId, requestParameters.includeHistory, options).then((request) => request(this.axios, this.basePath));
+        return MaterialBomApiFp(this.configuration).getReverseTraceData(requestParameters.materialId, requestParameters.versionId, requestParameters.includeHistory, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
