@@ -17,8 +17,9 @@ import { purchaseService } from '@/services/PurchaseService'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
-interface CalculationRow extends MaterialShortageRequestItem {
+interface CalculationRow extends Omit<MaterialShortageRequestItem, 'versionId'> {
   key: number
+  versionId?: number
 }
 
 interface BuyerOption {
@@ -32,7 +33,9 @@ const calculating = ref(false)
 const creatingDrafts = ref(false)
 const error = ref('')
 const result = ref<MaterialShortageResult>()
-const rows = reactive<CalculationRow[]>([{ key: 1, materialId: 0, productionQty: 1, versionId: 0 }])
+const rows = reactive<CalculationRow[]>([
+  { key: 1, materialId: 0, productionQty: 1, versionId: undefined },
+])
 const purchaseQuantities = reactive<Record<number, number>>({})
 const draftExpectedDate = ref(new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10))
 const selectedBuyerId = ref<number>()
@@ -57,15 +60,24 @@ const totalShortage = computed(() =>
   shortageItems.value.reduce((sum, item) => sum + item.netShortageQty, 0),
 )
 const productOptions = computed(() =>
-  referenceData.value.materials.filter((item) => item.materialType === 'finished'),
+  referenceData.value.materials.filter(
+    (item) => item.materialType === 'finished' || item.materialType === 'semi_finished',
+  ),
 )
+const productBomOptions = computed(() => {
+  const products = new Map(productOptions.value.map((item) => [item.materialId, item]))
+  return referenceData.value.bomVersions.flatMap((version) => {
+    const product = products.get(version.materialId)
+    if (!product) {
+      return []
+    }
+    return [{ ...version, materialName: product.materialName }]
+  })
+})
 
-function getVersionOptions(materialId: number) {
-  return referenceData.value.bomVersions.filter((item) => item.materialId === materialId)
-}
-
-function handleProductChange(row: CalculationRow) {
-  row.versionId = getVersionOptions(row.materialId)[0]?.versionId ?? 0
+function handleProductBomChange(row: CalculationRow) {
+  const option = productBomOptions.value.find((item) => item.versionId === row.versionId)
+  row.materialId = option?.materialId ?? 0
 }
 
 async function loadReferenceData() {
@@ -89,7 +101,7 @@ async function loadReferenceData() {
 }
 
 function addRow() {
-  rows.push({ key: nextKey++, materialId: 0, productionQty: 1, versionId: 0 })
+  rows.push({ key: nextKey++, materialId: 0, productionQty: 1, versionId: undefined })
 }
 
 function removeRow(key: number) {
@@ -102,8 +114,17 @@ function removeRow(key: number) {
 }
 
 function validateRows() {
-  if (rows.some((row) => row.materialId <= 0 || row.productionQty <= 0 || row.versionId <= 0)) {
-    ElMessage.warning('请完整选择成品、BOM 版本并填写生产数量')
+  if (
+    rows.some(
+      (row) =>
+        row.materialId <= 0 ||
+        !Number.isInteger(row.productionQty) ||
+        row.productionQty <= 0 ||
+        !row.versionId ||
+        row.versionId <= 0,
+    )
+  ) {
+    ElMessage.warning('请选择成品或半成品的 BOM 版本并填写正整数生产数量')
     return false
   }
   return true
@@ -121,7 +142,7 @@ async function calculate() {
       rows.map(({ materialId, productionQty, versionId }) => ({
         materialId,
         productionQty,
-        versionId,
+        versionId: versionId!,
       })),
     )
     if (currentRequestId !== requestId) {
@@ -129,7 +150,7 @@ async function calculate() {
     }
     result.value = calculation
     for (const item of calculation.items) {
-      purchaseQuantities[item.materialId] = item.suggestedPurchaseQty
+      purchaseQuantities[item.materialId] = Math.max(0, Math.ceil(item.suggestedPurchaseQty))
     }
   } catch (requestError) {
     if (currentRequestId === requestId) {
@@ -253,47 +274,47 @@ onBeforeUnmount(() => {
       <div class="calculation-rows">
         <div v-for="(row, index) in rows" :key="row.key" class="calculation-row">
           <span class="row-index">{{ index + 1 }}</span>
-          <label
-            ><span>成品物料</span
-            ><el-input-number
-              v-if="!productOptions.length"
-              v-model="row.materialId"
-              :min="1"
-              :precision="0"
-              placeholder="输入成品编号" /><el-select
-              v-else
-              v-model="row.materialId"
+          <label class="product-bom-field"
+            ><span>成品 / 半成品 BOM</span
+            ><el-select
+              v-if="referenceLoading || productBomOptions.length"
+              v-model="row.versionId"
               filterable
               :loading="referenceLoading"
-              placeholder="选择成品"
-              @change="handleProductChange(row)"
+              placeholder="选择产品 BOM 版本"
+              @change="handleProductBomChange(row)"
               ><el-option
-                v-for="product in productOptions"
-                :key="product.materialId"
-                :label="product.materialName"
-                :value="product.materialId" /></el-select
+                v-for="option in productBomOptions"
+                :key="option.versionId"
+                :label="`${option.materialName} ${option.versionNo} #${option.materialId}`"
+                :value="option.versionId"
+            /></el-select>
+            <div v-else class="manual-bom-inputs">
+              <el-input-number
+                :controls="false"
+                v-model="row.materialId"
+                :min="1"
+                :precision="0"
+                placeholder="物料编号"
+              />
+              <el-input-number
+                :controls="false"
+                v-model="row.versionId"
+                :min="1"
+                :precision="0"
+                placeholder="BOM 版本编号"
+              /></div
           ></label>
           <label
             ><span>生产数量</span
-            ><el-input-number v-model="row.productionQty" :min="0.01" :precision="2"
-          /></label>
-          <label
-            ><span>BOM 版本</span
             ><el-input-number
-              v-if="!getVersionOptions(row.materialId).length"
-              v-model="row.versionId"
+              :controls="false"
+              v-model="row.productionQty"
+              class="plain-number-input"
               :min="1"
               :precision="0"
-              placeholder="输入版本编号" /><el-select
-              v-else
-              v-model="row.versionId"
-              placeholder="选择版本"
-              ><el-option
-                v-for="version in getVersionOptions(row.materialId)"
-                :key="version.versionId"
-                :label="version.versionNo"
-                :value="version.versionId" /></el-select
-          ></label>
+              :step="1"
+          /></label>
           <el-tooltip content="移除此产品" placement="top">
             <el-button
               :disabled="rows.length === 1"
@@ -307,7 +328,6 @@ onBeforeUnmount(() => {
       </div>
       <div class="calculation-actions">
         <el-button :loading="calculating" type="primary" @click="calculate">开始计算</el-button>
-        <span>缺口口径：毛需求 − 可用库存 − 在途数量 + 安全库存</span>
       </div>
     </el-card>
 
@@ -345,6 +365,7 @@ onBeforeUnmount(() => {
               value-format="YYYY-MM-DD"
             />
             <el-input-number
+              :controls="false"
               v-if="!buyerOptions.length"
               v-model="selectedBuyerId"
               :min="1"
@@ -402,43 +423,48 @@ onBeforeUnmount(() => {
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="毛需求" min-width="105"
+          <el-table-column label="毛需求" min-width="70"
             ><template #default="{ row }">{{
               formatNumber(row.grossRequirement)
             }}</template></el-table-column
           >
-          <el-table-column label="可用库存" min-width="105"
+          <el-table-column label="-" width="20" />
+          <el-table-column label="可用库存" min-width="80"
             ><template #default="{ row }">{{
               formatNumber(row.availableQty)
             }}</template></el-table-column
           >
-          <el-table-column label="在途" min-width="90"
+          <el-table-column label="-" width="20" />
+          <el-table-column label="在途" min-width="70"
             ><template #default="{ row }">{{
               formatNumber(row.inTransitQty)
             }}</template></el-table-column
           >
-          <el-table-column label="安全库存" min-width="105"
+          <el-table-column label="+" width="20" />
+          <el-table-column label="安全库存" min-width="80"
             ><template #default="{ row }">{{
               formatNumber(row.safetyStock)
             }}</template></el-table-column
           >
-          <el-table-column label="净缺口" min-width="105">
+          <el-table-column label="=" width="20" />
+          <el-table-column label="净缺口" min-width="70">
             <template #default="{ row }"
               ><strong :class="{ shortage: row.netShortageQty > 0 }">{{
                 formatNumber(row.netShortageQty)
               }}</strong></template
             >
           </el-table-column>
-          <el-table-column label="建议采购" min-width="150">
+          <el-table-column label="采购" min-width="150">
             <template #default="{ row }">
               <el-input-number
-                v-if="row.netShortageQty > 0"
+                :controls="false"
                 v-model="purchaseQuantities[row.materialId]"
+                class="plain-number-input purchase-quantity-input"
                 :min="0"
-                :precision="2"
+                :precision="0"
                 size="small"
+                :step="1"
               />
-              <span v-else>-</span>
             </template>
           </el-table-column>
         </el-table>
@@ -466,7 +492,7 @@ onBeforeUnmount(() => {
 }
 .calculation-row {
   display: grid;
-  grid-template-columns: 30px repeat(3, minmax(150px, 1fr)) 34px;
+  grid-template-columns: 30px minmax(280px, 2fr) minmax(150px, 1fr) 34px;
   gap: 12px;
   align-items: end;
   border: 1px solid var(--el-border-color-lighter);
@@ -489,6 +515,25 @@ onBeforeUnmount(() => {
 .calculation-row :deep(.el-input-number),
 .calculation-row :deep(.el-select) {
   width: 100%;
+}
+.plain-number-input :deep(.el-input__inner) {
+  text-align: left;
+}
+.plain-number-input :deep(.el-input__wrapper) {
+  padding-right: 11px;
+  padding-left: 11px;
+}
+.purchase-quantity-input :deep(.el-input__wrapper) {
+  padding-right: 7px;
+  padding-left: 7px;
+}
+.purchase-quantity-input :deep(.el-input__inner) {
+  font-size: 14px;
+}
+.manual-bom-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 .calculation-actions {
   justify-content: flex-start;
@@ -522,16 +567,12 @@ onBeforeUnmount(() => {
   .calculation-row {
     grid-template-columns: 30px repeat(2, minmax(140px, 1fr)) 34px;
   }
-  .calculation-row label:nth-of-type(3) {
-    grid-column: 2 / 4;
-  }
 }
 @media (max-width: 640px) {
   .calculation-row {
     grid-template-columns: 28px minmax(0, 1fr) 34px;
   }
-  .calculation-row label,
-  .calculation-row label:nth-of-type(3) {
+  .calculation-row label {
     grid-column: 2;
   }
   .calculation-row > button {

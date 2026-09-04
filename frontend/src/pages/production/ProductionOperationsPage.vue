@@ -636,17 +636,17 @@ onMounted(() => {
           </el-radio-group>
           <el-form :model="estimateForm" inline>
             <el-form-item v-if="estimateMode === 'order'" label="生产订单 ID">
-              <el-input-number v-model="estimateForm.orderId" :min="1" />
+              <el-input-number :controls="false" v-model="estimateForm.orderId" :min="1" />
             </el-form-item>
             <template v-else>
               <el-form-item label="产品物料 ID">
-                <el-input-number v-model="estimateForm.materialId" :min="1" />
+                <el-input-number :controls="false" v-model="estimateForm.materialId" :min="1" />
               </el-form-item>
               <el-form-item label="BOM 版本 ID">
-                <el-input-number v-model="estimateForm.versionId" :min="1" />
+                <el-input-number :controls="false" v-model="estimateForm.versionId" :min="1" />
               </el-form-item>
               <el-form-item label="计划数量">
-                <el-input-number v-model="estimateForm.planQty" :min="1" />
+                <el-input-number :controls="false" v-model="estimateForm.planQty" :min="1" />
               </el-form-item>
               <el-form-item label="期望日期">
                 <el-date-picker
@@ -909,13 +909,18 @@ onMounted(() => {
               </el-select>
             </el-form-item>
             <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前订单">
-              <el-input-number v-model="lineStatusForm.currentOrderId" :min="0" />
+              <el-input-number :controls="false" v-model="lineStatusForm.currentOrderId" :min="0" />
             </el-form-item>
             <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前产品">
-              <el-input-number v-model="lineStatusForm.currentMaterialId" :min="0" />
+              <el-input-number
+                :controls="false"
+                v-model="lineStatusForm.currentMaterialId"
+                :min="0"
+              />
             </el-form-item>
             <el-form-item label="累计完成数量">
               <el-input-number
+                :controls="false"
                 v-model="lineStatusForm.finishedQty"
                 :min="0"
                 placeholder="留空由后端沿用当前任务数量"
@@ -923,6 +928,7 @@ onMounted(() => {
             </el-form-item>
             <el-form-item label="当前效率">
               <el-input-number
+                :controls="false"
                 v-model="lineStatusForm.efficiency"
                 :max="1"
                 :min="0"
@@ -978,13 +984,28 @@ onMounted(() => {
     <el-dialog v-model="externalCreateVisible" title="提交外部订单" width="540px">
       <el-form :model="externalForm" label-width="110px">
         <el-form-item v-if="canManageOrders && !isExternalCustomer" label="客户 ID">
-          <el-input-number v-model="externalForm.customerId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="externalForm.customerId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="产品物料 ID">
-          <el-input-number v-model="externalForm.materialId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="externalForm.materialId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="数量">
-          <el-input-number v-model="externalForm.quantity" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="externalForm.quantity"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="期望日期">
           <el-date-picker
@@ -1012,13 +1033,28 @@ onMounted(() => {
     <el-dialog v-model="convertVisible" title="转换为生产订单" width="560px">
       <el-form :model="convertForm" label-width="120px">
         <el-form-item label="产品物料 ID">
-          <el-input-number v-model="convertForm.materialId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="convertForm.materialId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="BOM 版本 ID">
-          <el-input-number v-model="convertForm.versionId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="convertForm.versionId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="计划数量">
-          <el-input-number v-model="convertForm.planQty" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="convertForm.planQty"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="计划开工">
           <el-date-picker

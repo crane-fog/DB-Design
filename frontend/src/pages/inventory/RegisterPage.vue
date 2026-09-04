@@ -422,6 +422,7 @@ onBeforeUnmount(() => {
         <div class="form-grid">
           <el-form-item label="生产订单" prop="orderId"
             ><el-input-number
+              :controls="false"
               v-if="!referenceData.productionOrders.length"
               v-model="form.orderId"
               :min="1"
@@ -443,6 +444,7 @@ onBeforeUnmount(() => {
           ></el-form-item>
           <el-form-item label="成品物料" prop="materialId"
             ><el-input-number
+              :controls="false"
               v-if="!referenceData.productionOrders.length"
               v-model="form.materialId"
               :min="1"
@@ -455,6 +457,7 @@ onBeforeUnmount(() => {
           ></el-form-item>
           <el-form-item label="BOM 版本" prop="versionId"
             ><el-input-number
+              :controls="false"
               v-if="!referenceData.productionOrders.length"
               v-model="form.versionId"
               :min="1"
@@ -472,6 +475,7 @@ onBeforeUnmount(() => {
           /></el-form-item>
           <el-form-item label="完工数量" prop="finishQty"
             ><el-input-number
+              :controls="false"
               v-model="form.finishQty"
               :max="selectedProductionOrder?.remainingQty"
               :min="0.01"
@@ -479,6 +483,7 @@ onBeforeUnmount(() => {
           /></el-form-item>
           <el-form-item label="合格数量" prop="qualifiedQty"
             ><el-input-number
+              :controls="false"
               v-model="form.qualifiedQty"
               :max="form.finishQty"
               :min="0"

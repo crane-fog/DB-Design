@@ -177,6 +177,7 @@ public class BomController(
     [Route("getReverseTraceData")]
     public IActionResult GetReverseTrace(
         [FromQuery(Name = "material_id")] long materialId,
+        [FromQuery(Name = "version_id")] long versionId,
         [FromQuery(Name = "include_history")] bool includeHistory = false)
     {
         if (ResolveReverseReaderOrForbidden() is { } forbidden)
@@ -184,7 +185,7 @@ public class BomController(
             return forbidden;
         }
 
-        var result = bomService.GetReverseTrace(materialId, includeHistory);
+        var result = bomService.GetReverseTrace(materialId, versionId, includeHistory);
         return Ok(Reverse(
             result.Ok ? ReverseTraceResponse.CodeEnum._200Enum : (ReverseTraceResponse.CodeEnum)(int)result.Error,
             result.Ok ? "查询成功" : result.ErrorMessage ?? "查询失败",

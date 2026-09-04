@@ -520,13 +520,28 @@ onMounted(() => {
     >
       <el-form ref="orderFormRef" :model="orderForm" :rules="orderRules" label-width="120px">
         <el-form-item label="产品物料 ID" prop="materialId">
-          <el-input-number v-model="orderForm.materialId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="orderForm.materialId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="BOM 版本 ID" prop="versionId">
-          <el-input-number v-model="orderForm.versionId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="orderForm.versionId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="计划数量" prop="planQty">
-          <el-input-number v-model="orderForm.planQty" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="orderForm.planQty"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="计划开工日期" prop="planStart">
           <el-date-picker

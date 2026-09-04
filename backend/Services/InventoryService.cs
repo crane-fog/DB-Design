@@ -97,7 +97,6 @@ public class InventoryService(
     private const string MaterialStockStatusSql = @"CASE
         WHEN NVL(ms.AVAILABLE_QTY, 0) <= 0 THEN 'zero'
         WHEN NVL(ms.AVAILABLE_QTY, 0) < NVL(m.SAFETY_STOCK, 0) THEN 'low'
-        WHEN NVL(ms.LOCKED_QTY, 0) > 0 THEN 'locked'
         ELSE 'normal'
     END";
 

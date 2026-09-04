@@ -522,7 +522,12 @@ onBeforeUnmount(() => {
           >
           <div class="toolbar">
             <div class="filters">
-              <el-input-number v-model="alertQuery.materialId" :min="1" placeholder="物料 ID" />
+              <el-input-number
+                :controls="false"
+                v-model="alertQuery.materialId"
+                :min="1"
+                placeholder="物料 ID"
+              />
               <el-select v-model="alertQuery.status" clearable placeholder="处理状态">
                 <el-option label="待处理" value="pending" /><el-option
                   label="已处理"
@@ -635,8 +640,18 @@ onBeforeUnmount(() => {
           >
           <div class="toolbar">
             <div class="filters">
-              <el-input-number v-model="lockQuery.orderId" :min="1" placeholder="订单 ID" />
-              <el-input-number v-model="lockQuery.materialId" :min="1" placeholder="物料 ID" />
+              <el-input-number
+                :controls="false"
+                v-model="lockQuery.orderId"
+                :min="1"
+                placeholder="订单 ID"
+              />
+              <el-input-number
+                :controls="false"
+                v-model="lockQuery.materialId"
+                :min="1"
+                placeholder="物料 ID"
+              />
               <el-select v-model="lockQuery.status" clearable placeholder="锁定状态"
                 ><el-option label="锁定中" value="locked" /><el-option
                   label="已释放"
@@ -725,7 +740,12 @@ onBeforeUnmount(() => {
           >
           <div class="toolbar">
             <div class="filters">
-              <el-input-number v-model="obsoleteQuery.materialId" :min="1" placeholder="物料 ID" />
+              <el-input-number
+                :controls="false"
+                v-model="obsoleteQuery.materialId"
+                :min="1"
+                placeholder="物料 ID"
+              />
               <el-select v-model="obsoleteQuery.status" clearable placeholder="处理状态"
                 ><el-option label="待处理" value="pending" /><el-option
                   label="已处理"
@@ -838,6 +858,7 @@ onBeforeUnmount(() => {
       ><el-form label-width="90px"
         ><el-form-item label="物料"
           ><el-input-number
+            :controls="false"
             v-if="!referenceData.materials.length"
             v-model="generateMaterialId"
             :min="1"
@@ -871,6 +892,7 @@ onBeforeUnmount(() => {
       ><el-form ref="lockFormRef" :model="lockForm" :rules="lockRules" label-width="100px"
         ><el-form-item label="生产订单" prop="orderId"
           ><el-input-number
+            :controls="false"
             v-if="!referenceData.productionOrders.length"
             v-model="lockForm.orderId"
             :min="1"
@@ -899,6 +921,7 @@ onBeforeUnmount(() => {
           ><div class="lock-lines">
             <div v-for="(item, index) in lockForm.items" :key="index" class="lock-line">
               <el-input-number
+                :controls="false"
                 v-if="!lockMaterialOptions.length"
                 v-model="item.materialId"
                 :min="1"
@@ -926,6 +949,7 @@ onBeforeUnmount(() => {
                   "
                   :value="material.materialId" /></el-select
               ><el-input-number
+                :controls="false"
                 v-model="item.lockQty"
                 :min="0.01"
                 :precision="2"
@@ -953,11 +977,13 @@ onBeforeUnmount(() => {
       ><el-form label-width="110px"
         ><el-form-item label="闲置天数阈值" required
           ><el-input-number
+            :controls="false"
             v-model="detectionForm.idleDaysThreshold"
             :min="1"
             style="width: 100%" /></el-form-item
         ><el-form-item label="指定物料"
           ><el-input-number
+            :controls="false"
             v-if="!referenceData.materials.length"
             v-model="detectionForm.materialId"
             :min="1"

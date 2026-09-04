@@ -693,11 +693,11 @@ onMounted(async () => {
               />
             </el-select>
             <el-input-number
+              :controls="false"
               v-else
               v-model="materialFilters.supplierId"
               :min="1"
               :precision="0"
-              :controls="false"
               placeholder="供应商 ID（可选）"
             />
           </el-form-item>
@@ -888,10 +888,10 @@ onMounted(async () => {
         <el-form-item label="生产订单 ID" prop="orderId">
           <div class="reference-input">
             <el-input-number
+              :controls="false"
               v-model="consumptionForm.orderId"
               :min="1"
               :precision="0"
-              :controls="false"
             />
             <el-select
               v-if="references.productionOrders?.length"
@@ -919,10 +919,10 @@ onMounted(async () => {
         <el-form-item label="采购明细 ID" prop="itemId">
           <div class="reference-input">
             <el-input-number
+              :controls="false"
               v-model="consumptionForm.itemId"
               :min="1"
               :precision="0"
-              :controls="false"
             />
             <el-select
               v-if="references.purchaseItems?.length"
@@ -948,7 +948,12 @@ onMounted(async () => {
           </div>
         </el-form-item>
         <el-form-item label="消耗数量" prop="consumeQty">
-          <el-input-number v-model="consumptionForm.consumeQty" :min="0.01" :precision="2" />
+          <el-input-number
+            :controls="false"
+            v-model="consumptionForm.consumeQty"
+            :min="0.01"
+            :precision="2"
+          />
         </el-form-item>
       </el-form>
       <template #footer>

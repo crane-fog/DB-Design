@@ -92,8 +92,7 @@ builder.Services.AddScoped<SupplierPriceIntegrationService>(_ => new SupplierPri
 builder.Services.AddScoped<IPriceQuery>(sp => sp.GetRequiredService<SupplierPriceIntegrationService>());
 builder.Services.AddScoped<DemandAnalysisService>(sp => new DemandAnalysisService(
     connString,
-    sp.GetRequiredService<IPriceQuery>(),
-    sp.GetRequiredService<MaterialRequirementNettingService>()));
+    sp.GetRequiredService<IPriceQuery>()));
 builder.Services.AddScoped<IBomExpansionQuery>(sp => sp.GetRequiredService<DemandAnalysisService>());
 builder.Services.AddScoped(sp => new CapacityEstimationDataSource(
     connString, sp.GetRequiredService<MaterialRequirementNettingService>()));

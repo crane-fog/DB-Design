@@ -890,7 +890,6 @@ public class MaterialCatalogService(
     private static bool HasMaterialReferences(OracleConnection conn, long materialId) =>
         ExistsBySql(conn, "SELECT COUNT(*) FROM BOM_VERSION WHERE MATERIAL_ID = :id", materialId)
         || ExistsBySql(conn, "SELECT COUNT(*) FROM BOM WHERE PARENT_MATERIAL_ID = :id OR CHILD_MATERIAL_ID = :id", materialId)
-        || ExistsBySql(conn, "SELECT COUNT(*) FROM DEMAND_ANALYSIS WHERE MATERIAL_ID = :id", materialId)
         || ExistsBySql(conn, "SELECT COUNT(*) FROM PRODUCTION_ORDER WHERE MATERIAL_ID = :id", materialId)
         || ExistsBySql(conn, "SELECT COUNT(*) FROM EXTERNAL_ORDER WHERE MATERIAL_ID = :id", materialId)
         || ExistsBySql(conn, "SELECT COUNT(*) FROM MATERIAL_STOCK WHERE MATERIAL_ID = :id AND (AVAILABLE_QTY <> 0 OR LOCKED_QTY <> 0)", materialId);

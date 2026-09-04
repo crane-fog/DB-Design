@@ -4,7 +4,6 @@ import type {
   Bom,
   BomCreateRequest,
   BomVersion,
-  DemandAnalysis,
   MaterialBomApiListMaterialDataRequest,
   MaterialCreateRequest,
   MaterialDetail,
@@ -12,7 +11,6 @@ import type {
 } from '@/api'
 import { type ApiEnvelope, type PageResult, mapPageResult, unwrap } from '@/services/pagination'
 import type {
-  BomAnalysisRecord,
   BomAnalysisResult,
   BomComponentForm,
   BomReverseTraceResult,
@@ -129,11 +127,18 @@ function materialRequest(form: MaterialForm): MaterialCreateRequest {
   if (!form.name.trim() || !form.unit.trim()) {
     throw new Error('请填写物料名称和计量单位')
   }
+  if (
+    form.safetyStock !== undefined &&
+    (!Number.isFinite(form.safetyStock) || form.safetyStock < 0)
+  ) {
+    throw new Error('安全库存必须是大于等于 0 的数字')
+  }
   return {
     category_id: idNumber(form.categoryId, '分类编号'),
     material_name: form.name.trim(),
     material_type: apiMaterialTypes[form.type],
     model: form.model.trim(),
+    safety_stock: form.safetyStock,
     unit: form.unit.trim(),
   }
 }
@@ -148,7 +153,7 @@ function materialUpdateRequest(
     current_version_id: material.currentVersionId ?? undefined,
     default_supplier_id: material.defaultSupplierId ?? undefined,
     material_id: idNumber(material.id, '物料编号'),
-    safety_stock: material.safetyStock,
+    safety_stock: form.safetyStock ?? material.safetyStock,
   }
 }
 
@@ -226,21 +231,6 @@ async function componentRequest(bomId: string, form: BomComponentForm): Promise<
   }
 }
 
-async function mapAnalysisRecord(data: DemandAnalysis): Promise<BomAnalysisRecord> {
-  const materialCode = String(idNumber(data.material_id, '物料编号'))
-  const bomId = String(idNumber(data.version_id, '版本编号'))
-  const [material, version] = await Promise.all([getMaterial(materialCode), getVersion(bomId)])
-  return {
-    bomId,
-    executedAt: data.analysis_time ?? '',
-    id: String(idNumber(data.analysis_id, '分析编号')),
-    materialCode,
-    materialName: material.name,
-    plannedQuantity: requiredNumber(data.production_qty, '计划数量'),
-    version: version.version_no ?? '',
-  }
-}
-
 /** 所有读取和写入均使用已生成的 materialBomApi，不缓存业务数据或伪造成功结果。 */
 export const materialService = {
   async addBomComponent(bomId: string, form: BomComponentForm): Promise<void> {
@@ -248,21 +238,6 @@ export const materialService = {
       bomCreateRequest: await componentRequest(bomId, form),
     })
     requiredData<Bom>(response.data)
-  },
-
-  async createAnalysisRecord(bomId: string, plannedQuantity: number): Promise<BomAnalysisRecord> {
-    if (!Number.isFinite(plannedQuantity) || plannedQuantity <= 0) {
-      throw new Error('计划生产数量必须大于 0')
-    }
-    const version = await getVersion(bomId)
-    const response = await materialBomApi.addRequirementAnalysis({
-      demandAnalysisCreateRequest: {
-        material_id: idNumber(version.material_id, '物料编号'),
-        production_qty: plannedQuantity,
-        version_id: idNumber(bomId, '版本编号'),
-      },
-    })
-    return mapAnalysisRecord(requiredData<DemandAnalysis>(response.data))
   },
 
   async createBomVersion(form: BomVersionForm): Promise<string> {
@@ -327,16 +302,6 @@ export const materialService = {
     }
   },
 
-  async getLatestAnalysis(bomId: string): Promise<BomAnalysisRecord | undefined> {
-    const response = await materialBomApi.getRequirementAnalysis({
-      versionId: idNumber(bomId, '版本编号'),
-    })
-    if (response.data.code === 404) {
-      return undefined
-    }
-    return mapAnalysisRecord(requiredData<DemandAnalysis>(response.data))
-  },
-
   getMaterial,
 
   async getOptions() {
@@ -358,6 +323,7 @@ export const materialService = {
 
   async getReverseTrace(
     materialCode: string,
+    bomId: string,
     includeHistory = false,
   ): Promise<BomReverseTraceResult[]> {
     const [material, response] = await Promise.all([
@@ -365,6 +331,7 @@ export const materialService = {
       materialBomApi.getReverseTraceData({
         includeHistory,
         materialId: idNumber(materialCode, '物料编号'),
+        versionId: idNumber(bomId, '版本编号'),
       }),
     ])
     return requiredData<NonNullable<typeof response.data.data>>(response.data).map((item) => {
@@ -545,6 +512,29 @@ export const materialService = {
       },
     })
     requiredData<Bom>(response.data)
+  },
+
+  async updateBomVersionExpireDate(bomId: string, expireDate: string): Promise<void> {
+    const version = await getVersion(bomId)
+    const effectiveDate = version.effective_date
+    const versionNo = version.version_no?.trim()
+    if (!effectiveDate || !versionNo) {
+      throw new Error('BOM 版本缺少版本号或生效日期，无法修改')
+    }
+    if (expireDate && expireDate < effectiveDate) {
+      throw new Error('失效日期不能早于生效日期')
+    }
+    const response = await materialBomApi.updateBomVersionData({
+      bomVersionUpdateRequest: {
+        change_reason: version.change_reason,
+        effective_date: effectiveDate,
+        expire_date: expireDate || undefined,
+        material_id: idNumber(version.material_id, '物料编号'),
+        version_id: idNumber(version.version_id, '版本编号'),
+        version_no: versionNo,
+      },
+    })
+    requiredData<BomVersion>(response.data)
   },
 
   async updateMaterial(materialId: string, form: MaterialForm): Promise<MaterialRecord> {

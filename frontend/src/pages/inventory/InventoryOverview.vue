@@ -36,11 +36,16 @@ const materialTypeLabels = {
   raw_material: '原材料',
   semi_finished: '半成品',
 }
-const stockStatusLabels: Record<InventoryStockStatus, string> = {
-  locked: '已锁定',
+type VisibleInventoryStockStatus = Exclude<InventoryStockStatus, 'locked'>
+
+const stockStatusLabels: Record<VisibleInventoryStockStatus, string> = {
   low: '低库存',
   normal: '正常',
   zero: '零库存',
+}
+
+function formatStockDateTime(value?: string | null) {
+  return value?.replace('T', ' ') || '-'
 }
 
 const shortcuts = [
@@ -101,6 +106,9 @@ const statistics = computed(() => [
 const refreshing = computed(() => loading.value || stockLoading.value)
 
 function getStockTagType(status?: InventoryStockStatus) {
+  if (status === 'locked') {
+    return 'success'
+  }
   if (status === 'normal') {
     return 'success'
   }
@@ -121,6 +129,9 @@ function getMaterialTypeLabel(item: InventoryStockData) {
 }
 
 function getStockStatusLabel(item: InventoryStockData) {
+  if (item.status === 'locked') {
+    return stockStatusLabels.normal
+  }
   if (item.status) {
     return stockStatusLabels[item.status]
   }
@@ -258,47 +269,6 @@ onBeforeUnmount(() => {
       </el-card>
     </section>
 
-    <el-card class="stock-query-card" shadow="never">
-      <div class="stock-filters">
-        <el-input-number v-model="stockQuery.materialId" :min="1" placeholder="物料编号" />
-        <el-input
-          v-if="canBrowseCatalog"
-          v-model.trim="stockQuery.materialName"
-          clearable
-          placeholder="物料名称"
-          @keyup.enter="searchStocks"
-        />
-        <el-select
-          v-if="canBrowseCatalog"
-          v-model="stockQuery.materialType"
-          clearable
-          placeholder="物料类型"
-        >
-          <el-option
-            v-for="(label, value) in materialTypeLabels"
-            :key="value"
-            :label="label"
-            :value="value"
-          />
-        </el-select>
-        <el-select
-          v-if="canBrowseCatalog"
-          v-model="stockQuery.status"
-          clearable
-          placeholder="库存状态"
-        >
-          <el-option
-            v-for="(label, value) in stockStatusLabels"
-            :key="value"
-            :label="label"
-            :value="value"
-          />
-        </el-select>
-        <el-button :icon="Search" type="primary" @click="searchStocks">查询</el-button>
-        <el-button @click="resetStockQuery">重置</el-button>
-      </div>
-    </el-card>
-
     <el-alert
       v-if="stockError"
       class="request-error"
@@ -318,6 +288,50 @@ onBeforeUnmount(() => {
           <el-icon><Box /></el-icon><span>物料库存台账</span>
         </div>
       </template>
+      <el-form class="stock-filter-form" inline @submit.prevent="searchStocks">
+        <el-form-item label="物料编号">
+          <el-input-number
+            :controls="false"
+            v-model="stockQuery.materialId"
+            :min="1"
+            placeholder="请输入编号"
+          />
+        </el-form-item>
+        <el-form-item v-if="canBrowseCatalog" label="物料名称">
+          <el-input
+            v-model.trim="stockQuery.materialName"
+            clearable
+            placeholder="请输入名称"
+            @keyup.enter="searchStocks"
+          />
+        </el-form-item>
+        <el-form-item v-if="canBrowseCatalog" label="物料类型">
+          <el-select v-model="stockQuery.materialType" clearable placeholder="全部">
+            <el-option
+              v-for="(label, value) in materialTypeLabels"
+              :key="value"
+              :label="label"
+              :value="value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="canBrowseCatalog" label="库存状态">
+          <el-select v-model="stockQuery.status" clearable placeholder="全部">
+            <el-option
+              v-for="(label, value) in stockStatusLabels"
+              :key="value"
+              :label="label"
+              :value="value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button :icon="Search" :loading="stockLoading" type="primary" @click="searchStocks"
+            >查询</el-button
+          >
+          <el-button @click="resetStockQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
       <div v-loading="stockLoading" class="stock-table-area">
         <EmptyState
           v-if="!stockLoading && !stockError && !stockItems.length"
@@ -336,28 +350,40 @@ onBeforeUnmount(() => {
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="可用数量" min-width="110">
+          <el-table-column label="总库存" width="70">
+            <template #default="{ row }"
+              ><strong>{{ formatNumber(row.availableQty + row.lockedQty) }}</strong>
+              {{ row.unit || '' }}</template
+            >
+          </el-table-column>
+          <el-table-column label="=" width="20" />
+          <el-table-column label="可用数量" width="80">
             <template #default="{ row }"
               ><strong>{{ formatNumber(row.availableQty) }}</strong> {{ row.unit || '' }}</template
             >
           </el-table-column>
-          <el-table-column label="锁定数量" min-width="110">
+          <el-table-column label="+" width="20" />
+          <el-table-column label="锁定数量" min-width="80">
             <template #default="{ row }"
               >{{ formatNumber(row.lockedQty) }} {{ row.unit || '' }}</template
             >
           </el-table-column>
-          <el-table-column label="安全库存" min-width="110">
+          <el-table-column label="安全库存" min-width="80">
             <template #default="{ row }"
               >{{ formatNumber(row.safetyStock) }} {{ row.unit || '' }}</template
             >
           </el-table-column>
-          <el-table-column label="库存状态" min-width="105">
+          <el-table-column label="库存状态" min-width="100">
             <template #default="{ row }">
               <el-tag :type="getStockTagType(row.status)">{{ getStockStatusLabel(row) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="最后入库" min-width="120" prop="lastInDate" />
-          <el-table-column label="最后出库" min-width="120" prop="lastOutDate" />
+          <el-table-column label="最后入库" min-width="160">
+            <template #default="{ row }">{{ formatStockDateTime(row.lastInDate) }}</template>
+          </el-table-column>
+          <el-table-column label="最后出库" min-width="160">
+            <template #default="{ row }">{{ formatStockDateTime(row.lastOutDate) }}</template>
+          </el-table-column>
           <el-table-column fixed="right" label="操作" min-width="80">
             <template #default="{ row }">
               <el-button link type="primary" @click="viewStockDetail(row.materialId)"
@@ -429,57 +455,20 @@ onBeforeUnmount(() => {
             }}</el-tag>
           </div>
           <div>
-            <span>最后入库</span><strong>{{ stockDetail.lastInDate || '-' }}</strong>
+            <span>最后入库</span><strong>{{ formatStockDateTime(stockDetail.lastInDate) }}</strong>
           </div>
           <div>
-            <span>最后出库</span><strong>{{ stockDetail.lastOutDate || '-' }}</strong>
+            <span>最后出库</span><strong>{{ formatStockDateTime(stockDetail.lastOutDate) }}</strong>
           </div>
         </div>
       </div>
     </el-drawer>
-
-    <el-card class="operation-card" shadow="never">
-      <template #header>
-        <div class="card-title">
-          <el-icon><TrendCharts /></el-icon><span>库存作业入口</span>
-        </div>
-      </template>
-      <div class="operation-grid">
-        <button
-          v-for="(shortcut, index) in shortcuts"
-          :key="shortcut.route"
-          class="operation-entry"
-          :class="index % 2 ? 'operation-entry--pink' : 'operation-entry--blue'"
-          type="button"
-          @click="navigateTo(shortcut.route)"
-        >
-          <span class="operation-icon"
-            ><el-icon :size="24"><component :is="shortcut.icon" /></el-icon
-          ></span>
-          <span>
-            <strong>{{ shortcut.title }}</strong>
-            <small>{{ shortcut.description }}</small>
-          </span>
-        </button>
-      </div>
-    </el-card>
-
-    <el-card class="flow-card" shadow="never">
-      <div class="flow-note">
-        <el-icon :size="22"><Box /></el-icon>
-        <span
-          ><strong>推荐作业顺序</strong
-          ><small>计算缺口 → 生成采购草稿 → 跟踪到货 → 锁定生产库存 → 完工入库</small></span
-        >
-      </div>
-    </el-card>
   </PageContainer>
 </template>
 
 <style scoped>
 .request-error,
 .inventory-statistics,
-.stock-query-card,
 .stock-card,
 .operation-card {
   margin-bottom: 16px;
@@ -489,16 +478,55 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
-.stock-filters {
+.stock-filter-form {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
-.stock-filters :deep(.el-input),
-.stock-filters :deep(.el-input-number),
-.stock-filters :deep(.el-select) {
-  width: 150px;
+.stock-filter-form :deep(.el-form-item) {
+  min-width: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+}
+.stock-filter-form :deep(.el-form-item__content) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.stock-filter-form :deep(.el-form-item__label) {
+  flex-shrink: 0;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+.stock-filter-form :deep(.el-form-item:not(:last-child)) {
+  flex: 1 1 150px;
+  max-width: 240px;
+}
+.stock-filter-form :deep(.el-form-item:first-child) {
+  min-width: 180px;
+}
+.stock-filter-form :deep(.el-input),
+.stock-filter-form :deep(.el-input-number),
+.stock-filter-form :deep(.el-select) {
+  width: 100%;
+}
+.stock-filter-form :deep(.el-input-number .el-input__inner) {
+  text-align: left;
+}
+.stock-filter-form :deep(.el-input-number.is-without-controls .el-input__wrapper) {
+  padding-right: 11px;
+  padding-left: 11px;
+}
+.stock-filter-form :deep(.el-form-item:last-child) {
+  flex: 0 0 auto;
+}
+.stock-filter-form :deep(.el-form-item:last-child .el-form-item__content) {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.stock-filter-form :deep(.el-form-item:last-child .el-button + .el-button) {
+  margin-left: 0;
 }
 .stock-table-area {
   min-height: 260px;
@@ -601,8 +629,14 @@ onBeforeUnmount(() => {
   .operation-grid {
     grid-template-columns: 1fr;
   }
-  .stock-filters > * {
-    flex: 1 1 150px;
+  .stock-filter-form {
+    flex-wrap: wrap;
+  }
+  .stock-filter-form :deep(.el-form-item) {
+    flex: 1 1 100%;
+    width: auto;
+    min-width: 0;
+    max-width: none;
   }
   .stock-detail-grid {
     grid-template-columns: 1fr;
