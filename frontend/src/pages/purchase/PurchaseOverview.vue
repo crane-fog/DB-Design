@@ -715,6 +715,7 @@ onBeforeUnmount(() => {
           <div class="toolbar">
             <div class="filters">
               <el-input-number
+                :controls="false"
                 v-model="orderQuery.orderId"
                 clearable
                 :min="1"
@@ -1137,12 +1138,18 @@ onBeforeUnmount(() => {
                   :label="`${material.materialName}${material.unit ? ` (${material.unit})` : ''}`"
                   :value="material.materialId" /></el-select
               ><el-input-number
+                :controls="false"
                 v-model="line.quantity"
                 :min="0.01"
                 :precision="2"
-              /><el-input-number v-model="line.unitPrice" :min="0" :precision="2" /><strong
-                class="line-amount"
-                >{{ formatAmount(line.quantity * line.unitPrice) }}</strong
+              /><el-input-number
+                :controls="false"
+                v-model="line.unitPrice"
+                :min="0"
+                :precision="2"
+              /><strong class="line-amount">{{
+                formatAmount(line.quantity * line.unitPrice)
+              }}</strong
               ><el-button
                 :disabled="orderForm.details.length === 1"
                 text
@@ -1198,6 +1205,7 @@ onBeforeUnmount(() => {
               :value="line.materialId" /></el-select></el-form-item
         ><el-form-item label="收货数量" prop="quantity"
           ><el-input-number
+            :controls="false"
             v-model="receiptForm.quantity"
             :max="receiptRemainingQty"
             :min="0.01"

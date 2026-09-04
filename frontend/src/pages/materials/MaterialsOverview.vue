@@ -59,6 +59,7 @@ const materialForm = reactive<MaterialForm>({
   categoryId: '',
   model: '',
   name: '',
+  safetyStock: undefined,
   type: 'raw',
   unit: '',
 })
@@ -268,6 +269,7 @@ function resetMaterialForm() {
     categoryId: '',
     model: '',
     name: '',
+    safetyStock: undefined,
     type: 'raw',
     unit: '',
   })
@@ -280,6 +282,7 @@ function openMaterialEditor(record?: MaterialRecord) {
       categoryId: record.categoryId,
       model: record.model,
       name: record.name,
+      safetyStock: record.safetyStock,
       type: record.type,
       unit: record.unit,
     })
@@ -634,20 +637,20 @@ watch([reverseBomId, reverseIncludeHistory], () => {
           >
         </div>
         <el-table v-loading="loading" :data="materialResult.items" min-height="360" stripe>
-          <el-table-column label="物料编号" min-width="150" prop="code" /><el-table-column
+          <el-table-column label="物料编号" min-width="80" prop="code" /><el-table-column
             label="名称"
             min-width="180"
             prop="name"
-          /><el-table-column label="类型" min-width="100"
+          /><el-table-column label="类型" min-width="80"
             ><template #default="{ row }">{{
               materialTypeLabel(row.type)
             }}</template></el-table-column
           ><el-table-column label="型号" min-width="120" prop="model" /><el-table-column
             label="单位"
-            min-width="80"
+            min-width="60"
             prop="unit"
           /><el-table-column label="分类" min-width="100" prop="categoryName" />
-          <el-table-column label="当前 BOM" min-width="100"
+          <el-table-column label="当前 BOM" min-width="80"
             ><template #default="{ row }">{{
               row.currentBomVersion || '-'
             }}</template></el-table-column
@@ -855,7 +858,12 @@ watch([reverseBomId, reverseIncludeHistory], () => {
         <el-form inline>
           <BomVersionSelect v-model="analysisBomId" :options="bomOptions" />
           <el-form-item label="计划生产数量">
-            <el-input-number v-model="plannedQuantity" :min="0.01" :precision="2" />
+            <el-input-number
+              :controls="false"
+              v-model="plannedQuantity"
+              :min="0.01"
+              :precision="2"
+            />
           </el-form-item>
           <el-form-item>
             <el-button
@@ -982,7 +990,11 @@ watch([reverseBomId, reverseIncludeHistory], () => {
     <el-dialog v-model="materialDialog" :title="materialDialogTitle" width="560px"
       ><el-form label-width="92px"
         ><p class="form-hint">
-          物料编号由后端自动分配；编辑主数据会保留安全库存、默认供应商和当前 BOM 版本。
+          {{
+            materialEditingId
+              ? '物料编号由后端自动分配；可以调整安全库存，默认供应商和当前 BOM 版本保持不变。'
+              : '物料编号由后端自动分配；安全库存可选，未填写时按 0 处理。'
+          }}
         </p>
         <el-form-item label="物料名称" required
           ><el-input v-model.trim="materialForm.name" /></el-form-item
@@ -1002,7 +1014,14 @@ watch([reverseBomId, reverseIncludeHistory], () => {
               v-for="category in categories"
               :key="category.id"
               :label="category.name"
-              :value="category.id" /></el-select></el-form-item></el-form
+              :value="category.id" /></el-select></el-form-item
+        ><el-form-item label="安全库存"
+          ><el-input-number
+            :controls="false"
+            v-model="materialForm.safetyStock"
+            class="material-safety-stock-input"
+            :min="0"
+            style="width: 100%" /></el-form-item></el-form
       ><template #footer
         ><el-button @click="materialDialog = false">取消</el-button
         ><el-button :loading="materialSaving" type="primary" @click="saveMaterial"
@@ -1027,11 +1046,13 @@ watch([reverseBomId, reverseIncludeHistory], () => {
               :value="material.code" /></el-select></el-form-item
         ><el-form-item label="单位用量" required
           ><el-input-number
+            :controls="false"
             v-model="bomComponentForm.quantity"
             :min="0.0001"
             :precision="4" /></el-form-item
         ><el-form-item label="损耗率" required
           ><el-input-number
+            :controls="false"
             v-model="bomComponentForm.lossRate"
             :max="99.99"
             :min="0"
@@ -1181,11 +1202,16 @@ watch([reverseBomId, reverseIncludeHistory], () => {
 }
 .material-filter-form :deep(.el-form-item:last-child) {
   flex: 0 0 auto;
-  display: flex;
+}
+.material-filter-form :deep(.el-form-item:last-child .el-form-item__content) {
+  flex-wrap: nowrap;
   gap: 8px;
 }
 .material-filter-form :deep(.el-form-item:last-child .el-button + .el-button) {
   margin-left: 0;
+}
+.material-safety-stock-input :deep(.el-input__inner) {
+  text-align: left;
 }
 .table-toolbar,
 .section-heading {

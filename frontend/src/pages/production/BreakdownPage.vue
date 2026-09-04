@@ -261,7 +261,7 @@ onMounted(() => void loadLines())
     >
       <el-form ref="reportFormRef" :model="reportForm" :rules="reportRules" label-width="110px">
         <el-form-item label="生产线编号" prop="lineId">
-          <el-input-number v-model="reportForm.lineId" :min="1" :precision="0" />
+          <el-input-number :controls="false" v-model="reportForm.lineId" :min="1" :precision="0" />
         </el-form-item>
         <el-form-item label="故障类型" prop="faultType">
           <el-input v-model.trim="reportForm.faultType" maxlength="50" />
@@ -290,7 +290,7 @@ onMounted(() => void loadLines())
     >
       <el-form ref="updateFormRef" :model="updateForm" :rules="updateRules" label-width="120px">
         <el-form-item label="故障编号" prop="faultId">
-          <el-input-number v-model="updateForm.faultId" :min="1" :precision="0" />
+          <el-input-number :controls="false" v-model="updateForm.faultId" :min="1" :precision="0" />
         </el-form-item>
         <el-form-item label="处理状态" prop="status">
           <el-select v-model="updateForm.status" style="width: 100%">
@@ -300,7 +300,12 @@ onMounted(() => void loadLines())
           </el-select>
         </el-form-item>
         <el-form-item label="维修负责人 ID" prop="repairerId">
-          <el-input-number v-model="updateForm.repairerId" :min="1" :precision="0" />
+          <el-input-number
+            :controls="false"
+            v-model="updateForm.repairerId"
+            :min="1"
+            :precision="0"
+          />
         </el-form-item>
         <el-form-item v-if="updateForm.status === 'recovered'" label="恢复时间" prop="recoverTime">
           <el-date-picker

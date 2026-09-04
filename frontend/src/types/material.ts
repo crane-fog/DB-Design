@@ -33,7 +33,8 @@ export interface MaterialListQuery extends PageRequest {
   type?: MaterialType
 }
 
-export type MaterialForm = Pick<MaterialRecord, 'categoryId' | 'model' | 'name' | 'type' | 'unit'>
+export type MaterialForm = Pick<MaterialRecord, 'categoryId' | 'model' | 'name' | 'type' | 'unit'> &
+  Partial<Pick<MaterialRecord, 'safetyStock'>>
 
 export interface MaterialBomListItem {
   /** 页面选择的是版本，值对应 version_id；明细 ID 单独存放在 componentId。 */

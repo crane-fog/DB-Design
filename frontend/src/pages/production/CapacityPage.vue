@@ -849,7 +849,12 @@ onMounted(() => {
     >
       <el-form ref="configFormRef" :model="configForm" :rules="configRules" label-width="120px">
         <el-form-item label="产品物料 ID" prop="materialId">
-          <el-input-number v-model="configForm.materialId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="configForm.materialId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="生产线类型" prop="typeId">
           <el-select v-model="configForm.typeId" placeholder="请选择生产线类型" style="width: 100%">
@@ -863,6 +868,7 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="单件工时" prop="unitTime">
           <el-input-number
+            :controls="false"
             v-model="configForm.unitTime"
             :min="0.01"
             :precision="2"
@@ -900,7 +906,12 @@ onMounted(() => {
           </el-select>
         </el-form-item>
         <el-form-item label="负责人用户 ID" prop="managerId">
-          <el-input-number v-model="lineForm.managerId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="lineForm.managerId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="启用日期" prop="startDate">
           <el-date-picker
@@ -957,10 +968,20 @@ onMounted(() => {
           />
         </el-form-item>
         <el-form-item label="生产线 ID" prop="lineId">
-          <el-input-number v-model="calendarForm.lineId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="calendarForm.lineId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="产能配置 ID" prop="configId">
-          <el-input-number v-model="calendarForm.configId" :min="1" style="width: 100%" />
+          <el-input-number
+            :controls="false"
+            v-model="calendarForm.configId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
       </el-form>
       <template #footer>

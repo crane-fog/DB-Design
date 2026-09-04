@@ -2,6 +2,23 @@
   max-width: 1440px;
   margin: 0 auto;
 }
+
+/* Make every number input behave visually like a regular text input. */
+.el-input-number.is-without-controls .el-input__wrapper {
+  padding-right: 11px !important;
+  padding-left: 11px !important;
+}
+.el-input-number--small.is-without-controls .el-input__wrapper {
+  padding-right: 7px !important;
+  padding-left: 7px !important;
+}
+.el-input-number--large.is-without-controls .el-input__wrapper {
+  padding-right: 15px !important;
+  padding-left: 15px !important;
+}
+.el-input-number.is-without-controls .el-input__inner {
+  text-align: left;
+}
 .page-header {
   display: flex;
   align-items: flex-start;

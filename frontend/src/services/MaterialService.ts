@@ -127,11 +127,18 @@ function materialRequest(form: MaterialForm): MaterialCreateRequest {
   if (!form.name.trim() || !form.unit.trim()) {
     throw new Error('请填写物料名称和计量单位')
   }
+  if (
+    form.safetyStock !== undefined &&
+    (!Number.isFinite(form.safetyStock) || form.safetyStock < 0)
+  ) {
+    throw new Error('安全库存必须是大于等于 0 的数字')
+  }
   return {
     category_id: idNumber(form.categoryId, '分类编号'),
     material_name: form.name.trim(),
     material_type: apiMaterialTypes[form.type],
     model: form.model.trim(),
+    safety_stock: form.safetyStock,
     unit: form.unit.trim(),
   }
 }
@@ -146,7 +153,7 @@ function materialUpdateRequest(
     current_version_id: material.currentVersionId ?? undefined,
     default_supplier_id: material.defaultSupplierId ?? undefined,
     material_id: idNumber(material.id, '物料编号'),
-    safety_stock: material.safetyStock,
+    safety_stock: form.safetyStock ?? material.safetyStock,
   }
 }
 
