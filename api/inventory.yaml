@@ -1,4 +1,4 @@
-﻿openapi: 3.0.1
+openapi: 3.0.1
 info:
   title: 库存管理模块 API
   description: 库存管理模块接口定义，覆盖物料缺口计算、库存预警、物料锁定、废弃物料检测和完工入库。
@@ -850,6 +850,8 @@ components:
         operator_id:
           type: integer
           format: int64
+        operator_name:
+          type: string
         consumed_lock_records:
           type: array
           items:
