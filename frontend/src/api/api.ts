@@ -631,6 +631,7 @@ export interface CompletionInboundOrder {
     'batch_no': string;
     'inbound_time': string;
     'operator_id': number;
+    'operator_name'?: string;
     'consumed_lock_records'?: Array<StockLockRecord>;
 }
 export interface CompletionInboundPageData {
