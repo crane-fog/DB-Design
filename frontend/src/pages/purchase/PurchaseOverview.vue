@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { Bell, CirclePlus, Document, Plus, Refresh, Search, Van } from '@element-plus/icons-vue'
+import {
+  Bell,
+  CirclePlus,
+  Document,
+  OfficeBuilding,
+  Plus,
+  Refresh,
+  Search,
+  Van,
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import type {
   PurchaseOrderFormData,
@@ -12,6 +21,8 @@ import type {
   PurchaseReferenceData,
   PurchaseReminderItem,
   PurchaseReminderQuery,
+  PurchaseSupplierQuery,
+  SupplierInfo,
 } from '@/types/purchase'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { formatAmount, formatDateTime, formatNumber } from '@/utils/format'
@@ -27,7 +38,20 @@ import { getErrorMessage } from '@/utils/error'
 import { purchaseService } from '@/services/PurchaseService'
 import { useAuthStore } from '@/stores/auth'
 
-type PurchaseTab = 'orders' | 'receipts' | 'reminders'
+type PurchaseTab = 'orders' | 'receipts' | 'reminders' | 'suppliers'
+
+interface PurchaseOrderLineForm {
+  materialId?: number
+  quantity: number
+  unitPrice: number
+}
+
+interface PurchaseOrderFormModel {
+  buyerId?: number
+  details: PurchaseOrderLineForm[]
+  expectedDate: string
+  supplierId?: number
+}
 
 const orderActionConfig = {
   cancel: {
@@ -70,13 +94,13 @@ const orderQuery = reactive<PurchaseOrderQuery>({ page: 1, pageSize: 10 })
 const orderDialogOpen = ref(false)
 const orderSubmitting = ref(false)
 const orderFormRef = ref<FormInstance>()
-const orderForm = reactive<PurchaseOrderFormData>({
-  buyerId: 0,
-  details: [{ materialId: 0, quantity: 1, unitPrice: 0 }],
+const orderForm = reactive<PurchaseOrderFormModel>({
+  buyerId: undefined,
+  details: [{ materialId: undefined, quantity: 1, unitPrice: 0 }],
   expectedDate: '',
-  supplierId: 0,
+  supplierId: undefined,
 })
-const orderRules: FormRules<PurchaseOrderFormData> = {
+const orderRules: FormRules<PurchaseOrderFormModel> = {
   buyerId: [{ message: '请选择采购员', required: true, trigger: 'change', type: 'number' }],
   expectedDate: [{ message: '请选择预计交货日期', required: true, trigger: 'change' }],
   supplierId: [{ message: '请选择供应商', required: true, trigger: 'change', type: 'number' }],
@@ -127,7 +151,17 @@ const receiptRules: FormRules<PurchaseReceiptFormData> = {
   ],
   quantity: [
     { message: '请输入本次收货数量', required: true, trigger: 'blur', type: 'number' },
-    { message: '收货数量必须大于 0', min: 0.01, trigger: 'blur', type: 'number' },
+    { message: '收货数量必须大于 0', min: 1, trigger: 'blur', type: 'number' },
+    {
+      trigger: ['blur', 'change'],
+      validator: (_rule, value, callback) => {
+        if (!Number.isInteger(value)) {
+          callback(new Error('收货数量必须为整数'))
+          return
+        }
+        callback()
+      },
+    },
   ],
   receiveDate: [{ message: '请选择收货日期', required: true, trigger: 'change' }],
 }
@@ -148,6 +182,14 @@ const reminderForm = reactive<{ remark: string; status: 'received' | 'urged' }>(
   status: 'urged',
 })
 let reminderRequestId = 0
+
+// 供应商
+const supplierLoading = ref(false)
+const supplierError = ref('')
+const supplierItems = ref<SupplierInfo[]>([])
+const supplierTotal = ref(0)
+const supplierQuery = reactive<PurchaseSupplierQuery>({ page: 1, pageSize: 10 })
+let supplierRequestId = 0
 
 const statistics = computed(() => [
   { label: '采购订单总数', value: summary.value?.totalOrderCount },
@@ -184,7 +226,12 @@ const receiptRemainingQty = computed(() => {
   return undefined
 })
 const refreshing = computed(
-  () => summaryLoading.value || orderLoading.value || receiptLoading.value || reminderLoading.value,
+  () =>
+    summaryLoading.value ||
+    orderLoading.value ||
+    receiptLoading.value ||
+    reminderLoading.value ||
+    supplierLoading.value,
 )
 const reminderStatusOptions = computed(() => {
   if (reminderTarget.value?.status === 'urged') {
@@ -309,6 +356,28 @@ async function loadReminders() {
   }
 }
 
+async function loadSuppliers() {
+  const currentRequestId = ++supplierRequestId
+  supplierLoading.value = true
+  supplierError.value = ''
+  try {
+    const result = await purchaseService.listSuppliers(supplierQuery)
+    if (!alive || currentRequestId !== supplierRequestId) {
+      return
+    }
+    supplierItems.value = result.items
+    supplierTotal.value = result.total
+  } catch (error) {
+    if (alive && currentRequestId === supplierRequestId) {
+      supplierError.value = getErrorMessage(error, '供应商列表加载失败')
+    }
+  } finally {
+    if (alive && currentRequestId === supplierRequestId) {
+      supplierLoading.value = false
+    }
+  }
+}
+
 function loadActiveTab() {
   if (activeTab.value === 'orders') {
     void loadOrders()
@@ -318,6 +387,9 @@ function loadActiveTab() {
   }
   if (activeTab.value === 'reminders') {
     void loadReminders()
+  }
+  if (activeTab.value === 'suppliers') {
+    void loadSuppliers()
   }
 }
 
@@ -350,6 +422,11 @@ function resetReminderQuery() {
   void loadReminders()
 }
 
+function resetSupplierQuery() {
+  Object.assign(supplierQuery, { page: 1, supplierId: undefined, supplierName: undefined })
+  void loadSuppliers()
+}
+
 function searchOrders() {
   orderQuery.page = 1
   void loadOrders()
@@ -365,18 +442,23 @@ function searchReminders() {
   void loadReminders()
 }
 
+function searchSuppliers() {
+  supplierQuery.page = 1
+  void loadSuppliers()
+}
+
 function openOrderDialog() {
   Object.assign(orderForm, {
-    buyerId: operatorId.value ?? referenceData.value.buyers[0]?.buyerId ?? 0,
-    details: [{ materialId: 0, quantity: 1, unitPrice: 0 }],
+    buyerId: operatorId.value ?? referenceData.value.buyers[0]?.buyerId,
+    details: [{ materialId: undefined, quantity: 1, unitPrice: 0 }],
     expectedDate: '',
-    supplierId: 0,
+    supplierId: undefined,
   })
   orderDialogOpen.value = true
 }
 
 function addOrderLine() {
-  orderForm.details.push({ materialId: 0, quantity: 1, unitPrice: 0 })
+  orderForm.details.push({ materialId: undefined, quantity: 1, unitPrice: 0 })
 }
 
 function removeOrderLine(index: number) {
@@ -388,7 +470,11 @@ function removeOrderLine(index: number) {
 function handleOrderMaterialChange(index: number) {
   const line = orderForm.details[index]
   if (line) {
-    line.materialId = Number(line.materialId)
+    const materialId = Number(line.materialId)
+    line.materialId = undefined
+    if (Number.isSafeInteger(materialId) && materialId > 0) {
+      line.materialId = materialId
+    }
   }
   const material = referenceData.value.materials.find(
     (item) => item.materialId === line?.materialId,
@@ -420,19 +506,39 @@ function getOverdueLabel(order: PurchaseOrderItem) {
 }
 
 function validateOrderSelections() {
-  if (!Number.isInteger(orderForm.buyerId) || orderForm.buyerId <= 0) {
+  if (
+    typeof orderForm.buyerId !== 'number' ||
+    !Number.isInteger(orderForm.buyerId) ||
+    orderForm.buyerId <= 0
+  ) {
     ElMessage.warning('请选择有效采购员')
     return false
   }
   if (
     orderForm.details.some(
-      (item) => item.materialId <= 0 || item.quantity <= 0 || item.unitPrice < 0,
+      (item) =>
+        typeof item.materialId !== 'number' ||
+        item.materialId <= 0 ||
+        item.quantity <= 0 ||
+        item.unitPrice < 0,
     )
   ) {
     ElMessage.warning('请完整填写采购物料、数量和单价')
     return false
   }
-  if (!Number.isInteger(orderForm.supplierId) || orderForm.supplierId <= 0) {
+  if (
+    orderForm.details.some(
+      (item) => !Number.isInteger(item.materialId) || !Number.isInteger(item.quantity),
+    )
+  ) {
+    ElMessage.warning('物料 ID 和采购数量必须为整数')
+    return false
+  }
+  if (
+    typeof orderForm.supplierId !== 'number' ||
+    !Number.isInteger(orderForm.supplierId) ||
+    orderForm.supplierId <= 0
+  ) {
     ElMessage.warning('请选择有效供应商')
     return false
   }
@@ -444,26 +550,32 @@ function validateOrderSelections() {
   return true
 }
 
-async function saveOrderForm(buyerId: number) {
-  const payload = {
-    buyerId,
-    details: orderForm.details.map((item) => ({ ...item })),
+function buildOrderPayload(): PurchaseOrderFormData {
+  return {
+    buyerId: orderForm.buyerId as number,
+    details: orderForm.details.map((item) => ({
+      materialId: item.materialId as number,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+    })),
     expectedDate: orderForm.expectedDate,
-    supplierId: orderForm.supplierId,
+    supplierId: orderForm.supplierId as number,
   }
-  await purchaseService.createOrder(payload)
+}
+
+async function saveOrderForm() {
+  await purchaseService.createOrder(buildOrderPayload())
   ElMessage.success('采购订单草稿已创建')
 }
 
 async function submitOrderForm() {
-  const { buyerId } = orderForm
   const valid = await orderFormRef.value?.validate().catch(() => false)
   if (!valid || orderSubmitting.value || !validateOrderSelections()) {
     return
   }
   orderSubmitting.value = true
   try {
-    await saveOrderForm(buyerId)
+    await saveOrderForm()
     orderDialogOpen.value = false
     orderQuery.page = 1
     await Promise.all([loadOrders(), loadSummary(), loadReferenceData()])
@@ -649,6 +761,7 @@ onBeforeUnmount(() => {
   reminderRequestId += 1
   referenceRequestId += 1
   summaryRequestId += 1
+  supplierRequestId += 1
 })
 </script>
 
@@ -719,8 +832,10 @@ onBeforeUnmount(() => {
                 v-model="orderQuery.orderId"
                 clearable
                 :min="1"
-                placeholder="订单编号"
+                placeholder="订单 ID"
                 :precision="0"
+                :step="1"
+                step-strictly
               />
               <el-select
                 v-model="orderQuery.supplierId"
@@ -795,7 +910,7 @@ onBeforeUnmount(() => {
               description="当前筛选条件下没有采购订单。"
             />
             <el-table v-else :data="orderItems" stripe>
-              <el-table-column label="订单" min-width="100"
+              <el-table-column label="订单 ID" min-width="100"
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewOrder(row.orderId)"
                     >#{{ row.orderId }}</el-button
@@ -810,7 +925,7 @@ onBeforeUnmount(() => {
                   </div></template
                 ></el-table-column
               >
-              <el-table-column label="下单 / 交期" min-width="190"
+              <el-table-column label="下单 / 交期" min-width="180"
                 ><template #default="{ row }"
                   ><div class="date-cell">
                     <span>{{ row.orderDate }}</span
@@ -821,12 +936,12 @@ onBeforeUnmount(() => {
                   </div></template
                 ></el-table-column
               >
-              <el-table-column label="总金额" min-width="130"
+              <el-table-column label="总金额" min-width="120"
                 ><template #default="{ row }">{{
                   formatAmount(row.totalAmount)
                 }}</template></el-table-column
               >
-              <el-table-column label="采购员" min-width="120"
+              <el-table-column label="采购员" min-width="80"
                 ><template #default="{ row }">{{
                   getBuyerName(row.buyerId)
                 }}</template></el-table-column
@@ -837,11 +952,11 @@ onBeforeUnmount(() => {
                     :percentage="Math.round(row.receiveProgress * 100)"
                     :stroke-width="8" /></template
               ></el-table-column>
-              <el-table-column label="状态" min-width="110"
+              <el-table-column label="状态" min-width="100"
                 ><template #default="{ row }"
                   ><StatusTag :labels="orderStatusLabels" :value="row.status" /></template
               ></el-table-column>
-              <el-table-column fixed="right" label="操作" min-width="250"
+              <el-table-column fixed="right" label="操作" min-width="200"
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewOrder(row.orderId)">详情</el-button
                   ><el-button
@@ -881,6 +996,77 @@ onBeforeUnmount(() => {
           />
         </el-tab-pane>
 
+        <el-tab-pane name="suppliers">
+          <template #label
+            ><span class="tab-label"
+              ><el-icon><OfficeBuilding /></el-icon>供应商列表</span
+            ></template
+          >
+          <div class="toolbar">
+            <div class="filters">
+              <el-input-number
+                :controls="false"
+                v-model="supplierQuery.supplierId"
+                clearable
+                :min="1"
+                placeholder="供应商 ID"
+                :precision="0"
+                :step="1"
+                step-strictly
+              />
+              <el-input
+                v-model.trim="supplierQuery.supplierName"
+                clearable
+                placeholder="供应商名称"
+                style="width: 180px"
+                @keyup.enter="searchSuppliers"
+              />
+              <el-button :icon="Search" type="primary" @click="searchSuppliers">查询</el-button>
+              <el-button @click="resetSupplierQuery">重置</el-button>
+            </div>
+          </div>
+          <el-alert
+            v-if="supplierError"
+            class="list-error"
+            :closable="false"
+            :title="supplierError"
+            type="error"
+            ><template #default
+              ><el-button link type="primary" @click="loadSuppliers">重试</el-button></template
+            ></el-alert
+          >
+          <div v-loading="supplierLoading" class="table-area">
+            <EmptyState
+              v-if="!supplierLoading && !supplierError && !supplierItems.length"
+              description="当前筛选条件下没有供应商。"
+            />
+            <el-table v-else :data="supplierItems" stripe>
+              <el-table-column label="供应商 ID" min-width="120" prop="supplierId" />
+              <el-table-column label="供应商名称" min-width="220" prop="supplierName" />
+              <el-table-column label="联系人" min-width="160"
+                ><template #default="{ row }">{{
+                  row.contactPerson || '-'
+                }}</template></el-table-column
+              >
+              <el-table-column label="联系电话" min-width="180"
+                ><template #default="{ row }">{{
+                  row.contactPhone || '-'
+                }}</template></el-table-column
+              >
+            </el-table>
+          </div>
+          <el-pagination
+            v-if="supplierTotal"
+            v-model:current-page="supplierQuery.page"
+            v-model:page-size="supplierQuery.pageSize"
+            :page-sizes="[10, 20, 50]"
+            background
+            layout="total, sizes, prev, pager, next"
+            :total="supplierTotal"
+            @change="loadSuppliers"
+          />
+        </el-tab-pane>
+
         <el-tab-pane name="receipts">
           <template #label
             ><span class="tab-label"
@@ -889,7 +1075,11 @@ onBeforeUnmount(() => {
           >
           <div class="toolbar">
             <div class="filters">
-              <el-select v-model="receiptQuery.orderId" clearable filterable placeholder="采购订单"
+              <el-select
+                v-model="receiptQuery.orderId"
+                clearable
+                filterable
+                placeholder="采购订单 ID"
                 ><el-option
                   v-for="order in referenceData.orders"
                   :key="order.orderId"
@@ -923,7 +1113,7 @@ onBeforeUnmount(() => {
             />
             <el-table v-else :data="receiptItems" stripe
               ><el-table-column label="收货 ID" min-width="100" prop="receiveId" /><el-table-column
-                label="采购订单"
+                label="采购订单 ID"
                 min-width="110"
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewOrder(row.orderId)"
@@ -964,7 +1154,11 @@ onBeforeUnmount(() => {
           >
           <div class="toolbar">
             <div class="filters">
-              <el-select v-model="reminderQuery.orderId" clearable filterable placeholder="采购订单"
+              <el-select
+                v-model="reminderQuery.orderId"
+                clearable
+                filterable
+                placeholder="采购订单 ID"
                 ><el-option
                   v-for="order in referenceData.orders"
                   :key="order.orderId"
@@ -1004,7 +1198,7 @@ onBeforeUnmount(() => {
             />
             <el-table v-else :data="reminderItems" stripe
               ><el-table-column label="提醒 ID" min-width="100" prop="reminderId" /><el-table-column
-                label="采购订单"
+                label="采购订单 ID"
                 min-width="110"
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewOrder(row.orderId)"
@@ -1092,13 +1286,13 @@ onBeforeUnmount(() => {
               default-first-option
               filterable
               :loading="referenceLoading"
-              placeholder="选择供应商或输入编号"
+              placeholder="选择供应商"
               @change="orderForm.supplierId = Number($event)"
             >
               <el-option
                 v-for="supplier in activeSuppliers"
                 :key="supplier.supplierId"
-                :label="`${supplier.supplierName} · ${supplier.contactPerson || '暂无联系人'}`"
+                :label="`${supplier.supplierName}`"
                 :value="supplier.supplierId"
               />
             </el-select>
@@ -1124,7 +1318,7 @@ onBeforeUnmount(() => {
                 allow-create
                 default-first-option
                 filterable
-                placeholder="选择物料或输入编号"
+                placeholder="选择物料"
                 @change="handleOrderMaterialChange(index)"
                 ><el-option
                   v-for="material in referenceData.materials"
@@ -1140,8 +1334,10 @@ onBeforeUnmount(() => {
               ><el-input-number
                 :controls="false"
                 v-model="line.quantity"
-                :min="0.01"
-                :precision="2"
+                :min="1"
+                :precision="0"
+                :step="1"
+                step-strictly
               /><el-input-number
                 :controls="false"
                 v-model="line.unitPrice"
@@ -1178,11 +1374,11 @@ onBeforeUnmount(() => {
       width="min(92vw, 480px)"
       @closed="receiptFormRef?.resetFields()"
       ><el-form ref="receiptFormRef" :model="receiptForm" :rules="receiptRules" label-width="105px"
-        ><el-form-item label="采购订单" prop="orderId"
+        ><el-form-item label="采购订单 ID" prop="orderId"
           ><el-select
             v-model="receiptForm.orderId"
             filterable
-            placeholder="选择待收货订单"
+            placeholder="选择待收货订单 ID"
             style="width: 100%"
             @change="handleReceiptOrderChange"
             ><el-option
@@ -1208,8 +1404,10 @@ onBeforeUnmount(() => {
             :controls="false"
             v-model="receiptForm.quantity"
             :max="receiptRemainingQty"
-            :min="0.01"
-            :precision="2"
+            :min="1"
+            :precision="0"
+            :step="1"
+            step-strictly
             style="width: 100%" /></el-form-item
         ><el-form-item label="收货日期" prop="receiveDate"
           ><el-date-picker
@@ -1251,7 +1449,7 @@ onBeforeUnmount(() => {
         <template v-if="selectedOrder"
           ><div class="detail-summary">
             <div>
-              <span>订单编号</span><strong>#{{ selectedOrder.orderId }}</strong>
+              <span>订单 ID</span><strong>#{{ selectedOrder.orderId }}</strong>
             </div>
             <div>
               <span>供应商</span><strong>{{ selectedOrder.supplier.supplierName }}</strong>

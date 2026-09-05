@@ -534,7 +534,7 @@ onMounted(() => {
             type="error"
           />
           <el-table v-else v-loading="externalLoading" :data="externalResult.items" stripe>
-            <el-table-column label="订单号" min-width="90">
+            <el-table-column label="外部订单 ID" min-width="110">
               <template #default="{ row }">#{{ row.extOrderId }}</template>
             </el-table-column>
             <el-table-column v-if="canManageOrders" label="客户" min-width="150">
@@ -821,7 +821,7 @@ onMounted(() => {
         <el-card class="section-card" shadow="never">
           <p>保存调整方案及关联订单；订单计划与生产日历在对应页面维护。</p>
           <el-form :model="balanceForm" label-position="top">
-            <el-form-item label="受影响生产订单">
+            <el-form-item label="受影响生产订单 ID">
               <el-input
                 v-model.trim="balanceForm.affectedOrders"
                 placeholder="多个订单 ID 用逗号分隔"
@@ -852,7 +852,7 @@ onMounted(() => {
             <el-descriptions-item label="调整人"
               >#{{ balanceResult.operatorId }}</el-descriptions-item
             >
-            <el-descriptions-item label="受影响订单">
+            <el-descriptions-item label="受影响生产订单 ID">
               {{ balanceResult.affectedOrders.map((id) => `#${id}`).join('、') }}
             </el-descriptions-item>
             <el-descriptions-item label="调整前">
@@ -908,7 +908,7 @@ onMounted(() => {
                 <el-option label="故障" value="fault" />
               </el-select>
             </el-form-item>
-            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前订单">
+            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前订单 ID">
               <el-input-number :controls="false" v-model="lineStatusForm.currentOrderId" :min="0" />
             </el-form-item>
             <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前产品">
@@ -961,7 +961,7 @@ onMounted(() => {
             <el-descriptions-item label="更新时间">
               {{ formatDateTime(lineStatusResult.updatedTime) }}
             </el-descriptions-item>
-            <el-descriptions-item label="当前订单">
+            <el-descriptions-item label="当前订单 ID">
               {{ lineStatusResult.currentOrderId ? `#${lineStatusResult.currentOrderId}` : '-' }}
             </el-descriptions-item>
             <el-descriptions-item label="当前产品">

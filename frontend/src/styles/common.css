@@ -17,7 +17,7 @@
   padding-left: 15px !important;
 }
 .el-input-number.is-without-controls .el-input__inner {
-  text-align: left;
+  text-align: left !important;
 }
 .page-header {
   display: flex;

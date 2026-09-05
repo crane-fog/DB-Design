@@ -96,6 +96,12 @@ namespace Org.OpenAPITools.Models
         public long OperatorId { get; set; }
 
         /// <summary>
+        /// Gets or Sets OperatorName
+        /// </summary>
+        [DataMember(Name="operator_name", EmitDefaultValue=false)]
+        public string OperatorName { get; set; }
+
+        /// <summary>
         /// Gets or Sets ConsumedLockRecords
         /// </summary>
         [DataMember(Name="consumed_lock_records", EmitDefaultValue=false)]
@@ -119,6 +125,7 @@ namespace Org.OpenAPITools.Models
             sb.Append("  BatchNo: ").Append(BatchNo).Append("\n");
             sb.Append("  InboundTime: ").Append(InboundTime).Append("\n");
             sb.Append("  OperatorId: ").Append(OperatorId).Append("\n");
+            sb.Append("  OperatorName: ").Append(OperatorName).Append("\n");
             sb.Append("  ConsumedLockRecords: ").Append(ConsumedLockRecords).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
@@ -207,6 +214,11 @@ namespace Org.OpenAPITools.Models
                     OperatorId.Equals(other.OperatorId)
                 ) && 
                 (
+                    OperatorName == other.OperatorName ||
+                    OperatorName != null &&
+                    OperatorName.Equals(other.OperatorName)
+                ) && 
+                (
                     ConsumedLockRecords == other.ConsumedLockRecords ||
                     ConsumedLockRecords != null &&
                     other.ConsumedLockRecords != null &&
@@ -244,6 +256,8 @@ namespace Org.OpenAPITools.Models
                     hashCode = hashCode * 59 + InboundTime.GetHashCode();
                     
                     hashCode = hashCode * 59 + OperatorId.GetHashCode();
+                    if (OperatorName != null)
+                    hashCode = hashCode * 59 + OperatorName.GetHashCode();
                     if (ConsumedLockRecords != null)
                     hashCode = hashCode * 59 + ConsumedLockRecords.GetHashCode();
                 return hashCode;

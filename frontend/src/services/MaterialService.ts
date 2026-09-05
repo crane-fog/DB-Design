@@ -8,6 +8,7 @@ import type {
   MaterialCreateRequest,
   MaterialDetail,
   MaterialUpdateRequest,
+  SupplierDetail,
 } from '@/api'
 import { type ApiEnvelope, type PageResult, mapPageResult, unwrap } from '@/services/pagination'
 import type {
@@ -22,9 +23,10 @@ import type {
   MaterialForm,
   MaterialListQuery,
   MaterialRecord,
+  MaterialSupplierOption,
   MaterialType,
 } from '@/types/material'
-import { materialBomApi } from '@/api/client'
+import { materialBomApi, purchaseApi } from '@/api/client'
 
 const pageSize = 200
 const apiMaterialTypes = {
@@ -133,8 +135,15 @@ function materialRequest(form: MaterialForm): MaterialCreateRequest {
   ) {
     throw new Error('安全库存必须是大于等于 0 的数字')
   }
+  if (
+    form.defaultSupplierId !== undefined &&
+    (!Number.isSafeInteger(form.defaultSupplierId) || form.defaultSupplierId <= 0)
+  ) {
+    throw new Error('请选择有效的默认供应商')
+  }
   return {
     category_id: idNumber(form.categoryId, '分类编号'),
+    default_supplier_id: form.defaultSupplierId,
     material_name: form.name.trim(),
     material_type: apiMaterialTypes[form.type],
     model: form.model.trim(),
@@ -430,6 +439,16 @@ export const materialService = {
     )
   },
 
+  async listSuppliers(): Promise<MaterialSupplierOption[]> {
+    const suppliers = await listAll<SupplierDetail>((page) =>
+      purchaseApi.listSupplierData({ page, pageSize }),
+    )
+    return suppliers.map((supplier) => ({
+      id: supplier.supplier_id,
+      name: supplier.supplier_name,
+    }))
+  },
+
   async removeBomComponent(componentId: string): Promise<void> {
     const response = await materialBomApi.deleteBomData({
       bomDeleteRequest: { bom_id: idNumber(componentId, 'BOM 明细编号') },
@@ -496,7 +515,10 @@ export const materialService = {
     const material = await getMaterial(String(idNumber(version.material_id, '物料编号')))
     const response = await materialBomApi.updateMaterialData({
       materialUpdateRequest: {
-        ...materialUpdateRequest(material, material),
+        ...materialUpdateRequest(material, {
+          ...material,
+          defaultSupplierId: material.defaultSupplierId ?? undefined,
+        }),
         current_version_id: idNumber(version.version_id, '版本编号'),
       },
     })

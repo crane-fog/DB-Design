@@ -11,6 +11,7 @@ import type {
   MaterialForm,
   MaterialListQuery,
   MaterialRecord,
+  MaterialSupplierOption,
   MaterialType,
 } from '@/types/material'
 import { EditPen, Plus, Refresh, Search, View } from '@element-plus/icons-vue'
@@ -34,6 +35,8 @@ const auth = useAuthStore()
 const loading = ref(false)
 const error = ref('')
 const categories = ref<MaterialCategory[]>([])
+const supplierOptions = ref<MaterialSupplierOption[]>([])
+const supplierLoading = ref(false)
 const materialOptions = ref<MaterialRecord[]>([])
 const bomOptions = ref<MaterialBomListItem[]>([])
 const materialPage = ref(1)
@@ -57,6 +60,7 @@ const materialEditingId = ref<string>()
 const materialSaving = ref(false)
 const materialForm = reactive<MaterialForm>({
   categoryId: '',
+  defaultSupplierId: undefined,
   model: '',
   name: '',
   safetyStock: undefined,
@@ -267,6 +271,7 @@ async function openMaterialDetail(record: MaterialRecord) {
 function resetMaterialForm() {
   Object.assign(materialForm, {
     categoryId: '',
+    defaultSupplierId: undefined,
     model: '',
     name: '',
     safetyStock: undefined,
@@ -280,6 +285,7 @@ function openMaterialEditor(record?: MaterialRecord) {
   if (record) {
     Object.assign(materialForm, {
       categoryId: record.categoryId,
+      defaultSupplierId: record.defaultSupplierId ?? undefined,
       model: record.model,
       name: record.name,
       safetyStock: record.safetyStock,
@@ -288,8 +294,23 @@ function openMaterialEditor(record?: MaterialRecord) {
     })
   } else {
     resetMaterialForm()
+    void loadSupplierOptions()
   }
   materialDialog.value = true
+}
+
+async function loadSupplierOptions() {
+  if (supplierLoading.value || supplierOptions.value.length) {
+    return
+  }
+  supplierLoading.value = true
+  try {
+    supplierOptions.value = await materialService.listSuppliers()
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '供应商列表加载失败'))
+  } finally {
+    supplierLoading.value = false
+  }
 }
 
 async function saveMaterial() {
@@ -993,7 +1014,7 @@ watch([reverseBomId, reverseIncludeHistory], () => {
           {{
             materialEditingId
               ? '物料编号由后端自动分配；可以调整安全库存，默认供应商和当前 BOM 版本保持不变。'
-              : '物料编号由后端自动分配；安全库存可选，未填写时按 0 处理。'
+              : '物料编号由后端自动分配；安全库存和默认供应商均为可选项。'
           }}
         </p>
         <el-form-item label="物料名称" required
@@ -1015,6 +1036,19 @@ watch([reverseBomId, reverseIncludeHistory], () => {
               :key="category.id"
               :label="category.name"
               :value="category.id" /></el-select></el-form-item
+        ><el-form-item v-if="!materialEditingId" label="默认供应商"
+          ><el-select
+            v-model="materialForm.defaultSupplierId"
+            clearable
+            filterable
+            :loading="supplierLoading"
+            placeholder="请选择默认供应商"
+            style="width: 100%"
+            ><el-option
+              v-for="supplier in supplierOptions"
+              :key="supplier.id"
+              :label="`${supplier.name}（#${supplier.id}）`"
+              :value="supplier.id" /></el-select></el-form-item
         ><el-form-item label="安全库存"
           ><el-input-number
             :controls="false"

@@ -405,7 +405,7 @@ onMounted(() => {
       </el-alert>
 
       <el-table v-else v-loading="loading" :data="result.items" min-height="320" stripe>
-        <el-table-column label="订单号" min-width="90" prop="orderId" />
+        <el-table-column label="订单 ID" min-width="90" prop="orderId" />
         <el-table-column label="产品" min-width="150">
           <template #default="{ row }">{{
             row.materialName || `物料 #${row.materialId}`
@@ -570,7 +570,7 @@ onMounted(() => {
       <el-alert v-if="detailError" :closable="false" show-icon :title="detailError" type="error" />
       <el-skeleton v-else-if="detailLoading" animated :rows="6" />
       <el-descriptions v-else-if="detail" border :column="1">
-        <el-descriptions-item label="订单号">{{ detail.orderId }}</el-descriptions-item>
+        <el-descriptions-item label="订单 ID">{{ detail.orderId }}</el-descriptions-item>
         <el-descriptions-item label="产品">{{
           detail.materialName || `物料 #${detail.materialId}`
         }}</el-descriptions-item>

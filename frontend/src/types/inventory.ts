@@ -194,6 +194,7 @@ export interface CompletionInboundItem {
   inboundTime: string
   materialId: number
   operatorId: number
+  operatorName?: string
   orderId: number
   productName?: string
   qualifiedQty: number

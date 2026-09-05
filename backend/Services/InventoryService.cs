@@ -131,9 +131,10 @@ public class InventoryService(
     private const string InboundColumns = @"
         SELECT i.INBOUND_ID, i.ORDER_ID, i.MATERIAL_ID, m.MATERIAL_NAME,
                i.VERSION_ID, i.FINISH_QTY, i.QUALIFIED_QTY, i.BATCH_NO,
-               i.INBOUND_TIME, i.OPERATOR_ID
+               i.INBOUND_TIME, i.OPERATOR_ID, u.USER_NAME
         FROM FINISH_INBOUND i
-        LEFT JOIN MATERIAL m ON m.MATERIAL_ID = i.MATERIAL_ID";
+        LEFT JOIN MATERIAL m ON m.MATERIAL_ID = i.MATERIAL_ID
+        LEFT JOIN SYS_USER u ON u.USER_ID = i.OPERATOR_ID";
 
     // ═══════════════════════════════════════════════════════════════
     //  getMaterialStockData（material_bom.yaml 中的 B 主责端点）
@@ -1081,6 +1082,7 @@ public class InventoryService(
             var requests = request.Items.Select(item =>
                 new ProductionRequirement(item.MaterialId, item.VersionId, item.ProductionQty)).ToList();
             allRecords.AddRange(requirementNetting.Calculate(conn, null, requests).Items
+                .Where(item => item.MaterialType is "原材料" or "辅料")
                 .Select(item => new MaterialShortageItem
                 {
                     MaterialId = item.MaterialId,
@@ -1213,6 +1215,7 @@ public class InventoryService(
             BatchNo = reader.IsDBNull(7) ? null! : reader.GetString(7),
             InboundTime = reader.GetDateTime(8),
             OperatorId = Convert.ToInt64(reader.GetValue(9)),
+            OperatorName = reader.IsDBNull(10) ? null! : reader.GetString(10),
             ConsumedLockRecords = consumedLocks,
         };
     }

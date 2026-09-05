@@ -141,6 +141,7 @@ function toInbound(item: CompletionInboundOrder): CompletionInboundItem {
     inboundTime: item.inbound_time,
     materialId: item.material_id,
     operatorId: item.operator_id,
+    operatorName: optionalText(item.operator_name),
     orderId: item.order_id,
     productName: optionalText(item.product_name),
     qualifiedQty: item.qualified_qty,

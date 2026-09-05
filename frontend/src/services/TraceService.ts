@@ -23,7 +23,6 @@ import { inventoryApi, productionApi, purchaseApi, qualityTraceabilityApi } from
 import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
-export type SuggestedActionValue = 'freeze' | 'observe' | 'recall'
 
 export interface BatchConsumptionQuery extends PageRequest {
   itemId?: number
@@ -81,7 +80,6 @@ export interface MaterialBatchTraceItem {
 
 export interface ProductBatchTraceQuery {
   batchNo?: string
-  includeSupplier?: boolean
   orderId?: number
 }
 
@@ -109,13 +107,6 @@ export interface ProductBatchTraceItem {
   inboundRecords?: CompletionInboundOrder[]
 }
 
-export interface QualityImpactAnalyzeFormData {
-  itemIds?: number[]
-  materialId?: number
-  receiveDateEnd?: string
-  receiveDateStart?: string
-}
-
 export interface TraceSupplierOption {
   supplierId: number
   supplierName: string
@@ -130,13 +121,6 @@ export interface TraceConsumptionReferenceData {
     supplierName?: string
   }[]
   suppliers?: TraceSupplierOption[]
-}
-
-export interface QualityImpactResult {
-  affectedBatchCount?: number
-  affectedOrderCount?: number
-  affectedProducts: AffectedProductItem[]
-  suggestedAction?: SuggestedActionValue
 }
 
 function toBatchConsumption(record: BatchConsumption): BatchConsumptionItem {
@@ -238,28 +222,6 @@ function assertConsumptionId(consumptionId: number) {
 
 /** 质量追溯只通过生成的 API 访问真实后端。 */
 export const traceService = {
-  async analyzeQualityImpact(form: QualityImpactAnalyzeFormData): Promise<QualityImpactResult> {
-    let itemIds: number[] | undefined = undefined
-    if (form.itemIds?.length) {
-      ;({ itemIds } = form)
-    }
-    const response = await qualityTraceabilityApi.analyzeQualityImpact({
-      qualityImpactAnalyzeRequest: {
-        item_ids: itemIds,
-        material_id: form.materialId,
-        receive_date_end: form.receiveDateEnd,
-        receive_date_start: form.receiveDateStart,
-      },
-    })
-    const data = requireData(response.data)
-    return {
-      affectedBatchCount: optionalNumber(data.affected_batch_count),
-      affectedOrderCount: optionalNumber(data.affected_order_count),
-      affectedProducts: (data.affected_products ?? []).map(toAffectedProduct),
-      suggestedAction: data.suggested_action,
-    }
-  },
-
   async createBatchConsumption(form: BatchConsumptionCreateFormData) {
     const response = await qualityTraceabilityApi.addBatchConsumption({
       batchConsumptionCreateRequest: {
@@ -277,16 +239,6 @@ export const traceService = {
       batchConsumptionDeleteRequest: { consumption_id: consumptionId },
     })
     unwrap(response.data)
-  },
-
-  async getBatchConsumption(
-    consumptionId: number,
-    query: Pick<BatchConsumptionQuery, 'itemId' | 'orderId'> = {},
-  ): Promise<BatchConsumptionItem> {
-    assertConsumptionId(consumptionId)
-    void query
-    const response = await qualityTraceabilityApi.getBatchConsumption({ consumptionId })
-    return toBatchConsumption(requireData(response.data))
   },
 
   async listBatchConsumption(
@@ -363,7 +315,7 @@ export const traceService = {
   async traceProductBatch(query: ProductBatchTraceQuery): Promise<ProductBatchTraceItem> {
     const response = await qualityTraceabilityApi.traceProductBatch({
       batchNo: query.batchNo,
-      includeSupplier: query.includeSupplier,
+      includeSupplier: true,
       orderId: query.orderId,
     })
     const data = requireData(response.data)
