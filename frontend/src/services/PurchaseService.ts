@@ -31,6 +31,8 @@ import type {
   PurchaseReferenceData,
   PurchaseReminderItem,
   PurchaseReminderQuery,
+  PurchaseSupplierQuery,
+  SupplierInfo,
 } from '@/types/purchase'
 import { materialBomApi, purchaseApi } from '@/api/client'
 import { cleanQuery } from '@/services/request'
@@ -91,6 +93,15 @@ function toReminder(item: PurchaseOverdueReminder): PurchaseReminderItem {
     remindTime: item.remind_time,
     reminderId: item.reminder_id,
     status: item.status,
+  }
+}
+
+function toSupplier(item: SupplierDetail): SupplierInfo {
+  return {
+    contactPerson: optionalText(item.contact_person),
+    contactPhone: optionalText(item.contact_phone),
+    supplierId: item.supplier_id,
+    supplierName: item.supplier_name,
   }
 }
 
@@ -386,12 +397,7 @@ export const purchaseService = {
       }
       materials.push(...materialMap.values())
     }
-    const suppliers = supplierItems.map((supplier) => ({
-      contactPerson: optionalText(supplier.contact_person),
-      contactPhone: optionalText(supplier.contact_phone),
-      supplierId: supplier.supplier_id,
-      supplierName: supplier.supplier_name,
-    }))
+    const suppliers = supplierItems.map(toSupplier)
     const buyers = buyerItems.map((buyer) => ({
       buyerId: buyer.buyer_id,
       buyerName: buyer.buyer_name,
@@ -483,6 +489,18 @@ export const purchaseService = {
       normalizedQuery,
       toReminder,
     )
+  },
+
+  async listSuppliers(query: PurchaseSupplierQuery) {
+    const normalizedQuery = cleanQuery(query)
+    const response = await purchaseApi.listSupplierData({
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
+      supplierId: normalizedQuery.supplierId,
+      supplierName: normalizedQuery.supplierName,
+    })
+    const payload = requireData(response.data as ApiEnvelope<unknown>)
+    return mapPageResult<SupplierDetail, SupplierInfo>(payload, normalizedQuery, toSupplier)
   },
 
   async submitOrder(orderId: number, operatorId: number) {

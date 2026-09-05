@@ -312,19 +312,6 @@ const adminRoutes: RouteRecordRaw[] = [
     path: 'trace/material',
   },
   {
-    component: () => import('@/pages/trace/QualityImpactPage.vue'),
-    meta: {
-      module: 'trace',
-      pageOrder: 16,
-      permission: PERMISSIONS.trace.view,
-      requiresAuth: true,
-      showInMenu: true,
-      title: '质量影响分析',
-    },
-    name: 'trace-impact',
-    path: 'trace/impact',
-  },
-  {
     component: () => import('@/pages/system/SystemOverview.vue'),
     meta: {
       icon: 'system',

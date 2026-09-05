@@ -644,7 +644,7 @@ onBeforeUnmount(() => {
                 :controls="false"
                 v-model="lockQuery.orderId"
                 :min="1"
-                placeholder="订单 ID"
+                placeholder="生产订单 ID"
               />
               <el-input-number
                 :controls="false"
@@ -679,7 +679,7 @@ onBeforeUnmount(() => {
             />
             <el-table v-else :data="lockItems" stripe>
               <el-table-column label="锁定 ID" min-width="90" prop="lockId" /><el-table-column
-                label="生产订单"
+                label="生产订单 ID"
                 min-width="110"
                 ><template #default="{ row }">#{{ row.orderId }}</template></el-table-column
               >
@@ -890,19 +890,19 @@ onBeforeUnmount(() => {
       width="min(94vw, 680px)"
       @closed="lockFormRef?.resetFields()"
       ><el-form ref="lockFormRef" :model="lockForm" :rules="lockRules" label-width="100px"
-        ><el-form-item label="生产订单" prop="orderId"
+        ><el-form-item label="生产订单 ID" prop="orderId"
           ><el-input-number
             :controls="false"
             v-if="!referenceData.productionOrders.length"
             v-model="lockForm.orderId"
             :min="1"
             :precision="0"
-            placeholder="输入生产订单编号" /><el-select
+            placeholder="输入生产订单 ID" /><el-select
             v-else
             v-model="lockForm.orderId"
             filterable
             :loading="referenceLoading"
-            placeholder="选择可执行订单"
+            placeholder="选择可执行订单 ID"
             style="width: 100%"
             ><el-option
               v-for="order in lockOrderOptions"

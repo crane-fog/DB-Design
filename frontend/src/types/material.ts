@@ -7,6 +7,11 @@ export interface MaterialCategory {
   name: string
 }
 
+export interface MaterialSupplierOption {
+  id: number
+  name: string
+}
+
 export interface MaterialRecord {
   categoryId: string
   categoryName: string
@@ -34,7 +39,7 @@ export interface MaterialListQuery extends PageRequest {
 }
 
 export type MaterialForm = Pick<MaterialRecord, 'categoryId' | 'model' | 'name' | 'type' | 'unit'> &
-  Partial<Pick<MaterialRecord, 'safetyStock'>>
+  Partial<Pick<MaterialRecord, 'safetyStock'>> & { defaultSupplierId?: number }
 
 export interface MaterialBomListItem {
   /** 页面选择的是版本，值对应 version_id；明细 ID 单独存放在 componentId。 */

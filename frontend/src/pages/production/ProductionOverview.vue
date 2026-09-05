@@ -37,18 +37,18 @@ const runningLines = ref<number>()
 
 const shortcuts: OverviewShortcut[] = [
   {
-    description: '维护生产订单，审核、开工、完工与取消。',
-    icon: Tickets,
-    permission: 'production:orders',
-    route: '/production/orders',
-    title: '生产订单',
-  },
-  {
     description: '配置产品产能、生产线、线型与排产日历。',
     icon: Odometer,
     permission: 'production:capacity',
     route: '/production/capacity',
     title: '产能配置',
+  },
+  {
+    description: '维护生产订单，审核、开工、完工与取消。',
+    icon: Tickets,
+    permission: 'production:orders',
+    route: '/production/orders',
+    title: '生产订单',
   },
   {
     description: '查看产线状态，上报故障并按编号处理。',

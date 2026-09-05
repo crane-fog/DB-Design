@@ -25,7 +25,7 @@
 
 ## 2. Agent 执行规范
 
-无论任务看起来多小，Agent 都要判断改动类型：前端 / 后端 / API 契约，然后按以下流程执行。
+如果任务很小，几乎不可能出问题，则不必执行格式化和编译检查等操作。
 
 ### 2.1 改前端
 
@@ -41,7 +41,7 @@
 
 1. 先改 `api/openapi.yaml`。
 2. 检查当前不在 `main` 分支。
-3. 提交 git 并 push 到当前分支，触发 CI/CD 流水线 `gen-api-code.yml`。
+3. 指示用户提交 git 并 push 到当前分支，触发 CI/CD 流水线 `gen-api-code.yml`。
 4. 等待流水线自动提交生成代码到当前分支。
 5. 执行 `git pull` 拉取生成后的代码。
 6. 对后端代码做适配：当前流水线设定中，后端仅生成 API 数据模型，需要修改 `backend/Controllers/*` 下的 API 路由来添加业务逻辑。
@@ -50,12 +50,12 @@
 
 ### 2.4 git 提交规范
 
-1. 必须在非 main 分支进行开发，在开始前检查当前分支。
+1. 必须在非 main 分支进行开发。
 2. 每次提交必须包含简洁但明确的 commit message，需遵循 Commitizen 规范（例如：`feat: add user login`、`fix: correct typo in database schema`）。
 3. 进行 git 提交前先执行 `pre-commit install` 确保 git hooks 已安装。
 4. 进行 git 提交前先依次执行 `git fetch origin`、`git rebase origin/main`，确保分支与 main 的同步，避免出现混乱的提交历史。
 5. 如提交被 `pre-commit` 检查拦截，必须修复问题后再提交，不得绕过检查。
-6. 在提交了一些 commit 并 push 到远程分支后，引导用户发起 PR 到 main 分支。
+6. 只能做只读的 git 操作，除非用户主动要求或明确授权。
 
 ## 3. 禁止项
 

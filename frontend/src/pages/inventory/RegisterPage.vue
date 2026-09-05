@@ -80,7 +80,7 @@ const formRules: FormRules<CompletionInboundFormData> = {
     { message: '请输入完工数量', required: true, trigger: 'blur', type: 'number' },
     { message: '完工数量必须大于 0', min: 0.01, trigger: 'blur', type: 'number' },
   ],
-  materialId: [{ message: '请选择成品物料', required: true, trigger: 'change', type: 'number' }],
+  materialId: [{ message: '请选择产出物料', required: true, trigger: 'change', type: 'number' }],
   orderId: [{ message: '请选择生产订单', required: true, trigger: 'change', type: 'number' }],
   qualifiedQty: [
     {
@@ -110,7 +110,7 @@ async function loadReferenceData() {
     }
   } catch (requestError) {
     if (alive && currentRequestId === referenceRequestId) {
-      referenceError.value = getErrorMessage(requestError, '生产订单与成品选项加载失败')
+      referenceError.value = getErrorMessage(requestError, '生产订单与产出物料选项加载失败')
     }
   } finally {
     if (alive && currentRequestId === referenceRequestId) {
@@ -228,7 +228,7 @@ async function submitInbound() {
     productionOrder &&
     (productionOrder.materialId !== form.materialId || productionOrder.versionId !== form.versionId)
   ) {
-    ElMessage.warning('生产订单、成品物料和 BOM 版本不匹配')
+    ElMessage.warning('生产订单、产出物料和 BOM 版本不匹配')
     return
   }
   if (productionOrder && form.finishQty > productionOrder.remainingQty) {
@@ -306,10 +306,10 @@ onBeforeUnmount(() => {
             :value="order.orderId"
           />
         </el-select>
-        <el-select v-model="query.materialId" clearable filterable placeholder="成品物料">
+        <el-select v-model="query.materialId" clearable filterable placeholder="物料">
           <el-option
-            v-for="material in referenceData.materials.filter(
-              (item) => item.materialType === 'finished',
+            v-for="material in referenceData.materials.filter((item) =>
+              ['finished', 'semi_finished'].includes(item.materialType),
             )"
             :key="material.materialId"
             :label="material.materialName"
@@ -352,35 +352,35 @@ onBeforeUnmount(() => {
           description="当前查询条件下没有完工入库记录。"
         />
         <el-table v-else :data="items" stripe>
-          <el-table-column label="入库 ID" min-width="90" prop="inboundId" />
+          <el-table-column label="入库 ID" min-width="70" prop="inboundId" />
           <el-table-column label="批次号" min-width="170"
             ><template #default="{ row }"
               ><strong>{{ row.batchNo }}</strong></template
             ></el-table-column
           >
-          <el-table-column label="生产订单" min-width="110"
+          <el-table-column label="生产订单 ID" min-width="100"
             ><template #default="{ row }">#{{ row.orderId }}</template></el-table-column
           >
-          <el-table-column label="成品物料" min-width="190"
+          <el-table-column label="产出物料" min-width="200"
             ><template #default="{ row }"
               ><div class="product-cell">
                 <strong>{{ row.productName || `物料 #${row.materialId}` }}</strong
-                ><small>ID {{ row.materialId }} · BOM #{{ row.versionId }}</small>
+                ><small>#{{ row.materialId }}</small>
               </div></template
             ></el-table-column
           >
-          <el-table-column label="完工 / 合格" min-width="140"
+          <el-table-column label="完工 / 合格" min-width="110"
             ><template #default="{ row }"
               >{{ formatNumber(row.finishQty) }} /
               <strong class="qualified">{{ formatNumber(row.qualifiedQty) }}</strong></template
             ></el-table-column
           >
-          <el-table-column label="合格率" min-width="100"
+          <el-table-column label="合格率" min-width="70"
             ><template #default="{ row }">{{
               row.finishQty ? `${formatNumber((row.qualifiedQty / row.finishQty) * 100)}%` : '-'
             }}</template></el-table-column
           >
-          <el-table-column label="消耗锁定" min-width="100"
+          <el-table-column label="消耗锁定" min-width="80"
             ><template #default="{ row }">{{
               row.consumedLockRecords?.length ?? 0
             }}</template></el-table-column
@@ -390,8 +390,10 @@ onBeforeUnmount(() => {
               formatDateTime(row.inboundTime)
             }}</template></el-table-column
           >
-          <el-table-column label="操作人" min-width="90"
-            ><template #default="{ row }">#{{ row.operatorId }}</template></el-table-column
+          <el-table-column label="操作人" min-width="80"
+            ><template #default="{ row }">{{
+              row.operatorName || (row.operatorId ? `用户 #${row.operatorId}` : '-')
+            }}</template></el-table-column
           >
           <el-table-column fixed="right" label="操作" min-width="90">
             <template #default="{ row }">
@@ -420,19 +422,19 @@ onBeforeUnmount(() => {
     >
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="115px">
         <div class="form-grid">
-          <el-form-item label="生产订单" prop="orderId"
+          <el-form-item label="生产订单 ID" prop="orderId"
             ><el-input-number
               :controls="false"
               v-if="!referenceData.productionOrders.length"
               v-model="form.orderId"
               :min="1"
               :precision="0"
-              placeholder="输入生产订单编号" /><el-select
+              placeholder="输入生产订单 ID" /><el-select
               v-else
               v-model="form.orderId"
               filterable
               :loading="referenceLoading"
-              placeholder="选择待入库订单"
+              placeholder="选择待入库订单 ID"
               @change="handleProductionOrderChange"
               ><el-option
                 v-for="order in inboundOrderOptions"
@@ -442,14 +444,14 @@ onBeforeUnmount(() => {
                 )}`"
                 :value="order.orderId" /></el-select
           ></el-form-item>
-          <el-form-item label="成品物料" prop="materialId"
+          <el-form-item label="产出物料" prop="materialId"
             ><el-input-number
               :controls="false"
               v-if="!referenceData.productionOrders.length"
               v-model="form.materialId"
               :min="1"
               :precision="0"
-              placeholder="输入成品物料编号" /><el-select v-else v-model="form.materialId" disabled
+              placeholder="输入产出物料 ID" /><el-select v-else v-model="form.materialId" disabled
               ><el-option
                 v-if="selectedProductionOrder"
                 :label="selectedProductionOrder.materialName"
@@ -539,7 +541,7 @@ onBeforeUnmount(() => {
               }}</strong>
             </div>
             <div>
-              <span>成品</span><strong>{{ selectedInbound.productName }}</strong>
+              <span>产出物料</span><strong>{{ selectedInbound.productName }}</strong>
             </div>
             <div>
               <span>批次号</span><strong>{{ selectedInbound.batchNo }}</strong>
@@ -557,7 +559,11 @@ onBeforeUnmount(() => {
               }}</strong>
             </div>
             <div>
-              <span>操作人</span><strong>#{{ selectedInbound.operatorId }}</strong>
+              <span>操作人</span
+              ><strong>{{
+                selectedInbound.operatorName ||
+                (selectedInbound.operatorId ? `用户 #${selectedInbound.operatorId}` : '-')
+              }}</strong>
             </div>
           </div>
           <div class="detail-actions">

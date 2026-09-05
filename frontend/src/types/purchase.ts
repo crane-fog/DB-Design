@@ -17,6 +17,11 @@ export interface SupplierInfo {
   supplierName: string
 }
 
+export interface PurchaseSupplierQuery extends PageRequest {
+  supplierId?: number
+  supplierName?: string
+}
+
 export interface PurchaseMaterialOption {
   defaultSupplierId?: number
   materialId: number
