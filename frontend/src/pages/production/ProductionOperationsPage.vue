@@ -16,7 +16,7 @@ import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import type { MaterialShortageItem } from '@/types/inventory'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
@@ -38,19 +38,67 @@ const lineStatusLabels = { fault: '故障', idle: '空闲', running: '运行中'
 
 const auth = useAuthStore()
 const route = useRoute()
-const isExternalCustomer = computed(() => auth.hasRole('外部客户'))
-const canManageOrders = computed(() => auth.hasPermission(PERMISSIONS.production.orders))
-const canManageCapacity = computed(() => auth.hasPermission(PERMISSIONS.production.capacity))
-const hasOperationsAccess = computed(
-  () => isExternalCustomer.value || canManageOrders.value || canManageCapacity.value,
+const canViewOwnExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderViewOwn))
+const canViewAllExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderViewAll))
+const canViewExternal = computed(() => canViewOwnExternal.value || canViewAllExternal.value)
+const canCreateOwnExternal = computed(() =>
+  auth.hasPermission(PermissionCode.ExternalOrderCreateOwn),
 )
-let initialTab: OperationsTab = 'estimate'
-if (isExternalCustomer.value || canManageOrders.value) {
-  initialTab = 'external'
+const canCreateExternalForCustomer = computed(() =>
+  auth.hasPermission(PermissionCode.ExternalOrderCreateForCustomer),
+)
+const canCreateExternal = computed(
+  () => canCreateOwnExternal.value || canCreateExternalForCustomer.value,
+)
+const canReviewExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderReview))
+const canConvertExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderConvert))
+const canEstimateCapacity = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionCapacityEstimate),
+)
+const canDetectCapacity = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionCapacityDetect),
+)
+const canBalanceCapacity = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionCapacityBalance),
+)
+const canUpdateLineStatus = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionLineStatusUpdate),
+)
+const canViewProductionOrders = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionOrderView),
+)
+const canViewLines = computed(() => auth.hasPermission(PermissionCode.ProductionLineView))
+const canCalculateShortage = computed(() =>
+  auth.hasPermission(PermissionCode.InventoryShortageCalculate),
+)
+const hasExternalAccess = computed(() => canViewExternal.value || canCreateExternal.value)
+const hasOperationsAccess = computed(
+  () =>
+    hasExternalAccess.value ||
+    canEstimateCapacity.value ||
+    canDetectCapacity.value ||
+    canBalanceCapacity.value ||
+    canUpdateLineStatus.value,
+)
+function getInitialTab(): OperationsTab {
+  if (route.query.tab === 'status' && canUpdateLineStatus.value) {
+    return 'status'
+  }
+  if (hasExternalAccess.value) {
+    return 'external'
+  }
+  if (canEstimateCapacity.value) {
+    return 'estimate'
+  }
+  if (canDetectCapacity.value) {
+    return 'detection'
+  }
+  if (canBalanceCapacity.value) {
+    return 'balance'
+  }
+  return 'status'
 }
-if (route.query.tab === 'status' && canManageCapacity.value) {
-  initialTab = 'status'
-}
+const initialTab = getInitialTab()
 const activeTab = ref<OperationsTab>(initialTab)
 
 // ---------- 外部订单 ----------
@@ -97,11 +145,14 @@ function selectedExternalStatus() {
 }
 
 async function loadExternalOrders(targetPage = externalPage.value) {
+  if (!canViewExternal.value) {
+    return
+  }
   externalLoading.value = true
   externalError.value = ''
   try {
     let customerId = undefined as number | undefined
-    if (canManageOrders.value) {
+    if (canViewAllExternal.value) {
       customerId = parsePositiveInt(externalFilters.customerId)
     }
     externalResult.value = await productionService.listExternalOrders({
@@ -146,14 +197,18 @@ async function submitExternalOrder() {
     ElMessage.warning('请完整填写产品、数量、日期和联系方式')
     return
   }
-  if (canManageOrders.value && !isExternalCustomer.value && externalForm.customerId <= 0) {
-    ElMessage.warning('管理员代录外部订单时必须填写客户 ID')
+  if (
+    canCreateExternalForCustomer.value &&
+    !canCreateOwnExternal.value &&
+    externalForm.customerId <= 0
+  ) {
+    ElMessage.warning('请填写客户 ID')
     return
   }
   externalSubmitting.value = true
   try {
     let customerId = undefined as number | undefined
-    if (canManageOrders.value && !isExternalCustomer.value) {
+    if (canCreateExternalForCustomer.value && externalForm.customerId > 0) {
       ;({ customerId } = externalForm)
     }
     await productionService.addExternalOrder({
@@ -246,7 +301,11 @@ async function submitConvert() {
 }
 
 // ---------- 交付能力评估 ----------
-const estimateMode = ref<'order' | 'temporary'>('order')
+let initialEstimateMode: 'order' | 'temporary' = 'temporary'
+if (canViewProductionOrders.value) {
+  initialEstimateMode = 'order'
+}
+const estimateMode = ref<'order' | 'temporary'>(initialEstimateMode)
 const estimateLoading = ref(false)
 const estimateError = ref('')
 const estimateResult = ref<ProductionCapacityEstimateItem>()
@@ -310,12 +369,13 @@ async function estimateCapacity() {
   estimateShortages.value = []
   try {
     const { request, shortage } = await resolveEstimateRequest()
-    const [estimate, shortageResult] = await Promise.all([
-      productionService.estimateCapacity(request satisfies ProductionCapacityEstimateFormData),
-      inventoryService.calculateShortage([shortage]),
-    ])
-    estimateResult.value = estimate
-    estimateShortages.value = shortageResult.items
+    estimateResult.value = await productionService.estimateCapacity(
+      request satisfies ProductionCapacityEstimateFormData,
+    )
+    if (canCalculateShortage.value) {
+      const shortageResult = await inventoryService.calculateShortage([shortage])
+      estimateShortages.value = shortageResult.items
+    }
   } catch (error) {
     estimateError.value = getErrorMessage(error, '交付能力评估失败')
   } finally {
@@ -331,7 +391,7 @@ const detectionResult = ref<CapacityDetectionItem>()
 const detectionForm = reactive({ lineId: 0, periodRange: [] as string[] })
 
 async function loadLineOptions() {
-  if (!canManageCapacity.value) {
+  if (!canViewLines.value) {
     return
   }
   try {
@@ -465,7 +525,7 @@ async function updateLineStatus() {
 onMounted(() => {
   if (
     route.query.tab === 'status' &&
-    canManageCapacity.value &&
+    canUpdateLineStatus.value &&
     typeof route.query.orderId === 'string'
   ) {
     const orderId = parsePositiveInt(route.query.orderId)
@@ -474,7 +534,7 @@ onMounted(() => {
       lineStatusForm.status = 'running'
     }
   }
-  if (isExternalCustomer.value || canManageOrders.value) {
+  if (canViewExternal.value) {
     void loadExternalOrders()
   }
   void loadLineOptions()
@@ -490,17 +550,17 @@ onMounted(() => {
 
     <el-empty v-if="!hasOperationsAccess" description="当前账号暂无外部订单或生产运营权限" />
     <el-tabs v-else v-model="activeTab" class="operations-tabs">
-      <el-tab-pane v-if="isExternalCustomer || canManageOrders" label="外部订单" name="external">
+      <el-tab-pane v-if="hasExternalAccess" label="外部订单" name="external">
         <el-card class="section-card" shadow="never">
           <el-form :model="externalFilters" inline @submit.prevent="loadExternalOrders(1)">
-            <el-form-item v-if="canManageOrders && !isExternalCustomer" label="客户 ID">
+            <el-form-item v-if="canViewAllExternal" label="客户 ID">
               <el-input
                 v-model.trim="externalFilters.customerId"
                 clearable
                 placeholder="全部客户"
               />
             </el-form-item>
-            <el-form-item label="订单状态">
+            <el-form-item v-if="canViewExternal" label="订单状态">
               <el-select
                 v-model="externalFilters.status"
                 clearable
@@ -513,18 +573,30 @@ onMounted(() => {
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" :loading="externalLoading" @click="loadExternalOrders(1)">
+              <el-button
+                v-if="canViewExternal"
+                type="primary"
+                :loading="externalLoading"
+                @click="loadExternalOrders(1)"
+              >
                 查询
               </el-button>
-              <el-button :icon="Refresh" @click="resetExternalFilters">重置</el-button>
-              <el-button type="primary" :icon="Plus" @click="openExternalCreate">
-                {{ isExternalCustomer ? '提交订单' : '代录订单' }}
+              <el-button v-if="canViewExternal" :icon="Refresh" @click="resetExternalFilters">
+                重置
+              </el-button>
+              <el-button
+                v-if="canCreateExternal"
+                type="primary"
+                :icon="Plus"
+                @click="openExternalCreate"
+              >
+                提交订单
               </el-button>
             </el-form-item>
           </el-form>
         </el-card>
 
-        <el-card class="section-card table-card" shadow="never">
+        <el-card v-if="canViewExternal" class="section-card table-card" shadow="never">
           <el-alert
             v-if="externalError"
             class="request-error"
@@ -537,7 +609,7 @@ onMounted(() => {
             <el-table-column label="外部订单 ID" min-width="110">
               <template #default="{ row }">#{{ row.extOrderId }}</template>
             </el-table-column>
-            <el-table-column v-if="canManageOrders" label="客户" min-width="150">
+            <el-table-column v-if="canViewAllExternal" label="客户" min-width="150">
               <template #default="{ row }">{{ row.customerName || `#${row.customerId}` }}</template>
             </el-table-column>
             <el-table-column label="产品" min-width="170">
@@ -560,9 +632,14 @@ onMounted(() => {
             <el-table-column label="审核意见" min-width="160">
               <template #default="{ row }">{{ row.reviewComment || '-' }}</template>
             </el-table-column>
-            <el-table-column v-if="canManageOrders" fixed="right" label="操作" min-width="210">
+            <el-table-column
+              v-if="canReviewExternal || canConvertExternal"
+              fixed="right"
+              label="操作"
+              min-width="210"
+            >
               <template #default="{ row }">
-                <template v-if="row.status === 'pending_review'">
+                <template v-if="canReviewExternal && row.status === 'pending_review'">
                   <el-button link type="success" @click="reviewExternalOrder(row, true)">
                     接受
                   </el-button>
@@ -571,7 +648,7 @@ onMounted(() => {
                   </el-button>
                 </template>
                 <el-button
-                  v-if="row.status === 'accepted'"
+                  v-if="canConvertExternal && row.status === 'accepted'"
                   link
                   type="primary"
                   @click="openConvert(row)"
@@ -628,10 +705,12 @@ onMounted(() => {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="canManageCapacity" label="交付评估" name="estimate">
+      <el-tab-pane v-if="canEstimateCapacity" label="交付评估" name="estimate">
         <el-card class="section-card" shadow="never">
           <el-radio-group v-model="estimateMode" class="mode-switch">
-            <el-radio-button value="order">按生产订单</el-radio-button>
+            <el-radio-button v-if="canViewProductionOrders" value="order"
+              >按生产订单</el-radio-button
+            >
             <el-radio-button value="temporary">临时评估</el-radio-button>
           </el-radio-group>
           <el-form :model="estimateForm" inline>
@@ -706,49 +785,58 @@ onMounted(() => {
               :title="estimateResult.riskReason"
               type="warning"
             />
-            <h3 class="section-title">物料齐套明细</h3>
-            <el-table :data="estimateShortages" stripe>
-              <el-table-column label="层级" min-width="80" prop="level" />
-              <el-table-column label="物料" min-width="180">
-                <template #default="{ row }">
-                  {{ row.materialName || `#${row.materialId}` }}
-                </template>
-              </el-table-column>
-              <el-table-column label="毛需求" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.grossRequirement) }}</template>
-              </el-table-column>
-              <el-table-column label="可用库存" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.availableQty) }}</template>
-              </el-table-column>
-              <el-table-column label="在途数量" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.inTransitQty) }}</template>
-              </el-table-column>
-              <el-table-column label="净缺口" min-width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.netShortageQty > 0 ? 'danger' : 'success'">
-                    {{ formatNumber(row.netShortageQty) }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="建议采购" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.suggestedPurchaseQty) }}</template>
-              </el-table-column>
-            </el-table>
-            <el-empty
-              v-if="!estimateShortages.length"
-              :image-size="60"
-              description="当前评估未返回物料缺口明细"
-            />
+            <template v-if="canCalculateShortage">
+              <h3 class="section-title">物料齐套明细</h3>
+              <el-table :data="estimateShortages" stripe>
+                <el-table-column label="层级" min-width="80" prop="level" />
+                <el-table-column label="物料" min-width="180">
+                  <template #default="{ row }">
+                    {{ row.materialName || `#${row.materialId}` }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="毛需求" min-width="100">
+                  <template #default="{ row }">{{ formatNumber(row.grossRequirement) }}</template>
+                </el-table-column>
+                <el-table-column label="可用库存" min-width="100">
+                  <template #default="{ row }">{{ formatNumber(row.availableQty) }}</template>
+                </el-table-column>
+                <el-table-column label="在途数量" min-width="100">
+                  <template #default="{ row }">{{ formatNumber(row.inTransitQty) }}</template>
+                </el-table-column>
+                <el-table-column label="净缺口" min-width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="row.netShortageQty > 0 ? 'danger' : 'success'">
+                      {{ formatNumber(row.netShortageQty) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="建议采购" min-width="100">
+                  <template #default="{ row }">{{
+                    formatNumber(row.suggestedPurchaseQty)
+                  }}</template>
+                </el-table-column>
+              </el-table>
+              <el-empty
+                v-if="!estimateShortages.length"
+                :image-size="60"
+                description="当前评估未返回物料缺口明细"
+              />
+            </template>
           </template>
           <el-empty v-else description="填写条件后开始评估交付能力" />
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="canManageCapacity" label="产能检测" name="detection">
+      <el-tab-pane v-if="canDetectCapacity" label="产能检测" name="detection">
         <el-card class="section-card" shadow="never">
           <el-form :model="detectionForm" inline>
             <el-form-item label="生产线">
-              <el-select v-model="detectionForm.lineId" filterable style="width: 200px">
+              <el-select
+                v-if="canViewLines"
+                v-model="detectionForm.lineId"
+                filterable
+                style="width: 200px"
+              >
                 <el-option
                   v-for="line in lineOptions"
                   :key="line.lineId"
@@ -756,6 +844,7 @@ onMounted(() => {
                   :value="line.lineId"
                 />
               </el-select>
+              <el-input-number v-else v-model="detectionForm.lineId" :controls="false" :min="1" />
             </el-form-item>
             <el-form-item label="统计周期">
               <el-date-picker
@@ -817,7 +906,7 @@ onMounted(() => {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="canManageCapacity" label="产能平衡" name="balance">
+      <el-tab-pane v-if="canBalanceCapacity" label="产能平衡" name="balance">
         <el-card class="section-card" shadow="never">
           <p>保存调整方案及关联订单；订单计划与生产日历在对应页面维护。</p>
           <el-form :model="balanceForm" label-position="top">
@@ -866,8 +955,8 @@ onMounted(() => {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="canManageCapacity" label="产线状态与报工" name="status">
-        <el-card class="section-card table-card" shadow="never">
+      <el-tab-pane v-if="canUpdateLineStatus" label="产线状态与报工" name="status">
+        <el-card v-if="canViewLines" class="section-card table-card" shadow="never">
           <el-table :data="lineOptions" stripe>
             <el-table-column label="生产线" min-width="100">
               <template #default="{ row }">#{{ row.lineId }}</template>
@@ -892,7 +981,12 @@ onMounted(() => {
           <p>按产线当前任务记录累计产量；订单完工数量在生产订单页登记。</p>
           <el-form :model="lineStatusForm" inline>
             <el-form-item label="生产线">
-              <el-select v-model="lineStatusForm.lineId" filterable style="width: 180px">
+              <el-select
+                v-if="canViewLines"
+                v-model="lineStatusForm.lineId"
+                filterable
+                style="width: 180px"
+              >
                 <el-option
                   v-for="line in lineOptions"
                   :key="line.lineId"
@@ -900,6 +994,7 @@ onMounted(() => {
                   :value="line.lineId"
                 />
               </el-select>
+              <el-input-number v-else v-model="lineStatusForm.lineId" :controls="false" :min="1" />
             </el-form-item>
             <el-form-item label="运行状态">
               <el-select v-model="lineStatusForm.status" style="width: 120px">
@@ -983,7 +1078,7 @@ onMounted(() => {
 
     <el-dialog v-model="externalCreateVisible" title="提交外部订单" width="540px">
       <el-form :model="externalForm" label-width="110px">
-        <el-form-item v-if="canManageOrders && !isExternalCustomer" label="客户 ID">
+        <el-form-item v-if="canCreateExternalForCustomer" label="客户 ID">
           <el-input-number
             :controls="false"
             v-model="externalForm.customerId"

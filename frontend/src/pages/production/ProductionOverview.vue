@@ -8,11 +8,12 @@ import { getErrorMessage } from '@/utils/error'
 import { productionService } from '@/services/ProductionService'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { PermissionCode, type PermissionCodeValue } from '@/constants/permissions'
 
 interface OverviewStat {
   description: string
   key: string
-  permission: string
+  permissions: readonly PermissionCodeValue[]
   route: string
   title: string
   value?: number
@@ -21,7 +22,7 @@ interface OverviewStat {
 interface OverviewShortcut {
   description: string
   icon: Component
-  permission: string
+  permissions: readonly PermissionCodeValue[]
   route: string
   title: string
 }
@@ -39,28 +40,48 @@ const shortcuts: OverviewShortcut[] = [
   {
     description: '配置产品产能、生产线、线型与排产日历。',
     icon: Odometer,
-    permission: 'production:capacity',
+    permissions: [
+      PermissionCode.ProductionLineView,
+      PermissionCode.ProductionLineTypeView,
+      PermissionCode.ProductionCapacityConfigView,
+      PermissionCode.ProductionCalendarView,
+    ],
     route: '/production/capacity',
     title: '产能配置',
   },
   {
     description: '维护生产订单，审核、开工、完工与取消。',
     icon: Tickets,
-    permission: 'production:orders',
+    permissions: [PermissionCode.ProductionOrderView],
     route: '/production/orders',
     title: '生产订单',
   },
   {
     description: '查看产线状态，上报故障并按编号处理。',
     icon: Tools,
-    permission: 'production:breakdown',
+    permissions: [
+      PermissionCode.ProductionFaultView,
+      PermissionCode.ProductionFaultReport,
+      PermissionCode.ProductionFaultClaim,
+      PermissionCode.ProductionFaultUpdateAssigned,
+      PermissionCode.ProductionFaultUpdateAny,
+    ],
     route: '/production/breakdown',
     title: '故障反馈',
   },
   {
     description: '处理外部订单、交付评估、产能检测与产线实时状态。',
     icon: Van,
-    permission: 'production:view',
+    permissions: [
+      PermissionCode.ExternalOrderViewOwn,
+      PermissionCode.ExternalOrderViewAll,
+      PermissionCode.ExternalOrderCreateOwn,
+      PermissionCode.ExternalOrderCreateForCustomer,
+      PermissionCode.ProductionCapacityEstimate,
+      PermissionCode.ProductionCapacityDetect,
+      PermissionCode.ProductionCapacityBalance,
+      PermissionCode.ProductionLineStatusUpdate,
+    ],
     route: '/production/operations',
     title: '生产运营',
   },
@@ -70,7 +91,7 @@ const statistics = computed<OverviewStat[]>(() => [
   {
     description: '等待审核的生产订单数量。',
     key: 'pending',
-    permission: 'production:orders',
+    permissions: [PermissionCode.ProductionOrderView],
     route: '/production/orders',
     title: '待审核订单',
     value: pendingOrders.value,
@@ -78,7 +99,7 @@ const statistics = computed<OverviewStat[]>(() => [
   {
     description: '正在生产中的订单数量。',
     key: 'in_progress',
-    permission: 'production:orders',
+    permissions: [PermissionCode.ProductionOrderView],
     route: '/production/orders',
     title: '生产中订单',
     value: inProgressOrders.value,
@@ -86,7 +107,7 @@ const statistics = computed<OverviewStat[]>(() => [
   {
     description: '当前处于运行状态的生产线数量。',
     key: 'running_lines',
-    permission: 'production:capacity',
+    permissions: [PermissionCode.ProductionLineView],
     route: '/production/capacity',
     title: '运行中产线',
     value: runningLines.value,
@@ -94,18 +115,18 @@ const statistics = computed<OverviewStat[]>(() => [
 ])
 
 const visibleShortcuts = computed(() =>
-  shortcuts.filter((shortcut) => auth.hasPermission(shortcut.permission)),
+  shortcuts.filter((shortcut) => auth.hasAnyPermission(...shortcut.permissions)),
 )
 const visibleStatistics = computed(() =>
-  statistics.value.filter((statistic) => auth.hasPermission(statistic.permission)),
+  statistics.value.filter((statistic) => auth.hasAnyPermission(...statistic.permissions)),
 )
 
-function canAccess(permission?: string) {
-  return !permission || auth.hasPermission(permission)
+function canAccess(permissions: readonly PermissionCodeValue[]) {
+  return auth.hasAnyPermission(...permissions)
 }
 
-function navigateTo(route?: string, permission?: string) {
-  if (route && canAccess(permission)) {
+function navigateTo(route: string, permissions: readonly PermissionCodeValue[]) {
+  if (canAccess(permissions)) {
     void router.push(route)
   }
 }
@@ -115,7 +136,7 @@ async function loadOverview() {
   error.value = ''
   try {
     const tasks: Promise<void>[] = []
-    if (auth.hasPermission('production:orders')) {
+    if (auth.hasPermission(PermissionCode.ProductionOrderView)) {
       tasks.push(
         productionService
           .listOrders({ page: 1, pageSize: 1, status: 'pending_review' })
@@ -125,7 +146,7 @@ async function loadOverview() {
           .then((result) => void (inProgressOrders.value = result.total)),
       )
     }
-    if (auth.hasPermission('production:capacity')) {
+    if (auth.hasPermission(PermissionCode.ProductionLineView)) {
       tasks.push(
         productionService
           .listLines({ page: 1, pageSize: 1, status: 'running' })
@@ -171,7 +192,7 @@ onMounted(() => void loadOverview())
         v-loading="loading"
         class="statistic-card statistic-card--clickable"
         shadow="never"
-        @click="navigateTo(statistic.route, statistic.permission)"
+        @click="navigateTo(statistic.route, statistic.permissions)"
       >
         <p>{{ statistic.title }}</p>
         <strong>{{ formatNumber(statistic.value) }}</strong>
@@ -197,7 +218,7 @@ onMounted(() => void loadOverview())
           :key="shortcut.route"
           class="shortcut-entry"
           type="button"
-          @click="navigateTo(shortcut.route, shortcut.permission)"
+          @click="navigateTo(shortcut.route, shortcut.permissions)"
         >
           <el-icon :size="25"><component :is="shortcut.icon" /></el-icon>
           <span>

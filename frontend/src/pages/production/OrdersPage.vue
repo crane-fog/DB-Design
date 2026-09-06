@@ -8,7 +8,7 @@ import {
   productionService,
 } from '@/services/ProductionService'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
@@ -29,8 +29,13 @@ const loading = ref(false)
 const error = ref('')
 const result = ref<PageResult<ProductionOrderItem>>({ items: [], page: 1, pageSize, total: 0 })
 
-const canManage = computed(() => auth.hasPermission(PERMISSIONS.production.orders))
-const canReportLine = computed(() => auth.hasPermission(PERMISSIONS.production.capacity))
+const canCreateOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderCreate))
+const canUpdateOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderUpdate))
+const canApproveOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderApprove))
+const canStartOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderStart))
+const canFinishOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderFinish))
+const canCancelOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderCancel))
+const canReportLine = computed(() => auth.hasPermission(PermissionCode.ProductionLineStatusUpdate))
 
 const orderDialogVisible = ref(false)
 const orderDialogMode = ref<'create' | 'edit'>('create')
@@ -315,19 +320,19 @@ function openLineReporting(order: ProductionOrderItem) {
   })
 }
 
-function canReview(order: ProductionOrderItem) {
+function isReviewable(order: ProductionOrderItem) {
   return order.status === 'pending_review'
 }
-function canEdit(order: ProductionOrderItem) {
+function isEditable(order: ProductionOrderItem) {
   return order.status === 'pending_review' || order.status === 'pending_schedule'
 }
-function canStart(order: ProductionOrderItem) {
+function isStartable(order: ProductionOrderItem) {
   return order.status === 'pending_schedule'
 }
-function canFinish(order: ProductionOrderItem) {
+function isFinishable(order: ProductionOrderItem) {
   return order.status === 'in_progress'
 }
-function canCancel(order: ProductionOrderItem) {
+function isCancellable(order: ProductionOrderItem) {
   return order.status !== 'completed' && order.status !== 'cancelled'
 }
 
@@ -347,7 +352,7 @@ onMounted(() => {
   <PageContainer>
     <PageHeader title="生产订单" description="按状态管理生产订单的审核、开工、完工与取消流程。">
       <template #actions>
-        <el-button v-if="canManage" type="primary" :icon="Plus" @click="openCreateDialog">
+        <el-button v-if="canCreateOrder" type="primary" :icon="Plus" @click="openCreateDialog">
           新增订单
         </el-button>
       </template>
@@ -442,9 +447,9 @@ onMounted(() => {
         <el-table-column fixed="right" label="操作" min-width="260">
           <template #default="{ row }">
             <el-button link type="primary" :icon="View" @click="openDetail(row)">详情</el-button>
-            <template v-if="canManage">
+            <template>
               <el-button
-                v-if="canReview(row)"
+                v-if="canApproveOrder && isReviewable(row)"
                 link
                 :disabled="actionSubmitting"
                 type="primary"
@@ -452,7 +457,7 @@ onMounted(() => {
                 >审核</el-button
               >
               <el-button
-                v-if="canEdit(row)"
+                v-if="canUpdateOrder && isEditable(row)"
                 link
                 type="primary"
                 :icon="EditPen"
@@ -460,7 +465,7 @@ onMounted(() => {
                 >计划排期</el-button
               >
               <el-button
-                v-if="canStart(row)"
+                v-if="canStartOrder && isStartable(row)"
                 link
                 :disabled="actionSubmitting"
                 type="success"
@@ -468,14 +473,14 @@ onMounted(() => {
                 >开工</el-button
               >
               <el-button
-                v-if="canFinish(row) && canReportLine"
+                v-if="isFinishable(row) && canReportLine"
                 link
                 type="primary"
                 @click="openLineReporting(row)"
                 >产线报工</el-button
               >
               <el-button
-                v-if="canFinish(row)"
+                v-if="canFinishOrder && isFinishable(row)"
                 link
                 :disabled="actionSubmitting"
                 type="success"
@@ -483,7 +488,7 @@ onMounted(() => {
                 >完工</el-button
               >
               <el-button
-                v-if="canCancel(row)"
+                v-if="canCancelOrder && isCancellable(row)"
                 link
                 :disabled="actionSubmitting"
                 type="danger"

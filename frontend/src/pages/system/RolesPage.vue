@@ -10,6 +10,7 @@ import {
 import { EditPen, Plus, Refresh, SetUp } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getErrorMessage } from '@/utils/error'
@@ -43,9 +44,13 @@ const permissionSubmitting = ref(false)
 
 const roleForm = reactive<RoleFormData>({ description: '', name: '', status: 'valid' })
 
-const canCreate = computed(() => auth.hasPermission('system:role:create'))
-const canUpdate = computed(() => auth.hasPermission('system:role:update'))
-const canAssignPermission = computed(() => auth.hasPermission('system:role:assign-permission'))
+const canCreate = computed(() => auth.hasPermission(PermissionCode.SystemRoleCreate))
+const canUpdate = computed(() => auth.hasPermission(PermissionCode.SystemRoleUpdate))
+const canAssignPermission = computed(
+  () =>
+    auth.hasPermission(PermissionCode.SystemRoleAssignPermission) &&
+    auth.hasPermission(PermissionCode.SystemPermissionView),
+)
 const roleDialogTitle = computed(() => {
   if (roleDialogMode.value === 'create') {
     return '新增角色'
@@ -79,6 +84,12 @@ function resetRoleForm() {
   Object.assign(roleForm, { description: '', name: '', status: 'valid' as AccountStatus })
   editingRoleId.value = undefined
   roleFormRef.value?.clearValidate()
+}
+
+async function reloadAccessIfCurrentRole(roleId: number) {
+  if (auth.roles.some((role) => role.role_id === roleId)) {
+    auth.setAccess(await systemService.loadCurrentAccess())
+  }
 }
 
 async function loadRoles(targetPage = page.value) {
@@ -136,6 +147,7 @@ async function submitRoleForm() {
       ElMessage.success('角色新增成功')
     } else if (editingRoleId.value !== undefined) {
       await systemService.updateRole(editingRoleId.value, { ...roleForm })
+      await reloadAccessIfCurrentRole(editingRoleId.value)
       ElMessage.success('角色信息已更新')
     }
     roleDialogVisible.value = false
@@ -165,6 +177,7 @@ async function updateStatus(role: SystemRoleSummary) {
       type: 'warning',
     })
     await systemService.updateRoleStatus(role, nextStatus)
+    await reloadAccessIfCurrentRole(role.id)
     ElMessage.success(`角色已${action}`)
     await loadRoles(page.value)
   } catch (requestError) {
@@ -206,10 +219,6 @@ async function loadRolePermissionAssignment() {
 }
 
 function openPermissionDialog(role: SystemRoleSummary) {
-  if (role.status === 'disabled') {
-    ElMessage.warning('停用角色不允许继续分配权限')
-    return
-  }
   permissionTarget.value = role
   permissionDialogVisible.value = true
   void loadRolePermissionAssignment()
@@ -229,8 +238,8 @@ async function submitPermissionAssignment() {
   if (!permissionTarget.value || permissionSubmitting.value || permissionLoading.value) {
     return
   }
-  if (!selectedPermissionIds.value.length) {
-    ElMessage.warning('当前接口要求至少选择一个权限，无法提交空集合')
+  if (permissionTarget.value.status === 'disabled' && selectedPermissionIds.value.length) {
+    ElMessage.warning('停用角色只能清空已有权限')
     return
   }
 
@@ -244,10 +253,8 @@ async function submitPermissionAssignment() {
         type: 'warning',
       },
     )
-    await systemService.assignRolePermissions(
-      permissionTarget.value.id,
-      selectedPermissionIds.value,
-    )
+    await systemService.setRolePermissions(permissionTarget.value.id, selectedPermissionIds.value)
+    await reloadAccessIfCurrentRole(permissionTarget.value.id)
     permissionDialogVisible.value = false
     ElMessage.success('角色权限已更新')
     await loadRoles(page.value)
@@ -340,7 +347,6 @@ onMounted(() => void loadRoles())
               v-if="canAssignPermission"
               link
               type="primary"
-              :disabled="row.status === 'disabled'"
               :icon="SetUp"
               @click="openPermissionDialog(row)"
             >
@@ -418,6 +424,14 @@ onMounted(() => void loadRoles())
         <p class="permission-dialog-description">
           为“{{ permissionTarget.name }}”选择权限；保存将提交当前完整勾选集合。
         </p>
+        <el-alert
+          v-if="permissionTarget.status === 'disabled'"
+          class="permission-empty-hint"
+          :closable="false"
+          show-icon
+          title="该角色已停用，只能清空已有权限。"
+          type="warning"
+        />
         <div class="permission-toolbar">
           <el-button
             :disabled="permissionLoading || permissionSubmitting"
@@ -465,14 +479,6 @@ onMounted(() => void loadRoles())
           show-checkbox
           @check="syncSelectedPermissions"
         />
-        <el-alert
-          v-if="!permissionLoading && !permissionError && !selectedPermissionIds.length"
-          class="permission-empty-hint"
-          :closable="false"
-          show-icon
-          title="当前接口要求 permission_ids 至少包含一个权限；清空后无法保存。"
-          type="warning"
-        />
       </template>
       <template #footer>
         <el-button :disabled="permissionSubmitting" @click="permissionDialogVisible = false"
@@ -480,7 +486,7 @@ onMounted(() => void loadRoles())
         >
         <el-button
           type="primary"
-          :disabled="Boolean(permissionError) || permissionLoading || !selectedPermissionIds.length"
+          :disabled="Boolean(permissionError) || permissionLoading"
           :loading="permissionSubmitting"
           @click="submitPermissionAssignment"
         >

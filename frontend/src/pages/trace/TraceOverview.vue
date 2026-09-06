@@ -11,7 +11,7 @@ import { Delete, EditPen, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
@@ -27,7 +27,15 @@ const { section } = defineProps<{ section: TraceTab }>()
 const pageSize = 10
 const auth = useAuthStore()
 const route = useRoute()
-const canManage = computed(() => auth.hasPermission(PERMISSIONS.trace.manage))
+const canCreateConsumption = computed(() =>
+  auth.hasPermission(PermissionCode.TraceConsumptionCreate),
+)
+const canUpdateConsumption = computed(() =>
+  auth.hasPermission(PermissionCode.TraceConsumptionUpdate),
+)
+const canDeleteConsumption = computed(() =>
+  auth.hasPermission(PermissionCode.TraceConsumptionDelete),
+)
 const references = ref<TraceConsumptionReferenceData>({})
 const suppliers = computed(() => references.value.suppliers ?? [])
 const referenceError = ref('')
@@ -392,7 +400,11 @@ onMounted(async () => {
               @click="resetConsumptionFilters"
               >重置</el-button
             >
-            <el-button v-if="canManage" :icon="Plus" type="primary" @click="openConsumptionCreate"
+            <el-button
+              v-if="canCreateConsumption"
+              :icon="Plus"
+              type="primary"
+              @click="openConsumptionCreate"
               >新增消耗</el-button
             >
           </el-form-item>
@@ -438,10 +450,15 @@ onMounted(async () => {
           <el-table-column label="消耗数量" min-width="120">
             <template #default="{ row }">{{ formatNumber(row.consumeQty) }}</template>
           </el-table-column>
-          <el-table-column v-if="canManage" fixed="right" label="操作" min-width="130">
+          <el-table-column
+            v-if="canUpdateConsumption || canDeleteConsumption"
+            fixed="right"
+            label="操作"
+            min-width="130"
+          >
             <template #default="{ row }">
               <el-button
-                v-if="canManage"
+                v-if="canUpdateConsumption"
                 link
                 type="primary"
                 :icon="EditPen"
@@ -449,7 +466,7 @@ onMounted(async () => {
                 >修改</el-button
               >
               <el-button
-                v-if="canManage"
+                v-if="canDeleteConsumption"
                 link
                 type="danger"
                 :icon="Delete"

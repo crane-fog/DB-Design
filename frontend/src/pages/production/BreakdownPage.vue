@@ -19,6 +19,7 @@ import { formatDateTime } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
 import { toBusinessDateTimeInput } from '@/utils/time'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 const pageSize = 10
 const faultStatusLabels = {
@@ -28,8 +29,17 @@ const faultStatusLabels = {
 }
 const lineStatusLabels = { fault: '故障', idle: '空闲', running: '运行中' }
 const auth = useAuthStore()
-const canManage = computed(() => auth.hasPermission('production:breakdown'))
-const canViewLines = computed(() => auth.hasPermission('production:capacity'))
+const canViewFaults = computed(() => auth.hasPermission(PermissionCode.ProductionFaultView))
+const canReportFault = computed(() => auth.hasPermission(PermissionCode.ProductionFaultReport))
+const canClaimFault = computed(() => auth.hasPermission(PermissionCode.ProductionFaultClaim))
+const canUpdateAssignedFault = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionFaultUpdateAssigned),
+)
+const canUpdateAnyFault = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionFaultUpdateAny),
+)
+const canViewLines = computed(() => auth.hasPermission(PermissionCode.ProductionLineView))
+const canViewUsers = computed(() => auth.hasPermission(PermissionCode.SystemUserView))
 const selectedLineStatus = ref<ProductionLineRunStatus | ''>('')
 const page = ref(1)
 const loading = ref(false)
@@ -51,7 +61,7 @@ const updateForm = reactive<FaultUpdateFormData>({
 const faultsVisible = ref(false)
 const faultsLoading = ref(false)
 const lineFaults = ref<FaultRecordItem[]>([])
-const selectedLineId = ref(0)
+const selectedLineId = ref<number>()
 const users = ref<SystemUser[]>([])
 const usersLoading = ref(false)
 
@@ -142,7 +152,17 @@ function openUpdate(record?: FaultRecordItem) {
   updateVisible.value = true
 }
 
-async function loadLineFaults(lineId: number) {
+function canUpdateFault(record: FaultRecordItem) {
+  return (
+    canUpdateAnyFault.value ||
+    (canUpdateAssignedFault.value && record.repairerId === auth.currentUser?.id)
+  )
+}
+
+async function loadLineFaults(lineId?: number) {
+  if (!canViewFaults.value) {
+    return
+  }
   selectedLineId.value = lineId
   faultsLoading.value = true
   lineFaults.value = []
@@ -179,7 +199,11 @@ async function submitUpdate() {
     })
     ElMessage.success(`故障 #${record.faultId} 处理状态已更新`)
     updateVisible.value = false
-    await loadLines(page.value)
+    const tasks: Promise<void>[] = [loadLines(page.value)]
+    if (faultsVisible.value) {
+      tasks.push(loadLineFaults(selectedLineId.value))
+    }
+    await Promise.all(tasks)
   } catch (requestError) {
     ElMessage.error(getErrorMessage(requestError, '故障处理更新失败'))
   } finally {
@@ -187,10 +211,35 @@ async function submitUpdate() {
   }
 }
 
+async function claimFault(record: FaultRecordItem) {
+  const currentUserId = auth.currentUser?.id
+  if (!currentUserId || updating.value) {
+    return
+  }
+  updating.value = true
+  try {
+    await productionService.updateFault({
+      faultId: record.faultId,
+      recoverTime: undefined,
+      repairerId: currentUserId,
+      status: 'repairing',
+    })
+    ElMessage.success(`已认领故障 #${record.faultId}`)
+    await Promise.all([loadLines(page.value), loadLineFaults(selectedLineId.value)])
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '故障认领失败'))
+  } finally {
+    updating.value = false
+  }
+}
+
 async function loadUsers() {
+  if (!canViewUsers.value) {
+    return
+  }
   usersLoading.value = true
   try {
-    const usersResult = await systemService.listInternalUsers({
+    const usersResult = await systemService.listUserOptions({
       page: 1,
       pageSize: 100,
       status: 'valid',
@@ -216,8 +265,9 @@ onMounted(() => {
       description="查看产线运行状态，上报故障，并按故障编号进行维修和恢复处理。"
     >
       <template #actions>
-        <el-button v-if="canManage" @click="openUpdate()">按编号处理</el-button>
-        <el-button v-if="canManage" :icon="Plus" type="primary" @click="openReport()">
+        <el-button v-if="canViewFaults" @click="loadLineFaults()">查看全部故障</el-button>
+        <el-button v-if="canUpdateAnyFault" @click="openUpdate()">按编号处理</el-button>
+        <el-button v-if="canReportFault" :icon="Plus" type="primary" @click="openReport()">
           上报故障
         </el-button>
       </template>
@@ -257,12 +307,14 @@ onMounted(() => {
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="canManage" label="操作" min-width="180">
+        <el-table-column v-if="canViewFaults || canReportFault" label="操作" min-width="180">
           <template #default="{ row }">
-            <el-button link type="primary" @click="loadLineFaults(row.lineId)">
+            <el-button v-if="canViewFaults" link type="primary" @click="loadLineFaults(row.lineId)">
               查看故障
             </el-button>
-            <el-button link type="primary" @click="openReport(row.lineId)"> 上报故障 </el-button>
+            <el-button v-if="canReportFault" link type="primary" @click="openReport(row.lineId)">
+              上报故障
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -326,6 +378,7 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="维修负责人" prop="repairerId">
           <el-select
+            v-if="canUpdateAnyFault && canViewUsers"
             v-model="updateForm.repairerId"
             clearable
             filterable
@@ -340,6 +393,14 @@ onMounted(() => {
               :value="user.id"
             />
           </el-select>
+          <el-input-number
+            v-else-if="canUpdateAnyFault"
+            v-model="updateForm.repairerId"
+            :controls="false"
+            :min="1"
+            style="width: 100%"
+          />
+          <el-input v-else :model-value="getUserName(updateForm.repairerId)" disabled />
         </el-form-item>
         <el-form-item v-if="updateForm.status === 'recovered'" label="恢复时间" prop="recoverTime">
           <el-date-picker
@@ -359,7 +420,9 @@ onMounted(() => {
     </el-dialog>
 
     <el-dialog v-model="faultsVisible" title="生产线故障记录" width="900px">
-      <p class="result-note">生产线 #{{ selectedLineId }} 的故障记录列表</p>
+      <p class="result-note">
+        {{ selectedLineId ? `生产线 #${selectedLineId} 的故障记录列表` : '全部故障记录' }}
+      </p>
       <div v-loading="faultsLoading">
         <div v-if="lineFaults.length > 0" class="fault-list">
           <el-card
@@ -391,7 +454,16 @@ onMounted(() => {
               }}</el-descriptions-item>
             </el-descriptions>
             <el-button
-              v-if="canManage"
+              v-if="canClaimFault && fault.status === 'pending_repair' && !fault.repairerId"
+              class="fault-action"
+              :loading="updating"
+              type="success"
+              @click="claimFault(fault)"
+            >
+              认领故障
+            </el-button>
+            <el-button
+              v-if="canUpdateFault(fault)"
               class="fault-action"
               type="primary"
               @click="openUpdate(fault)"

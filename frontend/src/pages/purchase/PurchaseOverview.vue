@@ -38,6 +38,7 @@ import { businessDate } from '@/utils/time'
 import { getErrorMessage } from '@/utils/error'
 import { purchaseService } from '@/services/PurchaseService'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 type PurchaseTab = 'orders' | 'receipts' | 'reminders' | 'suppliers'
 
@@ -77,8 +78,32 @@ const orderActionConfig = {
 
 const auth = useAuthStore()
 const operatorId = computed(() => auth.currentUser?.id)
-const activeTab = ref<PurchaseTab>('orders')
-const summary = ref<PurchaseOverviewSummary>()
+const canViewOrders = computed(() => auth.hasPermission(PermissionCode.PurchaseOrderView))
+const canCreateOrder = computed(() => auth.hasPermission(PermissionCode.PurchaseOrderCreate))
+const canSubmitOrder = computed(() => auth.hasPermission(PermissionCode.PurchaseOrderSubmit))
+const canCancelOrder = computed(() => auth.hasPermission(PermissionCode.PurchaseOrderCancel))
+const canViewReceipts = computed(() => auth.hasPermission(PermissionCode.PurchaseReceiptView))
+const canCreateReceipt = computed(() => auth.hasPermission(PermissionCode.PurchaseReceiptCreate))
+const canViewReminders = computed(() => auth.hasPermission(PermissionCode.PurchaseOverdueView))
+const canGenerateReminders = computed(() =>
+  auth.hasPermission(PermissionCode.PurchaseOverdueGenerate),
+)
+const canHandleReminders = computed(() => auth.hasPermission(PermissionCode.PurchaseOverdueHandle))
+const canViewSuppliers = computed(() => auth.hasPermission(PermissionCode.PurchaseSupplierView))
+function getInitialTab(): PurchaseTab {
+  if (canViewOrders.value) {
+    return 'orders'
+  }
+  if (canViewReceipts.value) {
+    return 'receipts'
+  }
+  if (canViewReminders.value) {
+    return 'reminders'
+  }
+  return 'suppliers'
+}
+const activeTab = ref<PurchaseTab>(getInitialTab())
+const summary = ref<Partial<PurchaseOverviewSummary>>()
 const summaryLoading = ref(false)
 const summaryError = ref('')
 let alive = true
@@ -286,6 +311,9 @@ async function loadReferenceData() {
 }
 
 async function loadOrders() {
+  if (!canViewOrders.value) {
+    return
+  }
   const currentRequestId = ++orderRequestId
   orderLoading.value = true
   orderError.value = ''
@@ -314,6 +342,9 @@ async function loadOrders() {
 }
 
 async function loadReceipts() {
+  if (!canViewReceipts.value) {
+    return
+  }
   const currentRequestId = ++receiptRequestId
   receiptLoading.value = true
   receiptError.value = ''
@@ -336,6 +367,9 @@ async function loadReceipts() {
 }
 
 async function loadReminders() {
+  if (!canViewReminders.value) {
+    return
+  }
   const currentRequestId = ++reminderRequestId
   reminderLoading.value = true
   reminderError.value = ''
@@ -358,6 +392,9 @@ async function loadReminders() {
 }
 
 async function loadSuppliers() {
+  if (!canViewSuppliers.value) {
+    return
+  }
   const currentRequestId = ++supplierRequestId
   supplierLoading.value = true
   supplierError.value = ''
@@ -589,6 +626,9 @@ async function submitOrderForm() {
 }
 
 async function viewOrder(orderId: number) {
+  if (!canViewOrders.value) {
+    return
+  }
   const currentRequestId = ++detailRequestId
   detailDrawerOpen.value = true
   detailLoading.value = true
@@ -596,10 +636,28 @@ async function viewOrder(orderId: number) {
   detailReceipts.value = []
   detailReminders.value = []
   try {
+    let receiptPromise = Promise.resolve({
+      items: [] as PurchaseReceiptItem[],
+      page: 1,
+      pageSize: 50,
+      total: 0,
+    })
+    if (canViewReceipts.value) {
+      receiptPromise = purchaseService.listReceipts({ orderId, page: 1, pageSize: 50 })
+    }
+    let reminderPromise = Promise.resolve({
+      items: [] as PurchaseReminderItem[],
+      page: 1,
+      pageSize: 50,
+      total: 0,
+    })
+    if (canViewReminders.value) {
+      reminderPromise = purchaseService.listReminders({ orderId, page: 1, pageSize: 50 })
+    }
     const [result, receiptResult, reminderResult] = await Promise.all([
       purchaseService.getOrder(orderId),
-      purchaseService.listReceipts({ orderId, page: 1, pageSize: 50 }),
-      purchaseService.listReminders({ orderId, page: 1, pageSize: 50 }),
+      receiptPromise,
+      reminderPromise,
     ])
     if (alive && currentRequestId === detailRequestId) {
       selectedOrder.value = result
@@ -751,7 +809,7 @@ async function submitReminder() {
 watch(activeTab, loadActiveTab)
 onMounted(() => {
   void loadSummary()
-  void loadOrders()
+  loadActiveTab()
   void loadReferenceData()
 })
 onBeforeUnmount(() => {
@@ -774,7 +832,11 @@ onBeforeUnmount(() => {
     >
       <template #actions>
         <el-button :icon="Refresh" :loading="refreshing" @click="refreshAll">刷新数据</el-button>
-        <el-button :icon="CirclePlus" type="primary" @click="openOrderDialog()"
+        <el-button
+          v-if="canCreateOrder"
+          :icon="CirclePlus"
+          type="primary"
+          @click="openOrderDialog()"
           >新建采购订单</el-button
         >
       </template>
@@ -820,7 +882,7 @@ onBeforeUnmount(() => {
 
     <el-card class="purchase-card table-card table-card--accent" shadow="never">
       <el-tabs v-model="activeTab">
-        <el-tab-pane name="orders">
+        <el-tab-pane v-if="canViewOrders" name="orders">
           <template #label
             ><span class="tab-label"
               ><el-icon><Document /></el-icon>采购订单</span
@@ -913,9 +975,13 @@ onBeforeUnmount(() => {
             <el-table v-else :data="orderItems" stripe>
               <el-table-column label="订单 ID" min-width="100"
                 ><template #default="{ row }"
-                  ><el-button link type="primary" @click="viewOrder(row.orderId)"
+                  ><el-button
+                    v-if="canViewOrders"
+                    link
+                    type="primary"
+                    @click="viewOrder(row.orderId)"
                     >#{{ row.orderId }}</el-button
-                  ></template
+                  ><span v-else>#{{ row.orderId }}</span></template
                 ></el-table-column
               >
               <el-table-column label="供应商" min-width="190"
@@ -961,20 +1027,22 @@ onBeforeUnmount(() => {
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewOrder(row.orderId)">详情</el-button
                   ><el-button
-                    v-if="row.status === 'draft'"
+                    v-if="canSubmitOrder && row.status === 'draft'"
                     :loading="actingOrderId === row.orderId"
                     link
                     type="primary"
                     @click="changeOrderStatus(row, 'submit')"
                     >提交</el-button
                   ><el-button
-                    v-if="['submitted', 'partial_received'].includes(row.status)"
+                    v-if="
+                      canCreateReceipt && ['submitted', 'partial_received'].includes(row.status)
+                    "
                     link
                     type="success"
                     @click="openReceiptDialog(row)"
                     >收货</el-button
                   ><el-button
-                    v-if="['draft', 'submitted'].includes(row.status)"
+                    v-if="canCancelOrder && ['draft', 'submitted'].includes(row.status)"
                     :loading="actingOrderId === row.orderId"
                     link
                     type="danger"
@@ -997,7 +1065,7 @@ onBeforeUnmount(() => {
           />
         </el-tab-pane>
 
-        <el-tab-pane name="suppliers">
+        <el-tab-pane v-if="canViewSuppliers" name="suppliers">
           <template #label
             ><span class="tab-label"
               ><el-icon><OfficeBuilding /></el-icon>供应商列表</span
@@ -1068,7 +1136,7 @@ onBeforeUnmount(() => {
           />
         </el-tab-pane>
 
-        <el-tab-pane name="receipts">
+        <el-tab-pane v-if="canViewReceipts" name="receipts">
           <template #label
             ><span class="tab-label"
               ><el-icon><Van /></el-icon>收货记录</span
@@ -1095,7 +1163,13 @@ onBeforeUnmount(() => {
               ><el-button :icon="Search" type="primary" @click="searchReceipts">查询</el-button
               ><el-button @click="resetReceiptQuery">重置</el-button>
             </div>
-            <el-button :icon="Plus" type="primary" @click="openReceiptDialog()">登记收货</el-button>
+            <el-button
+              v-if="canCreateReceipt"
+              :icon="Plus"
+              type="primary"
+              @click="openReceiptDialog()"
+              >登记收货</el-button
+            >
           </div>
           <el-alert
             v-if="receiptError"
@@ -1117,9 +1191,13 @@ onBeforeUnmount(() => {
                 label="采购订单 ID"
                 min-width="110"
                 ><template #default="{ row }"
-                  ><el-button link type="primary" @click="viewOrder(row.orderId)"
+                  ><el-button
+                    v-if="canViewOrders"
+                    link
+                    type="primary"
+                    @click="viewOrder(row.orderId)"
                     >#{{ row.orderId }}</el-button
-                  ></template
+                  ><span v-else>#{{ row.orderId }}</span></template
                 ></el-table-column
               ><el-table-column label="物料" min-width="210"
                 ><template #default="{ row }"
@@ -1147,7 +1225,7 @@ onBeforeUnmount(() => {
           />
         </el-tab-pane>
 
-        <el-tab-pane name="reminders">
+        <el-tab-pane v-if="canViewReminders" name="reminders">
           <template #label
             ><span class="tab-label"
               ><el-icon><Bell /></el-icon>逾期催交</span
@@ -1175,6 +1253,7 @@ onBeforeUnmount(() => {
               ><el-button @click="resetReminderQuery">重置</el-button>
             </div>
             <el-button
+              v-if="canGenerateReminders"
               :icon="Bell"
               :loading="generatingReminders"
               type="primary"
@@ -1202,9 +1281,13 @@ onBeforeUnmount(() => {
                 label="采购订单 ID"
                 min-width="110"
                 ><template #default="{ row }"
-                  ><el-button link type="primary" @click="viewOrder(row.orderId)"
+                  ><el-button
+                    v-if="canViewOrders"
+                    link
+                    type="primary"
+                    @click="viewOrder(row.orderId)"
                     >#{{ row.orderId }}</el-button
-                  ></template
+                  ><span v-else>#{{ row.orderId }}</span></template
                 ></el-table-column
               ><el-table-column
                 label="预计交期"
@@ -1231,7 +1314,7 @@ onBeforeUnmount(() => {
               ><el-table-column fixed="right" label="操作" min-width="100"
                 ><template #default="{ row }"
                   ><el-button
-                    v-if="row.status !== 'received'"
+                    v-if="canHandleReminders && row.status !== 'received'"
                     link
                     type="primary"
                     @click="openReminderDialog(row)"
@@ -1521,32 +1604,43 @@ onBeforeUnmount(() => {
                 ><el-progress
                   :percentage="Math.round(row.receiveProgress * 100)"
                   :stroke-width="7" /></template></el-table-column></el-table
-          ><el-divider content-position="left">收货记录</el-divider
-          ><EmptyState
-            v-if="!detailReceipts.length"
-            description="该采购订单暂无收货记录。" /><el-table v-else :data="detailReceipts" stripe
-            ><el-table-column label="物料" min-width="180"
-              ><template #default="{ row }">{{
-                row.materialName || `物料 #${row.materialId}`
-              }}</template></el-table-column
-            ><el-table-column label="本次数量" min-width="110" prop="quantity" /><el-table-column
-              label="收货日期"
-              min-width="130"
-              prop="receiveDate" /></el-table
-          ><el-divider content-position="left">催交信息</el-divider
-          ><EmptyState
-            v-if="!detailReminders.length"
-            description="该采购订单暂无催交记录。" /><el-table v-else :data="detailReminders" stripe
-            ><el-table-column label="提醒时间" min-width="160"
-              ><template #default="{ row }">{{
-                formatDateTime(row.remindTime)
-              }}</template></el-table-column
-            ><el-table-column label="状态" min-width="110"
-              ><template #default="{ row }"
-                ><StatusTag
-                  :labels="reminderStatusLabels"
-                  :value="row.status" /></template></el-table-column
-            ><el-table-column label="处理备注" min-width="180" prop="remark" /></el-table
+          ><template v-if="canViewReceipts"
+            ><el-divider content-position="left">收货记录</el-divider
+            ><EmptyState
+              v-if="!detailReceipts.length"
+              description="该采购订单暂无收货记录。" /><el-table
+              v-else
+              :data="detailReceipts"
+              stripe
+              ><el-table-column label="物料" min-width="180"
+                ><template #default="{ row }">{{
+                  row.materialName || `物料 #${row.materialId}`
+                }}</template></el-table-column
+              ><el-table-column label="本次数量" min-width="110" prop="quantity" /><el-table-column
+                label="收货日期"
+                min-width="130"
+                prop="receiveDate" /></el-table></template
+          ><template v-if="canViewReminders"
+            ><el-divider content-position="left">催交信息</el-divider
+            ><EmptyState
+              v-if="!detailReminders.length"
+              description="该采购订单暂无催交记录。" /><el-table
+              v-else
+              :data="detailReminders"
+              stripe
+              ><el-table-column label="提醒时间" min-width="160"
+                ><template #default="{ row }">{{
+                  formatDateTime(row.remindTime)
+                }}</template></el-table-column
+              ><el-table-column label="状态" min-width="110"
+                ><template #default="{ row }"
+                  ><StatusTag
+                    :labels="reminderStatusLabels"
+                    :value="row.status" /></template></el-table-column
+              ><el-table-column
+                label="处理备注"
+                min-width="180"
+                prop="remark" /></el-table></template
         ></template></div
     ></el-drawer>
   </PageContainer>

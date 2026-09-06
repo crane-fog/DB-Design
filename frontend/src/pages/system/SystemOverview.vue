@@ -8,7 +8,8 @@ import {
   systemDashboardShortcuts,
 } from '@/services/DashboardService'
 import { formatDateTime, formatNumber } from '@/utils/format'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PermissionCode } from '@/constants/permissions'
+import type { PermissionCode as PermissionCodeValue } from '@/api'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getErrorMessage } from '@/utils/error'
@@ -37,13 +38,13 @@ const visibleStatistics = computed(() =>
   (dashboard.value?.statistics ?? []).filter((statistic) => canAccess(statistic.permission)),
 )
 const visibleOperations = computed(() => {
-  if (!canAccess(PERMISSIONS.system.auditView)) {
+  if (!canAccess(PermissionCode.SystemAuditOperationView)) {
     return []
   }
   return dashboard.value?.recentOperations.items ?? []
 })
 const operationsEmptyText = computed(() => {
-  if (!canAccess(PERMISSIONS.system.auditView)) {
+  if (!canAccess(PermissionCode.SystemAuditOperationView)) {
     return '当前账号无权查看操作日志'
   }
   if (!dashboard.value || dashboard.value.recentOperations.state === 'error') {
@@ -52,11 +53,11 @@ const operationsEmptyText = computed(() => {
   return '暂无系统操作记录'
 })
 
-function canAccess(permission?: string) {
+function canAccess(permission?: PermissionCodeValue) {
   return !permission || hasDashboardPermission(auth, permission)
 }
 
-function navigateTo(route?: string, permission?: string) {
+function navigateTo(route?: string, permission?: PermissionCodeValue) {
   if (route && canAccess(permission)) {
     void router.push(route)
   }
@@ -70,7 +71,6 @@ async function loadDashboard() {
   try {
     const result = await dashboardService.getSystemDashboard({
       permissions: [...auth.permissions],
-      roles: [...auth.roles],
     })
     if (!isUnmounted && currentRequestId === requestId) {
       dashboard.value = result
@@ -88,7 +88,7 @@ async function loadDashboard() {
 }
 
 watch(
-  () => [auth.permissions, auth.roles],
+  () => auth.permissions,
   () => void loadDashboard(),
   { deep: true, immediate: true },
 )
@@ -171,10 +171,10 @@ onUnmounted(() => {
         <div class="card-header table-card__header">
           <span>最近系统操作</span
           ><el-button
-            v-if="canAccess('system:audit:view')"
+            v-if="canAccess(PermissionCode.SystemAuditOperationView)"
             link
             type="primary"
-            @click="navigateTo('/system/audit-logs', 'system:audit:view')"
+            @click="navigateTo('/system/audit-logs', PermissionCode.SystemAuditOperationView)"
             >查看更多</el-button
           >
         </div>

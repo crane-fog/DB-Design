@@ -7,6 +7,7 @@ import type {
   MaterialShortageResult,
 } from '@/types/inventory'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { PermissionCode } from '@/constants/permissions'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
@@ -29,6 +30,9 @@ interface BuyerOption {
 }
 
 const auth = useAuthStore()
+const canCreatePurchaseOrder = computed(() =>
+  auth.hasPermission(PermissionCode.PurchaseOrderCreate),
+)
 const router = useRouter()
 const calculating = ref(false)
 const creatingDrafts = ref(false)
@@ -218,7 +222,7 @@ async function createPurchaseDrafts() {
 }
 
 async function loadBuyerOptions() {
-  if (!auth.roles.some((role) => ['系统管理员', '采购员', '采购主管'].includes(role))) {
+  if (!auth.hasPermission(PermissionCode.PurchaseBuyerView)) {
     return
   }
   buyerLoading.value = true
@@ -359,44 +363,46 @@ onBeforeUnmount(() => {
             <span
               >总缺口 <strong>{{ formatNumber(totalShortage) }}</strong></span
             >
-            <el-date-picker
-              v-model="draftExpectedDate"
-              placeholder="采购预计交期"
-              type="date"
-              value-format="YYYY-MM-DD"
-            />
-            <el-input-number
-              :controls="false"
-              v-if="!buyerOptions.length"
-              v-model="selectedBuyerId"
-              :min="1"
-              :precision="0"
-              placeholder="输入采购员编号"
-            />
-            <el-select
-              v-else
-              v-model="selectedBuyerId"
-              :disabled="buyerLoading"
-              :loading="buyerLoading"
-              placeholder="请选择采购员"
-              style="width: 180px"
-            >
-              <el-option
-                v-for="buyer in buyerOptions"
-                :key="buyer.buyerId"
-                :label="buyer.buyerName"
-                :value="buyer.buyerId"
+            <template v-if="canCreatePurchaseOrder">
+              <el-date-picker
+                v-model="draftExpectedDate"
+                placeholder="采购预计交期"
+                type="date"
+                value-format="YYYY-MM-DD"
               />
-            </el-select>
-            <el-button
-              :icon="ShoppingCart"
-              :loading="creatingDrafts"
-              :disabled="buyerLoading"
-              type="primary"
-              @click="createPurchaseDrafts"
-            >
-              生成采购草稿
-            </el-button>
+              <el-input-number
+                :controls="false"
+                v-if="!buyerOptions.length"
+                v-model="selectedBuyerId"
+                :min="1"
+                :precision="0"
+                placeholder="输入采购员编号"
+              />
+              <el-select
+                v-else
+                v-model="selectedBuyerId"
+                :disabled="buyerLoading"
+                :loading="buyerLoading"
+                placeholder="请选择采购员"
+                style="width: 180px"
+              >
+                <el-option
+                  v-for="buyer in buyerOptions"
+                  :key="buyer.buyerId"
+                  :label="buyer.buyerName"
+                  :value="buyer.buyerId"
+                />
+              </el-select>
+              <el-button
+                :icon="ShoppingCart"
+                :loading="creatingDrafts"
+                :disabled="buyerLoading"
+                type="primary"
+                @click="createPurchaseDrafts"
+              >
+                生成采购草稿
+              </el-button>
+            </template>
           </div>
         </div>
       </template>

@@ -10,6 +10,7 @@ import type {
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { PermissionCode } from '@/constants/permissions'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
@@ -20,6 +21,9 @@ import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
+const canCreateInbound = computed(() =>
+  auth.hasPermission(PermissionCode.InventoryCompletionCreate),
+)
 const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
@@ -277,7 +281,9 @@ onBeforeUnmount(() => {
     >
       <template #actions>
         <el-button :icon="Refresh" :loading="loading" @click="loadItems">刷新</el-button>
-        <el-button :icon="Plus" type="primary" @click="openDialog">登记入库</el-button>
+        <el-button v-if="canCreateInbound" :icon="Plus" type="primary" @click="openDialog"
+          >登记入库</el-button
+        >
       </template>
     </PageHeader>
 

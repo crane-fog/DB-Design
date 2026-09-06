@@ -1,6 +1,7 @@
+import type { PermissionCode } from '@/api'
+
 export interface DashboardAccess {
-  permissions: readonly string[]
-  roles: readonly string[]
+  permissions: readonly PermissionCode[]
 }
 
 export type DashboardStatisticKey =
@@ -14,7 +15,7 @@ export type DashboardStatisticKey =
 export interface DashboardStatistic {
   description: string
   key: DashboardStatisticKey
-  permission: string
+  permission: PermissionCode
   route: string
   title: string
   /** 未加载成功时不显示数字，不能用 0 代替未知总数。 */
@@ -26,7 +27,7 @@ export type DashboardShortcutIcon = 'audit' | 'materials' | 'roles' | 'users'
 export interface DashboardShortcut {
   description: string
   icon: DashboardShortcutIcon
-  permission: string
+  permission: PermissionCode
   route: string
   title: string
 }
@@ -34,7 +35,7 @@ export interface DashboardShortcut {
 export interface DashboardTodo {
   createdAt: string
   id: string
-  permission: string
+  permission: PermissionCode
   route: string
   statusLabel: string
   title: string

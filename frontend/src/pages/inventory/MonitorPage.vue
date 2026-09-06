@@ -21,12 +21,31 @@ import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
 import { inventoryMonitorStatusLabels as statusLabels } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 type MonitorTab = 'alerts' | 'locks' | 'obsolete'
 
 const auth = useAuthStore()
 const operatorId = computed(() => auth.currentUser?.id)
-const activeTab = ref<MonitorTab>('alerts')
+const canViewAlerts = computed(() => auth.hasPermission(PermissionCode.InventoryAlertView))
+const canGenerateAlerts = computed(() => auth.hasPermission(PermissionCode.InventoryAlertGenerate))
+const canHandleAlerts = computed(() => auth.hasPermission(PermissionCode.InventoryAlertHandle))
+const canViewLocks = computed(() => auth.hasPermission(PermissionCode.InventoryLockView))
+const canCreateLocks = computed(() => auth.hasPermission(PermissionCode.InventoryLockCreate))
+const canReleaseLocks = computed(() => auth.hasPermission(PermissionCode.InventoryLockRelease))
+const canViewObsolete = computed(() => auth.hasPermission(PermissionCode.InventoryObsoleteView))
+const canDetectObsolete = computed(() => auth.hasPermission(PermissionCode.InventoryObsoleteDetect))
+const canHandleObsolete = computed(() => auth.hasPermission(PermissionCode.InventoryObsoleteHandle))
+function getInitialTab(): MonitorTab {
+  if (canViewAlerts.value) {
+    return 'alerts'
+  }
+  if (canViewLocks.value) {
+    return 'locks'
+  }
+  return 'obsolete'
+}
+const activeTab = ref<MonitorTab>(getInitialTab())
 let alive = true
 const referenceLoading = ref(false)
 const referenceError = ref('')
@@ -105,18 +124,23 @@ const lockOrderOptions = computed(() =>
 )
 
 async function loadReferenceData() {
+  if (!canCreateLocks.value) {
+    return
+  }
   referenceLoading.value = true
   referenceError.value = ''
   try {
-    const [references, stocks] = await Promise.all([
-      inventoryService.getReferenceData(),
-      inventoryService.listStocks({ page: 1, pageSize: 100 }),
-    ])
+    const references = await inventoryService.getReferenceData()
+    let stockItems: InventoryStockData[] = []
+    if (auth.hasPermission(PermissionCode.InventoryStockView)) {
+      const stocks = await inventoryService.listStocks({ page: 1, pageSize: 100 })
+      stockItems = stocks.items
+    }
     if (!alive) {
       return
     }
     referenceData.value = references
-    lockMaterialOptions.value = stocks.items.filter((item) => item.availableQty > 0)
+    lockMaterialOptions.value = stockItems.filter((item) => item.availableQty > 0)
   } catch (error) {
     if (alive) {
       referenceError.value = getErrorMessage(error, '库存操作选项加载失败')
@@ -129,6 +153,9 @@ async function loadReferenceData() {
 }
 
 async function loadAlerts() {
+  if (!canViewAlerts.value) {
+    return
+  }
   const currentRequestId = ++alertRequestId
   alertLoading.value = true
   alertError.value = ''
@@ -155,6 +182,9 @@ async function loadAlerts() {
 }
 
 async function loadLocks() {
+  if (!canViewLocks.value) {
+    return
+  }
   const currentRequestId = ++lockRequestId
   lockLoading.value = true
   lockError.value = ''
@@ -177,6 +207,9 @@ async function loadLocks() {
 }
 
 async function loadObsolete() {
+  if (!canViewObsolete.value) {
+    return
+  }
   const currentRequestId = ++obsoleteRequestId
   obsoleteLoading.value = true
   obsoleteError.value = ''
@@ -480,7 +513,7 @@ async function handleObsolete(item: ObsoleteMaterialItem, status: 'handled' | 'i
 
 watch(activeTab, loadActiveTab)
 onMounted(() => {
-  void loadAlerts()
+  loadActiveTab()
   void loadReferenceData()
 })
 onBeforeUnmount(() => {
@@ -514,7 +547,7 @@ onBeforeUnmount(() => {
 
     <el-card class="monitor-card table-card" shadow="never">
       <el-tabs v-model="activeTab">
-        <el-tab-pane name="alerts">
+        <el-tab-pane v-if="canViewAlerts" name="alerts">
           <template #label
             ><span class="tab-label"
               ><el-icon><Bell /></el-icon>库存预警</span
@@ -545,7 +578,11 @@ onBeforeUnmount(() => {
               <el-button :icon="Search" type="primary" @click="searchAlerts">查询</el-button>
               <el-button @click="resetAlertQuery">重置</el-button>
             </div>
-            <el-button :icon="Plus" type="primary" @click="generateDialogOpen = true"
+            <el-button
+              v-if="canGenerateAlerts"
+              :icon="Plus"
+              type="primary"
+              @click="generateDialogOpen = true"
               >生成预警</el-button
             >
           </div>
@@ -593,7 +630,7 @@ onBeforeUnmount(() => {
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewAlertDetail(row.alertId)"
                     >详情</el-button
-                  ><template v-if="row.status === 'pending'"
+                  ><template v-if="canHandleAlerts && row.status === 'pending'"
                     ><el-button
                       :disabled="handlingAlert !== undefined"
                       link
@@ -632,7 +669,7 @@ onBeforeUnmount(() => {
           />
         </el-tab-pane>
 
-        <el-tab-pane name="locks">
+        <el-tab-pane v-if="canViewLocks" name="locks">
           <template #label
             ><span class="tab-label"
               ><el-icon><Lock /></el-icon>库存锁定</span
@@ -660,7 +697,9 @@ onBeforeUnmount(() => {
               <el-button :icon="Search" type="primary" @click="searchLocks">查询</el-button
               ><el-button @click="resetLockQuery">重置</el-button>
             </div>
-            <el-button :icon="Lock" type="primary" @click="openLockDialog">锁定库存</el-button>
+            <el-button v-if="canCreateLocks" :icon="Lock" type="primary" @click="openLockDialog"
+              >锁定库存</el-button
+            >
           </div>
           <el-alert
             v-if="lockError"
@@ -708,7 +747,7 @@ onBeforeUnmount(() => {
               <el-table-column fixed="right" label="操作" min-width="100"
                 ><template #default="{ row }"
                   ><el-button
-                    v-if="row.status === 'locked'"
+                    v-if="canReleaseLocks && row.status === 'locked'"
                     :disabled="releasingLockId !== undefined"
                     link
                     :loading="releasingLockId === row.lockId"
@@ -732,7 +771,7 @@ onBeforeUnmount(() => {
           />
         </el-tab-pane>
 
-        <el-tab-pane name="obsolete">
+        <el-tab-pane v-if="canViewObsolete" name="obsolete">
           <template #label
             ><span class="tab-label"
               ><el-icon><Warning /></el-icon>呆滞物料</span
@@ -762,7 +801,11 @@ onBeforeUnmount(() => {
               <el-button :icon="Search" type="primary" @click="searchObsolete">查询</el-button
               ><el-button @click="resetObsoleteQuery">重置</el-button>
             </div>
-            <el-button :icon="Warning" type="primary" @click="detectDialogOpen = true"
+            <el-button
+              v-if="canDetectObsolete"
+              :icon="Warning"
+              type="primary"
+              @click="detectDialogOpen = true"
               >执行检测</el-button
             >
           </div>
@@ -813,7 +856,7 @@ onBeforeUnmount(() => {
                 ><template #default="{ row }"
                   ><el-button link type="primary" @click="viewObsoleteDetail(row.detectionId)"
                     >详情</el-button
-                  ><template v-if="row.status === 'pending'"
+                  ><template v-if="canHandleObsolete && row.status === 'pending'"
                     ><el-button
                       :disabled="handlingObsolete !== undefined"
                       link

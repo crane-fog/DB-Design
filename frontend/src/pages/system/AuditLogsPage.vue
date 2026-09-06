@@ -8,6 +8,7 @@ import {
 } from '@/services/SystemService'
 import { Refresh, View } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { formatDateTime } from '@/utils/format'
@@ -16,7 +17,6 @@ import { useAuthStore } from '@/stores/auth'
 
 const pageSize = 10
 const auth = useAuthStore()
-const activeTab = ref<'login' | 'operation'>('login')
 const loginFilters = reactive({ result: '', timeRange: [] as string[], userId: '' })
 const operationFilters = reactive({
   action: '',
@@ -41,8 +41,17 @@ const operationResult = ref<PageResult<SystemOperationLog>>({
 const detailDialogVisible = ref(false)
 const selectedOperation = ref<SystemOperationLog>()
 
-const canViewAudit = computed(() => auth.hasPermission('system:audit:view'))
-const canResolveAuditUserNames = computed(() => auth.hasPermission('system:user:view'))
+const canViewLoginAudit = computed(() => auth.hasPermission(PermissionCode.SystemAuditLoginView))
+const canViewOperationAudit = computed(() =>
+  auth.hasPermission(PermissionCode.SystemAuditOperationView),
+)
+const canViewAudit = computed(() => canViewLoginAudit.value || canViewOperationAudit.value)
+const canResolveAuditUserNames = computed(() => auth.hasPermission(PermissionCode.SystemUserView))
+let initialTab: 'login' | 'operation' = 'operation'
+if (canViewLoginAudit.value) {
+  initialTab = 'login'
+}
+const activeTab = ref<'login' | 'operation'>(initialTab)
 
 function selectedUserId(value: string) {
   const userId = Number(value)
@@ -64,7 +73,7 @@ function getTimeRange(timeRange: string[]) {
 }
 
 async function loadLoginLogs(targetPage = loginPage.value) {
-  if (!canViewAudit.value) {
+  if (!canViewLoginAudit.value) {
     return
   }
 
@@ -92,7 +101,7 @@ async function loadLoginLogs(targetPage = loginPage.value) {
 }
 
 async function loadOperationLogs(targetPage = operationPage.value) {
-  if (!canViewAudit.value) {
+  if (!canViewOperationAudit.value) {
     return
   }
 
@@ -142,7 +151,13 @@ function openOperationDetail(log: SystemOperationLog) {
   detailDialogVisible.value = true
 }
 
-onMounted(() => void loadLoginLogs())
+onMounted(() => {
+  if (canViewLoginAudit.value) {
+    void loadLoginLogs()
+  } else {
+    void loadOperationLogs()
+  }
+})
 </script>
 
 <template>
@@ -152,12 +167,12 @@ onMounted(() => void loadLoginLogs())
     <el-result
       v-if="!canViewAudit"
       icon="warning"
-      sub-title="当前账号没有 system:audit:view 权限。"
+      sub-title="当前账号没有登录日志或操作日志查看权限。"
       title="无审计日志查看权限"
     />
 
     <el-tabs v-else v-model="activeTab" class="audit-tabs" @tab-change="handleTabChange">
-      <el-tab-pane label="登录日志" name="login">
+      <el-tab-pane v-if="canViewLoginAudit" label="登录日志" name="login">
         <el-card class="audit-search-card" shadow="never">
           <el-form :model="loginFilters" inline @submit.prevent="loadLoginLogs(1)">
             <el-form-item label="用户编号">
@@ -257,7 +272,7 @@ onMounted(() => void loadLoginLogs())
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="操作日志" name="operation">
+      <el-tab-pane v-if="canViewOperationAudit" label="操作日志" name="operation">
         <el-card class="audit-search-card" shadow="never">
           <el-form :model="operationFilters" inline @submit.prevent="loadOperationLogs(1)">
             <el-form-item label="操作人编号">

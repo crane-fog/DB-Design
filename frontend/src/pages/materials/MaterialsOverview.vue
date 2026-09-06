@@ -16,6 +16,7 @@ import type {
 } from '@/types/material'
 import { EditPen, Plus, Refresh, Search, View } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { PermissionCode } from '@/constants/permissions'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import BomTreeDiagram from '@/components/materials/BomTreeDiagram.vue'
 import BomVersionSelect from '@/components/materials/BomVersionSelect.vue'
@@ -109,9 +110,37 @@ const reverseResult = ref<BomReverseTraceResult[]>([])
 const reverseError = ref('')
 const reverseQueried = ref(false)
 
-const canManage = computed(
-  () => auth.hasPermission('material:manage') || auth.hasRole('系统管理员'),
+const canCreateMaterial = computed(() => auth.hasPermission(PermissionCode.MaterialItemCreate))
+const canUpdateMaterial = computed(() => auth.hasPermission(PermissionCode.MaterialItemUpdate))
+const canCreateBomVersion = computed(() =>
+  auth.hasPermission(PermissionCode.MaterialBomVersionCreate),
 )
+const canUpdateBomVersion = computed(() =>
+  auth.hasPermission(PermissionCode.MaterialBomVersionUpdate),
+)
+const canCreateBom = computed(() => auth.hasPermission(PermissionCode.MaterialBomCreate))
+const canUpdateBom = computed(() => auth.hasPermission(PermissionCode.MaterialBomUpdate))
+const canDeleteBom = computed(() => auth.hasPermission(PermissionCode.MaterialBomDelete))
+const canAnalyze = computed(
+  () =>
+    auth.hasPermission(PermissionCode.MaterialLossCalculate) &&
+    auth.hasPermission(PermissionCode.MaterialBomTreeView),
+)
+const canModifyCurrentSection = computed(() => {
+  if (section === 'materials') {
+    return canCreateMaterial.value || canUpdateMaterial.value
+  }
+  if (section === 'bom') {
+    return (
+      canCreateBomVersion.value ||
+      canUpdateBomVersion.value ||
+      canCreateBom.value ||
+      canUpdateBom.value ||
+      canDeleteBom.value
+    )
+  }
+  return true
+})
 const treeBom = computed(() => bomOptions.value.find((bom) => bom.bomId === treeBomId.value))
 const analysisBom = computed(() =>
   bomOptions.value.find((bom) => bom.bomId === analysisBomId.value),
@@ -587,7 +616,7 @@ watch([reverseBomId, reverseIncludeHistory], () => {
     </PageHeader>
 
     <el-alert
-      v-if="!canManage"
+      v-if="!canModifyCurrentSection"
       :closable="false"
       class="permission-tip"
       show-icon
@@ -653,7 +682,11 @@ watch([reverseBomId, reverseIncludeHistory], () => {
         </el-form>
         <div class="table-toolbar">
           <span>共 {{ materialResult.total }} 条物料</span
-          ><el-button v-if="canManage" :icon="Plus" type="primary" @click="openMaterialEditor()"
+          ><el-button
+            v-if="canCreateMaterial"
+            :icon="Plus"
+            type="primary"
+            @click="openMaterialEditor()"
             >新增物料</el-button
           >
         </div>
@@ -685,7 +718,7 @@ watch([reverseBomId, reverseIncludeHistory], () => {
               ><el-button :icon="View" link type="primary" @click="openMaterialDetail(row)"
                 >查看</el-button
               ><el-button
-                v-if="canManage"
+                v-if="canUpdateMaterial"
                 :icon="EditPen"
                 link
                 type="primary"
@@ -724,7 +757,12 @@ watch([reverseBomId, reverseIncludeHistory], () => {
             @change="selectBom"
           ></BomVersionSelect>
           <el-form-item>
-            <el-button v-if="canManage" :icon="Plus" type="primary" @click="openVersionEditor">
+            <el-button
+              v-if="canCreateBomVersion"
+              :icon="Plus"
+              type="primary"
+              @click="openVersionEditor"
+            >
               创建版本
             </el-button>
           </el-form-item>
@@ -785,13 +823,13 @@ watch([reverseBomId, reverseIncludeHistory], () => {
                     @click="selectBom(row.bomId)"
                     >查看</el-button
                   ><el-button
-                    v-if="canManage"
+                    v-if="canUpdateBomVersion"
                     link
                     type="primary"
                     @click="openVersionDateEditor(row)"
                     >修改失效日期</el-button
                   ><el-popconfirm
-                    v-if="canManage && !row.isCurrent"
+                    v-if="canUpdateMaterial && !row.isCurrent"
                     title="将切换该物料的当前版本；后端会校验有效期与循环依赖，是否继续？"
                     confirm-button-text="确认生效"
                     @confirm="releaseBom(row.bomId)"
@@ -806,7 +844,11 @@ watch([reverseBomId, reverseIncludeHistory], () => {
             >
             <div class="section-heading">
               <h3>组件明细</h3>
-              <el-button v-if="canManage" :icon="Plus" type="primary" @click="openComponentEditor()"
+              <el-button
+                v-if="canCreateBom"
+                :icon="Plus"
+                type="primary"
+                @click="openComponentEditor()"
                 >新增明细</el-button
               >
             </div>
@@ -827,10 +869,14 @@ watch([reverseBomId, reverseIncludeHistory], () => {
                 ></el-table-column
               ><el-table-column label="操作" min-width="150"
                 ><template #default="{ row }"
-                  ><el-button v-if="canManage" link type="primary" @click="openComponentEditor(row)"
+                  ><el-button
+                    v-if="canUpdateBom"
+                    link
+                    type="primary"
+                    @click="openComponentEditor(row)"
                     >编辑</el-button
                   ><el-popconfirm
-                    v-if="canManage"
+                    v-if="canDeleteBom"
                     title="移除后无法恢复，是否继续？"
                     confirm-button-text="移除"
                     @confirm="removeBomComponent(row.componentId)"
@@ -888,7 +934,7 @@ watch([reverseBomId, reverseIncludeHistory], () => {
           </el-form-item>
           <el-form-item>
             <el-button
-              :disabled="!canManage || !analysisBomId"
+              :disabled="!canAnalyze || !analysisBomId"
               :loading="analysisLoading"
               type="primary"
               @click="runAnalysis"

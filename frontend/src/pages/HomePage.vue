@@ -16,7 +16,8 @@ import {
   homeDashboardShortcuts,
 } from '@/services/DashboardService'
 import { formatDateTime, formatNumber } from '@/utils/format'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PermissionCode } from '@/constants/permissions'
+import type { PermissionCode as PermissionCodeValue } from '@/api'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getErrorMessage } from '@/utils/error'
@@ -56,13 +57,13 @@ const visibleTodos = computed(() =>
   (dashboard.value?.todos.items ?? []).filter((todo) => canAccess(todo.permission)),
 )
 const visibleOperations = computed(() => {
-  if (!canAccess(PERMISSIONS.system.auditView)) {
+  if (!canAccess(PermissionCode.SystemAuditOperationView)) {
     return []
   }
   return dashboard.value?.recentOperations.items ?? []
 })
 const operationsEmptyText = computed(() => {
-  if (!canAccess(PERMISSIONS.system.auditView)) {
+  if (!canAccess(PermissionCode.SystemAuditOperationView)) {
     return '当前账号无权查看操作日志'
   }
   if (!dashboard.value || dashboard.value.recentOperations.state === 'error') {
@@ -71,7 +72,10 @@ const operationsEmptyText = computed(() => {
   return '暂无最近操作记录'
 })
 const todosEmptyText = computed(() => {
-  if (!canAccess(PERMISSIONS.inventory.monitor) && !canAccess(PERMISSIONS.purchase.view)) {
+  if (
+    !canAccess(PermissionCode.InventoryAlertView) &&
+    !canAccess(PermissionCode.PurchaseOverdueView)
+  ) {
     return '当前账号无权查看库存预警或采购提醒'
   }
   if (!dashboard.value || dashboard.value.todos.state === 'error') {
@@ -83,11 +87,11 @@ const todosEmptyText = computed(() => {
   return '权限范围内暂无待处理库存预警或待催交采购提醒'
 })
 
-function canAccess(permission?: string) {
+function canAccess(permission?: PermissionCodeValue) {
   return !permission || hasDashboardPermission(auth, permission)
 }
 
-function navigateTo(route?: string, permission?: string) {
+function navigateTo(route?: string, permission?: PermissionCodeValue) {
   if (route && canAccess(permission)) {
     void router.push(route)
   }
@@ -101,7 +105,6 @@ async function loadDashboard() {
   try {
     const result = await dashboardService.getHomeDashboard({
       permissions: [...auth.permissions],
-      roles: [...auth.roles],
     })
     if (!isUnmounted && currentRequestId === requestId) {
       dashboard.value = result
@@ -119,7 +122,7 @@ async function loadDashboard() {
 }
 
 watch(
-  () => [auth.permissions, auth.roles],
+  () => auth.permissions,
   () => void loadDashboard(),
   { deep: true, immediate: true },
 )

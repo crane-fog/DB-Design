@@ -25,7 +25,6 @@ import type {
 } from '@/api'
 import { productionApi } from '@/api/client'
 import { toUtcDateTime } from '@/utils/time'
-import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
 
@@ -479,16 +478,11 @@ function requireData<TData>(response: ApiEnvelope<TData>): NonNullable<TData> {
 
 export const productionService = {
   async addExternalOrder(form: ExternalOrderCreateFormData) {
-    const auth = useAuthStore()
-    let { customerId } = form
-    if (auth.hasRole('外部客户')) {
-      customerId = undefined
-    }
     const response = await productionApi.addExternalOrder({
       externalOrderCreateRequest: {
         contact_person: form.contactPerson.trim(),
         contact_phone: form.contactPhone.trim(),
-        customer_id: customerId,
+        customer_id: form.customerId,
         expected_date: form.expectedDate,
         material_id: form.materialId,
         quantity: form.quantity,

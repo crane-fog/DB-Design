@@ -11,6 +11,7 @@ import {
 import { EditPen, Key, Plus, Refresh, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { formatDateTime } from '@/utils/format'
@@ -57,8 +58,13 @@ const userForm = reactive<UserFormModel>({
 })
 const passwordForm = reactive({ confirmPassword: '', password: '' })
 
-const canCreate = computed(() => auth.hasPermission('system:user:create'))
-const canUpdate = computed(() => auth.hasPermission('system:user:update'))
+const canCreate = computed(() => auth.hasPermission(PermissionCode.SystemUserCreate))
+const canUpdate = computed(() => auth.hasPermission(PermissionCode.SystemUserUpdate))
+const canAssignRole = computed(
+  () =>
+    auth.hasPermission(PermissionCode.SystemUserAssignRole) &&
+    auth.hasPermission(PermissionCode.SystemRoleView),
+)
 const userDialogTitle = computed(() => {
   if (userDialogMode.value === 'create') {
     return '新增用户'
@@ -128,6 +134,12 @@ function resetUserForm() {
   userFormRef.value?.clearValidate()
 }
 
+async function reloadAccessIfCurrentUser(userId: number) {
+  if (auth.currentUser?.id === userId) {
+    auth.setAccess(await systemService.loadCurrentAccess())
+  }
+}
+
 async function loadUsers(targetPage = page.value) {
   loading.value = true
   error.value = ''
@@ -187,6 +199,7 @@ async function submitUserForm() {
     } else if (editingUserId.value !== undefined) {
       const { password: _password, ...form } = userForm
       await systemService.updateUser(editingUserId.value, form)
+      await reloadAccessIfCurrentUser(editingUserId.value)
       ElMessage.success('用户信息已更新')
     }
     userDialogVisible.value = false
@@ -220,6 +233,7 @@ async function updateStatus(user: SystemUser) {
       },
     )
     await systemService.updateUserStatus(user.id, nextStatus)
+    await reloadAccessIfCurrentUser(user.id)
     ElMessage.success(`用户已${action}`)
     await loadUsers(page.value)
   } catch (requestError) {
@@ -296,6 +310,10 @@ async function submitRoleAssignment() {
   if (!roleTarget.value || roleLoading.value || roleSubmitting.value || roleError.value) {
     return
   }
+  if (roleTarget.value.status === 'disabled' && roleIds.value.length) {
+    ElMessage.warning('停用用户只能清空已有角色')
+    return
+  }
 
   roleSubmitting.value = true
   try {
@@ -307,7 +325,8 @@ async function submitRoleAssignment() {
         type: 'warning',
       },
     )
-    await systemService.assignUserRoles(roleTarget.value.id, roleIds.value)
+    await systemService.setUserRoles(roleTarget.value.id, roleIds.value)
+    await reloadAccessIfCurrentUser(roleTarget.value.id)
     roleDialogVisible.value = false
     ElMessage.success('用户角色已更新')
     await loadUsers(page.value)
@@ -388,18 +407,39 @@ onMounted(() => void loadUsers())
         <el-table-column label="创建时间" min-width="165">
           <template #default="{ row }">{{ formatDateTime(row.createdTime) }}</template>
         </el-table-column>
-        <el-table-column v-if="canUpdate" fixed="right" label="操作" min-width="270">
+        <el-table-column
+          v-if="canUpdate || canAssignRole"
+          fixed="right"
+          label="操作"
+          min-width="270"
+        >
           <template #default="{ row }">
-            <el-button link type="primary" :icon="EditPen" @click="openEditDialog(row)"
+            <el-button
+              v-if="canUpdate"
+              link
+              type="primary"
+              :icon="EditPen"
+              @click="openEditDialog(row)"
               >编辑</el-button
             >
-            <el-button link type="primary" :icon="Key" @click="openPasswordDialog(row)"
+            <el-button
+              v-if="canUpdate"
+              link
+              type="primary"
+              :icon="Key"
+              @click="openPasswordDialog(row)"
               >重置密码</el-button
             >
-            <el-button link type="primary" :icon="UserFilled" @click="openRoleDialog(row)"
+            <el-button
+              v-if="canAssignRole"
+              link
+              type="primary"
+              :icon="UserFilled"
+              @click="openRoleDialog(row)"
               >分配角色</el-button
             >
             <el-button
+              v-if="canUpdate"
               link
               :disabled="statusSubmitting"
               :type="row.status === 'valid' ? 'danger' : 'success'"
@@ -529,6 +569,14 @@ onMounted(() => void loadUsers())
           type="error"
         />
         <template v-else>
+          <el-alert
+            v-if="roleTarget.status === 'disabled'"
+            class="role-disabled-hint"
+            :closable="false"
+            show-icon
+            title="该用户已停用，只能清空已有角色。"
+            type="warning"
+          />
           <el-alert
             v-if="
               assignedRoleIds.some((roleId) =>

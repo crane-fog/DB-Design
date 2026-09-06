@@ -8,22 +8,25 @@ import {
   optionalText,
   unwrap,
 } from '@/services/pagination'
-import type {
-  CurrentAccessData,
-  LoginData,
-  LoginLog,
-  LoginRequest,
-  OperationLog,
-  Permission,
-  RegisterRequest,
-  Role,
-  RolePermission,
-  User,
-  UserRole,
+import {
+  PermissionCode,
+  type CurrentAccessData,
+  type LoginData,
+  type LoginLog,
+  type LoginRequest,
+  type OperationLog,
+  type Permission,
+  type RegisterRequest,
+  type Role,
+  type RoleBrief,
+  type RolePermission,
+  type User,
+  type UserRole,
 } from '@/api'
-import { PERMISSIONS } from '@/constants/permissions'
 import { getRequestStatus } from '@/services/request'
+import { pinia } from '@/stores/pinia'
 import { toUtcDateTime } from '@/utils/time'
+import { useAuthStore } from '@/stores/auth'
 
 export { getRequestStatus }
 export type { PageResult }
@@ -116,7 +119,7 @@ export interface PermissionTreeLeaf {
 }
 
 export interface PermissionTreeNode {
-  children: PermissionTreeLeaf[]
+  children: (PermissionTreeLeaf | PermissionTreeNode)[]
   id: string
   label: string
 }
@@ -152,8 +155,8 @@ export interface SystemOperationLog {
 
 export interface SystemAccessContext {
   currentUser: Pick<SystemUser, 'employeeNo' | 'name'> & { id?: number }
-  permissions: string[]
-  roles: string[]
+  permissions: PermissionCode[]
+  roles: RoleBrief[]
 }
 
 function asAccountStatus(value: unknown): AccountStatus {
@@ -192,34 +195,6 @@ function toSystemRole(role: Role): SystemRole | undefined {
     name: role.role_name ?? '',
     status: asAccountStatus(role.status),
   }
-}
-
-const permissionResourceCodes: Record<string, string> = {
-  BOM: 'material',
-  外部订单: 'external-order',
-  库存: 'inventory',
-  物料: 'material',
-  生产线: 'production',
-  生产订单: 'production',
-  用户管理: 'system:user',
-  质量追溯: 'trace',
-  采购订单: 'purchase',
-}
-
-const permissionActionCodes: Record<string, string> = {
-  修改: 'update',
-  创建: 'create',
-  审核: 'approve',
-  查看: 'view',
-}
-
-function toPermissionCode(permission: Permission) {
-  const resource = permission.resource && permissionResourceCodes[permission.resource]
-  const action = permission.action && permissionActionCodes[permission.action]
-  if (!resource || !action) {
-    return undefined
-  }
-  return `${resource}:${action}`
 }
 
 function toLoginResult(value: unknown): LoginResult | undefined {
@@ -296,35 +271,55 @@ function toPermissionTreeLeaf(permission: Permission): PermissionTreeLeaf | unde
     return undefined
   }
 
-  const action = optionalText(permission.action) ?? '未命名操作'
   return {
     id: `permission:${permission.permission_id}`,
-    label: action,
+    label: `${permission.action_name}（${permission.permission_code}）`,
     permissionId: permission.permission_id,
   }
 }
 
 function buildPermissionTree(permissions: Permission[]) {
-  const groups = new Map<string, PermissionTreeNode>()
-  for (const permission of permissions) {
+  const modules = new Map<
+    string,
+    { node: PermissionTreeNode; resources: Map<string, PermissionTreeNode> }
+  >()
+  const sortedPermissions = permissions.filter((permission) => permission.status === 'valid')
+  sortedPermissions.sort(
+    (left: Permission, right: Permission) =>
+      left.sort_order - right.sort_order || left.permission_id - right.permission_id,
+  )
+
+  for (const permission of sortedPermissions) {
     const leaf = toPermissionTreeLeaf(permission)
     if (leaf) {
-      const resource = optionalText(permission.resource) ?? '未分类资源'
-      const group = groups.get(resource) ?? {
-        children: [],
-        id: `resource:${resource}`,
-        label: resource,
+      const moduleName = permission.module_name || '未分类模块'
+      const resourceName = permission.resource_name || '未分类资源'
+      const moduleEntry: {
+        node: PermissionTreeNode
+        resources: Map<string, PermissionTreeNode>
+      } = modules.get(moduleName) ?? {
+        node: {
+          children: [],
+          id: `module:${moduleName}`,
+          label: moduleName,
+        },
+        resources: new Map<string, PermissionTreeNode>(),
       }
-      group.children.push(leaf)
-      groups.set(resource, group)
+      const resource: PermissionTreeNode = moduleEntry.resources.get(resourceName) ?? {
+        children: [],
+        id: `resource:${moduleName}:${resourceName}`,
+        label: resourceName,
+      }
+      resource.children.push(leaf)
+      moduleEntry.resources.set(resourceName, resource)
+      if (!moduleEntry.node.children.includes(resource)) {
+        moduleEntry.node.children.push(resource)
+      }
+      modules.set(moduleName, moduleEntry)
     }
   }
 
-  const tree: PermissionTreeNode[] = []
-  for (const group of groups.values()) {
-    tree.push({ children: group.children, id: group.id, label: group.label })
-  }
-  return tree
+  return [...modules.values()].map(({ node }) => node)
 }
 
 function toPermissionId(nodeKey: unknown) {
@@ -397,44 +392,13 @@ async function loadCurrentAccess(): Promise<SystemAccessContext> {
   const access = unwrap(response.data as ApiEnvelope<CurrentAccessData>)
   const currentUser = access?.current_user
 
-  if (!access || !currentUser || !access.roles || !access.permissions) {
+  if (!access || !currentUser || !access.roles || !access.permission_codes) {
     throw new Error('当前登录用户的权限数据不完整')
   }
 
   // uniqueItems 被生成为 Set，实际 JSON 为数组；按可迭代集合读取以兼容两者。
-  const roles = [...new Set(access.roles)]
-  const permissionCodes = new Set(
-    [...access.permissions]
-      .map(toPermissionCode)
-      .filter((permission): permission is string => Boolean(permission)),
-  )
-
-  if (roles.includes('系统管理员')) {
-    Object.values(PERMISSIONS)
-      .flatMap((modulePermissions) => Object.values(modulePermissions))
-      .forEach((permission) => permissionCodes.add(permission))
-  }
-
-  // 将后端返回的业务角色映射到页面入口；与 UserContextService 的角色检查保持一致。
-  if (roles.includes('生产管理员')) {
-    Object.values(PERMISSIONS.production).forEach((permission) => permissionCodes.add(permission))
-    Object.values(PERMISSIONS.material).forEach((permission) => permissionCodes.add(permission))
-  }
-  if (roles.some((role) => role === '生产管理员' || role === '库存管理员')) {
-    Object.values(PERMISSIONS.inventory).forEach((permission) => permissionCodes.add(permission))
-  }
-  if (roles.some((role) => role === '采购员' || role === '采购主管')) {
-    Object.values(PERMISSIONS.purchase).forEach((permission) => permissionCodes.add(permission))
-  }
-  if (roles.includes('采购员')) {
-    permissionCodes.add(PERMISSIONS.material.view)
-  }
-  if (roles.includes('外部客户')) {
-    permissionCodes.add(PERMISSIONS.production.view)
-  }
-  if (roles.includes('质量管理员')) {
-    Object.values(PERMISSIONS.trace).forEach((permission) => permissionCodes.add(permission))
-  }
+  const roles = [...new Map(access.roles.map((role) => [role.role_id, role])).values()]
+  const permissionCodes = [...new Set(access.permission_codes)]
 
   return {
     currentUser: {
@@ -442,29 +406,12 @@ async function loadCurrentAccess(): Promise<SystemAccessContext> {
       id: currentUser.user_id,
       name: currentUser.user_name,
     },
-    permissions: [...permissionCodes],
+    permissions: permissionCodes,
     roles,
   }
 }
 
 export const systemService = {
-  async assignRolePermissions(roleId: number, permissionIds: number[]) {
-    if (!permissionIds.length) {
-      throw new Error('请至少选择一个权限')
-    }
-    const response = await systemApi.addRolePermission({
-      rolePermissionAssignRequest: { permission_ids: permissionIds, role_id: roleId },
-    })
-    return unwrap(response.data as ApiEnvelope<unknown>)
-  },
-
-  async assignUserRoles(userId: number, roleIds: number[]) {
-    const response = await systemApi.addUserRole({
-      userRoleAssignRequest: { role_ids: roleIds, user_id: userId },
-    })
-    return unwrap(response.data as ApiEnvelope<unknown>)
-  },
-
   async createRole(form: RoleFormData) {
     const response = await systemApi.addRoleData({
       roleCreateRequest: {
@@ -505,58 +452,6 @@ export const systemService = {
   },
 
   getUserTest: () => Api.getUserTest(),
-
-  async listInternalUsers(query: UserQuery): Promise<PageResult<SystemUser>> {
-    const response = await systemApi.listUserData({
-      employeeNo: query.employeeNo || undefined,
-      page: 1,
-      pageSize: 100,
-      status: query.status,
-      userName: query.userName || undefined,
-    })
-    const data = unwrap(response.data as ApiEnvelope<unknown>)
-    const allUsers = getPageItems<User>(data)
-      .map(toSystemUser)
-      .filter((user): user is SystemUser => Boolean(user))
-
-    const userRoles = await getAllPageItems<UserRole>((page, pageSize) =>
-      systemApi.listUserRoleData({ page, pageSize }),
-    )
-    const roles = await getAllPageItems<Role>((page, pageSize) =>
-      systemApi.listRoleData({ page, pageSize }),
-    )
-
-    const roleMap = new Map(
-      roles
-        .map((role) => [role.role_id, role.role_name])
-        .filter(
-          (pair): pair is [number, string] =>
-            typeof pair[0] === 'number' && typeof pair[1] === 'string',
-        ),
-    )
-
-    const externalCustomerUserIds = new Set(
-      userRoles
-        .filter((ur) => {
-          if (ur.role_id === undefined) {
-            return false
-          }
-          const roleName = roleMap.get(ur.role_id)
-          return roleName === '外部客户'
-        })
-        .map((ur) => ur.user_id)
-        .filter((id): id is number => typeof id === 'number'),
-    )
-
-    const internalUsers = allUsers.filter((user) => !externalCustomerUserIds.has(user.id))
-
-    return {
-      items: internalUsers,
-      page: 1,
-      pageSize: internalUsers.length,
-      total: internalUsers.length,
-    }
-  },
 
   async listLoginLogs(
     query: LoginLogQuery,
@@ -622,11 +517,22 @@ export const systemService = {
       status: query.status,
     })
     const data = unwrap(response.data as ApiEnvelope<unknown>)
-    const [userRelations, permissionRelations] = await Promise.all([
-      getAllPageItems<UserRole>((page, pageSize) => systemApi.listUserRoleData({ page, pageSize })),
-      getAllPageItems<RolePermission>((page, pageSize) =>
+    const auth = useAuthStore(pinia)
+    let userRelationsPromise = Promise.resolve<UserRole[]>([])
+    if (auth.hasPermission(PermissionCode.SystemUserAssignRole)) {
+      userRelationsPromise = getAllPageItems<UserRole>((page, pageSize) =>
+        systemApi.listUserRoleData({ page, pageSize }),
+      )
+    }
+    let permissionRelationsPromise = Promise.resolve<RolePermission[]>([])
+    if (auth.hasPermission(PermissionCode.SystemRoleAssignPermission)) {
+      permissionRelationsPromise = getAllPageItems<RolePermission>((page, pageSize) =>
         systemApi.listRolePermissionData({ page, pageSize }),
-      ),
+      )
+    }
+    const [userRelations, permissionRelations] = await Promise.all([
+      userRelationsPromise,
+      permissionRelationsPromise,
     ])
     const userCounts = countRoleRelations(userRelations)
     const permissionCounts = countRoleRelations(permissionRelations)
@@ -657,6 +563,27 @@ export const systemService = {
     return getPageItems<Role>(data)
       .map(toSystemRole)
       .filter((role): role is SystemRole => Boolean(role))
+  },
+
+  async listUserOptions(query: UserQuery): Promise<PageResult<SystemUser>> {
+    const response = await systemApi.listUserData({
+      employeeNo: query.employeeNo || undefined,
+      page: 1,
+      pageSize: 100,
+      status: query.status,
+      userName: query.userName || undefined,
+    })
+    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const items = getPageItems<User>(data)
+      .map(toSystemUser)
+      .filter((user): user is SystemUser => Boolean(user))
+
+    return {
+      items,
+      page: 1,
+      pageSize: items.length,
+      total: items.length,
+    }
   },
 
   async listUserRoleIds(userId: number) {
@@ -701,9 +628,9 @@ export const systemService = {
       ),
     ])
     const tree = buildPermissionTree(permissions)
-    const allPermissionNodeKeys = tree.flatMap((group) =>
-      group.children.map((permission) => permission.id),
-    )
+    const allPermissionNodeKeys = permissions
+      .filter((permission) => permission.status === 'valid')
+      .map((permission) => `permission:${permission.permission_id}`)
     const checkedPermissionNodeKeys = rolePermissions
       .filter(
         (relation) => relation.role_id === roleId && typeof relation.permission_id === 'number',
@@ -733,6 +660,23 @@ export const systemService = {
   async resetUserPassword(userId: number, password: string) {
     const response = await systemApi.updateUserData({
       userUpdateRequest: { password: await hashPassword(password), user_id: userId },
+    })
+    return unwrap(response.data as ApiEnvelope<unknown>)
+  },
+
+  async setRolePermissions(roleId: number, permissionIds: number[]) {
+    const response = await systemApi.setRolePermissions({
+      rolePermissionSetRequest: {
+        permission_ids: permissionIds as unknown as Set<number>,
+        role_id: roleId,
+      },
+    })
+    return unwrap(response.data as ApiEnvelope<unknown>)
+  },
+
+  async setUserRoles(userId: number, roleIds: number[]) {
+    const response = await systemApi.setUserRoles({
+      userRoleSetRequest: { role_ids: roleIds as unknown as Set<number>, user_id: userId },
     })
     return unwrap(response.data as ApiEnvelope<unknown>)
   },

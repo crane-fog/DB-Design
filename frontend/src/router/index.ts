@@ -1,4 +1,4 @@
-import { PERMISSIONS, type PermissionCode } from '@/constants/permissions'
+import { PermissionCode, type PermissionCodeValue } from '@/constants/permissions'
 import { type RouteRecordRaw, createRouter, createWebHistory } from 'vue-router'
 import { pinia } from '@/stores/pinia'
 import { systemService } from '@/services/SystemService'
@@ -10,7 +10,7 @@ declare module 'vue-router' {
     isModule?: boolean
     module?: string
     pageOrder?: number
-    permission?: PermissionCode
+    permissions?: readonly PermissionCodeValue[]
     requiresAuth?: boolean
     showInMenu?: boolean
     showOverviewInMenu?: boolean
@@ -38,7 +38,15 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'materials',
       pageOrder: 1,
-      permission: PERMISSIONS.material.view,
+      permissions: [
+        PermissionCode.MaterialItemView,
+        PermissionCode.MaterialBomVersionView,
+        PermissionCode.MaterialBomView,
+        PermissionCode.MaterialBomTreeView,
+        PermissionCode.MaterialBomReverseView,
+        PermissionCode.MaterialCostCalculate,
+        PermissionCode.MaterialLossCalculate,
+      ],
       requiresAuth: true,
       showInMenu: true,
       title: '物料管理',
@@ -52,7 +60,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'materials',
       pageOrder: 2,
-      permission: PERMISSIONS.material.view,
+      permissions: [PermissionCode.MaterialItemView],
       requiresAuth: true,
       showInMenu: true,
       title: '物料主数据',
@@ -65,7 +73,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'materials',
       pageOrder: 3,
-      permission: PERMISSIONS.material.view,
+      permissions: [PermissionCode.MaterialBomVersionView, PermissionCode.MaterialBomView],
       requiresAuth: true,
       showInMenu: true,
       title: 'BOM 维护与版本',
@@ -78,7 +86,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'materials',
       pageOrder: 4,
-      permission: PERMISSIONS.material.view,
+      permissions: [PermissionCode.MaterialBomTreeView],
       requiresAuth: true,
       showInMenu: true,
       title: 'BOM 结构树',
@@ -91,7 +99,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'materials',
       pageOrder: 5,
-      permission: PERMISSIONS.material.view,
+      permissions: [PermissionCode.MaterialCostCalculate, PermissionCode.MaterialLossCalculate],
       requiresAuth: true,
       showInMenu: true,
       title: '用料分析',
@@ -104,7 +112,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'materials',
       pageOrder: 6,
-      permission: PERMISSIONS.material.view,
+      permissions: [PermissionCode.MaterialBomReverseView],
       requiresAuth: true,
       showInMenu: true,
       title: 'BOM 反向追溯',
@@ -119,7 +127,7 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'inventory',
       pageOrder: 2,
-      permission: PERMISSIONS.inventory.view,
+      permissions: [PermissionCode.InventoryStockView],
       requiresAuth: true,
       showInMenu: true,
       showOverviewInMenu: true,
@@ -134,7 +142,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'calc',
       module: 'inventory',
       pageOrder: 3,
-      permission: PERMISSIONS.inventory.calc,
+      permissions: [PermissionCode.InventoryShortageCalculate],
       requiresAuth: true,
       showInMenu: true,
       title: '物料缺口计算',
@@ -148,7 +156,11 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'monitor',
       module: 'inventory',
       pageOrder: 4,
-      permission: PERMISSIONS.inventory.monitor,
+      permissions: [
+        PermissionCode.InventoryAlertView,
+        PermissionCode.InventoryLockView,
+        PermissionCode.InventoryObsoleteView,
+      ],
       requiresAuth: true,
       showInMenu: true,
       title: '库存监控',
@@ -162,7 +174,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'register',
       module: 'inventory',
       pageOrder: 5,
-      permission: PERMISSIONS.inventory.register,
+      permissions: [PermissionCode.InventoryCompletionView],
       requiresAuth: true,
       showInMenu: true,
       title: '完工入库登记',
@@ -177,7 +189,11 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'purchase',
       pageOrder: 6,
-      permission: PERMISSIONS.purchase.view,
+      permissions: [
+        PermissionCode.PurchaseOrderView,
+        PermissionCode.PurchaseReceiptView,
+        PermissionCode.PurchaseOverdueView,
+      ],
       requiresAuth: true,
       showInMenu: true,
       title: '采购管理',
@@ -192,7 +208,16 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'production',
       pageOrder: 7,
-      permission: PERMISSIONS.production.view,
+      permissions: [
+        PermissionCode.ProductionOrderView,
+        PermissionCode.ProductionLineView,
+        PermissionCode.ProductionLineTypeView,
+        PermissionCode.ProductionCapacityConfigView,
+        PermissionCode.ProductionCalendarView,
+        PermissionCode.ProductionFaultView,
+        PermissionCode.ExternalOrderViewOwn,
+        PermissionCode.ExternalOrderViewAll,
+      ],
       requiresAuth: true,
       showInMenu: true,
       showOverviewInMenu: true,
@@ -207,7 +232,12 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'capacity',
       module: 'production',
       pageOrder: 8,
-      permission: PERMISSIONS.production.capacity,
+      permissions: [
+        PermissionCode.ProductionLineView,
+        PermissionCode.ProductionLineTypeView,
+        PermissionCode.ProductionCapacityConfigView,
+        PermissionCode.ProductionCalendarView,
+      ],
       requiresAuth: true,
       showInMenu: true,
       title: '产能配置',
@@ -221,7 +251,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'orders',
       module: 'production',
       pageOrder: 9,
-      permission: PERMISSIONS.production.orders,
+      permissions: [PermissionCode.ProductionOrderView],
       requiresAuth: true,
       showInMenu: true,
       title: '生产订单',
@@ -235,7 +265,13 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'breakdown',
       module: 'production',
       pageOrder: 10,
-      permission: PERMISSIONS.production.breakdown,
+      permissions: [
+        PermissionCode.ProductionFaultView,
+        PermissionCode.ProductionFaultReport,
+        PermissionCode.ProductionFaultClaim,
+        PermissionCode.ProductionFaultUpdateAssigned,
+        PermissionCode.ProductionFaultUpdateAny,
+      ],
       requiresAuth: true,
       showInMenu: true,
       title: '故障反馈',
@@ -249,7 +285,16 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'monitor',
       module: 'production',
       pageOrder: 11,
-      permission: PERMISSIONS.production.view,
+      permissions: [
+        PermissionCode.ExternalOrderViewOwn,
+        PermissionCode.ExternalOrderViewAll,
+        PermissionCode.ExternalOrderCreateOwn,
+        PermissionCode.ExternalOrderCreateForCustomer,
+        PermissionCode.ProductionCapacityEstimate,
+        PermissionCode.ProductionCapacityDetect,
+        PermissionCode.ProductionCapacityBalance,
+        PermissionCode.ProductionLineStatusUpdate,
+      ],
       requiresAuth: true,
       showInMenu: true,
       title: '生产运营',
@@ -263,7 +308,11 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'trace',
       pageOrder: 12,
-      permission: PERMISSIONS.trace.view,
+      permissions: [
+        PermissionCode.TraceConsumptionView,
+        PermissionCode.TraceProductView,
+        PermissionCode.TraceMaterialView,
+      ],
       requiresAuth: true,
       showInMenu: true,
       title: '质量追溯',
@@ -277,7 +326,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'trace',
       pageOrder: 13,
-      permission: PERMISSIONS.trace.view,
+      permissions: [PermissionCode.TraceConsumptionView],
       requiresAuth: true,
       showInMenu: true,
       title: '批次消耗',
@@ -290,7 +339,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'trace',
       pageOrder: 14,
-      permission: PERMISSIONS.trace.view,
+      permissions: [PermissionCode.TraceProductView],
       requiresAuth: true,
       showInMenu: true,
       title: '正向追溯',
@@ -303,7 +352,7 @@ const adminRoutes: RouteRecordRaw[] = [
     meta: {
       module: 'trace',
       pageOrder: 15,
-      permission: PERMISSIONS.trace.view,
+      permissions: [PermissionCode.TraceMaterialView],
       requiresAuth: true,
       showInMenu: true,
       title: '反向追溯',
@@ -318,7 +367,13 @@ const adminRoutes: RouteRecordRaw[] = [
       isModule: true,
       module: 'system',
       pageOrder: 13,
-      permission: PERMISSIONS.system.view,
+      permissions: [
+        PermissionCode.SystemUserView,
+        PermissionCode.SystemRoleView,
+        PermissionCode.SystemPermissionView,
+        PermissionCode.SystemAuditLoginView,
+        PermissionCode.SystemAuditOperationView,
+      ],
       requiresAuth: true,
       showInMenu: true,
       showOverviewInMenu: true,
@@ -333,7 +388,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'users',
       module: 'system',
       pageOrder: 14,
-      permission: PERMISSIONS.system.userView,
+      permissions: [PermissionCode.SystemUserView],
       requiresAuth: true,
       showInMenu: true,
       title: '账号管理',
@@ -347,7 +402,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'audit',
       module: 'system',
       pageOrder: 16,
-      permission: PERMISSIONS.system.auditView,
+      permissions: [PermissionCode.SystemAuditLoginView, PermissionCode.SystemAuditOperationView],
       requiresAuth: true,
       showInMenu: true,
       title: '操作审计',
@@ -361,7 +416,7 @@ const adminRoutes: RouteRecordRaw[] = [
       icon: 'roles',
       module: 'system',
       pageOrder: 15,
-      permission: PERMISSIONS.system.roleView,
+      permissions: [PermissionCode.SystemRoleView],
       requiresAuth: true,
       showInMenu: true,
       title: '角色管理',
@@ -407,9 +462,7 @@ router.beforeEach(async (to) => {
   if (initializedAccessToken !== auth.token) {
     try {
       const access = await systemService.loadCurrentAccess()
-      auth.setCurrentUser(access.currentUser)
-      auth.setRoles(access.roles)
-      auth.setPermissions(access.permissions)
+      auth.setAccess(access)
       initializedAccessToken = auth.token
     } catch {
       auth.logout(false)
@@ -418,7 +471,7 @@ router.beforeEach(async (to) => {
     }
   }
 
-  if (typeof to.meta.permission === 'string' && !auth.hasPermission(to.meta.permission)) {
+  if (to.meta.permissions?.length && !auth.hasAnyPermission(...to.meta.permissions)) {
     return { name: 'forbidden', replace: true }
   }
 

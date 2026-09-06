@@ -29,14 +29,10 @@ async function handleLoginSuccess(result: AuthLoginResult, employeeNo: string) {
   }
 
   auth.setToken(accessToken, Math.floor(Date.now() / 1000) + expiresInSeconds)
-  auth.setCurrentUser({ employeeNo })
-  auth.setRoles([])
-  auth.setPermissions([])
+  auth.setAccess({ currentUser: { employeeNo }, permissions: [], roles: [] })
   try {
     const access = await authService.initializeAccess()
-    auth.setCurrentUser(access.currentUser)
-    auth.setRoles(access.roles)
-    auth.setPermissions(access.permissions)
+    auth.setAccess(access)
   } catch (error) {
     const status = getRequestStatus(error)
     if (status === 401) {
