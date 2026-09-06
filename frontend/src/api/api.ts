@@ -728,13 +728,13 @@ export interface ConsumedMaterialBatch {
 export interface CurrentAccessData {
     'current_user': CurrentAccessUser;
     /**
-     * 当前用户全部有效角色的名称，去重且不分页；无有效角色时为空数组。系统管理员保留现有全权限语义。
+     * 当前用户全部有效角色，仅用于身份展示和角色管理，不参与前后端授权判断。
      */
-    'roles': Set<string>;
+    'roles': Array<RoleBrief>;
     /**
-     * 当前用户有效角色关联的全部权限，按 permission_id 去重且不分页；无有效角色时为空数组。有效系统管理员返回全部已登记权限。
+     * 当前用户全部有效角色关联权限码的并集。无有效角色或角色均未配置权限时为空数组。
      */
-    'permissions': Set<Permission>;
+    'permission_codes': Set<PermissionCode>;
 }
 export interface CurrentAccessResponse {
     /**
@@ -866,7 +866,7 @@ export interface ExternalOrderConvertResult {
  */
 export interface ExternalOrderCreateRequest {
     /**
-     * 外部客户自提交时不得传，由当前登录用户推导；仅生产管理员或系统管理员代录时可传，后端必须按登录角色校验。
+     * 使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。
      */
     'customer_id'?: number | null;
     'material_id': number;
@@ -2153,22 +2153,174 @@ export interface PageResult {
     'records': Array<any>;
 }
 export interface Permission {
-    'permission_id'?: number;
-    'resource'?: string;
-    'action'?: string;
-}
-export interface PermissionBrief {
-    'permission_id'?: number;
-    'resource'?: string;
-    'action'?: string;
-}
-export interface PermissionCreateRequest {
-    'resource': string;
-    'action': string;
-}
-export interface PermissionDeleteRequest {
     'permission_id': number;
+    'permission_code': PermissionCode;
+    /**
+     * 权限在管理界面中的模块分组名称。
+     */
+    'module_name': string;
+    /**
+     * 权限对应资源的显示名称。
+     */
+    'resource_name': string;
+    /**
+     * 权限对应操作的显示名称。
+     */
+    'action_name': string;
+    'description'?: string | null;
+    'sort_order': number;
+    /**
+     * valid 权限参与授权和角色配置；disabled 权限不再产生有效授权。
+     */
+    'status': PermissionStatusEnum;
 }
+
+export const PermissionStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type PermissionStatusEnum = typeof PermissionStatusEnum[keyof typeof PermissionStatusEnum];
+
+export interface PermissionBrief {
+    'permission_id': number;
+    'permission_code': PermissionCode;
+    /**
+     * 权限在管理界面中的模块分组名称。
+     */
+    'module_name': string;
+    /**
+     * 权限对应资源的显示名称。
+     */
+    'resource_name': string;
+    /**
+     * 权限对应操作的显示名称。
+     */
+    'action_name': string;
+    'description'?: string | null;
+    'sort_order': number;
+    /**
+     * valid 权限参与授权和角色配置；disabled 权限不再产生有效授权。
+     */
+    'status': PermissionBriefStatusEnum;
+}
+
+export const PermissionBriefStatusEnum = {
+    Valid: 'valid',
+    Disabled: 'disabled',
+} as const;
+
+export type PermissionBriefStatusEnum = typeof PermissionBriefStatusEnum[keyof typeof PermissionBriefStatusEnum];
+
+/**
+ * 稳定的系统权限标识。角色名称和显示文案可以变化，权限码只能通过版本化 API 契约与数据库迁移调整。
+ */
+
+export const PermissionCode = {
+    SystemUserView: 'system:user:view',
+    SystemUserCreate: 'system:user:create',
+    SystemUserUpdate: 'system:user:update',
+    SystemUserDelete: 'system:user:delete',
+    SystemUserAssignRole: 'system:user:assign-role',
+    SystemRoleView: 'system:role:view',
+    SystemRoleCreate: 'system:role:create',
+    SystemRoleUpdate: 'system:role:update',
+    SystemRoleDelete: 'system:role:delete',
+    SystemRoleAssignPermission: 'system:role:assign-permission',
+    SystemPermissionView: 'system:permission:view',
+    SystemAuditLoginView: 'system:audit:login:view',
+    SystemAuditOperationView: 'system:audit:operation:view',
+    SystemAuditOperationCreate: 'system:audit:operation:create',
+    MaterialItemView: 'material:item:view',
+    MaterialItemCreate: 'material:item:create',
+    MaterialItemUpdate: 'material:item:update',
+    MaterialItemDelete: 'material:item:delete',
+    MaterialCategoryView: 'material:category:view',
+    MaterialCategoryCreate: 'material:category:create',
+    MaterialCategoryUpdate: 'material:category:update',
+    MaterialCategoryDelete: 'material:category:delete',
+    MaterialBomVersionView: 'material:bom-version:view',
+    MaterialBomVersionCreate: 'material:bom-version:create',
+    MaterialBomVersionUpdate: 'material:bom-version:update',
+    MaterialBomVersionDelete: 'material:bom-version:delete',
+    MaterialBomView: 'material:bom:view',
+    MaterialBomCreate: 'material:bom:create',
+    MaterialBomUpdate: 'material:bom:update',
+    MaterialBomDelete: 'material:bom:delete',
+    MaterialBomCheckCycle: 'material:bom:check-cycle',
+    MaterialBomTreeView: 'material:bom:tree:view',
+    MaterialBomReverseView: 'material:bom:reverse:view',
+    MaterialCostCalculate: 'material:cost:calculate',
+    MaterialLossCalculate: 'material:loss:calculate',
+    InventoryStockView: 'inventory:stock:view',
+    InventoryShortageCalculate: 'inventory:shortage:calculate',
+    InventoryAlertView: 'inventory:alert:view',
+    InventoryAlertGenerate: 'inventory:alert:generate',
+    InventoryAlertHandle: 'inventory:alert:handle',
+    InventoryLockView: 'inventory:lock:view',
+    InventoryLockCreate: 'inventory:lock:create',
+    InventoryLockRelease: 'inventory:lock:release',
+    InventoryObsoleteView: 'inventory:obsolete:view',
+    InventoryObsoleteDetect: 'inventory:obsolete:detect',
+    InventoryObsoleteHandle: 'inventory:obsolete:handle',
+    InventoryCompletionView: 'inventory:completion:view',
+    InventoryCompletionCreate: 'inventory:completion:create',
+    PurchaseSupplierView: 'purchase:supplier:view',
+    PurchaseBuyerView: 'purchase:buyer:view',
+    PurchaseBuyerEligible: 'purchase:buyer:eligible',
+    PurchaseOrderView: 'purchase:order:view',
+    PurchaseOrderCreate: 'purchase:order:create',
+    PurchaseOrderSubmit: 'purchase:order:submit',
+    PurchaseOrderCancel: 'purchase:order:cancel',
+    PurchaseReceiptView: 'purchase:receipt:view',
+    PurchaseReceiptCreate: 'purchase:receipt:create',
+    PurchaseOverdueView: 'purchase:overdue:view',
+    PurchaseOverdueGenerate: 'purchase:overdue:generate',
+    PurchaseOverdueHandle: 'purchase:overdue:handle',
+    ProductionOrderView: 'production:order:view',
+    ProductionOrderCreate: 'production:order:create',
+    ProductionOrderUpdate: 'production:order:update',
+    ProductionOrderApprove: 'production:order:approve',
+    ProductionOrderStart: 'production:order:start',
+    ProductionOrderFinish: 'production:order:finish',
+    ProductionOrderCancel: 'production:order:cancel',
+    ProductionLineView: 'production:line:view',
+    ProductionLineCreate: 'production:line:create',
+    ProductionLineUpdate: 'production:line:update',
+    ProductionLineTypeView: 'production:line-type:view',
+    ProductionLineTypeUpdate: 'production:line-type:update',
+    ProductionCapacityConfigView: 'production:capacity-config:view',
+    ProductionCapacityConfigUpdate: 'production:capacity-config:update',
+    ProductionCalendarView: 'production:calendar:view',
+    ProductionCalendarUpdate: 'production:calendar:update',
+    ProductionCalendarDelete: 'production:calendar:delete',
+    ProductionCapacityEstimate: 'production:capacity:estimate',
+    ProductionCapacityDetect: 'production:capacity:detect',
+    ProductionCapacityBalance: 'production:capacity:balance',
+    ProductionFaultView: 'production:fault:view',
+    ProductionFaultReport: 'production:fault:report',
+    ProductionFaultClaim: 'production:fault:claim',
+    ProductionFaultUpdateAssigned: 'production:fault:update-assigned',
+    ProductionFaultUpdateAny: 'production:fault:update-any',
+    ProductionLineStatusUpdate: 'production:line-status:update',
+    ExternalOrderViewOwn: 'external-order:view-own',
+    ExternalOrderViewAll: 'external-order:view-all',
+    ExternalOrderCreateOwn: 'external-order:create-own',
+    ExternalOrderCreateForCustomer: 'external-order:create-for-customer',
+    ExternalOrderReview: 'external-order:review',
+    ExternalOrderConvert: 'external-order:convert',
+    TraceConsumptionView: 'trace:consumption:view',
+    TraceConsumptionCreate: 'trace:consumption:create',
+    TraceConsumptionUpdate: 'trace:consumption:update',
+    TraceConsumptionDelete: 'trace:consumption:delete',
+    TraceProductView: 'trace:product:view',
+    TraceMaterialView: 'trace:material:view',
+    TraceImpactAnalyze: 'trace:impact:analyze',
+} as const;
+
+export type PermissionCode = typeof PermissionCode[keyof typeof PermissionCode];
+
+
 export interface PermissionPageResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -2217,11 +2369,6 @@ export const PermissionResponseCodeEnum = {
 
 export type PermissionResponseCodeEnum = typeof PermissionResponseCodeEnum[keyof typeof PermissionResponseCodeEnum];
 
-export interface PermissionUpdateRequest {
-    'resource': string;
-    'action': string;
-    'permission_id': number;
-}
 export interface ProductBatchTraceResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -3443,12 +3590,12 @@ export const ReverseTraceResponseCodeEnum = {
 export type ReverseTraceResponseCodeEnum = typeof ReverseTraceResponseCodeEnum[keyof typeof ReverseTraceResponseCodeEnum];
 
 export interface Role {
-    'role_id'?: number;
-    'role_name'?: string;
+    'role_id': number;
+    'role_name': string;
     /**
      * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
      */
-    'status'?: RoleStatusEnum;
+    'status': RoleStatusEnum;
     'description'?: string | null;
 }
 
@@ -3460,12 +3607,12 @@ export const RoleStatusEnum = {
 export type RoleStatusEnum = typeof RoleStatusEnum[keyof typeof RoleStatusEnum];
 
 export interface RoleBrief {
-    'role_id'?: number;
-    'role_name'?: string;
+    'role_id': number;
+    'role_name': string;
     /**
      * 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
      */
-    'status'?: RoleBriefStatusEnum;
+    'status': RoleBriefStatusEnum;
 }
 
 export const RoleBriefStatusEnum = {
@@ -3522,38 +3669,6 @@ export interface RolePermission {
     'role_id'?: number;
     'permission_id'?: number;
 }
-export interface RolePermissionAssignRequest {
-    'role_id': number;
-    'permission_ids': Array<number>;
-}
-export interface RolePermissionAssignResponse {
-    /**
-     * 业务状态码，只使用 200、400、401、403、404、409、500。
-     */
-    'code': RolePermissionAssignResponseCodeEnum;
-    /**
-     * 返回结果说明。
-     */
-    'message': string;
-    'data': Array<RolePermission> | null;
-}
-
-export const RolePermissionAssignResponseCodeEnum = {
-    NUMBER_200: 200,
-    NUMBER_400: 400,
-    NUMBER_401: 401,
-    NUMBER_403: 403,
-    NUMBER_404: 404,
-    NUMBER_409: 409,
-    NUMBER_500: 500,
-} as const;
-
-export type RolePermissionAssignResponseCodeEnum = typeof RolePermissionAssignResponseCodeEnum[keyof typeof RolePermissionAssignResponseCodeEnum];
-
-export interface RolePermissionDeleteRequest {
-    'role_id': number;
-    'permission_id': number;
-}
 export interface RolePermissionPageResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -3577,6 +3692,37 @@ export const RolePermissionPageResponseCodeEnum = {
 } as const;
 
 export type RolePermissionPageResponseCodeEnum = typeof RolePermissionPageResponseCodeEnum[keyof typeof RolePermissionPageResponseCodeEnum];
+
+export interface RolePermissionSetRequest {
+    'role_id': number;
+    /**
+     * 替换后的完整权限编号集合；空数组表示移除角色全部权限。
+     */
+    'permission_ids': Set<number>;
+}
+export interface RolePermissionSetResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': RolePermissionSetResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<RolePermission> | null;
+}
+
+export const RolePermissionSetResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type RolePermissionSetResponseCodeEnum = typeof RolePermissionSetResponseCodeEnum[keyof typeof RolePermissionSetResponseCodeEnum];
 
 export interface RoleResponse {
     /**
@@ -3903,38 +4049,6 @@ export interface UserRole {
     'user_id'?: number;
     'role_id'?: number;
 }
-export interface UserRoleAssignRequest {
-    'user_id': number;
-    'role_ids': Array<number>;
-}
-export interface UserRoleAssignResponse {
-    /**
-     * 业务状态码，只使用 200、400、401、403、404、409、500。
-     */
-    'code': UserRoleAssignResponseCodeEnum;
-    /**
-     * 返回结果说明。
-     */
-    'message': string;
-    'data': Array<UserRole> | null;
-}
-
-export const UserRoleAssignResponseCodeEnum = {
-    NUMBER_200: 200,
-    NUMBER_400: 400,
-    NUMBER_401: 401,
-    NUMBER_403: 403,
-    NUMBER_404: 404,
-    NUMBER_409: 409,
-    NUMBER_500: 500,
-} as const;
-
-export type UserRoleAssignResponseCodeEnum = typeof UserRoleAssignResponseCodeEnum[keyof typeof UserRoleAssignResponseCodeEnum];
-
-export interface UserRoleDeleteRequest {
-    'user_id': number;
-    'role_id': number;
-}
 export interface UserRolePageResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -3958,6 +4072,37 @@ export const UserRolePageResponseCodeEnum = {
 } as const;
 
 export type UserRolePageResponseCodeEnum = typeof UserRolePageResponseCodeEnum[keyof typeof UserRolePageResponseCodeEnum];
+
+export interface UserRoleSetRequest {
+    'user_id': number;
+    /**
+     * 替换后的完整角色编号集合；空数组表示移除用户全部角色。
+     */
+    'role_ids': Set<number>;
+}
+export interface UserRoleSetResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': UserRoleSetResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': Array<UserRole> | null;
+}
+
+export const UserRoleSetResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type UserRoleSetResponseCodeEnum = typeof UserRoleSetResponseCodeEnum[keyof typeof UserRoleSetResponseCodeEnum];
 
 export interface UserUpdateRequest {
     /**
@@ -4004,7 +4149,7 @@ export type UserUpdateRequestStatusEnum = typeof UserUpdateRequestStatusEnum[key
 export const InventoryApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。需具备 inventory:completion:create；权限不足返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
          * @summary 登记完工入库
          * @param {CompletionInboundCreateRequest} completionInboundCreateRequest 
          * @param {*} [options] Override http request option.
@@ -4043,7 +4188,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。需具备 inventory:shortage:calculate；权限不足返回 code 403。
          * @summary 计算物料缺口
          * @param {MaterialShortageCalculateRequest} materialShortageCalculateRequest 
          * @param {*} [options] Override http request option.
@@ -4082,7 +4227,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。需具备 inventory:obsolete:detect；权限不足返回 code 403。
          * @summary 检测废弃物料
          * @param {ObsoleteMaterialDetectRequest} obsoleteMaterialDetectRequest 
          * @param {*} [options] Override http request option.
@@ -4121,7 +4266,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。需具备 inventory:alert:generate；权限不足返回 code 403。
          * @summary 生成库存预警事件
          * @param {InventoryAlertGenerateRequest} [inventoryAlertGenerateRequest] 
          * @param {*} [options] Override http request option.
@@ -4158,7 +4303,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。需具备 inventory:completion:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询完工入库详情
          * @param {number} inboundId 
          * @param {*} [options] Override http request option.
@@ -4199,7 +4344,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。需具备 inventory:alert:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询库存预警详情
          * @param {number} alertId 
          * @param {*} [options] Override http request option.
@@ -4240,7 +4385,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。需具备 inventory:obsolete:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询废弃物料检测详情
          * @param {number} detectionId 
          * @param {*} [options] Override http request option.
@@ -4281,7 +4426,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。需具备 inventory:alert:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
          * @summary 处理库存预警事件
          * @param {InventoryAlertHandleRequest} inventoryAlertHandleRequest 
          * @param {*} [options] Override http request option.
@@ -4320,7 +4465,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。需具备 inventory:obsolete:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
          * @summary 处理废弃物料检测结果
          * @param {ObsoleteMaterialHandleRequest} obsoleteMaterialHandleRequest 
          * @param {*} [options] Override http request option.
@@ -4359,7 +4504,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。需具备 inventory:completion:view；权限不足返回 code 403。
          * @summary 查询完工入库单
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4427,7 +4572,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。需具备 inventory:alert:view；权限不足返回 code 403。
          * @summary 查询库存预警事件
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4495,7 +4640,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。需具备 inventory:stock:view；权限不足返回 code 403。
          * @summary 分页查询物料库存
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4559,7 +4704,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询物料 locked、cancelled 和 consumed 记录。需具备 inventory:lock:view；权限不足返回 code 403。
          * @summary 查询物料锁定记录
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4618,7 +4763,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。需具备 inventory:obsolete:view；权限不足返回 code 403。
          * @summary 查询废弃物料检测结果
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4686,7 +4831,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。需具备 inventory:lock:create；权限不足返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
          * @summary 锁定物料库存
          * @param {MaterialStockLockRequest} materialStockLockRequest 
          * @param {*} [options] Override http request option.
@@ -4725,7 +4870,7 @@ export const InventoryApiAxiosParamCreator = function (configuration?: Configura
             };
         },
         /**
-         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。需具备 inventory:lock:release；权限不足返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
          * @summary 释放物料锁定
          * @param {MaterialStockReleaseRequest} materialStockReleaseRequest 
          * @param {*} [options] Override http request option.
@@ -4773,7 +4918,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = InventoryApiAxiosParamCreator(configuration)
     return {
         /**
-         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。需具备 inventory:completion:create；权限不足返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
          * @summary 登记完工入库
          * @param {CompletionInboundCreateRequest} completionInboundCreateRequest 
          * @param {*} [options] Override http request option.
@@ -4786,7 +4931,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。需具备 inventory:shortage:calculate；权限不足返回 code 403。
          * @summary 计算物料缺口
          * @param {MaterialShortageCalculateRequest} materialShortageCalculateRequest 
          * @param {*} [options] Override http request option.
@@ -4799,7 +4944,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。需具备 inventory:obsolete:detect；权限不足返回 code 403。
          * @summary 检测废弃物料
          * @param {ObsoleteMaterialDetectRequest} obsoleteMaterialDetectRequest 
          * @param {*} [options] Override http request option.
@@ -4812,7 +4957,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。需具备 inventory:alert:generate；权限不足返回 code 403。
          * @summary 生成库存预警事件
          * @param {InventoryAlertGenerateRequest} [inventoryAlertGenerateRequest] 
          * @param {*} [options] Override http request option.
@@ -4825,7 +4970,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。需具备 inventory:completion:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询完工入库详情
          * @param {number} inboundId 
          * @param {*} [options] Override http request option.
@@ -4838,7 +4983,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。需具备 inventory:alert:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询库存预警详情
          * @param {number} alertId 
          * @param {*} [options] Override http request option.
@@ -4851,7 +4996,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。需具备 inventory:obsolete:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询废弃物料检测详情
          * @param {number} detectionId 
          * @param {*} [options] Override http request option.
@@ -4864,7 +5009,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。需具备 inventory:alert:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
          * @summary 处理库存预警事件
          * @param {InventoryAlertHandleRequest} inventoryAlertHandleRequest 
          * @param {*} [options] Override http request option.
@@ -4877,7 +5022,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。需具备 inventory:obsolete:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
          * @summary 处理废弃物料检测结果
          * @param {ObsoleteMaterialHandleRequest} obsoleteMaterialHandleRequest 
          * @param {*} [options] Override http request option.
@@ -4890,7 +5035,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。需具备 inventory:completion:view；权限不足返回 code 403。
          * @summary 查询完工入库单
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4908,7 +5053,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。需具备 inventory:alert:view；权限不足返回 code 403。
          * @summary 查询库存预警事件
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4926,7 +5071,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。需具备 inventory:stock:view；权限不足返回 code 403。
          * @summary 分页查询物料库存
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4944,7 +5089,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询物料 locked、cancelled 和 consumed 记录。需具备 inventory:lock:view；权限不足返回 code 403。
          * @summary 查询物料锁定记录
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4961,7 +5106,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。需具备 inventory:obsolete:view；权限不足返回 code 403。
          * @summary 查询废弃物料检测结果
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -4979,7 +5124,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。需具备 inventory:lock:create；权限不足返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
          * @summary 锁定物料库存
          * @param {MaterialStockLockRequest} materialStockLockRequest 
          * @param {*} [options] Override http request option.
@@ -4992,7 +5137,7 @@ export const InventoryApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。需具备 inventory:lock:release；权限不足返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
          * @summary 释放物料锁定
          * @param {MaterialStockReleaseRequest} materialStockReleaseRequest 
          * @param {*} [options] Override http request option.
@@ -5014,7 +5159,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
     const localVarFp = InventoryApiFp(configuration)
     return {
         /**
-         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+         * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。需具备 inventory:completion:create；权限不足返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
          * @summary 登记完工入库
          * @param {InventoryApiAddCompletionInboundRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5024,7 +5169,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.addCompletionInbound(requestParameters.completionInboundCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。需具备 inventory:shortage:calculate；权限不足返回 code 403。
          * @summary 计算物料缺口
          * @param {InventoryApiCalculateMaterialShortageRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5034,7 +5179,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.calculateMaterialShortage(requestParameters.materialShortageCalculateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。需具备 inventory:obsolete:detect；权限不足返回 code 403。
          * @summary 检测废弃物料
          * @param {InventoryApiDetectObsoleteMaterialRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5044,7 +5189,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.detectObsoleteMaterial(requestParameters.obsoleteMaterialDetectRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。需具备 inventory:alert:generate；权限不足返回 code 403。
          * @summary 生成库存预警事件
          * @param {InventoryApiGenerateInventoryAlertRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5054,7 +5199,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.generateInventoryAlert(requestParameters.inventoryAlertGenerateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。需具备 inventory:completion:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询完工入库详情
          * @param {InventoryApiGetCompletionInboundRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5064,7 +5209,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.getCompletionInbound(requestParameters.inboundId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。需具备 inventory:alert:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询库存预警详情
          * @param {InventoryApiGetInventoryAlertRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5074,7 +5219,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.getInventoryAlert(requestParameters.alertId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。需具备 inventory:obsolete:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询废弃物料检测详情
          * @param {InventoryApiGetObsoleteMaterialDetectionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5084,7 +5229,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.getObsoleteMaterialDetection(requestParameters.detectionId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。需具备 inventory:alert:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
          * @summary 处理库存预警事件
          * @param {InventoryApiHandleInventoryAlertRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5094,7 +5239,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.handleInventoryAlert(requestParameters.inventoryAlertHandleRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+         * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。需具备 inventory:obsolete:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
          * @summary 处理废弃物料检测结果
          * @param {InventoryApiHandleObsoleteMaterialDetectionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5104,7 +5249,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.handleObsoleteMaterialDetection(requestParameters.obsoleteMaterialHandleRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。需具备 inventory:completion:view；权限不足返回 code 403。
          * @summary 查询完工入库单
          * @param {InventoryApiListCompletionInboundRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5114,7 +5259,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.listCompletionInbound(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.inboundTimeStart, requestParameters.inboundTimeEnd, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。需具备 inventory:alert:view；权限不足返回 code 403。
          * @summary 查询库存预警事件
          * @param {InventoryApiListInventoryAlertRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5124,7 +5269,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.listInventoryAlert(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。需具备 inventory:stock:view；权限不足返回 code 403。
          * @summary 分页查询物料库存
          * @param {InventoryApiListMaterialStockDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5134,7 +5279,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.listMaterialStockData(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.materialName, requestParameters.materialType, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询物料 locked、cancelled 和 consumed 记录。需具备 inventory:lock:view；权限不足返回 code 403。
          * @summary 查询物料锁定记录
          * @param {InventoryApiListMaterialStockLockRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5144,7 +5289,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.listMaterialStockLock(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。需具备 inventory:obsolete:view；权限不足返回 code 403。
          * @summary 查询废弃物料检测结果
          * @param {InventoryApiListObsoleteMaterialDetectionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5154,7 +5299,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.listObsoleteMaterialDetection(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.detectTimeStart, requestParameters.detectTimeEnd, options).then((request) => request(axios, basePath));
         },
         /**
-         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+         * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。需具备 inventory:lock:create；权限不足返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
          * @summary 锁定物料库存
          * @param {InventoryApiLockMaterialStockRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5164,7 +5309,7 @@ export const InventoryApiFactory = function (configuration?: Configuration, base
             return localVarFp.lockMaterialStock(requestParameters.materialStockLockRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+         * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。需具备 inventory:lock:release；权限不足返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
          * @summary 释放物料锁定
          * @param {InventoryApiReleaseMaterialStockRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -5371,7 +5516,7 @@ export interface InventoryApiReleaseMaterialStockRequest {
  */
 export class InventoryApi extends BaseAPI {
     /**
-     * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+     * 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。需具备 inventory:completion:create；权限不足返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
      * @summary 登记完工入库
      * @param {InventoryApiAddCompletionInboundRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5382,7 +5527,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。需具备 inventory:shortage:calculate；权限不足返回 code 403。
      * @summary 计算物料缺口
      * @param {InventoryApiCalculateMaterialShortageRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5393,7 +5538,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。需具备 inventory:obsolete:detect；权限不足返回 code 403。
      * @summary 检测废弃物料
      * @param {InventoryApiDetectObsoleteMaterialRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5404,7 +5549,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。需具备 inventory:alert:generate；权限不足返回 code 403。
      * @summary 生成库存预警事件
      * @param {InventoryApiGenerateInventoryAlertRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5415,7 +5560,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+     * 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。需具备 inventory:completion:view；记录不存在返回 code 404，权限不足返回 code 403。
      * @summary 查询完工入库详情
      * @param {InventoryApiGetCompletionInboundRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5426,7 +5571,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+     * 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。需具备 inventory:alert:view；记录不存在返回 code 404，权限不足返回 code 403。
      * @summary 查询库存预警详情
      * @param {InventoryApiGetInventoryAlertRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5437,7 +5582,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+     * 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。需具备 inventory:obsolete:view；记录不存在返回 code 404，权限不足返回 code 403。
      * @summary 查询废弃物料检测详情
      * @param {InventoryApiGetObsoleteMaterialDetectionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5448,7 +5593,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+     * 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。需具备 inventory:alert:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
      * @summary 处理库存预警事件
      * @param {InventoryApiHandleInventoryAlertRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5459,7 +5604,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+     * 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。需具备 inventory:obsolete:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
      * @summary 处理废弃物料检测结果
      * @param {InventoryApiHandleObsoleteMaterialDetectionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5470,7 +5615,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。需具备 inventory:completion:view；权限不足返回 code 403。
      * @summary 查询完工入库单
      * @param {InventoryApiListCompletionInboundRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5481,7 +5626,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。需具备 inventory:alert:view；权限不足返回 code 403。
      * @summary 查询库存预警事件
      * @param {InventoryApiListInventoryAlertRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5492,7 +5637,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。需具备 inventory:stock:view；权限不足返回 code 403。
      * @summary 分页查询物料库存
      * @param {InventoryApiListMaterialStockDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5503,7 +5648,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询物料 locked、cancelled 和 consumed 记录。需具备 inventory:lock:view；权限不足返回 code 403。
      * @summary 查询物料锁定记录
      * @param {InventoryApiListMaterialStockLockRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5514,7 +5659,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。需具备 inventory:obsolete:view；权限不足返回 code 403。
      * @summary 查询废弃物料检测结果
      * @param {InventoryApiListObsoleteMaterialDetectionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5525,7 +5670,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+     * 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。需具备 inventory:lock:create；权限不足返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
      * @summary 锁定物料库存
      * @param {InventoryApiLockMaterialStockRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5536,7 +5681,7 @@ export class InventoryApi extends BaseAPI {
     }
 
     /**
-     * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+     * 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。需具备 inventory:lock:release；权限不足返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
      * @summary 释放物料锁定
      * @param {InventoryApiReleaseMaterialStockRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -5562,7 +5707,7 @@ export type ListMaterialStockDataMaterialTypeEnum = typeof ListMaterialStockData
 export const MaterialBomApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增 BOM 明细。需具备 material:bom:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增 BOM 明细
          * @param {BomCreateRequest} bomCreateRequest 
          * @param {*} [options] Override http request option.
@@ -5601,7 +5746,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增 BOM 版本。需具备 material:bom-version:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增 BOM 版本
          * @param {BomVersionCreateRequest} bomVersionCreateRequest 
          * @param {*} [options] Override http request option.
@@ -5640,7 +5785,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增物料分类。需具备 material:category:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增物料分类
          * @param {MaterialCategoryCreateRequest} materialCategoryCreateRequest 
          * @param {*} [options] Override http request option.
@@ -5679,7 +5824,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增物料基础信息。需具备 material:item:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增物料
          * @param {MaterialCreateRequest} materialCreateRequest 
          * @param {*} [options] Override http request option.
@@ -5718,7 +5863,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需具备 material:loss:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 生产损耗补偿计算
          * @param {LossCompensationCalculateRequest} lossCompensationCalculateRequest 
          * @param {*} [options] Override http request option.
@@ -5757,7 +5902,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需具备 material:cost:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 产品成本核算
          * @param {ProductCostCalculateRequest} productCostCalculateRequest 
          * @param {*} [options] Override http request option.
@@ -5796,7 +5941,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需具备 material:bom:check-cycle；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 检查 BOM 循环依赖
          * @param {BomCycleCheckRequest} bomCycleCheckRequest 
          * @param {*} [options] Override http request option.
@@ -5835,7 +5980,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除 BOM 明细。需具备 material:bom:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除 BOM 明细
          * @param {BomDeleteRequest} bomDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -5874,7 +6019,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除 BOM 版本。需具备 material:bom-version:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除 BOM 版本
          * @param {BomVersionDeleteRequest} bomVersionDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -5913,7 +6058,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除物料分类。需具备 material:category:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除物料分类
          * @param {MaterialCategoryDeleteRequest} materialCategoryDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -5952,7 +6097,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除物料基础信息。需具备 material:item:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除物料
          * @param {MaterialDeleteRequest} materialDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -5991,7 +6136,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询 BOM 明细详情。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 明细详情
          * @param {number} bomId BOM 明细编号。
          * @param {*} [options] Override http request option.
@@ -6032,7 +6177,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按产品和版本递归展开 BOM 层级关系。需具备 material:bom:tree:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 层级树
          * @param {number} materialId 根产品物料唯一标识，支持精确匹配。
          * @param {number} versionId 使用的 BOM 版本编号。
@@ -6080,7 +6225,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询 BOM 版本详情。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 版本详情
          * @param {number} versionId 版本编号。
          * @param {*} [options] Override http request option.
@@ -6121,7 +6266,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料详情
          * @param {number} materialId 物料唯一标识，支持精确匹配。
          * @param {*} [options] Override http request option.
@@ -6162,7 +6307,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 查询指定物料库存。需登录；库存管理员、生产管理员、系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询指定物料库存。需具备 inventory:stock:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料库存
          * @param {number} materialId 物料唯一标识，支持精确匹配。
          * @param {*} [options] Override http request option.
@@ -6203,7 +6348,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需具备 material:bom:reverse:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 反向产品追溯
          * @param {number} materialId 需要追溯的子项物料唯一标识，支持精确匹配。
          * @param {number} versionId 限定反向追溯使用关系范围的 BOM 版本唯一标识。
@@ -6256,7 +6401,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询 BOM 明细。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 明细列表
          * @param {number} versionId 所属 BOM 版本编号。
          * @param {number} [page] 当前页码，从 1 开始。
@@ -6317,7 +6462,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询 BOM 版本。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 版本列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -6376,7 +6521,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询物料分类。需具备 material:category:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料分类列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -6425,7 +6570,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询物料基础信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -6532,7 +6677,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改 BOM 明细。需具备 material:bom:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改 BOM 明细
          * @param {BomUpdateRequest} bomUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -6571,7 +6716,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改 BOM 版本。需具备 material:bom-version:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改 BOM 版本
          * @param {BomVersionUpdateRequest} bomVersionUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -6610,7 +6755,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改物料分类。需具备 material:category:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改物料分类
          * @param {MaterialCategoryUpdateRequest} materialCategoryUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -6649,7 +6794,7 @@ export const MaterialBomApiAxiosParamCreator = function (configuration?: Configu
             };
         },
         /**
-         * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改物料基础信息。需具备 material:item:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改物料
          * @param {MaterialUpdateRequest} materialUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -6697,7 +6842,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = MaterialBomApiAxiosParamCreator(configuration)
     return {
         /**
-         * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增 BOM 明细。需具备 material:bom:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增 BOM 明细
          * @param {BomCreateRequest} bomCreateRequest 
          * @param {*} [options] Override http request option.
@@ -6710,7 +6855,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增 BOM 版本。需具备 material:bom-version:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增 BOM 版本
          * @param {BomVersionCreateRequest} bomVersionCreateRequest 
          * @param {*} [options] Override http request option.
@@ -6723,7 +6868,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增物料分类。需具备 material:category:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增物料分类
          * @param {MaterialCategoryCreateRequest} materialCategoryCreateRequest 
          * @param {*} [options] Override http request option.
@@ -6736,7 +6881,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增物料基础信息。需具备 material:item:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增物料
          * @param {MaterialCreateRequest} materialCreateRequest 
          * @param {*} [options] Override http request option.
@@ -6749,7 +6894,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需具备 material:loss:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 生产损耗补偿计算
          * @param {LossCompensationCalculateRequest} lossCompensationCalculateRequest 
          * @param {*} [options] Override http request option.
@@ -6762,7 +6907,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需具备 material:cost:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 产品成本核算
          * @param {ProductCostCalculateRequest} productCostCalculateRequest 
          * @param {*} [options] Override http request option.
@@ -6775,7 +6920,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需具备 material:bom:check-cycle；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 检查 BOM 循环依赖
          * @param {BomCycleCheckRequest} bomCycleCheckRequest 
          * @param {*} [options] Override http request option.
@@ -6788,7 +6933,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除 BOM 明细。需具备 material:bom:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除 BOM 明细
          * @param {BomDeleteRequest} bomDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -6801,7 +6946,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除 BOM 版本。需具备 material:bom-version:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除 BOM 版本
          * @param {BomVersionDeleteRequest} bomVersionDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -6814,7 +6959,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除物料分类。需具备 material:category:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除物料分类
          * @param {MaterialCategoryDeleteRequest} materialCategoryDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -6827,7 +6972,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除物料基础信息。需具备 material:item:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除物料
          * @param {MaterialDeleteRequest} materialDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -6840,7 +6985,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询 BOM 明细详情。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 明细详情
          * @param {number} bomId BOM 明细编号。
          * @param {*} [options] Override http request option.
@@ -6853,7 +6998,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按产品和版本递归展开 BOM 层级关系。需具备 material:bom:tree:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 层级树
          * @param {number} materialId 根产品物料唯一标识，支持精确匹配。
          * @param {number} versionId 使用的 BOM 版本编号。
@@ -6867,7 +7012,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询 BOM 版本详情。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 版本详情
          * @param {number} versionId 版本编号。
          * @param {*} [options] Override http request option.
@@ -6880,7 +7025,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料详情
          * @param {number} materialId 物料唯一标识，支持精确匹配。
          * @param {*} [options] Override http request option.
@@ -6893,7 +7038,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 查询指定物料库存。需登录；库存管理员、生产管理员、系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询指定物料库存。需具备 inventory:stock:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料库存
          * @param {number} materialId 物料唯一标识，支持精确匹配。
          * @param {*} [options] Override http request option.
@@ -6906,7 +7051,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需具备 material:bom:reverse:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 反向产品追溯
          * @param {number} materialId 需要追溯的子项物料唯一标识，支持精确匹配。
          * @param {number} versionId 限定反向追溯使用关系范围的 BOM 版本唯一标识。
@@ -6921,7 +7066,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询 BOM 明细。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 明细列表
          * @param {number} versionId 所属 BOM 版本编号。
          * @param {number} [page] 当前页码，从 1 开始。
@@ -6938,7 +7083,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询 BOM 版本。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 版本列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -6955,7 +7100,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询物料分类。需具备 material:category:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料分类列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -6970,7 +7115,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询物料基础信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -6995,7 +7140,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改 BOM 明细。需具备 material:bom:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改 BOM 明细
          * @param {BomUpdateRequest} bomUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -7008,7 +7153,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改 BOM 版本。需具备 material:bom-version:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改 BOM 版本
          * @param {BomVersionUpdateRequest} bomVersionUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -7021,7 +7166,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改物料分类。需具备 material:category:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改物料分类
          * @param {MaterialCategoryUpdateRequest} materialCategoryUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -7034,7 +7179,7 @@ export const MaterialBomApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改物料基础信息。需具备 material:item:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改物料
          * @param {MaterialUpdateRequest} materialUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -7056,7 +7201,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
     const localVarFp = MaterialBomApiFp(configuration)
     return {
         /**
-         * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增 BOM 明细。需具备 material:bom:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增 BOM 明细
          * @param {MaterialBomApiAddBomDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7066,7 +7211,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.addBomData(requestParameters.bomCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增 BOM 版本。需具备 material:bom-version:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增 BOM 版本
          * @param {MaterialBomApiAddBomVersionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7076,7 +7221,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.addBomVersionData(requestParameters.bomVersionCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增物料分类。需具备 material:category:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增物料分类
          * @param {MaterialBomApiAddMaterialCategoryDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7086,7 +7231,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.addMaterialCategoryData(requestParameters.materialCategoryCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增物料基础信息。需具备 material:item:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增物料
          * @param {MaterialBomApiAddMaterialDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7096,7 +7241,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.addMaterialData(requestParameters.materialCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需具备 material:loss:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 生产损耗补偿计算
          * @param {MaterialBomApiCalculateLossCompensationRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7106,7 +7251,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.calculateLossCompensation(requestParameters.lossCompensationCalculateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需具备 material:cost:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 产品成本核算
          * @param {MaterialBomApiCalculateProductCostRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7116,7 +7261,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.calculateProductCost(requestParameters.productCostCalculateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需具备 material:bom:check-cycle；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 检查 BOM 循环依赖
          * @param {MaterialBomApiCheckBomCycleDependencyRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7126,7 +7271,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.checkBomCycleDependency(requestParameters.bomCycleCheckRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除 BOM 明细。需具备 material:bom:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除 BOM 明细
          * @param {MaterialBomApiDeleteBomDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7136,7 +7281,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.deleteBomData(requestParameters.bomDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除 BOM 版本。需具备 material:bom-version:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除 BOM 版本
          * @param {MaterialBomApiDeleteBomVersionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7146,7 +7291,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.deleteBomVersionData(requestParameters.bomVersionDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除物料分类。需具备 material:category:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除物料分类
          * @param {MaterialBomApiDeleteMaterialCategoryDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7156,7 +7301,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.deleteMaterialCategoryData(requestParameters.materialCategoryDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除物料基础信息。需具备 material:item:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除物料
          * @param {MaterialBomApiDeleteMaterialDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7166,7 +7311,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.deleteMaterialData(requestParameters.materialDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询 BOM 明细详情。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 明细详情
          * @param {MaterialBomApiGetBomDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7176,7 +7321,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.getBomData(requestParameters.bomId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按产品和版本递归展开 BOM 层级关系。需具备 material:bom:tree:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 层级树
          * @param {MaterialBomApiGetBomTreeDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7186,7 +7331,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.getBomTreeData(requestParameters.materialId, requestParameters.versionId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询 BOM 版本详情。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 版本详情
          * @param {MaterialBomApiGetBomVersionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7196,7 +7341,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.getBomVersionData(requestParameters.versionId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料详情
          * @param {MaterialBomApiGetMaterialDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7206,7 +7351,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.getMaterialData(requestParameters.materialId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 查询指定物料库存。需登录；库存管理员、生产管理员、系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询指定物料库存。需具备 inventory:stock:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料库存
          * @param {MaterialBomApiGetMaterialStockDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7216,7 +7361,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.getMaterialStockData(requestParameters.materialId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需具备 material:bom:reverse:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 反向产品追溯
          * @param {MaterialBomApiGetReverseTraceDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7226,7 +7371,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.getReverseTraceData(requestParameters.materialId, requestParameters.versionId, requestParameters.includeHistory, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询 BOM 明细。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 明细列表
          * @param {MaterialBomApiListBomDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7236,7 +7381,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.listBomData(requestParameters.versionId, requestParameters.page, requestParameters.pageSize, requestParameters.parentMaterialId, requestParameters.childMaterialId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询 BOM 版本。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询 BOM 版本列表
          * @param {MaterialBomApiListBomVersionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7246,7 +7391,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.listBomVersionData(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.versionNo, requestParameters.effectiveOnly, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询物料分类。需具备 material:category:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料分类列表
          * @param {MaterialBomApiListMaterialCategoryDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7256,7 +7401,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.listMaterialCategoryData(requestParameters.page, requestParameters.pageSize, requestParameters.categoryName, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询物料基础信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询物料列表
          * @param {MaterialBomApiListMaterialDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7266,7 +7411,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.listMaterialData(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.materialName, requestParameters.materialType, requestParameters.categoryId, requestParameters.defaultSupplierId, requestParameters.minSafetyStock, requestParameters.maxSafetyStock, requestParameters.createdStartTime, requestParameters.createdEndTime, requestParameters.updatedStartTime, requestParameters.updatedEndTime, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改 BOM 明细。需具备 material:bom:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改 BOM 明细
          * @param {MaterialBomApiUpdateBomDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7276,7 +7421,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.updateBomData(requestParameters.bomUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改 BOM 版本。需具备 material:bom-version:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改 BOM 版本
          * @param {MaterialBomApiUpdateBomVersionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7286,7 +7431,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.updateBomVersionData(requestParameters.bomVersionUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改物料分类。需具备 material:category:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改物料分类
          * @param {MaterialBomApiUpdateMaterialCategoryDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7296,7 +7441,7 @@ export const MaterialBomApiFactory = function (configuration?: Configuration, ba
             return localVarFp.updateMaterialCategoryData(requestParameters.materialCategoryUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改物料基础信息。需具备 material:item:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改物料
          * @param {MaterialBomApiUpdateMaterialDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -7643,7 +7788,7 @@ export interface MaterialBomApiUpdateMaterialDataRequest {
  */
 export class MaterialBomApi extends BaseAPI {
     /**
-     * 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 新增 BOM 明细。需具备 material:bom:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 新增 BOM 明细
      * @param {MaterialBomApiAddBomDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7654,7 +7799,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 新增 BOM 版本。需具备 material:bom-version:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 新增 BOM 版本
      * @param {MaterialBomApiAddBomVersionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7665,7 +7810,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 新增物料分类。需具备 material:category:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 新增物料分类
      * @param {MaterialBomApiAddMaterialCategoryDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7676,7 +7821,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 新增物料基础信息。需具备 material:item:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 新增物料
      * @param {MaterialBomApiAddMaterialDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7687,7 +7832,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需具备 material:loss:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 生产损耗补偿计算
      * @param {MaterialBomApiCalculateLossCompensationRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7698,7 +7843,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需具备 material:cost:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 产品成本核算
      * @param {MaterialBomApiCalculateProductCostRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7709,7 +7854,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需具备 material:bom:check-cycle；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 检查 BOM 循环依赖
      * @param {MaterialBomApiCheckBomCycleDependencyRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7720,7 +7865,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 删除 BOM 明细。需具备 material:bom:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 删除 BOM 明细
      * @param {MaterialBomApiDeleteBomDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7731,7 +7876,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 删除 BOM 版本。需具备 material:bom-version:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 删除 BOM 版本
      * @param {MaterialBomApiDeleteBomVersionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7742,7 +7887,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 删除物料分类。需具备 material:category:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 删除物料分类
      * @param {MaterialBomApiDeleteMaterialCategoryDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7753,7 +7898,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 删除物料基础信息。需具备 material:item:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 删除物料
      * @param {MaterialBomApiDeleteMaterialDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7764,7 +7909,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 查询 BOM 明细详情。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询 BOM 明细详情
      * @param {MaterialBomApiGetBomDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7775,7 +7920,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 按产品和版本递归展开 BOM 层级关系。需具备 material:bom:tree:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询 BOM 层级树
      * @param {MaterialBomApiGetBomTreeDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7786,7 +7931,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 查询 BOM 版本详情。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询 BOM 版本详情
      * @param {MaterialBomApiGetBomVersionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7797,7 +7942,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询物料详情
      * @param {MaterialBomApiGetMaterialDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7808,7 +7953,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 查询指定物料库存。需登录；库存管理员、生产管理员、系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 查询指定物料库存。需具备 inventory:stock:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询物料库存
      * @param {MaterialBomApiGetMaterialStockDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7819,7 +7964,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需具备 material:bom:reverse:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 反向产品追溯
      * @param {MaterialBomApiGetReverseTraceDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7830,7 +7975,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询 BOM 明细。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询 BOM 明细列表
      * @param {MaterialBomApiListBomDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7841,7 +7986,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询 BOM 版本。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询 BOM 版本列表
      * @param {MaterialBomApiListBomVersionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7852,7 +7997,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询物料分类。需具备 material:category:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询物料分类列表
      * @param {MaterialBomApiListMaterialCategoryDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7863,7 +8008,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询物料基础信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询物料列表
      * @param {MaterialBomApiListMaterialDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7874,7 +8019,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 修改 BOM 明细。需具备 material:bom:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 修改 BOM 明细
      * @param {MaterialBomApiUpdateBomDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7885,7 +8030,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 修改 BOM 版本。需具备 material:bom-version:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 修改 BOM 版本
      * @param {MaterialBomApiUpdateBomVersionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7896,7 +8041,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 修改物料分类。需具备 material:category:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 修改物料分类
      * @param {MaterialBomApiUpdateMaterialCategoryDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7907,7 +8052,7 @@ export class MaterialBomApi extends BaseAPI {
     }
 
     /**
-     * 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 修改物料基础信息。需具备 material:item:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 修改物料
      * @param {MaterialBomApiUpdateMaterialDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -7926,7 +8071,7 @@ export class MaterialBomApi extends BaseAPI {
 export const ProductionApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+         * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
          * @summary 外部客户提交订单
          * @param {ExternalOrderCreateRequest} externalOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -7965,7 +8110,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 新增生产线并初始化 line_status 记录，默认状态为 idle。需具备 production:line:create；权限不足返回 code 403。
          * @summary 新增生产线
          * @param {ProductionLineCreateRequest} productionLineCreateRequest 
          * @param {*} [options] Override http request option.
@@ -8004,7 +8149,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+         * 新增内部生产订单，初始状态为 pending_review。需具备 production:order:create；权限不足返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
          * @summary 新增生产订单
          * @param {ProductionOrderCreateRequest} productionOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -8043,7 +8188,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
          * @summary 审核生产订单
          * @param {ProductionOrderApproveRequest} productionOrderApproveRequest 
          * @param {*} [options] Override http request option.
@@ -8082,7 +8227,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
          * @summary 取消生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -8121,7 +8266,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
          * @summary 外部订单转生产订单
          * @param {ExternalOrderConvertRequest} externalOrderConvertRequest 
          * @param {*} [options] Override http request option.
@@ -8160,7 +8305,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+         * 删除指定日期、生产线的生产日历排产记录。需具备 production:calendar:delete；记录不存在返回 code 404。
          * @summary 删除生产日历
          * @param {ProductionCalendarDeleteRequest} productionCalendarDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -8199,7 +8344,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。需具备 production:capacity:estimate；权限不足返回 code 403。
          * @summary 估计生产订单交付能力
          * @param {ProductionCapacityEstimateRequest | null} productionCapacityEstimateRequest 
          * @param {*} [options] Override http request option.
@@ -8238,7 +8383,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。需具备 production:order:finish；非法状态返回 code 409。
          * @summary 完成生产订单
          * @param {ProductionOrderFinishRequest} productionOrderFinishRequest 
          * @param {*} [options] Override http request option.
@@ -8277,7 +8422,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。需具备 production:order:view；权限不足返回 code 403。
          * @summary 查询生产订单详情
          * @param {number} orderId 
          * @param {*} [options] Override http request option.
@@ -8318,7 +8463,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询产品所需生产线类型和单件生产时间。需具备 production:capacity-config:view；权限不足返回 code 403。
          * @summary 查询产品产能配置
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -8372,11 +8517,11 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+         * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
-         * @param {number} [customerId] 外部客户角色只能传自身 user_id。
+         * @param {number} [customerId] 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
          * @param {ExternalOrderStatus} [status] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -8426,7 +8571,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 按生产线、日期范围和产能配置查询生产日历排产记录。需具备 production:calendar:view；权限不足返回 code 403。
          * @summary 查询生产日历
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -8494,7 +8639,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产线及其线型、启用日期、负责人和当前状态。需具备 production:line:view；权限不足返回 code 403。
          * @summary 查询生产线列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -8548,7 +8693,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 按生产线编号、故障状态分页查询故障记录。需具备 production:fault:view；权限不足返回 code 403。
          * @summary 查询生产线故障列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -8602,7 +8747,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产线类型。需具备 production:line-type:view；权限不足返回 code 403。
          * @summary 查询生产线类型
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -8651,7 +8796,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。需具备 production:order:view；权限不足返回 code 403。
          * @summary 查询生产订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -8719,7 +8864,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
          * @summary 上报生产线故障
          * @param {FaultRecordCreateRequest} faultRecordCreateRequest 
          * @param {*} [options] Override http request option.
@@ -8758,7 +8903,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。需具备 external-order:review；非法状态返回 code 409。
          * @summary 审核外部订单
          * @param {ExternalOrderReviewRequest} externalOrderReviewRequest 
          * @param {*} [options] Override http request option.
@@ -8797,7 +8942,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。需具备 production:capacity:detect；权限不足返回 code 403。
          * @summary 执行产能检测
          * @param {CapacityDetectionRunRequest} capacityDetectionRunRequest 
          * @param {*} [options] Override http request option.
@@ -8836,7 +8981,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。需具备 production:capacity:balance；权限不足返回 code 403。
          * @summary 保存产能平衡调整
          * @param {CapacityBalanceSaveRequest} capacityBalanceSaveRequest 
          * @param {*} [options] Override http request option.
@@ -8875,7 +9020,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+         * 新增或更新产品产能配置。需具备 production:capacity-config:update；业务约束：unit_time 必须大于 0。
          * @summary 保存产品产能配置
          * @param {CapacityConfigSaveRequest} capacityConfigSaveRequest 
          * @param {*} [options] Override http request option.
@@ -8914,7 +9059,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+         * 新增或覆盖指定日期、生产线的生产日历配置。需具备 production:calendar:update；生产线或产能配置不存在返回 code 404。
          * @summary 保存生产日历
          * @param {ProductionCalendarSaveRequest} productionCalendarSaveRequest 
          * @param {*} [options] Override http request option.
@@ -8953,7 +9098,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+         * 新增或更新生产线类型。需具备 production:line-type:update；类型名称重复返回 code 409。
          * @summary 保存生产线类型
          * @param {LineTypeSaveRequest} lineTypeSaveRequest 
          * @param {*} [options] Override http request option.
@@ -8992,7 +9137,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
          * @summary 开始生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -9031,7 +9176,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+         * 修改生产线所属类型、启用日期或负责人。需具备 production:line:update；生产线不存在返回 code 404。
          * @summary 修改生产线
          * @param {ProductionLineUpdateRequest} productionLineUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9070,7 +9215,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+         * 更新故障记录状态和维修负责人。production:fault:update-any 可更新任意故障；production:fault:update-assigned 仅可更新分配给自己的故障；production:fault:claim 可认领尚未分配的故障。三项权限均无时返回 code 403，非法状态返回 code 409。
          * @summary 更新生产线故障状态
          * @param {FaultRecordUpdateRequest} faultRecordUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9109,7 +9254,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。需具备 production:line-status:update；权限不足返回 code 403。
          * @summary 更新生产线状态
          * @param {ProductionLineStatusUpdateRequest} productionLineStatusUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9148,7 +9293,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
          * @summary 修改生产订单计划
          * @param {ProductionOrderUpdateRequest} productionOrderUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9196,7 +9341,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = ProductionApiAxiosParamCreator(configuration)
     return {
         /**
-         * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+         * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
          * @summary 外部客户提交订单
          * @param {ExternalOrderCreateRequest} externalOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -9209,7 +9354,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 新增生产线并初始化 line_status 记录，默认状态为 idle。需具备 production:line:create；权限不足返回 code 403。
          * @summary 新增生产线
          * @param {ProductionLineCreateRequest} productionLineCreateRequest 
          * @param {*} [options] Override http request option.
@@ -9222,7 +9367,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+         * 新增内部生产订单，初始状态为 pending_review。需具备 production:order:create；权限不足返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
          * @summary 新增生产订单
          * @param {ProductionOrderCreateRequest} productionOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -9235,7 +9380,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
          * @summary 审核生产订单
          * @param {ProductionOrderApproveRequest} productionOrderApproveRequest 
          * @param {*} [options] Override http request option.
@@ -9248,7 +9393,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
          * @summary 取消生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -9261,7 +9406,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
          * @summary 外部订单转生产订单
          * @param {ExternalOrderConvertRequest} externalOrderConvertRequest 
          * @param {*} [options] Override http request option.
@@ -9274,7 +9419,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+         * 删除指定日期、生产线的生产日历排产记录。需具备 production:calendar:delete；记录不存在返回 code 404。
          * @summary 删除生产日历
          * @param {ProductionCalendarDeleteRequest} productionCalendarDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -9287,7 +9432,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。需具备 production:capacity:estimate；权限不足返回 code 403。
          * @summary 估计生产订单交付能力
          * @param {ProductionCapacityEstimateRequest | null} productionCapacityEstimateRequest 
          * @param {*} [options] Override http request option.
@@ -9300,7 +9445,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。需具备 production:order:finish；非法状态返回 code 409。
          * @summary 完成生产订单
          * @param {ProductionOrderFinishRequest} productionOrderFinishRequest 
          * @param {*} [options] Override http request option.
@@ -9313,7 +9458,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。需具备 production:order:view；权限不足返回 code 403。
          * @summary 查询生产订单详情
          * @param {number} orderId 
          * @param {*} [options] Override http request option.
@@ -9326,7 +9471,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询产品所需生产线类型和单件生产时间。需具备 production:capacity-config:view；权限不足返回 code 403。
          * @summary 查询产品产能配置
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -9342,11 +9487,11 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+         * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
-         * @param {number} [customerId] 外部客户角色只能传自身 user_id。
+         * @param {number} [customerId] 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
          * @param {ExternalOrderStatus} [status] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -9358,7 +9503,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 按生产线、日期范围和产能配置查询生产日历排产记录。需具备 production:calendar:view；权限不足返回 code 403。
          * @summary 查询生产日历
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -9376,7 +9521,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产线及其线型、启用日期、负责人和当前状态。需具备 production:line:view；权限不足返回 code 403。
          * @summary 查询生产线列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -9392,7 +9537,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 按生产线编号、故障状态分页查询故障记录。需具备 production:fault:view；权限不足返回 code 403。
          * @summary 查询生产线故障列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -9408,7 +9553,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产线类型。需具备 production:line-type:view；权限不足返回 code 403。
          * @summary 查询生产线类型
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -9423,7 +9568,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。需具备 production:order:view；权限不足返回 code 403。
          * @summary 查询生产订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -9441,7 +9586,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
          * @summary 上报生产线故障
          * @param {FaultRecordCreateRequest} faultRecordCreateRequest 
          * @param {*} [options] Override http request option.
@@ -9454,7 +9599,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。需具备 external-order:review；非法状态返回 code 409。
          * @summary 审核外部订单
          * @param {ExternalOrderReviewRequest} externalOrderReviewRequest 
          * @param {*} [options] Override http request option.
@@ -9467,7 +9612,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。需具备 production:capacity:detect；权限不足返回 code 403。
          * @summary 执行产能检测
          * @param {CapacityDetectionRunRequest} capacityDetectionRunRequest 
          * @param {*} [options] Override http request option.
@@ -9480,7 +9625,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。需具备 production:capacity:balance；权限不足返回 code 403。
          * @summary 保存产能平衡调整
          * @param {CapacityBalanceSaveRequest} capacityBalanceSaveRequest 
          * @param {*} [options] Override http request option.
@@ -9493,7 +9638,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+         * 新增或更新产品产能配置。需具备 production:capacity-config:update；业务约束：unit_time 必须大于 0。
          * @summary 保存产品产能配置
          * @param {CapacityConfigSaveRequest} capacityConfigSaveRequest 
          * @param {*} [options] Override http request option.
@@ -9506,7 +9651,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+         * 新增或覆盖指定日期、生产线的生产日历配置。需具备 production:calendar:update；生产线或产能配置不存在返回 code 404。
          * @summary 保存生产日历
          * @param {ProductionCalendarSaveRequest} productionCalendarSaveRequest 
          * @param {*} [options] Override http request option.
@@ -9519,7 +9664,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+         * 新增或更新生产线类型。需具备 production:line-type:update；类型名称重复返回 code 409。
          * @summary 保存生产线类型
          * @param {LineTypeSaveRequest} lineTypeSaveRequest 
          * @param {*} [options] Override http request option.
@@ -9532,7 +9677,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
          * @summary 开始生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -9545,7 +9690,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+         * 修改生产线所属类型、启用日期或负责人。需具备 production:line:update；生产线不存在返回 code 404。
          * @summary 修改生产线
          * @param {ProductionLineUpdateRequest} productionLineUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9558,7 +9703,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+         * 更新故障记录状态和维修负责人。production:fault:update-any 可更新任意故障；production:fault:update-assigned 仅可更新分配给自己的故障；production:fault:claim 可认领尚未分配的故障。三项权限均无时返回 code 403，非法状态返回 code 409。
          * @summary 更新生产线故障状态
          * @param {FaultRecordUpdateRequest} faultRecordUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9571,7 +9716,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。需具备 production:line-status:update；权限不足返回 code 403。
          * @summary 更新生产线状态
          * @param {ProductionLineStatusUpdateRequest} productionLineStatusUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9584,7 +9729,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
          * @summary 修改生产订单计划
          * @param {ProductionOrderUpdateRequest} productionOrderUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9606,7 +9751,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
     const localVarFp = ProductionApiFp(configuration)
     return {
         /**
-         * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+         * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
          * @summary 外部客户提交订单
          * @param {ProductionApiAddExternalOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9616,7 +9761,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.addExternalOrder(requestParameters.externalOrderCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 新增生产线并初始化 line_status 记录，默认状态为 idle。需具备 production:line:create；权限不足返回 code 403。
          * @summary 新增生产线
          * @param {ProductionApiAddProductionLineRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9626,7 +9771,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.addProductionLine(requestParameters.productionLineCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+         * 新增内部生产订单，初始状态为 pending_review。需具备 production:order:create；权限不足返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
          * @summary 新增生产订单
          * @param {ProductionApiAddProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9636,7 +9781,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.addProductionOrder(requestParameters.productionOrderCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
          * @summary 审核生产订单
          * @param {ProductionApiApproveProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9646,7 +9791,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.approveProductionOrder(requestParameters.productionOrderApproveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
          * @summary 取消生产订单
          * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9656,7 +9801,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.cancelProductionOrder(requestParameters.productionOrderActionRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
          * @summary 外部订单转生产订单
          * @param {ProductionApiConvertExternalOrderToProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9666,7 +9811,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.convertExternalOrderToProductionOrder(requestParameters.externalOrderConvertRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+         * 删除指定日期、生产线的生产日历排产记录。需具备 production:calendar:delete；记录不存在返回 code 404。
          * @summary 删除生产日历
          * @param {ProductionApiDeleteProductionCalendarRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9676,7 +9821,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.deleteProductionCalendar(requestParameters.productionCalendarDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。需具备 production:capacity:estimate；权限不足返回 code 403。
          * @summary 估计生产订单交付能力
          * @param {ProductionApiEstimateProductionCapacityRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9686,7 +9831,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.estimateProductionCapacity(requestParameters.productionCapacityEstimateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。需具备 production:order:finish；非法状态返回 code 409。
          * @summary 完成生产订单
          * @param {ProductionApiFinishProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9696,7 +9841,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.finishProductionOrder(requestParameters.productionOrderFinishRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。需具备 production:order:view；权限不足返回 code 403。
          * @summary 查询生产订单详情
          * @param {ProductionApiGetProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9706,7 +9851,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.getProductionOrder(requestParameters.orderId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询产品所需生产线类型和单件生产时间。需具备 production:capacity-config:view；权限不足返回 code 403。
          * @summary 查询产品产能配置
          * @param {ProductionApiListCapacityConfigRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9716,7 +9861,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listCapacityConfig(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.typeId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+         * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9726,7 +9871,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listExternalOrder(requestParameters.page, requestParameters.pageSize, requestParameters.customerId, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 按生产线、日期范围和产能配置查询生产日历排产记录。需具备 production:calendar:view；权限不足返回 code 403。
          * @summary 查询生产日历
          * @param {ProductionApiListProductionCalendarRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9736,7 +9881,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listProductionCalendar(requestParameters.page, requestParameters.pageSize, requestParameters.lineId, requestParameters.calendarDateStart, requestParameters.calendarDateEnd, requestParameters.configId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产线及其线型、启用日期、负责人和当前状态。需具备 production:line:view；权限不足返回 code 403。
          * @summary 查询生产线列表
          * @param {ProductionApiListProductionLineRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9746,7 +9891,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listProductionLine(requestParameters.page, requestParameters.pageSize, requestParameters.typeId, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 按生产线编号、故障状态分页查询故障记录。需具备 production:fault:view；权限不足返回 code 403。
          * @summary 查询生产线故障列表
          * @param {ProductionApiListProductionLineFaultRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9756,7 +9901,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listProductionLineFault(requestParameters.page, requestParameters.pageSize, requestParameters.lineId, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产线类型。需具备 production:line-type:view；权限不足返回 code 403。
          * @summary 查询生产线类型
          * @param {ProductionApiListProductionLineTypeRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9766,7 +9911,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listProductionLineType(requestParameters.page, requestParameters.pageSize, requestParameters.typeName, options).then((request) => request(axios, basePath));
         },
         /**
-         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+         * 按产品、订单状态、计划完工日期等条件分页查询生产订单。需具备 production:order:view；权限不足返回 code 403。
          * @summary 查询生产订单列表
          * @param {ProductionApiListProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9776,7 +9921,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listProductionOrder(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.planEndStart, requestParameters.planEndEnd, options).then((request) => request(axios, basePath));
         },
         /**
-         * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
          * @summary 上报生产线故障
          * @param {ProductionApiReportProductionLineFaultRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9786,7 +9931,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.reportProductionLineFault(requestParameters.faultRecordCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。需具备 external-order:review；非法状态返回 code 409。
          * @summary 审核外部订单
          * @param {ProductionApiReviewExternalOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9796,7 +9941,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.reviewExternalOrder(requestParameters.externalOrderReviewRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。需具备 production:capacity:detect；权限不足返回 code 403。
          * @summary 执行产能检测
          * @param {ProductionApiRunCapacityDetectionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9806,7 +9951,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.runCapacityDetection(requestParameters.capacityDetectionRunRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 保存产能调整前后排产方案、调整人和受影响生产订单列表。需具备 production:capacity:balance；权限不足返回 code 403。
          * @summary 保存产能平衡调整
          * @param {ProductionApiSaveCapacityBalanceRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9816,7 +9961,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.saveCapacityBalance(requestParameters.capacityBalanceSaveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+         * 新增或更新产品产能配置。需具备 production:capacity-config:update；业务约束：unit_time 必须大于 0。
          * @summary 保存产品产能配置
          * @param {ProductionApiSaveCapacityConfigRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9826,7 +9971,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.saveCapacityConfig(requestParameters.capacityConfigSaveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+         * 新增或覆盖指定日期、生产线的生产日历配置。需具备 production:calendar:update；生产线或产能配置不存在返回 code 404。
          * @summary 保存生产日历
          * @param {ProductionApiSaveProductionCalendarRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9836,7 +9981,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.saveProductionCalendar(requestParameters.productionCalendarSaveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+         * 新增或更新生产线类型。需具备 production:line-type:update；类型名称重复返回 code 409。
          * @summary 保存生产线类型
          * @param {ProductionApiSaveProductionLineTypeRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9846,7 +9991,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.saveProductionLineType(requestParameters.lineTypeSaveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
          * @summary 开始生产订单
          * @param {ProductionApiStartProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9856,7 +10001,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.startProductionOrder(requestParameters.productionOrderActionRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+         * 修改生产线所属类型、启用日期或负责人。需具备 production:line:update；生产线不存在返回 code 404。
          * @summary 修改生产线
          * @param {ProductionApiUpdateProductionLineRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9866,7 +10011,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.updateProductionLine(requestParameters.productionLineUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+         * 更新故障记录状态和维修负责人。production:fault:update-any 可更新任意故障；production:fault:update-assigned 仅可更新分配给自己的故障；production:fault:claim 可认领尚未分配的故障。三项权限均无时返回 code 403，非法状态返回 code 409。
          * @summary 更新生产线故障状态
          * @param {ProductionApiUpdateProductionLineFaultRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9876,7 +10021,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.updateProductionLineFault(requestParameters.faultRecordUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。需具备 production:line-status:update；权限不足返回 code 403。
          * @summary 更新生产线状态
          * @param {ProductionApiUpdateProductionLineStatusRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9886,7 +10031,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.updateProductionLineStatus(requestParameters.productionLineStatusUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
          * @summary 修改生产订单计划
          * @param {ProductionApiUpdateProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -10002,7 +10147,7 @@ export interface ProductionApiListExternalOrderRequest {
     readonly pageSize?: number
 
     /**
-     * 外部客户角色只能传自身 user_id。
+     * 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
      */
     readonly customerId?: number
 
@@ -10205,7 +10350,7 @@ export interface ProductionApiUpdateProductionOrderRequest {
  */
 export class ProductionApi extends BaseAPI {
     /**
-     * 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+     * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
      * @summary 外部客户提交订单
      * @param {ProductionApiAddExternalOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10216,7 +10361,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 新增生产线并初始化 line_status 记录，默认状态为 idle。需具备 production:line:create；权限不足返回 code 403。
      * @summary 新增生产线
      * @param {ProductionApiAddProductionLineRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10227,7 +10372,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+     * 新增内部生产订单，初始状态为 pending_review。需具备 production:order:create；权限不足返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
      * @summary 新增生产订单
      * @param {ProductionApiAddProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10238,7 +10383,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
      * @summary 审核生产订单
      * @param {ProductionApiApproveProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10249,7 +10394,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+     * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
      * @summary 取消生产订单
      * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10260,7 +10405,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
      * @summary 外部订单转生产订单
      * @param {ProductionApiConvertExternalOrderToProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10271,7 +10416,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+     * 删除指定日期、生产线的生产日历排产记录。需具备 production:calendar:delete；记录不存在返回 code 404。
      * @summary 删除生产日历
      * @param {ProductionApiDeleteProductionCalendarRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10282,7 +10427,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。需具备 production:capacity:estimate；权限不足返回 code 403。
      * @summary 估计生产订单交付能力
      * @param {ProductionApiEstimateProductionCapacityRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10293,7 +10438,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。需具备 production:order:finish；非法状态返回 code 409。
      * @summary 完成生产订单
      * @param {ProductionApiFinishProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10304,7 +10449,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。需具备 production:order:view；权限不足返回 code 403。
      * @summary 查询生产订单详情
      * @param {ProductionApiGetProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10315,7 +10460,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询产品所需生产线类型和单件生产时间。需具备 production:capacity-config:view；权限不足返回 code 403。
      * @summary 查询产品产能配置
      * @param {ProductionApiListCapacityConfigRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10326,7 +10471,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+     * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
      * @summary 查询外部订单列表
      * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10337,7 +10482,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 按生产线、日期范围和产能配置查询生产日历排产记录。需具备 production:calendar:view；权限不足返回 code 403。
      * @summary 查询生产日历
      * @param {ProductionApiListProductionCalendarRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10348,7 +10493,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询生产线及其线型、启用日期、负责人和当前状态。需具备 production:line:view；权限不足返回 code 403。
      * @summary 查询生产线列表
      * @param {ProductionApiListProductionLineRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10359,7 +10504,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+     * 按生产线编号、故障状态分页查询故障记录。需具备 production:fault:view；权限不足返回 code 403。
      * @summary 查询生产线故障列表
      * @param {ProductionApiListProductionLineFaultRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10370,7 +10515,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询生产线类型。需具备 production:line-type:view；权限不足返回 code 403。
      * @summary 查询生产线类型
      * @param {ProductionApiListProductionLineTypeRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10381,7 +10526,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+     * 按产品、订单状态、计划完工日期等条件分页查询生产订单。需具备 production:order:view；权限不足返回 code 403。
      * @summary 查询生产订单列表
      * @param {ProductionApiListProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10392,7 +10537,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+     * 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
      * @summary 上报生产线故障
      * @param {ProductionApiReportProductionLineFaultRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10403,7 +10548,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。需具备 external-order:review；非法状态返回 code 409。
      * @summary 审核外部订单
      * @param {ProductionApiReviewExternalOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10414,7 +10559,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。需具备 production:capacity:detect；权限不足返回 code 403。
      * @summary 执行产能检测
      * @param {ProductionApiRunCapacityDetectionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10425,7 +10570,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 保存产能调整前后排产方案、调整人和受影响生产订单列表。需具备 production:capacity:balance；权限不足返回 code 403。
      * @summary 保存产能平衡调整
      * @param {ProductionApiSaveCapacityBalanceRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10436,7 +10581,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+     * 新增或更新产品产能配置。需具备 production:capacity-config:update；业务约束：unit_time 必须大于 0。
      * @summary 保存产品产能配置
      * @param {ProductionApiSaveCapacityConfigRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10447,7 +10592,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+     * 新增或覆盖指定日期、生产线的生产日历配置。需具备 production:calendar:update；生产线或产能配置不存在返回 code 404。
      * @summary 保存生产日历
      * @param {ProductionApiSaveProductionCalendarRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10458,7 +10603,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+     * 新增或更新生产线类型。需具备 production:line-type:update；类型名称重复返回 code 409。
      * @summary 保存生产线类型
      * @param {ProductionApiSaveProductionLineTypeRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10469,7 +10614,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+     * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
      * @summary 开始生产订单
      * @param {ProductionApiStartProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10480,7 +10625,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+     * 修改生产线所属类型、启用日期或负责人。需具备 production:line:update；生产线不存在返回 code 404。
      * @summary 修改生产线
      * @param {ProductionApiUpdateProductionLineRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10491,7 +10636,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+     * 更新故障记录状态和维修负责人。production:fault:update-any 可更新任意故障；production:fault:update-assigned 仅可更新分配给自己的故障；production:fault:claim 可认领尚未分配的故障。三项权限均无时返回 code 403，非法状态返回 code 409。
      * @summary 更新生产线故障状态
      * @param {ProductionApiUpdateProductionLineFaultRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10502,7 +10647,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+     * 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。需具备 production:line-status:update；权限不足返回 code 403。
      * @summary 更新生产线状态
      * @param {ProductionApiUpdateProductionLineStatusRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10513,7 +10658,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+     * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
      * @summary 修改生产订单计划
      * @param {ProductionApiUpdateProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10532,7 +10677,7 @@ export class ProductionApi extends BaseAPI {
 export const PurchaseApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * 手工新增采购订单草稿及明细，初始状态为 draft。需具备 purchase:order:create；权限不足返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
          * @summary 新增采购订单草稿
          * @param {PurchaseOrderCreateRequest} purchaseOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -10571,7 +10716,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。需具备 purchase:receipt:create；权限不足返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
          * @summary 新增采购收货记录
          * @param {PurchaseReceiptCreateRequest} purchaseReceiptCreateRequest 
          * @param {*} [options] Override http request option.
@@ -10610,7 +10755,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * 将可取消的采购订单更新为 cancelled 状态。需具备 purchase:order:cancel；权限不足返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
          * @summary 取消采购订单
          * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -10649,7 +10794,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。需具备 purchase:order:create；权限不足返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
          * @summary 根据缺口生成采购订单草稿
          * @param {PurchaseDraftFromShortageRequest} purchaseDraftFromShortageRequest 
          * @param {*} [options] Override http request option.
@@ -10688,7 +10833,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。需具备 purchase:overdue:generate；权限不足返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
          * @summary 生成采购逾期提醒
          * @param {PurchaseOverdueReminderGenerateRequest} [purchaseOverdueReminderGenerateRequest] 
          * @param {*} [options] Override http request option.
@@ -10725,7 +10870,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。需具备 purchase:order:view；权限不足返回 code 403。
          * @summary 查询采购订单详情
          * @param {number} orderId 
          * @param {*} [options] Override http request option.
@@ -10766,7 +10911,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。需具备 purchase:overdue:handle；权限不足返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
          * @summary 处理采购逾期提醒
          * @param {PurchaseOverdueReminderHandleRequest} purchaseOverdueReminderHandleRequest 
          * @param {*} [options] Override http request option.
@@ -10805,7 +10950,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 分页查询具有有效采购角色的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询通过有效角色获得 purchase:buyer:eligible 权限的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。调用方需具备 purchase:buyer:view；权限不足返回 code 403。
          * @summary 查询采购员列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -10859,7 +11004,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。需具备 purchase:order:view；权限不足返回 code 403。
          * @summary 查询采购订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -10951,7 +11096,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。需具备 purchase:overdue:view；权限不足返回 code 403。
          * @summary 查询采购逾期提醒
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11005,7 +11150,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询采购订单分批收货记录。需具备 purchase:receipt:view；权限不足返回 code 403。
          * @summary 查询采购收货记录
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11059,7 +11204,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。权限：采购员、采购主管、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。需具备 purchase:supplier:view；权限不足返回 code 403。
          * @summary 查询供应商列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11113,7 +11258,7 @@ export const PurchaseApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
-         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * 将采购订单从 draft 状态提交为 submitted 状态。需具备 purchase:order:submit；权限不足返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
          * @summary 提交采购订单
          * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -11161,7 +11306,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = PurchaseApiAxiosParamCreator(configuration)
     return {
         /**
-         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * 手工新增采购订单草稿及明细，初始状态为 draft。需具备 purchase:order:create；权限不足返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
          * @summary 新增采购订单草稿
          * @param {PurchaseOrderCreateRequest} purchaseOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -11174,7 +11319,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。需具备 purchase:receipt:create；权限不足返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
          * @summary 新增采购收货记录
          * @param {PurchaseReceiptCreateRequest} purchaseReceiptCreateRequest 
          * @param {*} [options] Override http request option.
@@ -11187,7 +11332,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * 将可取消的采购订单更新为 cancelled 状态。需具备 purchase:order:cancel；权限不足返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
          * @summary 取消采购订单
          * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -11200,7 +11345,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。需具备 purchase:order:create；权限不足返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
          * @summary 根据缺口生成采购订单草稿
          * @param {PurchaseDraftFromShortageRequest} purchaseDraftFromShortageRequest 
          * @param {*} [options] Override http request option.
@@ -11213,7 +11358,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。需具备 purchase:overdue:generate；权限不足返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
          * @summary 生成采购逾期提醒
          * @param {PurchaseOverdueReminderGenerateRequest} [purchaseOverdueReminderGenerateRequest] 
          * @param {*} [options] Override http request option.
@@ -11226,7 +11371,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。需具备 purchase:order:view；权限不足返回 code 403。
          * @summary 查询采购订单详情
          * @param {number} orderId 
          * @param {*} [options] Override http request option.
@@ -11239,7 +11384,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。需具备 purchase:overdue:handle；权限不足返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
          * @summary 处理采购逾期提醒
          * @param {PurchaseOverdueReminderHandleRequest} purchaseOverdueReminderHandleRequest 
          * @param {*} [options] Override http request option.
@@ -11252,7 +11397,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询具有有效采购角色的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询通过有效角色获得 purchase:buyer:eligible 权限的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。调用方需具备 purchase:buyer:view；权限不足返回 code 403。
          * @summary 查询采购员列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11268,7 +11413,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。需具备 purchase:order:view；权限不足返回 code 403。
          * @summary 查询采购订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11290,7 +11435,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。需具备 purchase:overdue:view；权限不足返回 code 403。
          * @summary 查询采购逾期提醒
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11306,7 +11451,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询采购订单分批收货记录。需具备 purchase:receipt:view；权限不足返回 code 403。
          * @summary 查询采购收货记录
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11322,7 +11467,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。权限：采购员、采购主管、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。需具备 purchase:supplier:view；权限不足返回 code 403。
          * @summary 查询供应商列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -11338,7 +11483,7 @@ export const PurchaseApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * 将采购订单从 draft 状态提交为 submitted 状态。需具备 purchase:order:submit；权限不足返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
          * @summary 提交采购订单
          * @param {PurchaseOrderActionRequest} purchaseOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -11360,7 +11505,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
     const localVarFp = PurchaseApiFp(configuration)
     return {
         /**
-         * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+         * 手工新增采购订单草稿及明细，初始状态为 draft。需具备 purchase:order:create；权限不足返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
          * @summary 新增采购订单草稿
          * @param {PurchaseApiAddPurchaseOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11370,7 +11515,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.addPurchaseOrder(requestParameters.purchaseOrderCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+         * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。需具备 purchase:receipt:create；权限不足返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
          * @summary 新增采购收货记录
          * @param {PurchaseApiAddPurchaseReceiptRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11380,7 +11525,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.addPurchaseReceipt(requestParameters.purchaseReceiptCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+         * 将可取消的采购订单更新为 cancelled 状态。需具备 purchase:order:cancel；权限不足返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
          * @summary 取消采购订单
          * @param {PurchaseApiCancelPurchaseOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11390,7 +11535,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.cancelPurchaseOrder(requestParameters.purchaseOrderActionRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+         * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。需具备 purchase:order:create；权限不足返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
          * @summary 根据缺口生成采购订单草稿
          * @param {PurchaseApiCreatePurchaseOrderDraftFromShortageRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11400,7 +11545,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.createPurchaseOrderDraftFromShortage(requestParameters.purchaseDraftFromShortageRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+         * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。需具备 purchase:overdue:generate；权限不足返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
          * @summary 生成采购逾期提醒
          * @param {PurchaseApiGeneratePurchaseOverdueReminderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11410,7 +11555,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.generatePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderGenerateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 根据采购订单编号查询主表、明细、供应商和收货进度。需具备 purchase:order:view；权限不足返回 code 403。
          * @summary 查询采购订单详情
          * @param {PurchaseApiGetPurchaseOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11420,7 +11565,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.getPurchaseOrder(requestParameters.orderId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+         * 将逾期提醒更新为 urged 或 received，并记录处理备注。需具备 purchase:overdue:handle；权限不足返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
          * @summary 处理采购逾期提醒
          * @param {PurchaseApiHandlePurchaseOverdueReminderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11430,7 +11575,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.handlePurchaseOverdueReminder(requestParameters.purchaseOverdueReminderHandleRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询具有有效采购角色的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询通过有效角色获得 purchase:buyer:eligible 权限的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。调用方需具备 purchase:buyer:view；权限不足返回 code 403。
          * @summary 查询采购员列表
          * @param {PurchaseApiListPurchaseBuyerDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11440,7 +11585,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.listPurchaseBuyerData(requestParameters.page, requestParameters.pageSize, requestParameters.buyerId, requestParameters.buyerName, options).then((request) => request(axios, basePath));
         },
         /**
-         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。需具备 purchase:order:view；权限不足返回 code 403。
          * @summary 查询采购订单列表
          * @param {PurchaseApiListPurchaseOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11450,7 +11595,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.listPurchaseOrder(requestParameters.page, requestParameters.pageSize, requestParameters.supplierId, requestParameters.materialId, requestParameters.status, requestParameters.orderDateStart, requestParameters.orderDateEnd, requestParameters.expectedDateStart, requestParameters.expectedDateEnd, requestParameters.buyerId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。需具备 purchase:overdue:view；权限不足返回 code 403。
          * @summary 查询采购逾期提醒
          * @param {PurchaseApiListPurchaseOverdueReminderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11460,7 +11605,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.listPurchaseOverdueReminder(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+         * 分页查询采购订单分批收货记录。需具备 purchase:receipt:view；权限不足返回 code 403。
          * @summary 查询采购收货记录
          * @param {PurchaseApiListPurchaseReceiptRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11470,7 +11615,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.listPurchaseReceipt(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.materialId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。权限：采购员、采购主管、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。需具备 purchase:supplier:view；权限不足返回 code 403。
          * @summary 查询供应商列表
          * @param {PurchaseApiListSupplierDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11480,7 +11625,7 @@ export const PurchaseApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.listSupplierData(requestParameters.page, requestParameters.pageSize, requestParameters.supplierId, requestParameters.supplierName, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+         * 将采购订单从 draft 状态提交为 submitted 状态。需具备 purchase:order:submit；权限不足返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
          * @summary 提交采购订单
          * @param {PurchaseApiSubmitPurchaseOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -11660,7 +11805,7 @@ export interface PurchaseApiSubmitPurchaseOrderRequest {
  */
 export class PurchaseApi extends BaseAPI {
     /**
-     * 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+     * 手工新增采购订单草稿及明细，初始状态为 draft。需具备 purchase:order:create；权限不足返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
      * @summary 新增采购订单草稿
      * @param {PurchaseApiAddPurchaseOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11671,7 +11816,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+     * 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。需具备 purchase:receipt:create；权限不足返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
      * @summary 新增采购收货记录
      * @param {PurchaseApiAddPurchaseReceiptRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11682,7 +11827,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+     * 将可取消的采购订单更新为 cancelled 状态。需具备 purchase:order:cancel；权限不足返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
      * @summary 取消采购订单
      * @param {PurchaseApiCancelPurchaseOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11693,7 +11838,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+     * 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。需具备 purchase:order:create；权限不足返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
      * @summary 根据缺口生成采购订单草稿
      * @param {PurchaseApiCreatePurchaseOrderDraftFromShortageRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11704,7 +11849,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+     * 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。需具备 purchase:overdue:generate；权限不足返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
      * @summary 生成采购逾期提醒
      * @param {PurchaseApiGeneratePurchaseOverdueReminderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11715,7 +11860,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * 根据采购订单编号查询主表、明细、供应商和收货进度。需具备 purchase:order:view；权限不足返回 code 403。
      * @summary 查询采购订单详情
      * @param {PurchaseApiGetPurchaseOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11726,7 +11871,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+     * 将逾期提醒更新为 urged 或 received，并记录处理备注。需具备 purchase:overdue:handle；权限不足返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
      * @summary 处理采购逾期提醒
      * @param {PurchaseApiHandlePurchaseOverdueReminderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11737,7 +11882,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 分页查询具有有效采购角色的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * 分页查询通过有效角色获得 purchase:buyer:eligible 权限的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。调用方需具备 purchase:buyer:view；权限不足返回 code 403。
      * @summary 查询采购员列表
      * @param {PurchaseApiListPurchaseBuyerDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11748,7 +11893,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。需具备 purchase:order:view；权限不足返回 code 403。
      * @summary 查询采购订单列表
      * @param {PurchaseApiListPurchaseOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11759,7 +11904,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。需具备 purchase:overdue:view；权限不足返回 code 403。
      * @summary 查询采购逾期提醒
      * @param {PurchaseApiListPurchaseOverdueReminderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11770,7 +11915,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+     * 分页查询采购订单分批收货记录。需具备 purchase:receipt:view；权限不足返回 code 403。
      * @summary 查询采购收货记录
      * @param {PurchaseApiListPurchaseReceiptRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11781,7 +11926,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。权限：采购员、采购主管、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。需具备 purchase:supplier:view；权限不足返回 code 403。
      * @summary 查询供应商列表
      * @param {PurchaseApiListSupplierDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11792,7 +11937,7 @@ export class PurchaseApi extends BaseAPI {
     }
 
     /**
-     * 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+     * 将采购订单从 draft 状态提交为 submitted 状态。需具备 purchase:order:submit；权限不足返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
      * @summary 提交采购订单
      * @param {PurchaseApiSubmitPurchaseOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -11811,7 +11956,7 @@ export class PurchaseApi extends BaseAPI {
 export const QualityTraceabilityApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+         * 记录生产订单实际消耗的采购物料批次和消耗数量。需具备 trace:consumption:create；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
          * @summary 新增批次消耗关系
          * @param {BatchConsumptionCreateRequest} batchConsumptionCreateRequest 
          * @param {*} [options] Override http request option.
@@ -11850,7 +11995,7 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
             };
         },
         /**
-         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。需具备 trace:impact:analyze；权限不足返回 code 403。
          * @summary 分析问题批次影响范围
          * @param {QualityImpactAnalyzeRequest | null} qualityImpactAnalyzeRequest 
          * @param {*} [options] Override http request option.
@@ -11889,7 +12034,7 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
             };
         },
         /**
-         * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+         * 删除录入错误的批次消耗关系。需具备 trace:consumption:delete；数据不存在返回 code 404。
          * @summary 删除批次消耗关系
          * @param {BatchConsumptionDeleteRequest} batchConsumptionDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -11928,7 +12073,7 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
             };
         },
         /**
-         * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。权限：质量管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。需具备 trace:consumption:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询批次消耗详情
          * @param {number} consumptionId 
          * @param {*} [options] Override http request option.
@@ -11969,7 +12114,7 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
             };
         },
         /**
-         * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产订单与采购订单明细之间的批次消耗关系。需具备 trace:consumption:view；权限不足返回 code 403。
          * @summary 查询批次消耗关系
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -12028,7 +12173,7 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
             };
         },
         /**
-         * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。需具备 trace:material:view；权限不足返回 code 403。
          * @summary 反向追溯原材料批次
          * @param {number} [itemId] 
          * @param {number} [materialId] 
@@ -12091,7 +12236,7 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
             };
         },
         /**
-         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。需具备 trace:product:view；权限不足返回 code 403。
          * @summary 正向追溯成品批次
          * @param {number} [orderId] 
          * @param {string} [batchNo] 成品批次号，来自完工入库单。order_id 和 batch_no 至少提供一个，由后端校验。
@@ -12140,7 +12285,7 @@ export const QualityTraceabilityApiAxiosParamCreator = function (configuration?:
             };
         },
         /**
-         * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+         * 修改批次消耗数量或关联采购明细。需具备 trace:consumption:update；已进入召回流程的数据修改时返回 code 409。
          * @summary 修改批次消耗关系
          * @param {BatchConsumptionUpdateRequest} batchConsumptionUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -12188,7 +12333,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
     const localVarAxiosParamCreator = QualityTraceabilityApiAxiosParamCreator(configuration)
     return {
         /**
-         * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+         * 记录生产订单实际消耗的采购物料批次和消耗数量。需具备 trace:consumption:create；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
          * @summary 新增批次消耗关系
          * @param {BatchConsumptionCreateRequest} batchConsumptionCreateRequest 
          * @param {*} [options] Override http request option.
@@ -12201,7 +12346,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。需具备 trace:impact:analyze；权限不足返回 code 403。
          * @summary 分析问题批次影响范围
          * @param {QualityImpactAnalyzeRequest | null} qualityImpactAnalyzeRequest 
          * @param {*} [options] Override http request option.
@@ -12214,7 +12359,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+         * 删除录入错误的批次消耗关系。需具备 trace:consumption:delete；数据不存在返回 code 404。
          * @summary 删除批次消耗关系
          * @param {BatchConsumptionDeleteRequest} batchConsumptionDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -12227,7 +12372,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。权限：质量管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。需具备 trace:consumption:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询批次消耗详情
          * @param {number} consumptionId 
          * @param {*} [options] Override http request option.
@@ -12240,7 +12385,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产订单与采购订单明细之间的批次消耗关系。需具备 trace:consumption:view；权限不足返回 code 403。
          * @summary 查询批次消耗关系
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -12257,7 +12402,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。需具备 trace:material:view；权限不足返回 code 403。
          * @summary 反向追溯原材料批次
          * @param {number} [itemId] 
          * @param {number} [materialId] 
@@ -12274,7 +12419,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。需具备 trace:product:view；权限不足返回 code 403。
          * @summary 正向追溯成品批次
          * @param {number} [orderId] 
          * @param {string} [batchNo] 成品批次号，来自完工入库单。order_id 和 batch_no 至少提供一个，由后端校验。
@@ -12289,7 +12434,7 @@ export const QualityTraceabilityApiFp = function(configuration?: Configuration) 
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+         * 修改批次消耗数量或关联采购明细。需具备 trace:consumption:update；已进入召回流程的数据修改时返回 code 409。
          * @summary 修改批次消耗关系
          * @param {BatchConsumptionUpdateRequest} batchConsumptionUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -12311,7 +12456,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
     const localVarFp = QualityTraceabilityApiFp(configuration)
     return {
         /**
-         * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+         * 记录生产订单实际消耗的采购物料批次和消耗数量。需具备 trace:consumption:create；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
          * @summary 新增批次消耗关系
          * @param {QualityTraceabilityApiAddBatchConsumptionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12321,7 +12466,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
             return localVarFp.addBatchConsumption(requestParameters.batchConsumptionCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+         * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。需具备 trace:impact:analyze；权限不足返回 code 403。
          * @summary 分析问题批次影响范围
          * @param {QualityTraceabilityApiAnalyzeQualityImpactRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12331,7 +12476,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
             return localVarFp.analyzeQualityImpact(requestParameters.qualityImpactAnalyzeRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+         * 删除录入错误的批次消耗关系。需具备 trace:consumption:delete；数据不存在返回 code 404。
          * @summary 删除批次消耗关系
          * @param {QualityTraceabilityApiDeleteBatchConsumptionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12341,7 +12486,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
             return localVarFp.deleteBatchConsumption(requestParameters.batchConsumptionDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。权限：质量管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+         * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。需具备 trace:consumption:view；记录不存在返回 code 404，权限不足返回 code 403。
          * @summary 查询批次消耗详情
          * @param {QualityTraceabilityApiGetBatchConsumptionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12351,7 +12496,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
             return localVarFp.getBatchConsumption(requestParameters.consumptionId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 分页查询生产订单与采购订单明细之间的批次消耗关系。需具备 trace:consumption:view；权限不足返回 code 403。
          * @summary 查询批次消耗关系
          * @param {QualityTraceabilityApiListBatchConsumptionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12361,7 +12506,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
             return localVarFp.listBatchConsumption(requestParameters.page, requestParameters.pageSize, requestParameters.orderId, requestParameters.itemId, requestParameters.materialId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。需具备 trace:material:view；权限不足返回 code 403。
          * @summary 反向追溯原材料批次
          * @param {QualityTraceabilityApiTraceMaterialBatchRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12371,7 +12516,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
             return localVarFp.traceMaterialBatch(requestParameters.itemId, requestParameters.materialId, requestParameters.supplierId, requestParameters.receiveDateStart, requestParameters.receiveDateEnd, options).then((request) => request(axios, basePath));
         },
         /**
-         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+         * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。需具备 trace:product:view；权限不足返回 code 403。
          * @summary 正向追溯成品批次
          * @param {QualityTraceabilityApiTraceProductBatchRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12381,7 +12526,7 @@ export const QualityTraceabilityApiFactory = function (configuration?: Configura
             return localVarFp.traceProductBatch(requestParameters.orderId, requestParameters.batchNo, requestParameters.includeSupplier, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+         * 修改批次消耗数量或关联采购明细。需具备 trace:consumption:update；已进入召回流程的数据修改时返回 code 409。
          * @summary 修改批次消耗关系
          * @param {QualityTraceabilityApiUpdateBatchConsumptionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -12495,7 +12640,7 @@ export interface QualityTraceabilityApiUpdateBatchConsumptionRequest {
  */
 export class QualityTraceabilityApi extends BaseAPI {
     /**
-     * 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+     * 记录生产订单实际消耗的采购物料批次和消耗数量。需具备 trace:consumption:create；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
      * @summary 新增批次消耗关系
      * @param {QualityTraceabilityApiAddBatchConsumptionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12506,7 +12651,7 @@ export class QualityTraceabilityApi extends BaseAPI {
     }
 
     /**
-     * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+     * 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。需具备 trace:impact:analyze；权限不足返回 code 403。
      * @summary 分析问题批次影响范围
      * @param {QualityTraceabilityApiAnalyzeQualityImpactRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12517,7 +12662,7 @@ export class QualityTraceabilityApi extends BaseAPI {
     }
 
     /**
-     * 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+     * 删除录入错误的批次消耗关系。需具备 trace:consumption:delete；数据不存在返回 code 404。
      * @summary 删除批次消耗关系
      * @param {QualityTraceabilityApiDeleteBatchConsumptionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12528,7 +12673,7 @@ export class QualityTraceabilityApi extends BaseAPI {
     }
 
     /**
-     * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。权限：质量管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+     * 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。需具备 trace:consumption:view；记录不存在返回 code 404，权限不足返回 code 403。
      * @summary 查询批次消耗详情
      * @param {QualityTraceabilityApiGetBatchConsumptionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12539,7 +12684,7 @@ export class QualityTraceabilityApi extends BaseAPI {
     }
 
     /**
-     * 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 分页查询生产订单与采购订单明细之间的批次消耗关系。需具备 trace:consumption:view；权限不足返回 code 403。
      * @summary 查询批次消耗关系
      * @param {QualityTraceabilityApiListBatchConsumptionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12550,7 +12695,7 @@ export class QualityTraceabilityApi extends BaseAPI {
     }
 
     /**
-     * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。需具备 trace:material:view；权限不足返回 code 403。
      * @summary 反向追溯原材料批次
      * @param {QualityTraceabilityApiTraceMaterialBatchRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12561,7 +12706,7 @@ export class QualityTraceabilityApi extends BaseAPI {
     }
 
     /**
-     * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+     * 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。需具备 trace:product:view；权限不足返回 code 403。
      * @summary 正向追溯成品批次
      * @param {QualityTraceabilityApiTraceProductBatchRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12572,7 +12717,7 @@ export class QualityTraceabilityApi extends BaseAPI {
     }
 
     /**
-     * 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+     * 修改批次消耗数量或关联采购明细。需具备 trace:consumption:update；已进入召回流程的数据修改时返回 code 409。
      * @summary 修改批次消耗关系
      * @param {QualityTraceabilityApiUpdateBatchConsumptionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -12591,7 +12736,7 @@ export class QualityTraceabilityApi extends BaseAPI {
 export const SystemApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+         * 追踪写入操作日志。需具备 system:audit:operation:create；未登录或登录失效返回 code 401；权限不足返回 code 403。日志数据不提供修改或删除接口。
          * @summary 新增操作日志
          * @param {OperationLogCreateRequest} operationLogCreateRequest 
          * @param {*} [options] Override http request option.
@@ -12630,46 +12775,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 新增权限
-         * @param {PermissionCreateRequest} permissionCreateRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addPermissionData: async (permissionCreateRequest: PermissionCreateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'permissionCreateRequest' is not null or undefined
-            assertParamExists('addPermissionData', 'permissionCreateRequest', permissionCreateRequest)
-            const localVarPath = `/api/addPermissionData`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(permissionCreateRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增系统角色。需具备 system:role:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增角色
          * @param {RoleCreateRequest} roleCreateRequest 
          * @param {*} [options] Override http request option.
@@ -12708,46 +12814,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 给角色分配权限
-         * @param {RolePermissionAssignRequest} rolePermissionAssignRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addRolePermission: async (rolePermissionAssignRequest: RolePermissionAssignRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'rolePermissionAssignRequest' is not null or undefined
-            assertParamExists('addRolePermission', 'rolePermissionAssignRequest', rolePermissionAssignRequest)
-            const localVarPath = `/api/addRolePermission`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(rolePermissionAssignRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增系统用户。需具备 system:user:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增用户
          * @param {UserCreateRequest} userCreateRequest 
          * @param {*} [options] Override http request option.
@@ -12786,85 +12853,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 给用户分配角色
-         * @param {UserRoleAssignRequest} userRoleAssignRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addUserRole: async (userRoleAssignRequest: UserRoleAssignRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'userRoleAssignRequest' is not null or undefined
-            assertParamExists('addUserRole', 'userRoleAssignRequest', userRoleAssignRequest)
-            const localVarPath = `/api/addUserRole`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(userRoleAssignRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 删除权限
-         * @param {PermissionDeleteRequest} permissionDeleteRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deletePermissionData: async (permissionDeleteRequest: PermissionDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'permissionDeleteRequest' is not null or undefined
-            assertParamExists('deletePermissionData', 'permissionDeleteRequest', permissionDeleteRequest)
-            const localVarPath = `/api/deletePermissionData`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(permissionDeleteRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除系统角色。需具备 system:role:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除角色
          * @param {RoleDeleteRequest} roleDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -12903,46 +12892,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 移除角色权限
-         * @param {RolePermissionDeleteRequest} rolePermissionDeleteRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteRolePermission: async (rolePermissionDeleteRequest: RolePermissionDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'rolePermissionDeleteRequest' is not null or undefined
-            assertParamExists('deleteRolePermission', 'rolePermissionDeleteRequest', rolePermissionDeleteRequest)
-            const localVarPath = `/api/deleteRolePermission`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(rolePermissionDeleteRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除系统用户。需具备 system:user:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除用户
          * @param {UserDeleteRequest} userDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -12981,46 +12931,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 移除用户角色
-         * @param {UserRoleDeleteRequest} userRoleDeleteRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteUserRole: async (userRoleDeleteRequest: UserRoleDeleteRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'userRoleDeleteRequest' is not null or undefined
-            assertParamExists('deleteUserRole', 'userRoleDeleteRequest', userRoleDeleteRequest)
-            const localVarPath = `/api/deleteUserRole`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(userRoleDeleteRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求业务权限。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色和有效角色关联权限码的并集，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permission_codes 均为空数组。 角色名称仅用于展示，不参与授权判断；任何角色都只拥有角色权限关系中明确配置的权限，不存在按角色名称自动放行规则。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
          * @summary 查询当前登录者身份与权限
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -13054,7 +12965,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询只读权限目录中的权限详情。需具备 system:permission:view。
          * @summary 查询权限详情
          * @param {number} permissionId 权限编号。
          * @param {*} [options] Override http request option.
@@ -13095,7 +13006,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询系统角色详情。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色详情
          * @param {number} roleId 角色编号。
          * @param {*} [options] Override http request option.
@@ -13136,7 +13047,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询系统用户详情。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户详情
          * @param {number} userId 用户编号。
          * @param {*} [options] Override http request option.
@@ -13177,7 +13088,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询用户登录日志。需具备 system:audit:login:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询登录日志
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -13245,7 +13156,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+         * 分页查询系统操作日志。需具备 system:audit:operation:view；未登录或登录失效返回 code 401；权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
          * @summary 查询操作日志
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -13318,17 +13229,19 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询只读权限目录。需具备 system:permission:view；权限码是稳定的系统契约，不通过运行时接口新增、修改或删除。
          * @summary 查询权限列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
          * @param {number} [permissionId] 权限编号。
-         * @param {string} [resource] 资源名称，支持模糊匹配。
-         * @param {string} [action] 操作类型，支持模糊匹配。
+         * @param {string} [permissionCode] 稳定权限码，支持模糊匹配。
+         * @param {string} [moduleName] 模块显示名称，支持模糊匹配。
+         * @param {string} [resourceName] 资源显示名称，支持模糊匹配。
+         * @param {string} [actionName] 操作显示名称，支持模糊匹配。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listPermissionData: async (page?: number, pageSize?: number, permissionId?: number, resource?: string, action?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listPermissionData: async (page?: number, pageSize?: number, permissionId?: number, permissionCode?: string, moduleName?: string, resourceName?: string, actionName?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/listPermissionData`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -13357,12 +13270,20 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
                 localVarQueryParameter['permission_id'] = permissionId;
             }
 
-            if (resource !== undefined) {
-                localVarQueryParameter['resource'] = resource;
+            if (permissionCode !== undefined) {
+                localVarQueryParameter['permission_code'] = permissionCode;
             }
 
-            if (action !== undefined) {
-                localVarQueryParameter['action'] = action;
+            if (moduleName !== undefined) {
+                localVarQueryParameter['module_name'] = moduleName;
+            }
+
+            if (resourceName !== undefined) {
+                localVarQueryParameter['resource_name'] = resourceName;
+            }
+
+            if (actionName !== undefined) {
+                localVarQueryParameter['action_name'] = actionName;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -13377,7 +13298,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询系统角色。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -13436,7 +13357,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询角色与权限的多对多关系。需具备 system:role:assign-permission；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色权限关系列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -13490,7 +13411,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询系统用户。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -13554,7 +13475,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询用户与角色的多对多关系。需具备 system:user:assign-role；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户角色关系列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -13678,16 +13599,16 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 修改权限
-         * @param {PermissionUpdateRequest} permissionUpdateRequest 
+         * 使用请求中的完整权限编号集合替换角色当前的全部权限关联，允许传空数组以移除全部权限。操作必须在一个事务内完成。需具备 system:role:assign-permission。
+         * @summary 设置角色权限集合
+         * @param {RolePermissionSetRequest} rolePermissionSetRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        updatePermissionData: async (permissionUpdateRequest: PermissionUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'permissionUpdateRequest' is not null or undefined
-            assertParamExists('updatePermissionData', 'permissionUpdateRequest', permissionUpdateRequest)
-            const localVarPath = `/api/updatePermissionData`;
+        setRolePermissions: async (rolePermissionSetRequest: RolePermissionSetRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'rolePermissionSetRequest' is not null or undefined
+            assertParamExists('setRolePermissions', 'rolePermissionSetRequest', rolePermissionSetRequest)
+            const localVarPath = `/api/setRolePermissions`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -13709,7 +13630,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(permissionUpdateRequest, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = serializeDataIfNeeded(rolePermissionSetRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -13717,7 +13638,46 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 使用请求中的完整角色编号集合替换用户当前的全部角色关联，允许传空数组以移除全部角色。操作必须在一个事务内完成。需具备 system:user:assign-role。
+         * @summary 设置用户角色集合
+         * @param {UserRoleSetRequest} userRoleSetRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        setUserRoles: async (userRoleSetRequest: UserRoleSetRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'userRoleSetRequest' is not null or undefined
+            assertParamExists('setUserRoles', 'userRoleSetRequest', userRoleSetRequest)
+            const localVarPath = `/api/setUserRoles`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(userRoleSetRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 修改系统角色名称、描述或状态。需具备 system:role:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改角色
          * @param {RoleUpdateRequest} roleUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -13756,7 +13716,7 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
             };
         },
         /**
-         * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改系统用户基础信息、密码或账号状态。需具备 system:user:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改用户
          * @param {UserUpdateRequest} userUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -13804,7 +13764,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = SystemApiAxiosParamCreator(configuration)
     return {
         /**
-         * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+         * 追踪写入操作日志。需具备 system:audit:operation:create；未登录或登录失效返回 code 401；权限不足返回 code 403。日志数据不提供修改或删除接口。
          * @summary 新增操作日志
          * @param {OperationLogCreateRequest} operationLogCreateRequest 
          * @param {*} [options] Override http request option.
@@ -13817,20 +13777,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 新增权限
-         * @param {PermissionCreateRequest} permissionCreateRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async addPermissionData(permissionCreateRequest: PermissionCreateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.addPermissionData(permissionCreateRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['SystemApi.addPermissionData']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增系统角色。需具备 system:role:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增角色
          * @param {RoleCreateRequest} roleCreateRequest 
          * @param {*} [options] Override http request option.
@@ -13843,20 +13790,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 给角色分配权限
-         * @param {RolePermissionAssignRequest} rolePermissionAssignRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async addRolePermission(rolePermissionAssignRequest: RolePermissionAssignRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RolePermissionAssignResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.addRolePermission(rolePermissionAssignRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['SystemApi.addRolePermission']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增系统用户。需具备 system:user:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增用户
          * @param {UserCreateRequest} userCreateRequest 
          * @param {*} [options] Override http request option.
@@ -13869,33 +13803,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 给用户分配角色
-         * @param {UserRoleAssignRequest} userRoleAssignRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async addUserRole(userRoleAssignRequest: UserRoleAssignRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserRoleAssignResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.addUserRole(userRoleAssignRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['SystemApi.addUserRole']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 删除权限
-         * @param {PermissionDeleteRequest} permissionDeleteRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async deletePermissionData(permissionDeleteRequest: PermissionDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.deletePermissionData(permissionDeleteRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['SystemApi.deletePermissionData']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除系统角色。需具备 system:role:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除角色
          * @param {RoleDeleteRequest} roleDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -13908,20 +13816,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 移除角色权限
-         * @param {RolePermissionDeleteRequest} rolePermissionDeleteRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async deleteRolePermission(rolePermissionDeleteRequest: RolePermissionDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteRolePermission(rolePermissionDeleteRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['SystemApi.deleteRolePermission']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除系统用户。需具备 system:user:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除用户
          * @param {UserDeleteRequest} userDeleteRequest 
          * @param {*} [options] Override http request option.
@@ -13934,20 +13829,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 移除用户角色
-         * @param {UserRoleDeleteRequest} userRoleDeleteRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async deleteUserRole(userRoleDeleteRequest: UserRoleDeleteRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteUserRole(userRoleDeleteRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['SystemApi.deleteUserRole']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求业务权限。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色和有效角色关联权限码的并集，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permission_codes 均为空数组。 角色名称仅用于展示，不参与授权判断；任何角色都只拥有角色权限关系中明确配置的权限，不存在按角色名称自动放行规则。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
          * @summary 查询当前登录者身份与权限
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -13959,7 +13841,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询只读权限目录中的权限详情。需具备 system:permission:view。
          * @summary 查询权限详情
          * @param {number} permissionId 权限编号。
          * @param {*} [options] Override http request option.
@@ -13972,7 +13854,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询系统角色详情。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色详情
          * @param {number} roleId 角色编号。
          * @param {*} [options] Override http request option.
@@ -13985,7 +13867,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询系统用户详情。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户详情
          * @param {number} userId 用户编号。
          * @param {*} [options] Override http request option.
@@ -13998,7 +13880,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询用户登录日志。需具备 system:audit:login:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询登录日志
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -14016,7 +13898,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+         * 分页查询系统操作日志。需具备 system:audit:operation:view；未登录或登录失效返回 code 401；权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
          * @summary 查询操作日志
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -14035,24 +13917,26 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询只读权限目录。需具备 system:permission:view；权限码是稳定的系统契约，不通过运行时接口新增、修改或删除。
          * @summary 查询权限列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
          * @param {number} [permissionId] 权限编号。
-         * @param {string} [resource] 资源名称，支持模糊匹配。
-         * @param {string} [action] 操作类型，支持模糊匹配。
+         * @param {string} [permissionCode] 稳定权限码，支持模糊匹配。
+         * @param {string} [moduleName] 模块显示名称，支持模糊匹配。
+         * @param {string} [resourceName] 资源显示名称，支持模糊匹配。
+         * @param {string} [actionName] 操作显示名称，支持模糊匹配。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listPermissionData(page?: number, pageSize?: number, permissionId?: number, resource?: string, action?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionPageResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listPermissionData(page, pageSize, permissionId, resource, action, options);
+        async listPermissionData(page?: number, pageSize?: number, permissionId?: number, permissionCode?: string, moduleName?: string, resourceName?: string, actionName?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listPermissionData(page, pageSize, permissionId, permissionCode, moduleName, resourceName, actionName, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['SystemApi.listPermissionData']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询系统角色。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -14069,7 +13953,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询角色与权限的多对多关系。需具备 system:role:assign-permission；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色权限关系列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -14085,7 +13969,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询系统用户。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -14103,7 +13987,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询用户与角色的多对多关系。需具备 system:user:assign-role；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户角色关系列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -14145,20 +14029,33 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 修改权限
-         * @param {PermissionUpdateRequest} permissionUpdateRequest 
+         * 使用请求中的完整权限编号集合替换角色当前的全部权限关联，允许传空数组以移除全部权限。操作必须在一个事务内完成。需具备 system:role:assign-permission。
+         * @summary 设置角色权限集合
+         * @param {RolePermissionSetRequest} rolePermissionSetRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async updatePermissionData(permissionUpdateRequest: PermissionUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PermissionResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.updatePermissionData(permissionUpdateRequest, options);
+        async setRolePermissions(rolePermissionSetRequest: RolePermissionSetRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<RolePermissionSetResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.setRolePermissions(rolePermissionSetRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['SystemApi.updatePermissionData']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.setRolePermissions']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 使用请求中的完整角色编号集合替换用户当前的全部角色关联，允许传空数组以移除全部角色。操作必须在一个事务内完成。需具备 system:user:assign-role。
+         * @summary 设置用户角色集合
+         * @param {UserRoleSetRequest} userRoleSetRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async setUserRoles(userRoleSetRequest: UserRoleSetRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserRoleSetResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.setUserRoles(userRoleSetRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SystemApi.setUserRoles']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 修改系统角色名称、描述或状态。需具备 system:role:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改角色
          * @param {RoleUpdateRequest} roleUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -14171,7 +14068,7 @@ export const SystemApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改系统用户基础信息、密码或账号状态。需具备 system:user:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改用户
          * @param {UserUpdateRequest} userUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -14193,7 +14090,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
     const localVarFp = SystemApiFp(configuration)
     return {
         /**
-         * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+         * 追踪写入操作日志。需具备 system:audit:operation:create；未登录或登录失效返回 code 401；权限不足返回 code 403。日志数据不提供修改或删除接口。
          * @summary 新增操作日志
          * @param {SystemApiAddOperationLogDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14203,17 +14100,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.addOperationLogData(requestParameters.operationLogCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 新增权限
-         * @param {SystemApiAddPermissionDataRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addPermissionData(requestParameters: SystemApiAddPermissionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<PermissionResponse> {
-            return localVarFp.addPermissionData(requestParameters.permissionCreateRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增系统角色。需具备 system:role:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增角色
          * @param {SystemApiAddRoleDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14223,17 +14110,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.addRoleData(requestParameters.roleCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 给角色分配权限
-         * @param {SystemApiAddRolePermissionRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addRolePermission(requestParameters: SystemApiAddRolePermissionRequest, options?: RawAxiosRequestConfig): AxiosPromise<RolePermissionAssignResponse> {
-            return localVarFp.addRolePermission(requestParameters.rolePermissionAssignRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 新增系统用户。需具备 system:user:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 新增用户
          * @param {SystemApiAddUserDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14243,27 +14120,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.addUserData(requestParameters.userCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 给用户分配角色
-         * @param {SystemApiAddUserRoleRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        addUserRole(requestParameters: SystemApiAddUserRoleRequest, options?: RawAxiosRequestConfig): AxiosPromise<UserRoleAssignResponse> {
-            return localVarFp.addUserRole(requestParameters.userRoleAssignRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 删除权限
-         * @param {SystemApiDeletePermissionDataRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deletePermissionData(requestParameters: SystemApiDeletePermissionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
-            return localVarFp.deletePermissionData(requestParameters.permissionDeleteRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除系统角色。需具备 system:role:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除角色
          * @param {SystemApiDeleteRoleDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14273,17 +14130,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.deleteRoleData(requestParameters.roleDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 移除角色权限
-         * @param {SystemApiDeleteRolePermissionRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteRolePermission(requestParameters: SystemApiDeleteRolePermissionRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
-            return localVarFp.deleteRolePermission(requestParameters.rolePermissionDeleteRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 删除系统用户。需具备 system:user:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 删除用户
          * @param {SystemApiDeleteUserDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14293,17 +14140,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.deleteUserData(requestParameters.userDeleteRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 移除用户角色
-         * @param {SystemApiDeleteUserRoleRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteUserRole(requestParameters: SystemApiDeleteUserRoleRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
-            return localVarFp.deleteUserRole(requestParameters.userRoleDeleteRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+         * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求业务权限。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色和有效角色关联权限码的并集，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permission_codes 均为空数组。 角色名称仅用于展示，不参与授权判断；任何角色都只拥有角色权限关系中明确配置的权限，不存在按角色名称自动放行规则。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
          * @summary 查询当前登录者身份与权限
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -14312,7 +14149,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.getCurrentAccess(options).then((request) => request(axios, basePath));
         },
         /**
-         * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询只读权限目录中的权限详情。需具备 system:permission:view。
          * @summary 查询权限详情
          * @param {SystemApiGetPermissionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14322,7 +14159,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.getPermissionData(requestParameters.permissionId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询系统角色详情。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色详情
          * @param {SystemApiGetRoleDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14332,7 +14169,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.getRoleData(requestParameters.roleId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 查询系统用户详情。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户详情
          * @param {SystemApiGetUserDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14342,7 +14179,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.getUserData(requestParameters.userId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询用户登录日志。需具备 system:audit:login:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询登录日志
          * @param {SystemApiListLoginRecordDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14352,7 +14189,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.listLoginRecordData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.result, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+         * 分页查询系统操作日志。需具备 system:audit:operation:view；未登录或登录失效返回 code 401；权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
          * @summary 查询操作日志
          * @param {SystemApiListOperationLogDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14362,17 +14199,17 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.listOperationLogData(requestParameters.page, requestParameters.pageSize, requestParameters.module, requestParameters.action, requestParameters.operatorId, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询只读权限目录。需具备 system:permission:view；权限码是稳定的系统契约，不通过运行时接口新增、修改或删除。
          * @summary 查询权限列表
          * @param {SystemApiListPermissionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
         listPermissionData(requestParameters: SystemApiListPermissionDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<PermissionPageResponse> {
-            return localVarFp.listPermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.permissionId, requestParameters.resource, requestParameters.action, options).then((request) => request(axios, basePath));
+            return localVarFp.listPermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.permissionId, requestParameters.permissionCode, requestParameters.moduleName, requestParameters.resourceName, requestParameters.actionName, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询系统角色。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色列表
          * @param {SystemApiListRoleDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14382,7 +14219,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.listRoleData(requestParameters.page, requestParameters.pageSize, requestParameters.roleId, requestParameters.roleName, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询角色与权限的多对多关系。需具备 system:role:assign-permission；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询角色权限关系列表
          * @param {SystemApiListRolePermissionDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14392,7 +14229,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.listRolePermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.roleId, requestParameters.permissionId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询系统用户。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户列表
          * @param {SystemApiListUserDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14402,7 +14239,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.listUserData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.employeeNo, requestParameters.userName, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 分页查询用户与角色的多对多关系。需具备 system:user:assign-role；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 查询用户角色关系列表
          * @param {SystemApiListUserRoleDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14432,17 +14269,27 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.register(requestParameters.registerRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-         * @summary 修改权限
-         * @param {SystemApiUpdatePermissionDataRequest} requestParameters Request parameters.
+         * 使用请求中的完整权限编号集合替换角色当前的全部权限关联，允许传空数组以移除全部权限。操作必须在一个事务内完成。需具备 system:role:assign-permission。
+         * @summary 设置角色权限集合
+         * @param {SystemApiSetRolePermissionsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        updatePermissionData(requestParameters: SystemApiUpdatePermissionDataRequest, options?: RawAxiosRequestConfig): AxiosPromise<PermissionResponse> {
-            return localVarFp.updatePermissionData(requestParameters.permissionUpdateRequest, options).then((request) => request(axios, basePath));
+        setRolePermissions(requestParameters: SystemApiSetRolePermissionsRequest, options?: RawAxiosRequestConfig): AxiosPromise<RolePermissionSetResponse> {
+            return localVarFp.setRolePermissions(requestParameters.rolePermissionSetRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 使用请求中的完整角色编号集合替换用户当前的全部角色关联，允许传空数组以移除全部角色。操作必须在一个事务内完成。需具备 system:user:assign-role。
+         * @summary 设置用户角色集合
+         * @param {SystemApiSetUserRolesRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        setUserRoles(requestParameters: SystemApiSetUserRolesRequest, options?: RawAxiosRequestConfig): AxiosPromise<UserRoleSetResponse> {
+            return localVarFp.setUserRoles(requestParameters.userRoleSetRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 修改系统角色名称、描述或状态。需具备 system:role:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改角色
          * @param {SystemApiUpdateRoleDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14452,7 +14299,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
             return localVarFp.updateRoleData(requestParameters.roleUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+         * 修改系统用户基础信息、密码或账号状态。需具备 system:user:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
          * @summary 修改用户
          * @param {SystemApiUpdateUserDataRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -14472,24 +14319,10 @@ export interface SystemApiAddOperationLogDataRequest {
 }
 
 /**
- * Request parameters for addPermissionData operation in SystemApi.
- */
-export interface SystemApiAddPermissionDataRequest {
-    readonly permissionCreateRequest: PermissionCreateRequest
-}
-
-/**
  * Request parameters for addRoleData operation in SystemApi.
  */
 export interface SystemApiAddRoleDataRequest {
     readonly roleCreateRequest: RoleCreateRequest
-}
-
-/**
- * Request parameters for addRolePermission operation in SystemApi.
- */
-export interface SystemApiAddRolePermissionRequest {
-    readonly rolePermissionAssignRequest: RolePermissionAssignRequest
 }
 
 /**
@@ -14500,20 +14333,6 @@ export interface SystemApiAddUserDataRequest {
 }
 
 /**
- * Request parameters for addUserRole operation in SystemApi.
- */
-export interface SystemApiAddUserRoleRequest {
-    readonly userRoleAssignRequest: UserRoleAssignRequest
-}
-
-/**
- * Request parameters for deletePermissionData operation in SystemApi.
- */
-export interface SystemApiDeletePermissionDataRequest {
-    readonly permissionDeleteRequest: PermissionDeleteRequest
-}
-
-/**
  * Request parameters for deleteRoleData operation in SystemApi.
  */
 export interface SystemApiDeleteRoleDataRequest {
@@ -14521,24 +14340,10 @@ export interface SystemApiDeleteRoleDataRequest {
 }
 
 /**
- * Request parameters for deleteRolePermission operation in SystemApi.
- */
-export interface SystemApiDeleteRolePermissionRequest {
-    readonly rolePermissionDeleteRequest: RolePermissionDeleteRequest
-}
-
-/**
  * Request parameters for deleteUserData operation in SystemApi.
  */
 export interface SystemApiDeleteUserDataRequest {
     readonly userDeleteRequest: UserDeleteRequest
-}
-
-/**
- * Request parameters for deleteUserRole operation in SystemApi.
- */
-export interface SystemApiDeleteUserRoleRequest {
-    readonly userRoleDeleteRequest: UserRoleDeleteRequest
 }
 
 /**
@@ -14666,14 +14471,24 @@ export interface SystemApiListPermissionDataRequest {
     readonly permissionId?: number
 
     /**
-     * 资源名称，支持模糊匹配。
+     * 稳定权限码，支持模糊匹配。
      */
-    readonly resource?: string
+    readonly permissionCode?: string
 
     /**
-     * 操作类型，支持模糊匹配。
+     * 模块显示名称，支持模糊匹配。
      */
-    readonly action?: string
+    readonly moduleName?: string
+
+    /**
+     * 资源显示名称，支持模糊匹配。
+     */
+    readonly resourceName?: string
+
+    /**
+     * 操作显示名称，支持模糊匹配。
+     */
+    readonly actionName?: string
 }
 
 /**
@@ -14806,10 +14621,17 @@ export interface SystemApiRegisterRequest {
 }
 
 /**
- * Request parameters for updatePermissionData operation in SystemApi.
+ * Request parameters for setRolePermissions operation in SystemApi.
  */
-export interface SystemApiUpdatePermissionDataRequest {
-    readonly permissionUpdateRequest: PermissionUpdateRequest
+export interface SystemApiSetRolePermissionsRequest {
+    readonly rolePermissionSetRequest: RolePermissionSetRequest
+}
+
+/**
+ * Request parameters for setUserRoles operation in SystemApi.
+ */
+export interface SystemApiSetUserRolesRequest {
+    readonly userRoleSetRequest: UserRoleSetRequest
 }
 
 /**
@@ -14831,7 +14653,7 @@ export interface SystemApiUpdateUserDataRequest {
  */
 export class SystemApi extends BaseAPI {
     /**
-     * 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+     * 追踪写入操作日志。需具备 system:audit:operation:create；未登录或登录失效返回 code 401；权限不足返回 code 403。日志数据不提供修改或删除接口。
      * @summary 新增操作日志
      * @param {SystemApiAddOperationLogDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14842,18 +14664,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 新增权限
-     * @param {SystemApiAddPermissionDataRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public addPermissionData(requestParameters: SystemApiAddPermissionDataRequest, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).addPermissionData(requestParameters.permissionCreateRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 新增系统角色。需具备 system:role:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 新增角色
      * @param {SystemApiAddRoleDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14864,18 +14675,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 给角色分配权限
-     * @param {SystemApiAddRolePermissionRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public addRolePermission(requestParameters: SystemApiAddRolePermissionRequest, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).addRolePermission(requestParameters.rolePermissionAssignRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 新增系统用户。需具备 system:user:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 新增用户
      * @param {SystemApiAddUserDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14886,29 +14686,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 给用户分配角色
-     * @param {SystemApiAddUserRoleRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public addUserRole(requestParameters: SystemApiAddUserRoleRequest, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).addUserRole(requestParameters.userRoleAssignRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 删除权限
-     * @param {SystemApiDeletePermissionDataRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public deletePermissionData(requestParameters: SystemApiDeletePermissionDataRequest, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).deletePermissionData(requestParameters.permissionDeleteRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 删除系统角色。需具备 system:role:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 删除角色
      * @param {SystemApiDeleteRoleDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14919,18 +14697,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 移除角色权限
-     * @param {SystemApiDeleteRolePermissionRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public deleteRolePermission(requestParameters: SystemApiDeleteRolePermissionRequest, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).deleteRolePermission(requestParameters.rolePermissionDeleteRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 删除系统用户。需具备 system:user:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 删除用户
      * @param {SystemApiDeleteUserDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14941,18 +14708,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 移除用户角色
-     * @param {SystemApiDeleteUserRoleRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public deleteUserRole(requestParameters: SystemApiDeleteUserRoleRequest, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).deleteUserRole(requestParameters.userRoleDeleteRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。 拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
+     * 供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求业务权限。 当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。 返回当前用户的最小身份信息、全部有效角色和有效角色关联权限码的并集，不分页，不返回其他用户的信息。 停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permission_codes 均为空数组。 角色名称仅用于展示，不参与授权判断；任何角色都只拥有角色权限关系中明确配置的权限，不存在按角色名称自动放行规则。 HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。 本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。 
      * @summary 查询当前登录者身份与权限
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -14962,7 +14718,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 查询只读权限目录中的权限详情。需具备 system:permission:view。
      * @summary 查询权限详情
      * @param {SystemApiGetPermissionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14973,7 +14729,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 查询系统角色详情。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询角色详情
      * @param {SystemApiGetRoleDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14984,7 +14740,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 查询系统用户详情。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询用户详情
      * @param {SystemApiGetUserDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -14995,7 +14751,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询用户登录日志。需具备 system:audit:login:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询登录日志
      * @param {SystemApiListLoginRecordDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -15006,7 +14762,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+     * 分页查询系统操作日志。需具备 system:audit:operation:view；未登录或登录失效返回 code 401；权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
      * @summary 查询操作日志
      * @param {SystemApiListOperationLogDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -15017,18 +14773,18 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询只读权限目录。需具备 system:permission:view；权限码是稳定的系统契约，不通过运行时接口新增、修改或删除。
      * @summary 查询权限列表
      * @param {SystemApiListPermissionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listPermissionData(requestParameters: SystemApiListPermissionDataRequest = {}, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).listPermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.permissionId, requestParameters.resource, requestParameters.action, options).then((request) => request(this.axios, this.basePath));
+        return SystemApiFp(this.configuration).listPermissionData(requestParameters.page, requestParameters.pageSize, requestParameters.permissionId, requestParameters.permissionCode, requestParameters.moduleName, requestParameters.resourceName, requestParameters.actionName, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询系统角色。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询角色列表
      * @param {SystemApiListRoleDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -15039,7 +14795,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询角色与权限的多对多关系。需具备 system:role:assign-permission；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询角色权限关系列表
      * @param {SystemApiListRolePermissionDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -15050,7 +14806,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询系统用户。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询用户列表
      * @param {SystemApiListUserDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -15061,7 +14817,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 分页查询用户与角色的多对多关系。需具备 system:user:assign-role；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 查询用户角色关系列表
      * @param {SystemApiListUserRoleDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -15094,18 +14850,29 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-     * @summary 修改权限
-     * @param {SystemApiUpdatePermissionDataRequest} requestParameters Request parameters.
+     * 使用请求中的完整权限编号集合替换角色当前的全部权限关联，允许传空数组以移除全部权限。操作必须在一个事务内完成。需具备 system:role:assign-permission。
+     * @summary 设置角色权限集合
+     * @param {SystemApiSetRolePermissionsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public updatePermissionData(requestParameters: SystemApiUpdatePermissionDataRequest, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).updatePermissionData(requestParameters.permissionUpdateRequest, options).then((request) => request(this.axios, this.basePath));
+    public setRolePermissions(requestParameters: SystemApiSetRolePermissionsRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).setRolePermissions(requestParameters.rolePermissionSetRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 使用请求中的完整角色编号集合替换用户当前的全部角色关联，允许传空数组以移除全部角色。操作必须在一个事务内完成。需具备 system:user:assign-role。
+     * @summary 设置用户角色集合
+     * @param {SystemApiSetUserRolesRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public setUserRoles(requestParameters: SystemApiSetUserRolesRequest, options?: RawAxiosRequestConfig) {
+        return SystemApiFp(this.configuration).setUserRoles(requestParameters.userRoleSetRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 修改系统角色名称、描述或状态。需具备 system:role:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 修改角色
      * @param {SystemApiUpdateRoleDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -15116,7 +14883,7 @@ export class SystemApi extends BaseAPI {
     }
 
     /**
-     * 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+     * 修改系统用户基础信息、密码或账号状态。需具备 system:user:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
      * @summary 修改用户
      * @param {SystemApiUpdateUserDataRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.

@@ -24,7 +24,7 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class UserRoleAssignResponse : IEquatable<UserRoleAssignResponse>
+    public partial class UserRoleSetResponse : IEquatable<UserRoleSetResponse>
     {
 
         /// <summary>
@@ -110,7 +110,7 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class UserRoleAssignResponse {\n");
+            sb.Append("class UserRoleSetResponse {\n");
             sb.Append("  Code: ").Append(Code).Append("\n");
             sb.Append("  Message: ").Append(Message).Append("\n");
             sb.Append("  Data: ").Append(Data).Append("\n");
@@ -136,15 +136,15 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((UserRoleAssignResponse)obj);
+            return obj.GetType() == GetType() && Equals((UserRoleSetResponse)obj);
         }
 
         /// <summary>
-        /// Returns true if UserRoleAssignResponse instances are equal
+        /// Returns true if UserRoleSetResponse instances are equal
         /// </summary>
-        /// <param name="other">Instance of UserRoleAssignResponse to be compared</param>
+        /// <param name="other">Instance of UserRoleSetResponse to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(UserRoleAssignResponse other)
+        public bool Equals(UserRoleSetResponse other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -191,12 +191,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(UserRoleAssignResponse left, UserRoleAssignResponse right)
+        public static bool operator ==(UserRoleSetResponse left, UserRoleSetResponse right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(UserRoleAssignResponse left, UserRoleAssignResponse right)
+        public static bool operator !=(UserRoleSetResponse left, UserRoleSetResponse right)
         {
             return !Equals(left, right);
         }

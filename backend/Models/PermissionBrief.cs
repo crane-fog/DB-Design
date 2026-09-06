@@ -29,20 +29,84 @@ namespace Org.OpenAPITools.Models
         /// <summary>
         /// Gets or Sets PermissionId
         /// </summary>
+        [Required]
         [DataMember(Name="permission_id", EmitDefaultValue=true)]
         public int PermissionId { get; set; }
 
         /// <summary>
-        /// Gets or Sets Resource
+        /// Gets or Sets PermissionCode
         /// </summary>
-        [DataMember(Name="resource", EmitDefaultValue=false)]
-        public string Resource { get; set; }
+        [Required]
+        [DataMember(Name="permission_code", EmitDefaultValue=true)]
+        public PermissionCode PermissionCode { get; set; }
 
         /// <summary>
-        /// Gets or Sets Action
+        /// 权限在管理界面中的模块分组名称。
         /// </summary>
-        [DataMember(Name="action", EmitDefaultValue=false)]
-        public string Action { get; set; }
+        /// <value>权限在管理界面中的模块分组名称。</value>
+        [Required]
+        [DataMember(Name="module_name", EmitDefaultValue=false)]
+        public string ModuleName { get; set; }
+
+        /// <summary>
+        /// 权限对应资源的显示名称。
+        /// </summary>
+        /// <value>权限对应资源的显示名称。</value>
+        [Required]
+        [DataMember(Name="resource_name", EmitDefaultValue=false)]
+        public string ResourceName { get; set; }
+
+        /// <summary>
+        /// 权限对应操作的显示名称。
+        /// </summary>
+        /// <value>权限对应操作的显示名称。</value>
+        [Required]
+        [DataMember(Name="action_name", EmitDefaultValue=false)]
+        public string ActionName { get; set; }
+
+        /// <summary>
+        /// Gets or Sets Description
+        /// </summary>
+        [DataMember(Name="description", EmitDefaultValue=true)]
+        public string Description { get; set; }
+
+        /// <summary>
+        /// Gets or Sets SortOrder
+        /// </summary>
+        [Required]
+        [DataMember(Name="sort_order", EmitDefaultValue=true)]
+        public int SortOrder { get; set; }
+
+
+        /// <summary>
+        /// valid 权限参与授权和角色配置；disabled 权限不再产生有效授权。
+        /// </summary>
+        /// <value>valid 权限参与授权和角色配置；disabled 权限不再产生有效授权。</value>
+        [TypeConverter(typeof(CustomEnumConverter<StatusEnum>))]
+        [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public enum StatusEnum
+        {
+            
+            /// <summary>
+            /// Enum ValidEnum for valid
+            /// </summary>
+            [EnumMember(Value = "valid")]
+            ValidEnum = 1,
+            
+            /// <summary>
+            /// Enum DisabledEnum for disabled
+            /// </summary>
+            [EnumMember(Value = "disabled")]
+            DisabledEnum = 2
+        }
+
+        /// <summary>
+        /// valid 权限参与授权和角色配置；disabled 权限不再产生有效授权。
+        /// </summary>
+        /// <value>valid 权限参与授权和角色配置；disabled 权限不再产生有效授权。</value>
+        [Required]
+        [DataMember(Name="status", EmitDefaultValue=true)]
+        public StatusEnum Status { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -53,8 +117,13 @@ namespace Org.OpenAPITools.Models
             var sb = new StringBuilder();
             sb.Append("class PermissionBrief {\n");
             sb.Append("  PermissionId: ").Append(PermissionId).Append("\n");
-            sb.Append("  Resource: ").Append(Resource).Append("\n");
-            sb.Append("  Action: ").Append(Action).Append("\n");
+            sb.Append("  PermissionCode: ").Append(PermissionCode).Append("\n");
+            sb.Append("  ModuleName: ").Append(ModuleName).Append("\n");
+            sb.Append("  ResourceName: ").Append(ResourceName).Append("\n");
+            sb.Append("  ActionName: ").Append(ActionName).Append("\n");
+            sb.Append("  Description: ").Append(Description).Append("\n");
+            sb.Append("  SortOrder: ").Append(SortOrder).Append("\n");
+            sb.Append("  Status: ").Append(Status).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -97,14 +166,39 @@ namespace Org.OpenAPITools.Models
                     PermissionId.Equals(other.PermissionId)
                 ) && 
                 (
-                    Resource == other.Resource ||
-                    Resource != null &&
-                    Resource.Equals(other.Resource)
+                    PermissionCode == other.PermissionCode ||
+                    
+                    PermissionCode.Equals(other.PermissionCode)
                 ) && 
                 (
-                    Action == other.Action ||
-                    Action != null &&
-                    Action.Equals(other.Action)
+                    ModuleName == other.ModuleName ||
+                    ModuleName != null &&
+                    ModuleName.Equals(other.ModuleName)
+                ) && 
+                (
+                    ResourceName == other.ResourceName ||
+                    ResourceName != null &&
+                    ResourceName.Equals(other.ResourceName)
+                ) && 
+                (
+                    ActionName == other.ActionName ||
+                    ActionName != null &&
+                    ActionName.Equals(other.ActionName)
+                ) && 
+                (
+                    Description == other.Description ||
+                    Description != null &&
+                    Description.Equals(other.Description)
+                ) && 
+                (
+                    SortOrder == other.SortOrder ||
+                    
+                    SortOrder.Equals(other.SortOrder)
+                ) && 
+                (
+                    Status == other.Status ||
+                    
+                    Status.Equals(other.Status)
                 );
         }
 
@@ -120,10 +214,20 @@ namespace Org.OpenAPITools.Models
                 // Suitable nullity checks etc, of course :)
                     
                     hashCode = hashCode * 59 + PermissionId.GetHashCode();
-                    if (Resource != null)
-                    hashCode = hashCode * 59 + Resource.GetHashCode();
-                    if (Action != null)
-                    hashCode = hashCode * 59 + Action.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + PermissionCode.GetHashCode();
+                    if (ModuleName != null)
+                    hashCode = hashCode * 59 + ModuleName.GetHashCode();
+                    if (ResourceName != null)
+                    hashCode = hashCode * 59 + ResourceName.GetHashCode();
+                    if (ActionName != null)
+                    hashCode = hashCode * 59 + ActionName.GetHashCode();
+                    if (Description != null)
+                    hashCode = hashCode * 59 + Description.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + SortOrder.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + Status.GetHashCode();
                 return hashCode;
             }
         }

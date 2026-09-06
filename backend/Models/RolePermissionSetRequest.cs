@@ -24,21 +24,22 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class PermissionCreateRequest : IEquatable<PermissionCreateRequest>
+    public partial class RolePermissionSetRequest : IEquatable<RolePermissionSetRequest>
     {
         /// <summary>
-        /// Gets or Sets Resource
+        /// Gets or Sets RoleId
         /// </summary>
         [Required]
-        [DataMember(Name="resource", EmitDefaultValue=false)]
-        public string Resource { get; set; }
+        [DataMember(Name="role_id", EmitDefaultValue=true)]
+        public int RoleId { get; set; }
 
         /// <summary>
-        /// Gets or Sets Action
+        /// 替换后的完整权限编号集合；空数组表示移除角色全部权限。
         /// </summary>
+        /// <value>替换后的完整权限编号集合；空数组表示移除角色全部权限。</value>
         [Required]
-        [DataMember(Name="action", EmitDefaultValue=false)]
-        public string Action { get; set; }
+        [DataMember(Name="permission_ids", EmitDefaultValue=false)]
+        public List<int> PermissionIds { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -47,9 +48,9 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class PermissionCreateRequest {\n");
-            sb.Append("  Resource: ").Append(Resource).Append("\n");
-            sb.Append("  Action: ").Append(Action).Append("\n");
+            sb.Append("class RolePermissionSetRequest {\n");
+            sb.Append("  RoleId: ").Append(RoleId).Append("\n");
+            sb.Append("  PermissionIds: ").Append(PermissionIds).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,29 +73,30 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((PermissionCreateRequest)obj);
+            return obj.GetType() == GetType() && Equals((RolePermissionSetRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if PermissionCreateRequest instances are equal
+        /// Returns true if RolePermissionSetRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of PermissionCreateRequest to be compared</param>
+        /// <param name="other">Instance of RolePermissionSetRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(PermissionCreateRequest other)
+        public bool Equals(RolePermissionSetRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    Resource == other.Resource ||
-                    Resource != null &&
-                    Resource.Equals(other.Resource)
+                    RoleId == other.RoleId ||
+                    
+                    RoleId.Equals(other.RoleId)
                 ) && 
                 (
-                    Action == other.Action ||
-                    Action != null &&
-                    Action.Equals(other.Action)
+                    PermissionIds == other.PermissionIds ||
+                    PermissionIds != null &&
+                    other.PermissionIds != null &&
+                    PermissionIds.SequenceEqual(other.PermissionIds)
                 );
         }
 
@@ -108,10 +110,10 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (Resource != null)
-                    hashCode = hashCode * 59 + Resource.GetHashCode();
-                    if (Action != null)
-                    hashCode = hashCode * 59 + Action.GetHashCode();
+                    
+                    hashCode = hashCode * 59 + RoleId.GetHashCode();
+                    if (PermissionIds != null)
+                    hashCode = hashCode * 59 + PermissionIds.GetHashCode();
                 return hashCode;
             }
         }
@@ -119,12 +121,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(PermissionCreateRequest left, PermissionCreateRequest right)
+        public static bool operator ==(RolePermissionSetRequest left, RolePermissionSetRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(PermissionCreateRequest left, PermissionCreateRequest right)
+        public static bool operator !=(RolePermissionSetRequest left, RolePermissionSetRequest right)
         {
             return !Equals(left, right);
         }

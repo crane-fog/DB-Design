@@ -27,9 +27,9 @@ namespace Org.OpenAPITools.Models
     public partial class ExternalOrderCreateRequest : IEquatable<ExternalOrderCreateRequest>
     {
         /// <summary>
-        /// 外部客户自提交时不得传，由当前登录用户推导；仅生产管理员或系统管理员代录时可传，后端必须按登录角色校验。
+        /// 使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。
         /// </summary>
-        /// <value>外部客户自提交时不得传，由当前登录用户推导；仅生产管理员或系统管理员代录时可传，后端必须按登录角色校验。</value>
+        /// <value>使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。</value>
         [DataMember(Name="customer_id", EmitDefaultValue=true)]
         public long? CustomerId { get; set; }
 

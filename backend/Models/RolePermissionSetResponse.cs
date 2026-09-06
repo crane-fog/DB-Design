@@ -24,7 +24,7 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class RolePermissionAssignResponse : IEquatable<RolePermissionAssignResponse>
+    public partial class RolePermissionSetResponse : IEquatable<RolePermissionSetResponse>
     {
 
         /// <summary>
@@ -110,7 +110,7 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class RolePermissionAssignResponse {\n");
+            sb.Append("class RolePermissionSetResponse {\n");
             sb.Append("  Code: ").Append(Code).Append("\n");
             sb.Append("  Message: ").Append(Message).Append("\n");
             sb.Append("  Data: ").Append(Data).Append("\n");
@@ -136,15 +136,15 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((RolePermissionAssignResponse)obj);
+            return obj.GetType() == GetType() && Equals((RolePermissionSetResponse)obj);
         }
 
         /// <summary>
-        /// Returns true if RolePermissionAssignResponse instances are equal
+        /// Returns true if RolePermissionSetResponse instances are equal
         /// </summary>
-        /// <param name="other">Instance of RolePermissionAssignResponse to be compared</param>
+        /// <param name="other">Instance of RolePermissionSetResponse to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(RolePermissionAssignResponse other)
+        public bool Equals(RolePermissionSetResponse other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -191,12 +191,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(RolePermissionAssignResponse left, RolePermissionAssignResponse right)
+        public static bool operator ==(RolePermissionSetResponse left, RolePermissionSetResponse right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(RolePermissionAssignResponse left, RolePermissionAssignResponse right)
+        public static bool operator !=(RolePermissionSetResponse left, RolePermissionSetResponse right)
         {
             return !Equals(left, right);
         }
