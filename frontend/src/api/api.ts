@@ -985,6 +985,45 @@ export interface FaultRecordCreateRequest {
     'fault_type': string;
     'description': string;
 }
+export interface FaultRecordListResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': FaultRecordListResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': FaultRecordListResponseAllOfData;
+}
+
+export const FaultRecordListResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type FaultRecordListResponseCodeEnum = typeof FaultRecordListResponseCodeEnum[keyof typeof FaultRecordListResponseCodeEnum];
+
+export interface FaultRecordListResponseAllOfData {
+    /**
+     * 数据总数。
+     */
+    'total': number;
+    /**
+     * 当前页码。
+     */
+    'page': number;
+    /**
+     * 每页数据数量。
+     */
+    'page_size': number;
+    'records': Array<FaultRecord>;
+}
 export interface FaultRecordResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -8509,6 +8548,60 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
+         * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线故障列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [lineId] 生产线编号
+         * @param {FaultStatus} [status] 故障状态
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionLineFault: async (page?: number, pageSize?: number, lineId?: number, status?: FaultStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listProductionLineFault`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['page_size'] = pageSize;
+            }
+
+            if (lineId !== undefined) {
+                localVarQueryParameter['line_id'] = lineId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
          * @summary 查询生产线类型
          * @param {number} [page] 当前页码，从 1 开始。
@@ -9299,6 +9392,22 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线故障列表
+         * @param {number} [page] 当前页码，从 1 开始。
+         * @param {number} [pageSize] 每页数据数量。
+         * @param {number} [lineId] 生产线编号
+         * @param {FaultStatus} [status] 故障状态
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listProductionLineFault(page?: number, pageSize?: number, lineId?: number, status?: FaultStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<FaultRecordListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listProductionLineFault(page, pageSize, lineId, status, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listProductionLineFault']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
          * @summary 查询生产线类型
          * @param {number} [page] 当前页码，从 1 开始。
@@ -9637,6 +9746,16 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listProductionLine(requestParameters.page, requestParameters.pageSize, requestParameters.typeId, requestParameters.status, options).then((request) => request(axios, basePath));
         },
         /**
+         * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+         * @summary 查询生产线故障列表
+         * @param {ProductionApiListProductionLineFaultRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listProductionLineFault(requestParameters: ProductionApiListProductionLineFaultRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<FaultRecordListResponse> {
+            return localVarFp.listProductionLineFault(requestParameters.page, requestParameters.pageSize, requestParameters.lineId, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
          * 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
          * @summary 查询生产线类型
          * @param {ProductionApiListProductionLineTypeRequest} requestParameters Request parameters.
@@ -9933,6 +10052,31 @@ export interface ProductionApiListProductionLineRequest {
 }
 
 /**
+ * Request parameters for listProductionLineFault operation in ProductionApi.
+ */
+export interface ProductionApiListProductionLineFaultRequest {
+    /**
+     * 当前页码，从 1 开始。
+     */
+    readonly page?: number
+
+    /**
+     * 每页数据数量。
+     */
+    readonly pageSize?: number
+
+    /**
+     * 生产线编号
+     */
+    readonly lineId?: number
+
+    /**
+     * 故障状态
+     */
+    readonly status?: FaultStatus
+}
+
+/**
  * Request parameters for listProductionLineType operation in ProductionApi.
  */
 export interface ProductionApiListProductionLineTypeRequest {
@@ -10212,6 +10356,17 @@ export class ProductionApi extends BaseAPI {
      */
     public listProductionLine(requestParameters: ProductionApiListProductionLineRequest = {}, options?: RawAxiosRequestConfig) {
         return ProductionApiFp(this.configuration).listProductionLine(requestParameters.page, requestParameters.pageSize, requestParameters.typeId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+     * @summary 查询生产线故障列表
+     * @param {ProductionApiListProductionLineFaultRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listProductionLineFault(requestParameters: ProductionApiListProductionLineFaultRequest = {}, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listProductionLineFault(requestParameters.page, requestParameters.pageSize, requestParameters.lineId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
