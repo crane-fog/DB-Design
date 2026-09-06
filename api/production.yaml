@@ -10,7 +10,7 @@ paths:
   /api/listProductionOrder:
     get:
       summary: 查询生产订单列表
-      description: 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+      description: 按产品、订单状态、计划完工日期等条件分页查询生产订单。需具备 production:order:view；权限不足返回 code 403。
       operationId: listProductionOrder
       tags: [production]
       security:
@@ -51,7 +51,7 @@ paths:
   /api/getProductionOrder:
     get:
       summary: 查询生产订单详情
-      description: 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。需具备 production:order:view；权限不足返回 code 403。
       operationId: getProductionOrder
       tags: [production]
       security:
@@ -73,7 +73,7 @@ paths:
   /api/addProductionOrder:
     post:
       summary: 新增生产订单
-      description: 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+      description: 新增内部生产订单，初始状态为 pending_review。需具备 production:order:create；权限不足返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
       operationId: addProductionOrder
       tags: [production]
       security:
@@ -94,7 +94,7 @@ paths:
   /api/updateProductionOrder:
     post:
       summary: 修改生产订单计划
-      description: 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+      description: 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
       operationId: updateProductionOrder
       tags: [production]
       security:
@@ -115,7 +115,7 @@ paths:
   /api/approveProductionOrder:
     post:
       summary: 审核生产订单
-      description: 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
       operationId: approveProductionOrder
       tags: [production]
       security:
@@ -136,7 +136,7 @@ paths:
   /api/startProductionOrder:
     post:
       summary: 开始生产订单
-      description: 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
       operationId: startProductionOrder
       tags: [production]
       security:
@@ -157,7 +157,7 @@ paths:
   /api/finishProductionOrder:
     post:
       summary: 完成生产订单
-      description: 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。需具备 production:order:finish；非法状态返回 code 409。
       operationId: finishProductionOrder
       tags: [production]
       security:
@@ -178,7 +178,7 @@ paths:
   /api/cancelProductionOrder:
     post:
       summary: 取消生产订单
-      description: 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+      description: 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
       operationId: cancelProductionOrder
       tags: [production]
       security:
@@ -199,7 +199,7 @@ paths:
   /api/listProductionLine:
     get:
       summary: 查询生产线列表
-      description: 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询生产线及其线型、启用日期、负责人和当前状态。需具备 production:line:view；权限不足返回 code 403。
       operationId: listProductionLine
       tags: [production]
       security:
@@ -228,7 +228,7 @@ paths:
   /api/listProductionLineType:
     get:
       summary: 查询生产线类型
-      description: 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询生产线类型。需具备 production:line-type:view；权限不足返回 code 403。
       operationId: listProductionLineType
       tags: [production]
       security:
@@ -251,7 +251,7 @@ paths:
   /api/saveProductionLineType:
     post:
       summary: 保存生产线类型
-      description: 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+      description: 新增或更新生产线类型。需具备 production:line-type:update；类型名称重复返回 code 409。
       operationId: saveProductionLineType
       tags: [production]
       security:
@@ -272,7 +272,7 @@ paths:
   /api/addProductionLine:
     post:
       summary: 新增生产线
-      description: 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 新增生产线并初始化 line_status 记录，默认状态为 idle。需具备 production:line:create；权限不足返回 code 403。
       operationId: addProductionLine
       tags: [production]
       security:
@@ -293,7 +293,7 @@ paths:
   /api/updateProductionLine:
     post:
       summary: 修改生产线
-      description: 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+      description: 修改生产线所属类型、启用日期或负责人。需具备 production:line:update；生产线不存在返回 code 404。
       operationId: updateProductionLine
       tags: [production]
       security:
@@ -314,7 +314,7 @@ paths:
   /api/listCapacityConfig:
     get:
       summary: 查询产品产能配置
-      description: 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询产品所需生产线类型和单件生产时间。需具备 production:capacity-config:view；权限不足返回 code 403。
       operationId: listCapacityConfig
       tags: [production]
       security:
@@ -344,7 +344,7 @@ paths:
   /api/saveCapacityConfig:
     post:
       summary: 保存产品产能配置
-      description: 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+      description: 新增或更新产品产能配置。需具备 production:capacity-config:update；业务约束：unit_time 必须大于 0。
       operationId: saveCapacityConfig
       tags: [production]
       security:
@@ -365,7 +365,7 @@ paths:
   /api/listProductionCalendar:
     get:
       summary: 查询生产日历
-      description: 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 按生产线、日期范围和产能配置查询生产日历排产记录。需具备 production:calendar:view；权限不足返回 code 403。
       operationId: listProductionCalendar
       tags: [production]
       security:
@@ -407,7 +407,7 @@ paths:
   /api/saveProductionCalendar:
     post:
       summary: 保存生产日历
-      description: 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+      description: 新增或覆盖指定日期、生产线的生产日历配置。需具备 production:calendar:update；生产线或产能配置不存在返回 code 404。
       operationId: saveProductionCalendar
       tags: [production]
       security:
@@ -428,7 +428,7 @@ paths:
   /api/deleteProductionCalendar:
     post:
       summary: 删除生产日历
-      description: 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+      description: 删除指定日期、生产线的生产日历排产记录。需具备 production:calendar:delete；记录不存在返回 code 404。
       operationId: deleteProductionCalendar
       tags: [production]
       security:
@@ -449,7 +449,7 @@ paths:
   /api/estimateProductionCapacity:
     post:
       summary: 估计生产订单交付能力
-      description: 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。需具备 production:capacity:estimate；权限不足返回 code 403。
       operationId: estimateProductionCapacity
       tags: [production]
       security:
@@ -470,7 +470,7 @@ paths:
   /api/listExternalOrder:
     get:
       summary: 查询外部订单列表
-      description: 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+      description: 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
       operationId: listExternalOrder
       tags: [production]
       security:
@@ -481,7 +481,7 @@ paths:
         - name: customer_id
           in: query
           required: false
-          description: 外部客户角色只能传自身 user_id。
+          description: 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
           schema:
             type: integer
             format: int64
@@ -500,7 +500,7 @@ paths:
   /api/addExternalOrder:
     post:
       summary: 外部客户提交订单
-      description: 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+      description: 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
       operationId: addExternalOrder
       tags: [production]
       security:
@@ -521,7 +521,7 @@ paths:
   /api/reviewExternalOrder:
     post:
       summary: 审核外部订单
-      description: 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。需具备 external-order:review；非法状态返回 code 409。
       operationId: reviewExternalOrder
       tags: [production]
       security:
@@ -542,7 +542,7 @@ paths:
   /api/convertExternalOrderToProductionOrder:
     post:
       summary: 外部订单转生产订单
-      description: 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
       operationId: convertExternalOrderToProductionOrder
       tags: [production]
       security:
@@ -563,7 +563,7 @@ paths:
   /api/runCapacityDetection:
     post:
       summary: 执行产能检测
-      description: 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。需具备 production:capacity:detect；权限不足返回 code 403。
       operationId: runCapacityDetection
       tags: [production]
       security:
@@ -584,7 +584,7 @@ paths:
   /api/saveCapacityBalance:
     post:
       summary: 保存产能平衡调整
-      description: 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 保存产能调整前后排产方案、调整人和受影响生产订单列表。需具备 production:capacity:balance；权限不足返回 code 403。
       operationId: saveCapacityBalance
       tags: [production]
       security:
@@ -605,7 +605,7 @@ paths:
   /api/reportProductionLineFault:
     post:
       summary: 上报生产线故障
-      description: 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      description: 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
       operationId: reportProductionLineFault
       tags: [production]
       security:
@@ -626,7 +626,7 @@ paths:
   /api/updateProductionLineFault:
     post:
       summary: 更新生产线故障状态
-      description: 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+      description: 更新故障记录状态和维修负责人。production:fault:update-any 可更新任意故障；production:fault:update-assigned 仅可更新分配给自己的故障；production:fault:claim 可认领尚未分配的故障。三项权限均无时返回 code 403，非法状态返回 code 409。
       operationId: updateProductionLineFault
       tags: [production]
       security:
@@ -647,7 +647,7 @@ paths:
   /api/listProductionLineFault:
     get:
       summary: 查询生产线故障列表
-      description: 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      description: 按生产线编号、故障状态分页查询故障记录。需具备 production:fault:view；权限不足返回 code 403。
       operationId: listProductionLineFault
       tags: [production]
       security:
@@ -678,7 +678,7 @@ paths:
   /api/updateProductionLineStatus:
     post:
       summary: 更新生产线状态
-      description: 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      description: 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。需具备 production:line-status:update；权限不足返回 code 403。
       operationId: updateProductionLineStatus
       tags: [production]
       security:
@@ -1128,7 +1128,7 @@ components:
           type: integer
           format: int64
           nullable: true
-          description: 外部客户自提交时不得传，由当前登录用户推导；仅生产管理员或系统管理员代录时可传，后端必须按登录角色校验。
+          description: 使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。
         material_id:
           type: integer
           format: int64

@@ -10,7 +10,7 @@ paths:
   /api/listBatchConsumption:
     get:
       summary: 查询批次消耗关系
-      description: 分页查询生产订单与采购订单明细之间的批次消耗关系。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询生产订单与采购订单明细之间的批次消耗关系。需具备 trace:consumption:view；权限不足返回 code 403。
       operationId: listBatchConsumption
       tags: [quality_traceability]
       security:
@@ -47,7 +47,7 @@ paths:
   /api/getBatchConsumption:
     get:
       summary: 查询批次消耗详情
-      description: 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。权限：质量管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      description: 根据 consumption_id 查询单条批次消耗关系及关联的生产订单、采购明细，避免客户端遍历分页列表定位记录。需具备 trace:consumption:view；记录不存在返回 code 404，权限不足返回 code 403。
       operationId: getBatchConsumption
       tags: [quality_traceability]
       security:
@@ -69,7 +69,7 @@ paths:
   /api/addBatchConsumption:
     post:
       summary: 新增批次消耗关系
-      description: 记录生产订单实际消耗的采购物料批次和消耗数量。权限：质量管理员、生产管理员、系统管理员可访问；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
+      description: 记录生产订单实际消耗的采购物料批次和消耗数量。需具备 trace:consumption:create；业务约束：consume_qty 必须大于 0，生产订单和采购明细必须存在。
       operationId: addBatchConsumption
       tags: [quality_traceability]
       security:
@@ -90,7 +90,7 @@ paths:
   /api/updateBatchConsumption:
     post:
       summary: 修改批次消耗关系
-      description: 修改批次消耗数量或关联采购明细。权限：质量管理员、生产管理员、系统管理员可访问；已进入召回流程的数据修改时返回 code 409。
+      description: 修改批次消耗数量或关联采购明细。需具备 trace:consumption:update；已进入召回流程的数据修改时返回 code 409。
       operationId: updateBatchConsumption
       tags: [quality_traceability]
       security:
@@ -111,7 +111,7 @@ paths:
   /api/deleteBatchConsumption:
     post:
       summary: 删除批次消耗关系
-      description: 删除录入错误的批次消耗关系。权限：质量管理员、系统管理员可访问；数据不存在返回 code 404。
+      description: 删除录入错误的批次消耗关系。需具备 trace:consumption:delete；数据不存在返回 code 404。
       operationId: deleteBatchConsumption
       tags: [quality_traceability]
       security:
@@ -132,7 +132,7 @@ paths:
   /api/traceProductBatch:
     get:
       summary: 正向追溯成品批次
-      description: 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 从生产订单或成品批次号出发，查询该成品使用的原材料采购明细、供应商、消耗数量和采购批次信息。order_id 和 batch_no 至少提供一个。需具备 trace:product:view；权限不足返回 code 403。
       operationId: traceProductBatch
       tags: [quality_traceability]
       security:
@@ -166,7 +166,7 @@ paths:
   /api/traceMaterialBatch:
     get:
       summary: 反向追溯原材料批次
-      description: 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。权限：质量管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 从采购订单明细、原材料编号、供应商或到货日期范围出发，查询问题批次流入的所有生产订单和成品批次。item_id、material_id、supplier_id 或完整到货日期范围至少提供一种；多个条件同时提供时按 AND 组合过滤。需具备 trace:material:view；权限不足返回 code 403。
       operationId: traceMaterialBatch
       tags: [quality_traceability]
       security:
@@ -215,7 +215,7 @@ paths:
   /api/analyzeQualityImpact:
     post:
       summary: 分析问题批次影响范围
-      description: 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。权限：质量管理员、系统管理员可访问；无权限返回 code 403。
+      description: 根据问题采购明细、原材料或时间范围，汇总受影响生产订单、成品批次和建议处理动作。需具备 trace:impact:analyze；权限不足返回 code 403。
       operationId: analyzeQualityImpact
       tags: [quality_traceability]
       security:

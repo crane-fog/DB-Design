@@ -98,11 +98,11 @@ paths:
     get:
       summary: 查询当前登录者身份与权限
       description: |
-        供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求系统管理员角色。
+        供登录后及会话恢复时初始化当前用户的访问权限。仅要求有效登录，不要求业务权限。
         当前身份只能从 JWT 的 employee_no 声明解析，不通过客户端传入的用户编号或工号选择用户。
-        返回当前用户的最小身份信息、全部有效角色名称及其权限，不分页，不返回其他用户的信息。
-        停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permissions 均为空数组。
-        拥有有效系统管理员角色的用户保留现有全权限语义，permissions 返回全部已登记权限，不受角色权限关联记录是否齐全的限制。
+        返回当前用户的最小身份信息、全部有效角色和有效角色关联权限码的并集，不分页，不返回其他用户的信息。
+        停用角色及其权限不参与计算；没有有效角色的用户仍返回 code 200，roles 和 permission_codes 均为空数组。
+        角色名称仅用于展示，不参与授权判断；任何角色都只拥有角色权限关系中明确配置的权限，不存在按角色名称自动放行规则。
         HTTP 状态码固定返回 200；未登录、令牌失效、用户不存在或账号停用时返回 code 401，data 为 null。
         本接口不放宽用户、角色和权限管理列表的管理员限制，各业务操作仍由后端独立鉴权。
       operationId: getCurrentAccess
@@ -128,11 +128,11 @@ paths:
                         employee_no: EMP002
                         user_name: 张三
                       roles:
-                        - 生产管理员
-                      permissions:
-                        - permission_id: 1
-                          resource: 生产订单
-                          action: 查看
+                        - role_id: 2
+                          role_name: 生产管理员
+                          status: valid
+                      permission_codes:
+                        - production:order:view
                 noRoles:
                   summary: 无有效角色的用户查询成功
                   value:
@@ -144,7 +144,7 @@ paths:
                         employee_no: EMP003
                         user_name: 李四
                       roles: []
-                      permissions: []
+                      permission_codes: []
                 unauthorized:
                   summary: 未登录、登录失效或账号不可用
                   value:
@@ -157,7 +157,7 @@ paths:
   /api/listUserData:
     get:
       summary: 查询用户列表
-      description: 分页查询系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询系统用户。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listUserData
       tags:
         - system
@@ -200,7 +200,7 @@ paths:
   /api/getUserData:
     get:
       summary: 查询用户详情
-      description: 查询系统用户详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 查询系统用户详情。需具备 system:user:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getUserData
       tags:
         - system
@@ -224,7 +224,7 @@ paths:
   /api/addUserData:
     post:
       summary: 新增用户
-      description: 新增系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 新增系统用户。需具备 system:user:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: addUserData
       tags:
         - system
@@ -247,7 +247,7 @@ paths:
   /api/updateUserData:
     post:
       summary: 修改用户
-      description: 修改系统用户基础信息、密码或账号状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 修改系统用户基础信息、密码或账号状态。需具备 system:user:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: updateUserData
       tags:
         - system
@@ -270,7 +270,7 @@ paths:
   /api/deleteUserData:
     post:
       summary: 删除用户
-      description: 删除系统用户。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 删除系统用户。需具备 system:user:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: deleteUserData
       tags:
         - system
@@ -293,7 +293,7 @@ paths:
   /api/listRoleData:
     get:
       summary: 查询角色列表
-      description: 分页查询系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询系统角色。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listRoleData
       tags:
         - system
@@ -331,7 +331,7 @@ paths:
   /api/getRoleData:
     get:
       summary: 查询角色详情
-      description: 查询系统角色详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 查询系统角色详情。需具备 system:role:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getRoleData
       tags:
         - system
@@ -355,7 +355,7 @@ paths:
   /api/addRoleData:
     post:
       summary: 新增角色
-      description: 新增系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 新增系统角色。需具备 system:role:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: addRoleData
       tags:
         - system
@@ -378,7 +378,7 @@ paths:
   /api/updateRoleData:
     post:
       summary: 修改角色
-      description: 修改系统角色名称、描述或状态。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 修改系统角色名称、描述或状态。需具备 system:role:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: updateRoleData
       tags:
         - system
@@ -401,7 +401,7 @@ paths:
   /api/deleteRoleData:
     post:
       summary: 删除角色
-      description: 删除系统角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 删除系统角色。需具备 system:role:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: deleteRoleData
       tags:
         - system
@@ -424,7 +424,7 @@ paths:
   /api/listPermissionData:
     get:
       summary: 查询权限列表
-      description: 分页查询系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询只读权限目录。需具备 system:permission:view；权限码是稳定的系统契约，不通过运行时接口新增、修改或删除。
       operationId: listPermissionData
       tags:
         - system
@@ -436,14 +436,24 @@ paths:
           description: 权限编号。
           schema:
             type: integer
-        - name: resource
+        - name: permission_code
           in: query
-          description: 资源名称，支持模糊匹配。
+          description: 稳定权限码，支持模糊匹配。
           schema:
             type: string
-        - name: action
+        - name: module_name
           in: query
-          description: 操作类型，支持模糊匹配。
+          description: 模块显示名称，支持模糊匹配。
+          schema:
+            type: string
+        - name: resource_name
+          in: query
+          description: 资源显示名称，支持模糊匹配。
+          schema:
+            type: string
+        - name: action_name
+          in: query
+          description: 操作显示名称，支持模糊匹配。
           schema:
             type: string
       responses:
@@ -459,7 +469,7 @@ paths:
   /api/getPermissionData:
     get:
       summary: 查询权限详情
-      description: 查询系统权限详情。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 查询只读权限目录中的权限详情。需具备 system:permission:view。
       operationId: getPermissionData
       tags:
         - system
@@ -480,79 +490,10 @@ paths:
       security:
         - bearerAuth: []
 
-  /api/addPermissionData:
-    post:
-      summary: 新增权限
-      description: 新增系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: addPermissionData
-      tags:
-        - system
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PermissionCreateRequest'
-      responses:
-        '200':
-          description: 统一响应；成功时 data 为新增后的权限。
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PermissionResponse'
-      security:
-        - bearerAuth: []
-
-  /api/updatePermissionData:
-    post:
-      summary: 修改权限
-      description: 修改系统权限资源或操作类型。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: updatePermissionData
-      tags:
-        - system
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PermissionUpdateRequest'
-      responses:
-        '200':
-          description: 统一响应；成功时 data 为修改后的权限。
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PermissionResponse'
-      security:
-        - bearerAuth: []
-
-  /api/deletePermissionData:
-    post:
-      summary: 删除权限
-      description: 删除系统权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: deletePermissionData
-      tags:
-        - system
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PermissionDeleteRequest'
-      responses:
-        '200':
-          description: 统一响应；成功时 data 为 null。
-          content:
-            application/json:
-              schema:
-                $ref: './common.yaml#/components/schemas/ApiResponse'
-      security:
-        - bearerAuth: []
-
   /api/listUserRoleData:
     get:
       summary: 查询用户角色关系列表
-      description: 分页查询用户与角色的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询用户与角色的多对多关系。需具备 system:user:assign-role；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listUserRoleData
       tags:
         - system
@@ -579,11 +520,11 @@ paths:
       security:
         - bearerAuth: []
 
-  /api/addUserRole:
+  /api/setUserRoles:
     post:
-      summary: 给用户分配角色
-      description: 给用户分配角色。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: addUserRole
+      summary: 设置用户角色集合
+      description: 使用请求中的完整角色编号集合替换用户当前的全部角色关联，允许传空数组以移除全部角色。操作必须在一个事务内完成。需具备 system:user:assign-role。
+      operationId: setUserRoles
       tags:
         - system
       requestBody:
@@ -591,44 +532,21 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserRoleAssignRequest'
+              $ref: '#/components/schemas/UserRoleSetRequest'
       responses:
         '200':
-          description: 统一响应；成功时 data 为分配后的用户角色关系。
+          description: 统一响应；成功时 data 为替换后的完整用户角色关系。
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRoleAssignResponse'
-      security:
-        - bearerAuth: []
-
-  /api/deleteUserRole:
-    post:
-      summary: 移除用户角色
-      description: 移除用户角色关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: deleteUserRole
-      tags:
-        - system
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserRoleDeleteRequest'
-      responses:
-        '200':
-          description: 统一响应；成功时 data 为 null。
-          content:
-            application/json:
-              schema:
-                $ref: './common.yaml#/components/schemas/ApiResponse'
+                $ref: '#/components/schemas/UserRoleSetResponse'
       security:
         - bearerAuth: []
 
   /api/listRolePermissionData:
     get:
       summary: 查询角色权限关系列表
-      description: 分页查询角色与权限的多对多关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询角色与权限的多对多关系。需具备 system:role:assign-permission；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listRolePermissionData
       tags:
         - system
@@ -655,11 +573,11 @@ paths:
       security:
         - bearerAuth: []
 
-  /api/addRolePermission:
+  /api/setRolePermissions:
     post:
-      summary: 给角色分配权限
-      description: 给角色分配权限。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: addRolePermission
+      summary: 设置角色权限集合
+      description: 使用请求中的完整权限编号集合替换角色当前的全部权限关联，允许传空数组以移除全部权限。操作必须在一个事务内完成。需具备 system:role:assign-permission。
+      operationId: setRolePermissions
       tags:
         - system
       requestBody:
@@ -667,44 +585,21 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RolePermissionAssignRequest'
+              $ref: '#/components/schemas/RolePermissionSetRequest'
       responses:
         '200':
-          description: 统一响应；成功时 data 为分配后的角色权限关系。
+          description: 统一响应；成功时 data 为替换后的完整角色权限关系。
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RolePermissionAssignResponse'
-      security:
-        - bearerAuth: []
-
-  /api/deleteRolePermission:
-    post:
-      summary: 移除角色权限
-      description: 移除角色权限关系。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
-      operationId: deleteRolePermission
-      tags:
-        - system
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RolePermissionDeleteRequest'
-      responses:
-        '200':
-          description: 统一响应；成功时 data 为 null。
-          content:
-            application/json:
-              schema:
-                $ref: './common.yaml#/components/schemas/ApiResponse'
+                $ref: '#/components/schemas/RolePermissionSetResponse'
       security:
         - bearerAuth: []
 
   /api/listLoginRecordData:
     get:
       summary: 查询登录日志
-      description: 分页查询用户登录日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询用户登录日志。需具备 system:audit:login:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listLoginRecordData
       tags:
         - system
@@ -749,7 +644,7 @@ paths:
   /api/listOperationLogData:
     get:
       summary: 查询操作日志
-      description: 分页查询系统操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
+      description: 分页查询系统操作日志。需具备 system:audit:operation:view；未登录或登录失效返回 code 401；权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
       operationId: listOperationLogData
       tags:
         - system
@@ -796,7 +691,7 @@ paths:
   /api/addOperationLogData:
     post:
       summary: 新增操作日志
-      description: 追踪写入操作日志。需登录；仅系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。日志数据不提供修改或删除接口。
+      description: 追踪写入操作日志。需具备 system:audit:operation:create；未登录或登录失效返回 code 401；权限不足返回 code 403。日志数据不提供修改或删除接口。
       operationId: addOperationLogData
       tags:
         - system
@@ -885,22 +780,21 @@ components:
       required:
         - current_user
         - roles
-        - permissions
+        - permission_codes
       properties:
         current_user:
           $ref: '#/components/schemas/CurrentAccessUser'
         roles:
           type: array
-          description: 当前用户全部有效角色的名称，去重且不分页；无有效角色时为空数组。系统管理员保留现有全权限语义。
-          uniqueItems: true
+          description: 当前用户全部有效角色，仅用于身份展示和角色管理，不参与前后端授权判断。
           items:
-            type: string
-        permissions:
+            $ref: '#/components/schemas/RoleBrief'
+        permission_codes:
           type: array
-          description: 当前用户有效角色关联的全部权限，按 permission_id 去重且不分页；无有效角色时为空数组。有效系统管理员返回全部已登记权限。
+          description: 当前用户全部有效角色关联权限码的并集。无有效角色或角色均未配置权限时为空数组。
           uniqueItems: true
           items:
-            $ref: '#/components/schemas/Permission'
+            $ref: '#/components/schemas/PermissionCode'
 
     CurrentAccessResponse:
       allOf:
@@ -1067,6 +961,10 @@ components:
 
     RoleBrief:
       type: object
+      required:
+        - role_id
+        - role_name
+        - status
       properties:
         role_id:
           type: integer
@@ -1139,46 +1037,148 @@ components:
 
     PermissionBrief:
       type: object
+      required:
+        - permission_id
+        - permission_code
+        - module_name
+        - resource_name
+        - action_name
+        - sort_order
+        - status
       properties:
         permission_id:
           type: integer
-        resource:
+        permission_code:
+          $ref: '#/components/schemas/PermissionCode'
+        module_name:
           type: string
-        action:
+          description: 权限在管理界面中的模块分组名称。
+        resource_name:
           type: string
+          description: 权限对应资源的显示名称。
+        action_name:
+          type: string
+          description: 权限对应操作的显示名称。
+        description:
+          type: string
+          nullable: true
+        sort_order:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          description: valid 权限参与授权和角色配置；disabled 权限不再产生有效授权。
+          enum:
+            - valid
+            - disabled
 
     Permission:
       allOf:
         - $ref: '#/components/schemas/PermissionBrief'
 
-    PermissionCreateRequest:
-      type: object
-      required:
-        - resource
-        - action
-      properties:
-        resource:
-          type: string
-        action:
-          type: string
-
-    PermissionUpdateRequest:
-      allOf:
-        - $ref: '#/components/schemas/PermissionCreateRequest'
-        - type: object
-          required:
-            - permission_id
-          properties:
-            permission_id:
-              type: integer
-
-    PermissionDeleteRequest:
-      type: object
-      required:
-        - permission_id
-      properties:
-        permission_id:
-          type: integer
+    PermissionCode:
+      type: string
+      description: 稳定的系统权限标识。角色名称和显示文案可以变化，权限码只能通过版本化 API 契约与数据库迁移调整。
+      enum:
+        - system:user:view
+        - system:user:create
+        - system:user:update
+        - system:user:delete
+        - system:user:assign-role
+        - system:role:view
+        - system:role:create
+        - system:role:update
+        - system:role:delete
+        - system:role:assign-permission
+        - system:permission:view
+        - system:audit:login:view
+        - system:audit:operation:view
+        - system:audit:operation:create
+        - material:item:view
+        - material:item:create
+        - material:item:update
+        - material:item:delete
+        - material:category:view
+        - material:category:create
+        - material:category:update
+        - material:category:delete
+        - material:bom-version:view
+        - material:bom-version:create
+        - material:bom-version:update
+        - material:bom-version:delete
+        - material:bom:view
+        - material:bom:create
+        - material:bom:update
+        - material:bom:delete
+        - material:bom:check-cycle
+        - material:bom:tree:view
+        - material:bom:reverse:view
+        - material:cost:calculate
+        - material:loss:calculate
+        - inventory:stock:view
+        - inventory:shortage:calculate
+        - inventory:alert:view
+        - inventory:alert:generate
+        - inventory:alert:handle
+        - inventory:lock:view
+        - inventory:lock:create
+        - inventory:lock:release
+        - inventory:obsolete:view
+        - inventory:obsolete:detect
+        - inventory:obsolete:handle
+        - inventory:completion:view
+        - inventory:completion:create
+        - purchase:supplier:view
+        - purchase:buyer:view
+        - purchase:buyer:eligible
+        - purchase:order:view
+        - purchase:order:create
+        - purchase:order:submit
+        - purchase:order:cancel
+        - purchase:receipt:view
+        - purchase:receipt:create
+        - purchase:overdue:view
+        - purchase:overdue:generate
+        - purchase:overdue:handle
+        - production:order:view
+        - production:order:create
+        - production:order:update
+        - production:order:approve
+        - production:order:start
+        - production:order:finish
+        - production:order:cancel
+        - production:line:view
+        - production:line:create
+        - production:line:update
+        - production:line-type:view
+        - production:line-type:update
+        - production:capacity-config:view
+        - production:capacity-config:update
+        - production:calendar:view
+        - production:calendar:update
+        - production:calendar:delete
+        - production:capacity:estimate
+        - production:capacity:detect
+        - production:capacity:balance
+        - production:fault:view
+        - production:fault:report
+        - production:fault:claim
+        - production:fault:update-assigned
+        - production:fault:update-any
+        - production:line-status:update
+        - external-order:view-own
+        - external-order:view-all
+        - external-order:create-own
+        - external-order:create-for-customer
+        - external-order:review
+        - external-order:convert
+        - trace:consumption:view
+        - trace:consumption:create
+        - trace:consumption:update
+        - trace:consumption:delete
+        - trace:product:view
+        - trace:material:view
+        - trace:impact:analyze
 
     UserRole:
       type: object
@@ -1188,7 +1188,7 @@ components:
         role_id:
           type: integer
 
-    UserRoleAssignRequest:
+    UserRoleSetRequest:
       type: object
       required:
         - user_id
@@ -1198,20 +1198,10 @@ components:
           type: integer
         role_ids:
           type: array
-          minItems: 1
+          description: 替换后的完整角色编号集合；空数组表示移除用户全部角色。
+          uniqueItems: true
           items:
             type: integer
-
-    UserRoleDeleteRequest:
-      type: object
-      required:
-        - user_id
-        - role_id
-      properties:
-        user_id:
-          type: integer
-        role_id:
-          type: integer
 
     RolePermission:
       type: object
@@ -1221,7 +1211,7 @@ components:
         permission_id:
           type: integer
 
-    RolePermissionAssignRequest:
+    RolePermissionSetRequest:
       type: object
       required:
         - role_id
@@ -1231,20 +1221,10 @@ components:
           type: integer
         permission_ids:
           type: array
-          minItems: 1
+          description: 替换后的完整权限编号集合；空数组表示移除角色全部权限。
+          uniqueItems: true
           items:
             type: integer
-
-    RolePermissionDeleteRequest:
-      type: object
-      required:
-        - role_id
-        - permission_id
-      properties:
-        role_id:
-          type: integer
-        permission_id:
-          type: integer
 
     LoginLog:
       type: object
@@ -1420,7 +1400,7 @@ components:
                         $ref: '#/components/schemas/UserRole'
               nullable: true
 
-    UserRoleAssignResponse:
+    UserRoleSetResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object
@@ -1448,7 +1428,7 @@ components:
                         $ref: '#/components/schemas/RolePermission'
               nullable: true
 
-    RolePermissionAssignResponse:
+    RolePermissionSetResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
         - type: object

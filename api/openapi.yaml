@@ -231,24 +231,14 @@ paths:
     $ref: './system.yaml#/paths/~1api~1listPermissionData'
   /api/getPermissionData:
     $ref: './system.yaml#/paths/~1api~1getPermissionData'
-  /api/addPermissionData:
-    $ref: './system.yaml#/paths/~1api~1addPermissionData'
-  /api/updatePermissionData:
-    $ref: './system.yaml#/paths/~1api~1updatePermissionData'
-  /api/deletePermissionData:
-    $ref: './system.yaml#/paths/~1api~1deletePermissionData'
   /api/listUserRoleData:
     $ref: './system.yaml#/paths/~1api~1listUserRoleData'
-  /api/addUserRole:
-    $ref: './system.yaml#/paths/~1api~1addUserRole'
-  /api/deleteUserRole:
-    $ref: './system.yaml#/paths/~1api~1deleteUserRole'
+  /api/setUserRoles:
+    $ref: './system.yaml#/paths/~1api~1setUserRoles'
   /api/listRolePermissionData:
     $ref: './system.yaml#/paths/~1api~1listRolePermissionData'
-  /api/addRolePermission:
-    $ref: './system.yaml#/paths/~1api~1addRolePermission'
-  /api/deleteRolePermission:
-    $ref: './system.yaml#/paths/~1api~1deleteRolePermission'
+  /api/setRolePermissions:
+    $ref: './system.yaml#/paths/~1api~1setRolePermissions'
   /api/listLoginRecordData:
     $ref: './system.yaml#/paths/~1api~1listLoginRecordData'
   /api/listOperationLogData:
