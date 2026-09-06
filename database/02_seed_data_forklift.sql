@@ -30,64 +30,16 @@ INSERT INTO sys_user VALUES (9,'EXT9002','8d969eef6ecad3c29a3a629280e686cf0c3f5d
 INSERT INTO sys_user VALUES (10,'GD0103','8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92','钱进','13641357790',NULL,'disabled','2025-08-01 09:35:00','2026-04-30 17:20:15','2025-08-01 09:35:00');
 
 INSERT INTO sys_role VALUES (1,'系统管理员','拥有全部资源的管理权限','valid');
-INSERT INTO sys_role VALUES (2,'生产管理员','生产订单、产能、生产线管理','valid');
-INSERT INTO sys_role VALUES (3,'采购员','采购订单全生命周期管理','valid');
-INSERT INTO sys_role VALUES (4,'库存管理员','库存、锁定、入库、预警处理','valid');
-INSERT INTO sys_role VALUES (5,'质量管理员','质量追溯与批次管理','valid');
+INSERT INTO sys_role VALUES (2,'生产管理员','生产、物料、库存、外部订单与质量追溯管理','valid');
+INSERT INTO sys_role VALUES (3,'采购员','采购全流程及所需物料库存查询','valid');
+INSERT INTO sys_role VALUES (4,'库存管理员','库存全流程及缺口采购草稿管理','valid');
+INSERT INTO sys_role VALUES (5,'质量管理员','质量追溯及关联业务数据查询','valid');
 INSERT INTO sys_role VALUES (6,'设备管理员','生产线故障维修与状态维护','valid');
 INSERT INTO sys_role VALUES (7,'外部客户','仅可提交和查看自身外部订单','valid');
 
-INSERT INTO sys_permission VALUES ( 1,'物料','查看');
-INSERT INTO sys_permission VALUES ( 2,'物料','创建');
-INSERT INTO sys_permission VALUES ( 3,'物料','修改');
-INSERT INTO sys_permission VALUES ( 4,'BOM','查看');
-INSERT INTO sys_permission VALUES ( 5,'BOM','创建');
-INSERT INTO sys_permission VALUES ( 6,'BOM','修改');
-INSERT INTO sys_permission VALUES ( 7,'库存','查看');
-INSERT INTO sys_permission VALUES ( 8,'库存','修改');
-INSERT INTO sys_permission VALUES ( 9,'采购订单','查看');
-INSERT INTO sys_permission VALUES (10,'采购订单','创建');
-INSERT INTO sys_permission VALUES (11,'采购订单','修改');
-INSERT INTO sys_permission VALUES (12,'采购订单','审核');
-INSERT INTO sys_permission VALUES (13,'生产订单','查看');
-INSERT INTO sys_permission VALUES (14,'生产订单','创建');
-INSERT INTO sys_permission VALUES (15,'生产订单','审核');
-INSERT INTO sys_permission VALUES (16,'外部订单','查看');
-INSERT INTO sys_permission VALUES (17,'外部订单','创建');
-INSERT INTO sys_permission VALUES (18,'外部订单','审核');
-INSERT INTO sys_permission VALUES (19,'质量追溯','查看');
-INSERT INTO sys_permission VALUES (20,'生产线','查看');
-INSERT INTO sys_permission VALUES (21,'生产线','修改');
-INSERT INTO sys_permission VALUES (22,'用户管理','查看');
-INSERT INTO sys_permission VALUES (23,'用户管理','创建');
-INSERT INTO sys_permission VALUES (24,'用户管理','修改');
-
--- 角色-权限
-INSERT INTO sys_role_permission SELECT 1, permission_id FROM sys_permission;
--- 管理员全量
-INSERT INTO sys_role_permission VALUES (2, 1);
-INSERT INTO sys_role_permission VALUES (2, 4);
-INSERT INTO sys_role_permission VALUES (2, 7);
-INSERT INTO sys_role_permission VALUES (2,13);
-INSERT INTO sys_role_permission VALUES (2,14);
-INSERT INTO sys_role_permission VALUES (2,15);
-INSERT INTO sys_role_permission VALUES (2,18);
-INSERT INTO sys_role_permission VALUES (2,20);
-INSERT INTO sys_role_permission VALUES (3, 1);
-INSERT INTO sys_role_permission VALUES (3, 9);
-INSERT INTO sys_role_permission VALUES (3,10);
-INSERT INTO sys_role_permission VALUES (3,11);
-INSERT INTO sys_role_permission VALUES (4, 1);
-INSERT INTO sys_role_permission VALUES (4, 7);
-INSERT INTO sys_role_permission VALUES (4, 8);
-INSERT INTO sys_role_permission VALUES (4,13);
-INSERT INTO sys_role_permission VALUES (5, 1);
-INSERT INTO sys_role_permission VALUES (5, 7);
-INSERT INTO sys_role_permission VALUES (5,19);
-INSERT INTO sys_role_permission VALUES (6,20);
-INSERT INTO sys_role_permission VALUES (6,21);
-INSERT INTO sys_role_permission VALUES (7,16);
-INSERT INTO sys_role_permission VALUES (7,17);
+-- 权限目录和默认角色授权关系由独立脚本统一维护。
+-- @@ 按当前脚本所在目录解析，需使用 Oracle SQLcl、SQL*Plus 或 SQL Developer 的“运行脚本”模式执行。
+@@permission_catalog.sql
 
 -- 用户-角色
 INSERT INTO sys_user_role VALUES ( 1,1);
