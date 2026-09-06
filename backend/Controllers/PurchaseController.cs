@@ -8,14 +8,14 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 /// <summary>
-/// 采购管理接口（B 模块）。所有接口要求登录，权限为采购员/采购主管/系统管理员。
+/// 采购管理接口（B 模块）。各接口分别检查稳定权限码。
 /// </summary>
 [ApiController]
 [Authorize]
 [Route("/api")]
 public class PurchaseController(
     PurchaseService purchaseService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -26,25 +26,9 @@ public class PurchaseController(
         [FromQuery(Name = "supplier_id")] long? supplierId,
         [FromQuery(Name = "supplier_name")] string? supplierName)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
+        if (RequirePermission(PermissionCode.PurchaseSupplierViewEnum) is { } forbidden)
         {
-            return Ok(new SupplierPageResponse
-            {
-                Code = SupplierPageResponse.CodeEnum._401Enum,
-                Message = "登录状态无效",
-                Data = null!,
-            });
-        }
-
-        if (!user.IsPurchaser && !user.IsProductionManager)
-        {
-            return Ok(new SupplierPageResponse
-            {
-                Code = SupplierPageResponse.CodeEnum._403Enum,
-                Message = "无权查看供应商数据",
-                Data = null!,
-            });
+            return forbidden;
         }
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
@@ -76,25 +60,9 @@ public class PurchaseController(
         [FromQuery(Name = "buyer_id")] long? buyerId,
         [FromQuery(Name = "buyer_name")] string? buyerName)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
+        if (RequirePermission(PermissionCode.PurchaseBuyerViewEnum) is { } forbidden)
         {
-            return Ok(new PurchaseBuyerPageResponse
-            {
-                Code = PurchaseBuyerPageResponse.CodeEnum._401Enum,
-                Message = "登录状态无效",
-                Data = null!,
-            });
-        }
-
-        if (!user.IsPurchaser)
-        {
-            return Ok(new PurchaseBuyerPageResponse
-            {
-                Code = PurchaseBuyerPageResponse.CodeEnum._403Enum,
-                Message = "无权查看采购员数据",
-                Data = null!,
-            });
+            return forbidden;
         }
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
@@ -136,7 +104,7 @@ public class PurchaseController(
         [FromQuery(Name = "expected_date_end")] DateOnly? expectedDateEnd,
         [FromQuery(Name = "buyer_id")] long? buyerId)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOrderViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = purchaseService.List(
@@ -167,7 +135,7 @@ public class PurchaseController(
     [Route("getPurchaseOrder")]
     public IActionResult Get([FromQuery(Name = "order_id")] long orderId)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOrderViewEnum) is { } forbidden) return forbidden;
 
         var order = purchaseService.Get(orderId);
         return order is null
@@ -185,7 +153,7 @@ public class PurchaseController(
     [Route("addPurchaseOrder")]
     public IActionResult Add([FromBody] PurchaseOrderCreateRequest? request)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOrderCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(OrderSingle(PurchaseOrderResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -203,7 +171,7 @@ public class PurchaseController(
     [Route("createPurchaseOrderDraftFromShortage")]
     public IActionResult CreateDraftsFromShortage([FromBody] PurchaseDraftFromShortageRequest? request)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOrderCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null || request.Items is null || request.Items.Count == 0)
             return Ok(new PurchaseDraftFromShortageResponse
@@ -241,7 +209,7 @@ public class PurchaseController(
     [Route("submitPurchaseOrder")]
     public IActionResult Submit([FromBody] PurchaseOrderActionRequest? request)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOrderSubmitEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(OrderSingle(PurchaseOrderResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -259,7 +227,7 @@ public class PurchaseController(
     [Route("cancelPurchaseOrder")]
     public IActionResult Cancel([FromBody] PurchaseOrderActionRequest? request)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOrderCancelEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(OrderSingle(PurchaseOrderResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -277,7 +245,7 @@ public class PurchaseController(
     [Route("addPurchaseReceipt")]
     public IActionResult AddReceipt([FromBody] PurchaseReceiptCreateRequest? request)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseReceiptCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(ReceiptSingle(PurchaseReceiptResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -308,7 +276,7 @@ public class PurchaseController(
         [FromQuery(Name = "order_id")] long? orderId,
         [FromQuery(Name = "material_id")] long? materialId)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseReceiptViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = purchaseService.ListReceipts(currentPage, size, orderId, materialId);
@@ -337,7 +305,7 @@ public class PurchaseController(
     [Route("generatePurchaseOverdueReminder")]
     public IActionResult GenerateReminders([FromBody] PurchaseOverdueReminderGenerateRequest? request)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOverdueGenerateEnum) is { } forbidden) return forbidden;
 
         long? orderId = request?.OrderId;
         var (count, records) = purchaseService.GenerateReminders(orderId);
@@ -363,7 +331,7 @@ public class PurchaseController(
         [FromQuery(Name = "order_id")] long? orderId,
         [FromQuery(Name = "status")] PurchaseOverdueReminderStatus? status)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOverdueViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = purchaseService.ListReminders(
@@ -389,7 +357,7 @@ public class PurchaseController(
     [Route("handlePurchaseOverdueReminder")]
     public IActionResult HandleReminder([FromBody] PurchaseOverdueReminderHandleRequest? request)
     {
-        if (ResolvePurchaserOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.PurchaseOverdueHandleEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(ReminderSingle(PurchaseOverdueReminderResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -415,16 +383,10 @@ public class PurchaseController(
     //  Authorization helpers
     // ═══════════════════════════════════════════════════════════════
 
-    private IActionResult? ResolvePurchaserOrForbidden()
+    private IActionResult? RequirePermission(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-            return Ok(OrderSingle(PurchaseOrderResponse.CodeEnum._401Enum, "登录状态无效", null));
-
-        if (!user.IsPurchaser)
-            return Ok(OrderSingle(PurchaseOrderResponse.CodeEnum._403Enum, "无权访问采购管理", null));
-
-        return null;
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
+        return result.Ok ? null : Ok(result.ToApiResponse());
     }
 
     private IActionResult FromResult(PurchaseResult result, string successMessage)

@@ -17,7 +17,7 @@ namespace Backend.Controllers;
 public sealed class ProductionResourceController(
     IProductionLineService productionLineService,
     ICapacityService capacityService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -28,7 +28,7 @@ public sealed class ProductionResourceController(
         [FromQuery(Name = "type_id")] long? typeId,
         [FromQuery(Name = "status")] ProductionLineRunStatus? status)
     {
-        if (RequireProductionManager(ProductionLinePageError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionLineViewEnum, ProductionLinePageError) is { } error)
         {
             return error;
         }
@@ -46,7 +46,7 @@ public sealed class ProductionResourceController(
         [FromQuery(Name = "page_size")] int? pageSize,
         [FromQuery(Name = "type_name")] string? typeName)
     {
-        if (RequireProductionManager(LineTypePageError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionLineTypeViewEnum, LineTypePageError) is { } error)
         {
             return error;
         }
@@ -62,7 +62,7 @@ public sealed class ProductionResourceController(
     [Route("saveProductionLineType")]
     public IActionResult SaveProductionLineType([FromBody] LineTypeSaveRequest? request)
     {
-        if (RequireProductionManager(LineTypeError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionLineTypeUpdateEnum, LineTypeError) is { } error)
         {
             return error;
         }
@@ -78,7 +78,7 @@ public sealed class ProductionResourceController(
     [Route("addProductionLine")]
     public IActionResult AddProductionLine([FromBody] ProductionLineCreateRequest? request)
     {
-        if (RequireProductionManager(ProductionLineError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionLineCreateEnum, ProductionLineError) is { } error)
         {
             return error;
         }
@@ -94,7 +94,7 @@ public sealed class ProductionResourceController(
     [Route("updateProductionLine")]
     public IActionResult UpdateProductionLine([FromBody] ProductionLineUpdateRequest? request)
     {
-        if (RequireProductionManager(ProductionLineError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionLineUpdateEnum, ProductionLineError) is { } error)
         {
             return error;
         }
@@ -113,7 +113,7 @@ public sealed class ProductionResourceController(
         [FromQuery(Name = "material_id")] long? materialId,
         [FromQuery(Name = "type_id")] long? typeId)
     {
-        if (RequireProductionManager(CapacityConfigPageError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionCapacityConfigViewEnum, CapacityConfigPageError) is { } error)
         {
             return error;
         }
@@ -129,7 +129,7 @@ public sealed class ProductionResourceController(
     [Route("saveCapacityConfig")]
     public IActionResult SaveCapacityConfig([FromBody] CapacityConfigSaveRequest? request)
     {
-        if (RequireProductionManager(CapacityConfigError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionCapacityConfigUpdateEnum, CapacityConfigError) is { } error)
         {
             return error;
         }
@@ -150,7 +150,7 @@ public sealed class ProductionResourceController(
         [FromQuery(Name = "calendar_date_end")] DateOnly? endDate,
         [FromQuery(Name = "config_id")] long? configId)
     {
-        if (RequireProductionManager(ProductionCalendarPageError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionCalendarViewEnum, ProductionCalendarPageError) is { } error)
         {
             return error;
         }
@@ -172,7 +172,7 @@ public sealed class ProductionResourceController(
     [Route("saveProductionCalendar")]
     public IActionResult SaveProductionCalendar([FromBody] ProductionCalendarSaveRequest? request)
     {
-        if (RequireProductionManager(ProductionCalendarError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionCalendarUpdateEnum, ProductionCalendarError) is { } error)
         {
             return error;
         }
@@ -188,7 +188,7 @@ public sealed class ProductionResourceController(
     [Route("deleteProductionCalendar")]
     public IActionResult DeleteProductionCalendar([FromBody] ProductionCalendarDeleteRequest? request)
     {
-        if (RequireProductionManager(ApiError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionCalendarDeleteEnum, ApiError) is { } error)
         {
             return error;
         }
@@ -205,7 +205,7 @@ public sealed class ProductionResourceController(
     public IActionResult EstimateProductionCapacity(
         [FromBody] ProductionCapacityEstimateRequest? request)
     {
-        if (RequireProductionManager(ProductionCapacityEstimateError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionCapacityEstimateEnum, ProductionCapacityEstimateError) is { } error)
         {
             return error;
         }
@@ -221,7 +221,7 @@ public sealed class ProductionResourceController(
     [Route("runCapacityDetection")]
     public IActionResult RunCapacityDetection([FromBody] CapacityDetectionRunRequest? request)
     {
-        if (RequireProductionManager(CapacityDetectionError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionCapacityDetectEnum, CapacityDetectionError) is { } error)
         {
             return error;
         }
@@ -237,20 +237,17 @@ public sealed class ProductionResourceController(
     [Route("saveCapacityBalance")]
     public IActionResult SaveCapacityBalance([FromBody] CapacityBalanceSaveRequest? request)
     {
-        CurrentUser? currentUser = ResolveCurrentUser();
-        if (currentUser is null)
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionCapacityBalanceEnum);
+        if (!auth.Ok)
         {
-            return CapacityBalanceError(401, "登录状态无效");
-        }
-
-        if (!currentUser.IsProductionManager)
-        {
-            return CapacityBalanceError(403, "无权保存产能平衡方案");
+            return CapacityBalanceError(auth.Code, auth.Message ?? "无权保存产能平衡方案");
         }
 
         return request is null
             ? CapacityBalanceError(400, "请求体不能为空")
-            : CapacityBalanceResponse(capacityService.SaveBalance(request, currentUser));
+            : CapacityBalanceResponse(capacityService.SaveBalance(request, auth.User!));
     }
 
     [HttpPost]
@@ -259,15 +256,17 @@ public sealed class ProductionResourceController(
     [Route("reportProductionLineFault")]
     public IActionResult ReportProductionLineFault([FromBody] FaultRecordCreateRequest? request)
     {
-        CurrentUser? currentUser = ResolveCurrentUser();
-        if (currentUser is null)
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionFaultReportEnum);
+        if (!auth.Ok)
         {
-            return FaultRecordError(401, "登录状态无效");
+            return FaultRecordError(auth.Code, auth.Message ?? "无权上报生产线故障");
         }
 
         return request is null
             ? FaultRecordError(400, "请求体不能为空")
-            : FaultRecordResponse(productionLineService.ReportFault(request, currentUser));
+            : FaultRecordResponse(productionLineService.ReportFault(request, auth.User!));
     }
 
     [HttpPost]
@@ -276,15 +275,19 @@ public sealed class ProductionResourceController(
     [Route("updateProductionLineFault")]
     public IActionResult UpdateProductionLineFault([FromBody] FaultRecordUpdateRequest? request)
     {
-        CurrentUser? currentUser = ResolveCurrentUser();
-        if (currentUser is null)
+        AuthResult auth = authorization.RequireAnyPermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionFaultUpdateAnyEnum,
+            PermissionCode.ProductionFaultUpdateAssignedEnum,
+            PermissionCode.ProductionFaultClaimEnum);
+        if (!auth.Ok)
         {
-            return FaultRecordError(401, "登录状态无效");
+            return FaultRecordError(auth.Code, auth.Message ?? "无权更新生产线故障");
         }
 
         return request is null
             ? FaultRecordError(400, "请求体不能为空")
-            : FaultRecordResponse(productionLineService.UpdateFault(request, currentUser));
+            : FaultRecordResponse(productionLineService.UpdateFault(request, auth.User!));
     }
 
     [HttpGet]
@@ -296,7 +299,7 @@ public sealed class ProductionResourceController(
         [FromQuery(Name = "line_id")] long? lineId,
         [FromQuery(Name = "status")] FaultStatus? status)
     {
-        if (RequireProductionManager(FaultRecordListError) is { } error)
+        if (RequirePermission(PermissionCode.ProductionFaultViewEnum, FaultRecordListError) is { } error)
         {
             return error;
         }
@@ -313,32 +316,28 @@ public sealed class ProductionResourceController(
     public IActionResult UpdateProductionLineStatus(
         [FromBody] ProductionLineStatusUpdateRequest? request)
     {
-        CurrentUser? currentUser = ResolveCurrentUser();
-        if (currentUser is null)
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionLineStatusUpdateEnum);
+        if (!auth.Ok)
         {
-            return ProductionLineStatusError(401, "登录状态无效");
+            return ProductionLineStatusError(auth.Code, auth.Message ?? "无权更新生产线状态");
         }
 
         return request is null
             ? ProductionLineStatusError(400, "请求体不能为空")
             : ProductionLineStatusResponse(
-                productionLineService.UpdateLineStatus(request, currentUser));
+                productionLineService.UpdateLineStatus(request, auth.User!));
     }
 
-    private CurrentUser? ResolveCurrentUser() =>
-        userContext.Resolve(User.GetEmployeeNo());
-
-    private IActionResult? RequireProductionManager(Func<int, string, IActionResult> errorFactory)
+    private IActionResult? RequirePermission(
+        PermissionCode permissionCode,
+        Func<int, string, IActionResult> errorFactory)
     {
-        CurrentUser? currentUser = ResolveCurrentUser();
-        if (currentUser is null)
-        {
-            return errorFactory(401, "登录状态无效");
-        }
-
-        return currentUser.IsProductionManager
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
+        return result.Ok
             ? null
-            : errorFactory(403, "仅生产管理员或系统管理员可执行该操作");
+            : errorFactory(result.Code, result.Message ?? "没有权限访问该接口");
     }
 
     private IActionResult LineTypePage(

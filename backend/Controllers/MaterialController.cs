@@ -13,7 +13,7 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class MaterialController(
     MaterialCatalogService materialCatalogService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -50,7 +50,7 @@ public class MaterialController(
     [Route("addMaterialCategoryData")]
     public IActionResult AddCategory([FromBody] MaterialCategoryCreateRequest? request)
     {
-        if (ResolveCategoryManagerOrForbidden() is { } forbidden)
+        if (ResolveCategoryManagerOrForbidden(PermissionCode.MaterialCategoryCreateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -69,7 +69,7 @@ public class MaterialController(
     [Route("updateMaterialCategoryData")]
     public IActionResult UpdateCategory([FromBody] MaterialCategoryUpdateRequest? request)
     {
-        if (ResolveCategoryManagerOrForbidden() is { } forbidden)
+        if (ResolveCategoryManagerOrForbidden(PermissionCode.MaterialCategoryUpdateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -88,7 +88,7 @@ public class MaterialController(
     [Route("deleteMaterialCategoryData")]
     public IActionResult DeleteCategory([FromBody] MaterialCategoryDeleteRequest? request)
     {
-        if (ResolveCommonManagerOrForbidden() is { } forbidden)
+        if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialCategoryDeleteEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -180,7 +180,7 @@ public class MaterialController(
     [RequireJsonFields("material_type")]
     public IActionResult AddMaterial([FromBody] MaterialCreateRequest? request)
     {
-        var user = ResolveManager();
+        var user = ResolveManager(PermissionCode.MaterialItemCreateEnum);
         if (user.Response is not null)
         {
             return user.Response;
@@ -201,7 +201,7 @@ public class MaterialController(
     [RequireJsonFields("material_type")]
     public IActionResult UpdateMaterial([FromBody] MaterialUpdateRequest? request)
     {
-        if (ResolveMaterialManagerOrForbidden() is { } forbidden)
+        if (ResolveMaterialManagerOrForbidden(PermissionCode.MaterialItemUpdateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -220,7 +220,7 @@ public class MaterialController(
     [Route("deleteMaterialData")]
     public IActionResult DeleteMaterial([FromBody] MaterialDeleteRequest? request)
     {
-        if (ResolveCommonManagerOrForbidden() is { } forbidden)
+        if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialItemDeleteEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -238,121 +238,67 @@ public class MaterialController(
 
     private IActionResult? ResolveMaterialReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Material(MaterialResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(Material(MaterialResponse.CodeEnum._403Enum, "无权访问物料主数据", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(PermissionCode.MaterialItemViewEnum);
+        return result.Ok
+            ? null
+            : Ok(Material((MaterialResponse.CodeEnum)result.Code, result.Message ?? "无权访问物料主数据", null));
     }
 
     private IActionResult? ResolveMaterialPageReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(new MaterialPageResponse
+        AuthResult result = Authorize(PermissionCode.MaterialItemViewEnum);
+        return result.Ok
+            ? null
+            : Ok(new MaterialPageResponse
             {
-                Code = MaterialPageResponse.CodeEnum._401Enum,
-                Message = "登录状态无效",
+                Code = (MaterialPageResponse.CodeEnum)result.Code,
+                Message = result.Message ?? "无权访问物料主数据",
                 Data = null!,
             });
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(new MaterialPageResponse
-            {
-                Code = MaterialPageResponse.CodeEnum._403Enum,
-                Message = "无权访问物料主数据",
-                Data = null!,
-            });
-        }
-
-        return null;
     }
 
     private IActionResult? ResolveCategoryPageReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(new MaterialCategoryPageResponse
+        AuthResult result = Authorize(PermissionCode.MaterialCategoryViewEnum);
+        return result.Ok
+            ? null
+            : Ok(new MaterialCategoryPageResponse
             {
-                Code = MaterialCategoryPageResponse.CodeEnum._401Enum,
-                Message = "登录状态无效",
+                Code = (MaterialCategoryPageResponse.CodeEnum)result.Code,
+                Message = result.Message ?? "无权访问物料分类",
                 Data = null!,
             });
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(new MaterialCategoryPageResponse
-            {
-                Code = MaterialCategoryPageResponse.CodeEnum._403Enum,
-                Message = "无权访问物料主数据",
-                Data = null!,
-            });
-        }
-
-        return null;
     }
 
-    private IActionResult? ResolveMaterialManagerOrForbidden() => ResolveManager().Response;
+    private IActionResult? ResolveMaterialManagerOrForbidden(PermissionCode permissionCode) =>
+        ResolveManager(permissionCode).Response;
 
-    private IActionResult? ResolveCategoryManagerOrForbidden()
+    private IActionResult? ResolveCategoryManagerOrForbidden(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Category(MaterialCategoryResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return Ok(Category(MaterialCategoryResponse.CodeEnum._403Enum, "无权维护物料主数据", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Category((MaterialCategoryResponse.CodeEnum)result.Code, result.Message ?? "无权维护物料分类", null));
     }
 
-    private IActionResult? ResolveCommonManagerOrForbidden()
+    private IActionResult? ResolveCommonManagerOrForbidden(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Common(ApiResponse.CodeEnum._401Enum, "登录状态无效"));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return Ok(Common(ApiResponse.CodeEnum._403Enum, "无权维护物料主数据"));
-        }
-
-        return null;
+        AuthResult result = Authorize(permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Common((ApiResponse.CodeEnum)result.Code, result.Message ?? "无权维护物料主数据"));
     }
 
-    private (CurrentUser? User, IActionResult? Response) ResolveManager()
+    private (CurrentUser? User, IActionResult? Response) ResolveManager(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return (null, Ok(Material(MaterialResponse.CodeEnum._401Enum, "登录状态无效", null)));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return (null, Ok(Material(MaterialResponse.CodeEnum._403Enum, "无权维护物料主数据", null)));
-        }
-
-        return (user, null);
+        AuthResult result = Authorize(permissionCode);
+        return result.Ok
+            ? (result.User, null)
+            : (null, Ok(Material((MaterialResponse.CodeEnum)result.Code, result.Message ?? "无权维护物料主数据", null)));
     }
+
+    private AuthResult Authorize(PermissionCode permissionCode) =>
+        authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
 
     private static IActionResult FromCategoryResult(MaterialCatalogResult<MaterialCategory> result, string successMessage)
     {

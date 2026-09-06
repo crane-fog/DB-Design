@@ -12,7 +12,7 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class DemandAnalysisController(
     DemandAnalysisService demandAnalysisService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpPost]
     [Consumes("application/json")]
@@ -20,7 +20,12 @@ public class DemandAnalysisController(
     [Route("calculateLossCompensation")]
     public IActionResult CalculateLossCompensation([FromBody] LossCompensationCalculateRequest? request)
     {
-        if (ResolveManagerOrForbidden(Loss) is { } forbidden) return forbidden;
+        if (RequirePermission(
+                PermissionCode.MaterialLossCalculateEnum,
+                (code, message) => Loss((LossCompensationResponse.CodeEnum)code, message, null)) is { } forbidden)
+        {
+            return forbidden;
+        }
         if (request is null) return Ok(Loss(LossCompensationResponse.CodeEnum._400Enum, "请求体不能为空", null));
         var result = demandAnalysisService.CalculateLossCompensation(request);
         return Ok(Loss(result.Ok ? LossCompensationResponse.CodeEnum._200Enum : (LossCompensationResponse.CodeEnum)(int)result.Error,
@@ -33,25 +38,24 @@ public class DemandAnalysisController(
     [Route("calculateProductCost")]
     public IActionResult CalculateProductCost([FromBody] ProductCostCalculateRequest? request)
     {
-        if (ResolveCostReaderOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(
+                PermissionCode.MaterialCostCalculateEnum,
+                (code, message) => Cost((ProductCostResponse.CodeEnum)code, message, null)) is { } forbidden)
+        {
+            return forbidden;
+        }
         if (request is null) return Ok(Cost(ProductCostResponse.CodeEnum._400Enum, "请求体不能为空", null));
         var result = demandAnalysisService.CalculateProductCost(request);
         return Ok(Cost(result.Ok ? ProductCostResponse.CodeEnum._200Enum : (ProductCostResponse.CodeEnum)(int)result.Error,
             result.Ok ? "计算成功" : result.ErrorMessage ?? "计算失败", result.Data));
     }
 
-    private IActionResult? ResolveCostReaderOrForbidden()
+    private IActionResult? RequirePermission(
+        PermissionCode permissionCode,
+        Func<int, string, object> responseFactory)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null) return Ok(Cost(ProductCostResponse.CodeEnum._401Enum, "登录状态无效", null));
-        return user.IsMaterialReader ? null : Ok(Cost(ProductCostResponse.CodeEnum._403Enum, "无权核算产品成本", null));
-    }
-
-    private IActionResult? ResolveManagerOrForbidden(Func<LossCompensationResponse.CodeEnum, string, List<LossCompensationItem>?, LossCompensationResponse> response)
-    {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null) return Ok(response(LossCompensationResponse.CodeEnum._401Enum, "登录状态无效", null));
-        return user.IsMaterialManager ? null : Ok(response(LossCompensationResponse.CodeEnum._403Enum, "无权计算损耗补偿", null));
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
+        return result.Ok ? null : Ok(responseFactory(result.Code, result.Message ?? "没有权限访问该接口"));
     }
 
     private static ProductCostResponse Cost(ProductCostResponse.CodeEnum code, string message, ProductCostResult? data) => new()

@@ -13,7 +13,7 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class BomVersionController(
     BomVersionService bomVersionService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -69,7 +69,7 @@ public class BomVersionController(
     [RequireJsonFields("effective_date")]
     public IActionResult AddVersion([FromBody] BomVersionCreateRequest? request)
     {
-        var user = ResolveManager();
+        var user = ResolveManager(PermissionCode.MaterialBomVersionCreateEnum);
         if (user.Response is not null)
         {
             return user.Response;
@@ -90,7 +90,7 @@ public class BomVersionController(
     [RequireJsonFields("effective_date")]
     public IActionResult UpdateVersion([FromBody] BomVersionUpdateRequest? request)
     {
-        if (ResolveVersionManagerOrForbidden() is { } forbidden)
+        if (ResolveVersionManagerOrForbidden(PermissionCode.MaterialBomVersionUpdateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -109,7 +109,7 @@ public class BomVersionController(
     [Route("deleteBomVersionData")]
     public IActionResult DeleteVersion([FromBody] BomVersionDeleteRequest? request)
     {
-        if (ResolveCommonManagerOrForbidden() is { } forbidden)
+        if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialBomVersionDeleteEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -127,79 +127,46 @@ public class BomVersionController(
 
     private IActionResult? ResolveReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Version(BomVersionResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(Version(BomVersionResponse.CodeEnum._403Enum, "无权访问 BOM 版本", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(PermissionCode.MaterialBomVersionViewEnum);
+        return result.Ok
+            ? null
+            : Ok(Version((BomVersionResponse.CodeEnum)result.Code, result.Message ?? "无权访问 BOM 版本", null));
     }
 
     private IActionResult? ResolvePageReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(new BomVersionPageResponse
+        AuthResult result = Authorize(PermissionCode.MaterialBomVersionViewEnum);
+        return result.Ok
+            ? null
+            : Ok(new BomVersionPageResponse
             {
-                Code = BomVersionPageResponse.CodeEnum._401Enum,
-                Message = "登录状态无效",
+                Code = (BomVersionPageResponse.CodeEnum)result.Code,
+                Message = result.Message ?? "无权访问 BOM 版本",
                 Data = null!,
             });
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(new BomVersionPageResponse
-            {
-                Code = BomVersionPageResponse.CodeEnum._403Enum,
-                Message = "无权访问 BOM 版本",
-                Data = null!,
-            });
-        }
-
-        return null;
     }
 
-    private IActionResult? ResolveVersionManagerOrForbidden() => ResolveManager().Response;
+    private IActionResult? ResolveVersionManagerOrForbidden(PermissionCode permissionCode) =>
+        ResolveManager(permissionCode).Response;
 
-    private IActionResult? ResolveCommonManagerOrForbidden()
+    private IActionResult? ResolveCommonManagerOrForbidden(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Common(ApiResponse.CodeEnum._401Enum, "登录状态无效"));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return Ok(Common(ApiResponse.CodeEnum._403Enum, "无权维护 BOM 版本"));
-        }
-
-        return null;
+        AuthResult result = Authorize(permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Common((ApiResponse.CodeEnum)result.Code, result.Message ?? "无权维护 BOM 版本"));
     }
 
-    private (CurrentUser? User, IActionResult? Response) ResolveManager()
+    private (CurrentUser? User, IActionResult? Response) ResolveManager(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return (null, Ok(Version(BomVersionResponse.CodeEnum._401Enum, "登录状态无效", null)));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return (null, Ok(Version(BomVersionResponse.CodeEnum._403Enum, "无权维护 BOM 版本", null)));
-        }
-
-        return (user, null);
+        AuthResult result = Authorize(permissionCode);
+        return result.Ok
+            ? (result.User, null)
+            : (null, Ok(Version((BomVersionResponse.CodeEnum)result.Code, result.Message ?? "无权维护 BOM 版本", null)));
     }
+
+    private AuthResult Authorize(PermissionCode permissionCode) =>
+        authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
 
     private static IActionResult FromVersionResult(BomBusinessResult<BomVersion> result, string successMessage)
     {

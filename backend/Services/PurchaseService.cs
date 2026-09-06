@@ -252,18 +252,30 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         var where = new List<string>
         {
             "u.STATUS = 'valid'",
-            "r.STATUS = 'valid'",
-            "r.ROLE_NAME IN ('采购员', '采购主管', '系统管理员')",
+            @"EXISTS (
+                SELECT 1
+                FROM SYS_USER_ROLE ur
+                JOIN SYS_ROLE r
+                  ON r.ROLE_ID = ur.ROLE_ID
+                 AND r.STATUS = 'valid'
+                JOIN SYS_ROLE_PERMISSION rp ON rp.ROLE_ID = r.ROLE_ID
+                JOIN SYS_PERMISSION p
+                  ON p.PERMISSION_ID = rp.PERMISSION_ID
+                 AND p.STATUS = 'valid'
+                WHERE ur.USER_ID = u.USER_ID
+                  AND p.PERMISSION_CODE = :eligiblePermission)",
         };
         if (buyerId.HasValue) where.Add("u.USER_ID = :buyerId");
         if (!string.IsNullOrWhiteSpace(buyerName)) where.Add("u.USER_NAME LIKE :buyerName");
         var whereClause = " WHERE " + string.Join(" AND ", where);
-        const string fromClause = @" FROM SYS_USER u
-            JOIN SYS_USER_ROLE ur ON ur.USER_ID = u.USER_ID
-            JOIN SYS_ROLE r ON r.ROLE_ID = ur.ROLE_ID";
+        const string fromClause = " FROM SYS_USER u";
 
         void AddFilters(OracleCommand command)
         {
+            command.BindByName = true;
+            command.Parameters.Add(new OracleParameter(
+                "eligiblePermission",
+                PermissionCode.PurchaseBuyerEligibleEnum.ToContractValue()));
             if (buyerId.HasValue)
                 command.Parameters.Add(new OracleParameter("buyerId", buyerId.Value));
             if (!string.IsNullOrWhiteSpace(buyerName))

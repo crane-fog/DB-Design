@@ -406,12 +406,6 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                 return ProductionResourceResult<FaultRecord>.Fail(404, "生产线不存在");
             }
 
-            if (!currentUser.IsProductionManager
-                && !IsLineManager(connection, request.LineId, currentUser.UserId))
-            {
-                return ProductionResourceResult<FaultRecord>.Fail(403, "无权上报该生产线故障");
-            }
-
             using OracleTransaction transaction = connection.BeginTransaction();
             try
             {
@@ -493,16 +487,17 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                     ?? FaultStatusMap.Db.PendingRepair;
                 long? effectiveRepairerId = request.RepairerId ?? current.RepairerId;
                 bool isCurrentRepairer = current.RepairerId == currentUser.UserId;
-                bool isEquipmentManager = currentUser.RoleNames.Contains("设备管理员");
                 bool currentRepairerRemainsAssigned = isCurrentRepairer
                     && (!request.RepairerId.HasValue
                         || request.RepairerId == currentUser.UserId);
-                bool isClaimingSelf = isEquipmentManager
+                bool isClaimingSelf = currentUser.HasPermission(PermissionCode.ProductionFaultClaimEnum)
                     && currentStatus == FaultStatusMap.Db.PendingRepair
                     && !current.RepairerId.HasValue
                     && request.RepairerId == currentUser.UserId;
-                if (!currentUser.IsProductionManager
-                    && !currentRepairerRemainsAssigned
+                bool mayUpdateAssigned = currentUser.HasPermission(PermissionCode.ProductionFaultUpdateAssignedEnum)
+                    && currentRepairerRemainsAssigned;
+                if (!currentUser.HasPermission(PermissionCode.ProductionFaultUpdateAnyEnum)
+                    && !mayUpdateAssigned
                     && !isClaimingSelf)
                 {
                     transaction.Rollback();
@@ -719,12 +714,6 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
             if (!LineExists(connection, request.LineId))
             {
                 return ProductionResourceResult<ProductionLineStatus>.Fail(404, "生产线不存在");
-            }
-
-            if (!currentUser.IsProductionManager
-                && !IsLineManager(connection, request.LineId, currentUser.UserId))
-            {
-                return ProductionResourceResult<ProductionLineStatus>.Fail(403, "无权更新该生产线状态");
             }
 
             using OracleTransaction transaction = connection.BeginTransaction();
@@ -1077,24 +1066,6 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
             "SELECT COUNT(*) FROM PRODUCTION_LINE WHERE LINE_ID = :lineId",
             transaction);
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
-        return Convert.ToInt32(command.ExecuteScalar()) > 0;
-    }
-
-    private static bool IsLineManager(
-        OracleConnection connection,
-        long lineId,
-        long userId,
-        OracleTransaction? transaction = null)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"SELECT COUNT(*)
-              FROM PRODUCTION_LINE
-              WHERE LINE_ID = :lineId
-                AND MANAGER_ID = :userId",
-            transaction);
-        command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
-        command.Parameters.Add("userId", OracleDbType.Int64).Value = userId;
         return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 

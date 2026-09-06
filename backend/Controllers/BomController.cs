@@ -13,7 +13,7 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class BomController(
     BomService bomService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -79,7 +79,7 @@ public class BomController(
     [RequireJsonFields("loss_rate")]
     public IActionResult AddBom([FromBody] BomCreateRequest? request)
     {
-        if (ResolveBomManagerOrForbidden() is { } forbidden)
+        if (ResolveBomManagerOrForbidden(PermissionCode.MaterialBomCreateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -99,7 +99,7 @@ public class BomController(
     [RequireJsonFields("loss_rate")]
     public IActionResult UpdateBom([FromBody] BomUpdateRequest? request)
     {
-        if (ResolveBomManagerOrForbidden() is { } forbidden)
+        if (ResolveBomManagerOrForbidden(PermissionCode.MaterialBomUpdateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -118,7 +118,7 @@ public class BomController(
     [Route("deleteBomData")]
     public IActionResult DeleteBom([FromBody] BomDeleteRequest? request)
     {
-        if (ResolveCommonManagerOrForbidden() is { } forbidden)
+        if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialBomDeleteEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -194,125 +194,67 @@ public class BomController(
 
     private IActionResult? ResolveReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Bom(BomResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(Bom(BomResponse.CodeEnum._403Enum, "无权访问 BOM 明细", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(PermissionCode.MaterialBomViewEnum);
+        return result.Ok
+            ? null
+            : Ok(Bom((BomResponse.CodeEnum)result.Code, result.Message ?? "无权访问 BOM 明细", null));
     }
 
     private IActionResult? ResolveTreeReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Tree(BomTreeResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(Tree(BomTreeResponse.CodeEnum._403Enum, "无权查询 BOM 层级树", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(PermissionCode.MaterialBomTreeViewEnum);
+        return result.Ok
+            ? null
+            : Ok(Tree((BomTreeResponse.CodeEnum)result.Code, result.Message ?? "无权查询 BOM 层级树", null));
     }
 
     private IActionResult? ResolveReverseReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Reverse(ReverseTraceResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(Reverse(ReverseTraceResponse.CodeEnum._403Enum, "无权查询反向追溯", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(PermissionCode.MaterialBomReverseViewEnum);
+        return result.Ok
+            ? null
+            : Ok(Reverse((ReverseTraceResponse.CodeEnum)result.Code, result.Message ?? "无权查询反向追溯", null));
     }
 
     private IActionResult? ResolvePageReaderOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(new BomPageResponse
+        AuthResult result = Authorize(PermissionCode.MaterialBomViewEnum);
+        return result.Ok
+            ? null
+            : Ok(new BomPageResponse
             {
-                Code = BomPageResponse.CodeEnum._401Enum,
-                Message = "登录状态无效",
+                Code = (BomPageResponse.CodeEnum)result.Code,
+                Message = result.Message ?? "无权访问 BOM 明细",
                 Data = null!,
             });
-        }
-
-        if (!user.IsMaterialReader)
-        {
-            return Ok(new BomPageResponse
-            {
-                Code = BomPageResponse.CodeEnum._403Enum,
-                Message = "无权访问 BOM 明细",
-                Data = null!,
-            });
-        }
-
-        return null;
     }
 
-    private IActionResult? ResolveBomManagerOrForbidden()
+    private IActionResult? ResolveBomManagerOrForbidden(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Bom(BomResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return Ok(Bom(BomResponse.CodeEnum._403Enum, "无权维护 BOM 明细", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Bom((BomResponse.CodeEnum)result.Code, result.Message ?? "无权维护 BOM 明细", null));
     }
 
     private IActionResult? ResolveCycleManagerOrForbidden()
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Cycle(BomCycleCheckResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return Ok(Cycle(BomCycleCheckResponse.CodeEnum._403Enum, "无权维护 BOM 明细", null));
-        }
-
-        return null;
+        AuthResult result = Authorize(PermissionCode.MaterialBomCheckCycleEnum);
+        return result.Ok
+            ? null
+            : Ok(Cycle((BomCycleCheckResponse.CodeEnum)result.Code, result.Message ?? "无权检查 BOM 循环依赖", null));
     }
 
-    private IActionResult? ResolveCommonManagerOrForbidden()
+    private IActionResult? ResolveCommonManagerOrForbidden(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Common(ApiResponse.CodeEnum._401Enum, "登录状态无效"));
-        }
-
-        if (!user.IsMaterialManager)
-        {
-            return Ok(Common(ApiResponse.CodeEnum._403Enum, "无权维护 BOM 明细"));
-        }
-
-        return null;
+        AuthResult result = Authorize(permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Common((ApiResponse.CodeEnum)result.Code, result.Message ?? "无权维护 BOM 明细"));
     }
+
+    private AuthResult Authorize(PermissionCode permissionCode) =>
+        authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
 
     private static IActionResult FromBomResult(BomBusinessResult<Bom> result, string successMessage)
     {

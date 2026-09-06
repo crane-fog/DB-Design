@@ -9,14 +9,14 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 /// <summary>
-/// 库存管理接口（B 模块）。所有接口要求登录，权限为库存管理员/生产管理员/系统管理员。
+/// 库存管理接口（B 模块）。各接口分别检查稳定权限码。
 /// </summary>
 [ApiController]
 [Authorize]
 [Route("/api")]
 public class InventoryController(
     InventoryService inventoryService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     // ═══════════════════════════════════════════════════════════════
     //  GET /api/getMaterialStockData
@@ -27,7 +27,7 @@ public class InventoryController(
     [Route("getMaterialStockData")]
     public IActionResult GetStockData([FromQuery(Name = "material_id")] long materialId)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryStockViewEnum) is { } forbidden) return forbidden;
 
         var stock = inventoryService.GetStockData(materialId);
         return stock is null
@@ -56,7 +56,7 @@ public class InventoryController(
         [FromQuery(Name = "material_type")] string? materialType,
         [FromQuery(Name = "status")] string? status)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryStockViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = inventoryService.ListStockData(
@@ -95,7 +95,7 @@ public class InventoryController(
         [FromQuery(Name = "start_time")] DateTime? startTime,
         [FromQuery(Name = "end_time")] DateTime? endTime)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryAlertViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = inventoryService.ListAlerts(
@@ -121,7 +121,7 @@ public class InventoryController(
     [Route("getInventoryAlert")]
     public IActionResult GetAlert([FromQuery(Name = "alert_id")] long alertId)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryAlertViewEnum) is { } forbidden) return forbidden;
 
         var alert = inventoryService.GetAlert(alertId);
         return alert is null
@@ -135,7 +135,7 @@ public class InventoryController(
     [Route("generateInventoryAlert")]
     public IActionResult GenerateAlerts([FromBody] InventoryAlertGenerateRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryAlertGenerateEnum) is { } forbidden) return forbidden;
 
         long? materialId = request?.MaterialId;
 
@@ -160,7 +160,7 @@ public class InventoryController(
     [Route("handleInventoryAlert")]
     public IActionResult HandleAlert([FromBody] InventoryAlertHandleRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryAlertHandleEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(AlertSingle(InventoryAlertResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -192,7 +192,7 @@ public class InventoryController(
     [Route("lockMaterialStock")]
     public IActionResult LockStock([FromBody] MaterialStockLockRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryLockCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null || request.Items is null || request.Items.Count == 0)
             return Ok(new MaterialStockLockResponse
@@ -221,7 +221,7 @@ public class InventoryController(
     [Route("releaseMaterialStock")]
     public IActionResult ReleaseStock([FromBody] MaterialStockReleaseRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryLockReleaseEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(LockSingle(StockLockRecordResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -246,7 +246,7 @@ public class InventoryController(
         [FromQuery(Name = "material_id")] long? materialId,
         [FromQuery(Name = "status")] StockLockStatus? status)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryLockViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = inventoryService.ListLocks(
@@ -276,7 +276,7 @@ public class InventoryController(
     [Route("detectObsoleteMaterial")]
     public IActionResult DetectObsolete([FromBody] ObsoleteMaterialDetectRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryObsoleteDetectEnum) is { } forbidden) return forbidden;
 
         if (request is null || request.IdleDaysThreshold < 1)
             return Ok(new ObsoleteMaterialDetectResponse
@@ -312,7 +312,7 @@ public class InventoryController(
         [FromQuery(Name = "detect_time_start")] DateTime? detectTimeStart,
         [FromQuery(Name = "detect_time_end")] DateTime? detectTimeEnd)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryObsoleteViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = inventoryService.ListDetections(
@@ -338,7 +338,7 @@ public class InventoryController(
     [Route("getObsoleteMaterialDetection")]
     public IActionResult GetDetection([FromQuery(Name = "detection_id")] long detectionId)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryObsoleteViewEnum) is { } forbidden) return forbidden;
 
         var detection = inventoryService.GetDetection(detectionId);
         return detection is null
@@ -352,7 +352,7 @@ public class InventoryController(
     [Route("handleObsoleteMaterialDetection")]
     public IActionResult HandleDetection([FromBody] ObsoleteMaterialHandleRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryObsoleteHandleEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(ObsoleteSingle(ObsoleteMaterialResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -384,7 +384,7 @@ public class InventoryController(
     [Route("addCompletionInbound")]
     public IActionResult AddInbound([FromBody] CompletionInboundCreateRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryCompletionCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
             return Ok(InboundSingle(CompletionInboundResponse.CodeEnum._400Enum, "请求体不能为空", null));
@@ -413,7 +413,7 @@ public class InventoryController(
         [FromQuery(Name = "inbound_time_start")] DateTime? inboundTimeStart,
         [FromQuery(Name = "inbound_time_end")] DateTime? inboundTimeEnd)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryCompletionViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = inventoryService.ListInbound(
@@ -438,7 +438,7 @@ public class InventoryController(
     [Route("getCompletionInbound")]
     public IActionResult GetInbound([FromQuery(Name = "inbound_id")] long inboundId)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryCompletionViewEnum) is { } forbidden) return forbidden;
 
         var inbound = inventoryService.GetInbound(inboundId);
         return inbound is null
@@ -456,7 +456,7 @@ public class InventoryController(
     [Route("calculateMaterialShortage")]
     public IActionResult CalculateShortage([FromBody] MaterialShortageCalculateRequest? request)
     {
-        if (ResolveInventoryOrForbidden() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.InventoryShortageCalculateEnum) is { } forbidden) return forbidden;
 
         if (request is null || request.Items is null || request.Items.Count == 0)
             return Ok(new MaterialShortageCalculateResponse
@@ -489,26 +489,17 @@ public class InventoryController(
     //  Authorization helpers
     // ═══════════════════════════════════════════════════════════════
 
-    private IActionResult? ResolveInventoryOrForbidden()
+    private IActionResult? RequirePermission(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-            return Ok(new InventoryAlertResponse
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
+        return result.Ok
+            ? null
+            : Ok(new ApiResponse
             {
-                Code = InventoryAlertResponse.CodeEnum._401Enum,
-                Message = "登录状态无效",
+                Code = (ApiResponse.CodeEnum)result.Code,
+                Message = result.Message ?? "无权访问库存管理",
                 Data = null!,
             });
-
-        if (!user.IsInventoryManager)
-            return Ok(new InventoryAlertResponse
-            {
-                Code = InventoryAlertResponse.CodeEnum._403Enum,
-                Message = "无权访问库存管理",
-                Data = null!,
-            });
-
-        return null;
     }
 
     private static InventoryAlertResponse AlertSingle(

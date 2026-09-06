@@ -9,7 +9,7 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 /// <summary>
-/// 生产订单接口（C 模块）。所有接口要求登录；外部客户不可访问生产订单。
+/// 生产订单接口（C 模块）。各接口分别检查稳定权限码。
 /// HTTP 固定 200，业务状态通过响应体 code 表达。
 /// </summary>
 [ApiController]
@@ -17,7 +17,7 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class ProductionOrderController(
     ProductionOrderService orderService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -30,7 +30,7 @@ public class ProductionOrderController(
         [FromQuery(Name = "plan_end_start")] DateOnly? planEndStart,
         [FromQuery(Name = "plan_end_end")] DateOnly? planEndEnd)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderViewEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -58,7 +58,7 @@ public class ProductionOrderController(
     [Route("getProductionOrder")]
     public IActionResult Get([FromQuery(Name = "order_id")] long orderId)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderViewEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -75,7 +75,7 @@ public class ProductionOrderController(
     [Route("addProductionOrder")]
     public IActionResult Add([FromBody] ProductionOrderCreateRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderCreateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -94,7 +94,7 @@ public class ProductionOrderController(
     [Route("updateProductionOrder")]
     public IActionResult Update([FromBody] ProductionOrderUpdateRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderUpdateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -114,7 +114,7 @@ public class ProductionOrderController(
     [RequireJsonFields("approved")]
     public IActionResult Approve([FromBody] ProductionOrderApproveRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderApproveEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -133,7 +133,7 @@ public class ProductionOrderController(
     [Route("startProductionOrder")]
     public IActionResult Start([FromBody] ProductionOrderActionRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderStartEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -152,7 +152,7 @@ public class ProductionOrderController(
     [Route("finishProductionOrder")]
     public IActionResult Finish([FromBody] ProductionOrderFinishRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderFinishEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -171,7 +171,7 @@ public class ProductionOrderController(
     [Route("cancelProductionOrder")]
     public IActionResult Cancel([FromBody] ProductionOrderActionRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderCancelEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -184,21 +184,12 @@ public class ProductionOrderController(
         return FromResult(orderService.Cancel(request), "已取消");
     }
 
-    /// <summary>校验当前用户为生产/系统管理员；否则返回 403 响应对象。</summary>
-    private IActionResult? ResolveManagerOrForbidden()
+    private IActionResult? RequirePermission(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Detail(ProductionOrderResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsProductionManager)
-        {
-            return Ok(Detail(ProductionOrderResponse.CodeEnum._403Enum, "无权访问生产订单", null));
-        }
-
-        return null;
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Detail((ProductionOrderResponse.CodeEnum)result.Code, result.Message ?? "无权访问生产订单", null));
     }
 
     private IActionResult FromResult(ProductionOrderResult result, string successMessage)
