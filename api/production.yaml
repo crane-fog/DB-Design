@@ -644,6 +644,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FaultRecordResponse'
+  /api/listProductionLineFault:
+    get:
+      summary: 查询生产线故障列表
+      description: 按生产线编号、故障状态分页查询故障记录。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      operationId: listProductionLineFault
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: line_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 生产线编号
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/FaultStatus'
+          description: 故障状态
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaultRecordListResponse'
   /api/updateProductionLineStatus:
     post:
       summary: 更新生产线状态
@@ -1557,6 +1588,21 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/FaultRecord'
+    FaultRecordListResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/FaultRecord'
     ProductionLineStatusResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'

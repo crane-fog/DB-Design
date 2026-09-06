@@ -181,6 +181,8 @@ paths:
     $ref: './production.yaml#/paths/~1api~1reportProductionLineFault'
   /api/updateProductionLineFault:
     $ref: './production.yaml#/paths/~1api~1updateProductionLineFault'
+  /api/listProductionLineFault:
+    $ref: './production.yaml#/paths/~1api~1listProductionLineFault'
   /api/updateProductionLineStatus:
     $ref: './production.yaml#/paths/~1api~1updateProductionLineStatus'
   /api/listBatchConsumption:
