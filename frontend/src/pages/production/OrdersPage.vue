@@ -405,17 +405,17 @@ onMounted(() => {
       </el-alert>
 
       <el-table v-else v-loading="loading" :data="result.items" min-height="320" stripe>
-        <el-table-column label="订单 ID" min-width="90" prop="orderId" />
+        <el-table-column label="订单 ID" min-width="70" prop="orderId" />
         <el-table-column label="产品" min-width="150">
           <template #default="{ row }">{{
             row.materialName || `物料 #${row.materialId}`
           }}</template>
         </el-table-column>
-        <el-table-column label="BOM 版本" min-width="120">
+        <el-table-column label="BOM 版本" min-width="90">
           <template #default="{ row }">{{ row.versionNo || `#${row.versionId}` }}</template>
         </el-table-column>
-        <el-table-column label="计划数量" min-width="90" prop="planQty" />
-        <el-table-column label="完工数量" min-width="90">
+        <el-table-column label="计划数量" min-width="80" prop="planQty" />
+        <el-table-column label="完工数量" min-width="80">
           <template #default="{ row }">{{ row.finishedQty ?? '-' }}</template>
         </el-table-column>
         <el-table-column label="完工比例" min-width="150">
@@ -428,18 +428,18 @@ onMounted(() => {
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" min-width="90">
+        <el-table-column label="状态" min-width="80">
           <template #default="{ row }"
             ><StatusTag :labels="statusLabels" :value="row.status"
           /></template>
         </el-table-column>
-        <el-table-column label="计划开工" min-width="120">
+        <el-table-column label="计划开工" min-width="100">
           <template #default="{ row }">{{ row.planStart || '-' }}</template>
         </el-table-column>
-        <el-table-column label="计划完工" min-width="120">
+        <el-table-column label="计划完工" min-width="100">
           <template #default="{ row }">{{ row.planEnd || '-' }}</template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" min-width="360">
+        <el-table-column fixed="right" label="操作" min-width="260">
           <template #default="{ row }">
             <el-button link type="primary" :icon="View" @click="openDetail(row)">详情</el-button>
             <template v-if="canManage">

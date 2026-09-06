@@ -604,6 +604,94 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
         }
     }
 
+    public ProductionResourceResult<ProductionResourcePage<FaultRecord>> ListFaults(
+        int page,
+        int pageSize,
+        long? lineId,
+        FaultStatus? status)
+    {
+        try
+        {
+            using OracleConnection connection = OpenConnection();
+            string whereClause = "1 = 1";
+            string? dbStatus = status.HasValue ? FaultStatusMap.ToDbOrNull(status.Value) : null;
+            if (lineId.HasValue)
+            {
+                whereClause += " AND LINE_ID = :lineId";
+            }
+
+            if (dbStatus is not null)
+            {
+                whereClause += " AND STATUS = :status";
+            }
+
+            using OracleCommand countCommand = OracleCommandFactory.Create(
+                connection,
+                $"SELECT COUNT(*) FROM FAULT_RECORD WHERE {whereClause}");
+            if (lineId.HasValue)
+            {
+                countCommand.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId.Value;
+            }
+
+            if (dbStatus is not null)
+            {
+                countCommand.Parameters.Add("status", OracleDbType.Varchar2).Value = dbStatus;
+            }
+
+            long total = Convert.ToInt64(countCommand.ExecuteScalar());
+            if (total == 0)
+            {
+                return ProductionResourceResult<ProductionResourcePage<FaultRecord>>.Success(
+                    new ProductionResourcePage<FaultRecord>([], 0, page, pageSize),
+                    "查询成功");
+            }
+
+            long offset = (page - 1) * pageSize;
+            using OracleCommand selectCommand = OracleCommandFactory.Create(
+                connection,
+                $@"SELECT FAULT_ID, LINE_ID, FAULT_TYPE, DESCRIPTION, OCCUR_TIME,
+                          RECOVER_TIME, STATUS, REPORTER_ID, REPAIRER_ID
+                   FROM FAULT_RECORD
+                   WHERE {whereClause}
+                   ORDER BY OCCUR_TIME DESC
+                   OFFSET :offset ROWS FETCH NEXT :pageSize ROWS ONLY");
+            selectCommand.Parameters.Add("offset", OracleDbType.Int64).Value = offset;
+            selectCommand.Parameters.Add("pageSize", OracleDbType.Int32).Value = pageSize;
+            if (lineId.HasValue)
+            {
+                selectCommand.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId.Value;
+            }
+
+            if (dbStatus is not null)
+            {
+                selectCommand.Parameters.Add("status", OracleDbType.Varchar2).Value = dbStatus;
+            }
+
+            List<FaultRecord> records = [];
+            using (OracleDataReader reader = selectCommand.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    records.Add(MapFault(reader));
+                }
+            }
+
+            return ProductionResourceResult<ProductionResourcePage<FaultRecord>>.Success(
+                new ProductionResourcePage<FaultRecord>(
+                    records,
+                    (int)total,
+                    page,
+                    pageSize),
+                "查询成功");
+        }
+        catch (OracleException)
+        {
+            return ProductionResourceResult<ProductionResourcePage<FaultRecord>>.Fail(
+                500,
+                "查询故障列表失败");
+        }
+    }
+
     public ProductionResourceResult<ProductionLineStatus> UpdateLineStatus(
         ProductionLineStatusUpdateRequest request,
         CurrentUser currentUser)

@@ -287,6 +287,25 @@ public sealed class ProductionResourceController(
             : FaultRecordResponse(productionLineService.UpdateFault(request, currentUser));
     }
 
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("listProductionLineFault")]
+    public IActionResult ListProductionLineFault(
+        [FromQuery(Name = "page")] int? page,
+        [FromQuery(Name = "page_size")] int? pageSize,
+        [FromQuery(Name = "line_id")] long? lineId,
+        [FromQuery(Name = "status")] FaultStatus? status)
+    {
+        if (RequireProductionManager(FaultRecordListError) is { } error)
+        {
+            return error;
+        }
+
+        (int currentPage, int size) = Paging.Normalize(page, pageSize);
+        return FaultRecordList(
+            productionLineService.ListFaults(currentPage, size, lineId, status));
+    }
+
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
@@ -523,6 +542,30 @@ public sealed class ProductionResourceController(
 
     private IActionResult FaultRecordError(int code, string message) =>
         FaultRecordResponse(ProductionResourceResult<FaultRecord>.Fail(code, message));
+
+    private IActionResult FaultRecordList(
+        ProductionResourceResult<ProductionResourcePage<FaultRecord>> result)
+    {
+        FaultRecordListResponseAllOfData? data = result.Data is null
+            ? null
+            : new FaultRecordListResponseAllOfData
+            {
+                Records = result.Data.Records,
+                Total = result.Data.Total,
+                Page = result.Data.Page,
+                PageSize = result.Data.PageSize,
+            };
+        return Ok(new FaultRecordListResponse
+        {
+            Code = (FaultRecordListResponse.CodeEnum)result.Code,
+            Message = result.Message,
+            Data = data!,
+        });
+    }
+
+    private IActionResult FaultRecordListError(int code, string message) =>
+        FaultRecordList(
+            ProductionResourceResult<ProductionResourcePage<FaultRecord>>.Fail(code, message));
 
     private IActionResult ProductionLineStatusResponse(
         ProductionResourceResult<ProductionLineStatus> result) =>

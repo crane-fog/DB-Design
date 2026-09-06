@@ -15,6 +15,7 @@ import type {
   ExternalOrder,
   ExternalOrderConvertResult,
   FaultRecord,
+  FaultStatus,
   LineType,
   ProductionCalendar,
   ProductionCapacityEstimateResult,
@@ -654,6 +655,28 @@ export const productionService = {
     })
     const data = requireData(response.data as ApiEnvelope<unknown>)
     const items = getPageItems<ExternalOrder>(data).map(toExternalOrder)
+    const metadata = getPageMetadata(data, {
+      page: query.page,
+      pageSize: query.pageSize,
+      total: items.length,
+    })
+    return { items, ...metadata }
+  },
+
+  async listFaults(query: {
+    page: number
+    pageSize: number
+    lineId?: number
+    status?: FaultStatus
+  }) {
+    const response = await productionApi.listProductionLineFault({
+      lineId: query.lineId,
+      page: query.page,
+      pageSize: query.pageSize,
+      status: query.status,
+    })
+    const data = requireData(response.data as ApiEnvelope<unknown>)
+    const items = getPageItems<FaultRecord>(data).map(toFaultRecord)
     const metadata = getPageMetadata(data, {
       page: query.page,
       pageSize: query.pageSize,

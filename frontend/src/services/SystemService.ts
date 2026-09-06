@@ -506,6 +506,58 @@ export const systemService = {
 
   getUserTest: () => Api.getUserTest(),
 
+  async listInternalUsers(query: UserQuery): Promise<PageResult<SystemUser>> {
+    const response = await systemApi.listUserData({
+      employeeNo: query.employeeNo || undefined,
+      page: 1,
+      pageSize: 100,
+      status: query.status,
+      userName: query.userName || undefined,
+    })
+    const data = unwrap(response.data as ApiEnvelope<unknown>)
+    const allUsers = getPageItems<User>(data)
+      .map(toSystemUser)
+      .filter((user): user is SystemUser => Boolean(user))
+
+    const userRoles = await getAllPageItems<UserRole>((page, pageSize) =>
+      systemApi.listUserRoleData({ page, pageSize }),
+    )
+    const roles = await getAllPageItems<Role>((page, pageSize) =>
+      systemApi.listRoleData({ page, pageSize }),
+    )
+
+    const roleMap = new Map(
+      roles
+        .map((role) => [role.role_id, role.role_name])
+        .filter(
+          (pair): pair is [number, string] =>
+            typeof pair[0] === 'number' && typeof pair[1] === 'string',
+        ),
+    )
+
+    const externalCustomerUserIds = new Set(
+      userRoles
+        .filter((ur) => {
+          if (ur.role_id === undefined) {
+            return false
+          }
+          const roleName = roleMap.get(ur.role_id)
+          return roleName === '外部客户'
+        })
+        .map((ur) => ur.user_id)
+        .filter((id): id is number => typeof id === 'number'),
+    )
+
+    const internalUsers = allUsers.filter((user) => !externalCustomerUserIds.has(user.id))
+
+    return {
+      items: internalUsers,
+      page: 1,
+      pageSize: internalUsers.length,
+      total: internalUsers.length,
+    }
+  },
+
   async listLoginLogs(
     query: LoginLogQuery,
     includeUserDirectory = false,

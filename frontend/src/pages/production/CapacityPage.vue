@@ -15,6 +15,7 @@ import {
 import { Delete, EditPen, Plus, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { type SystemUser, systemService } from '@/services/SystemService'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -167,6 +168,8 @@ const lineFormRef = ref<FormInstance>()
 const lineSubmitting = ref(false)
 const editingLineId = ref<number>()
 const lineForm = reactive<ProductionLineFormData>({ managerId: 0, startDate: '', typeId: 0 })
+const users = ref<SystemUser[]>([])
+const usersLoading = ref(false)
 const lineDialogTitle = computed(() => {
   if (lineDialogMode.value === 'create') {
     return '新增生产线'
@@ -175,8 +178,8 @@ const lineDialogTitle = computed(() => {
 })
 const lineRules: FormRules<ProductionLineFormData> = {
   managerId: [
-    { message: '请输入负责人用户 ID', required: true, trigger: 'blur', type: 'number' },
-    { message: '负责人 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
+    { message: '请选择负责人', required: true, trigger: 'change', type: 'number' },
+    { message: '请选择负责人', min: 1, trigger: 'change', type: 'number' },
   ],
   startDate: [{ message: '请选择启用日期', required: true, trigger: 'change' }],
   typeId: [
@@ -458,9 +461,26 @@ function handleTabChange(tab: string) {
   }
 }
 
+async function loadUsers() {
+  usersLoading.value = true
+  try {
+    const usersResult = await systemService.listInternalUsers({
+      page: 1,
+      pageSize: 100,
+      status: 'valid',
+    })
+    users.value = usersResult.items
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '加载用户列表失败'))
+  } finally {
+    usersLoading.value = false
+  }
+}
+
 onMounted(() => {
   void loadLineTypeOptions()
   void loadConfigs()
+  void loadUsers()
 })
 </script>
 
@@ -905,13 +925,22 @@ onMounted(() => {
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="负责人用户 ID" prop="managerId">
-          <el-input-number
-            :controls="false"
+        <el-form-item label="负责人" prop="managerId">
+          <el-select
             v-model="lineForm.managerId"
-            :min="1"
+            clearable
+            filterable
+            :loading="usersLoading"
+            placeholder="请选择负责人"
             style="width: 100%"
-          />
+          >
+            <el-option
+              v-for="user in users"
+              :key="user.id"
+              :label="`${user.name} (${user.employeeNo})`"
+              :value="user.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="启用日期" prop="startDate">
           <el-date-picker
