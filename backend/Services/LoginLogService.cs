@@ -21,7 +21,7 @@ public class LoginLogService(string connString)
             // 当前生成的 LoginLog.UserId 为非空 int，用 0 表示“未知用户”；
             // 待契约 nullable:true 重新生成后应改为 null。
             UserId = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1)),
-            LoginTime = reader.GetDateTime(2),
+            LoginTime = reader.GetUtcDateTime(2),
             IpAddress = reader.GetString(3),
             Result = reader.GetString(4) == "成功" ? LoginLog.ResultEnum.SuccessEnum : LoginLog.ResultEnum.FailureEnum,
         };
@@ -90,7 +90,7 @@ public class LoginLogService(string connString)
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"INSERT INTO LOGIN_LOG (USER_ID, LOGIN_TIME, IP_ADDRESS, RESULT, FAIL_REASON)
-                            VALUES (:userId, SYSTIMESTAMP, :ipAddress, :result, :failReason)";
+                            VALUES (:userId, SYS_EXTRACT_UTC(SYSTIMESTAMP), :ipAddress, :result, :failReason)";
         cmd.Parameters.Add(new OracleParameter("userId", userId > 0 ? (object)userId : DBNull.Value));
         cmd.Parameters.Add(new OracleParameter("ipAddress", ipAddress));
         cmd.Parameters.Add(new OracleParameter("result", success ? "成功" : "失败"));

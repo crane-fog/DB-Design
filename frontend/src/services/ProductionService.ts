@@ -23,6 +23,7 @@ import type {
   ProductionOrderDetail,
 } from '@/api'
 import { productionApi } from '@/api/client'
+import { toUtcDateTime } from '@/utils/time'
 import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
@@ -741,8 +742,8 @@ export const productionService = {
     const response = await productionApi.runCapacityDetection({
       capacityDetectionRunRequest: {
         line_id: form.lineId,
-        period_end: form.periodEnd,
-        period_start: form.periodStart,
+        period_end: toUtcDateTime(form.periodEnd),
+        period_start: toUtcDateTime(form.periodStart),
       },
     })
     const data = requireData(response.data as ApiEnvelope<CapacityDetection | undefined>)
@@ -806,7 +807,7 @@ export const productionService = {
     const response = await productionApi.updateProductionLineFault({
       faultRecordUpdateRequest: {
         fault_id: form.faultId,
-        recover_time: nullableText(form.recoverTime),
+        recover_time: toUtcDateTime(form.recoverTime || undefined),
         repairer_id: form.repairerId ?? undefined,
         status: form.status,
       },

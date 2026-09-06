@@ -47,6 +47,7 @@ import type {
 import { inventoryApi, materialBomApi, productionApi } from '@/api/client'
 import { cleanQuery } from '@/services/request'
 import { pinia } from '@/stores/pinia'
+import { toUtcDayBoundary } from '@/utils/time'
 import { useAuthStore } from '@/stores/auth'
 
 export type { PageResult }
@@ -177,21 +178,6 @@ function toStock(item: MaterialStockDetail): InventoryStockItem {
     status: item.status,
     unit: item.unit,
   }
-}
-
-function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
-  if (!value || value.length > 10) {
-    return value
-  }
-  let time = '00:00:00.000'
-  if (endOfDay) {
-    time = '23:59:59.999'
-  }
-  const parsed = new Date(`${value}T${time}`)
-  if (Number.isNaN(parsed.getTime())) {
-    return value
-  }
-  return parsed.toISOString()
 }
 
 async function loadAllPageItems<TItem>(
@@ -502,8 +488,8 @@ export const inventoryService = {
   async listAlerts(query: InventoryAlertQuery) {
     const normalizedQuery = cleanQuery({
       ...query,
-      endTime: toIsoDayBoundary(query.endTime, true),
-      startTime: toIsoDayBoundary(query.startTime, false),
+      endTime: toUtcDayBoundary(query.endTime, true),
+      startTime: toUtcDayBoundary(query.startTime, false),
     })
     const response = await inventoryApi.listInventoryAlert({
       endTime: normalizedQuery.endTime,
@@ -520,8 +506,8 @@ export const inventoryService = {
   async listCompletionInbound(query: CompletionInboundQuery) {
     const normalizedQuery = cleanQuery({
       ...query,
-      endTime: toIsoDayBoundary(query.endTime, true),
-      startTime: toIsoDayBoundary(query.startTime, false),
+      endTime: toUtcDayBoundary(query.endTime, true),
+      startTime: toUtcDayBoundary(query.startTime, false),
     })
     const response = await inventoryApi.listCompletionInbound({
       inboundTimeEnd: normalizedQuery.endTime,
@@ -555,8 +541,8 @@ export const inventoryService = {
   async listObsolete(query: ObsoleteMaterialQuery) {
     const normalizedQuery = cleanQuery({
       ...query,
-      endTime: toIsoDayBoundary(query.endTime, true),
-      startTime: toIsoDayBoundary(query.startTime, false),
+      endTime: toUtcDayBoundary(query.endTime, true),
+      startTime: toUtcDayBoundary(query.startTime, false),
     })
     const response = await inventoryApi.listObsoleteMaterialDetection({
       detectTimeEnd: normalizedQuery.endTime,

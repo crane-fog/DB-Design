@@ -347,7 +347,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO PURCHASE_ORDER
                         (STATUS, SUPPLIER_ID, ORDER_DATE, EXPECTED_DATE, BUYER_ID, TOTAL_AMOUNT)
-                        VALUES (:status, :supplierId, SYSDATE, :expectedDate, :buyerId, :totalAmount)
+                        VALUES (:status, :supplierId, TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)), :expectedDate, :buyerId, :totalAmount)
                         RETURNING ORDER_ID INTO :newId";
                     cmd.Parameters.Add(new OracleParameter("status", PurchaseOrderStatusMap.Db.Draft));
                     cmd.Parameters.Add(new OracleParameter("supplierId", request.SupplierId));
@@ -470,7 +470,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO PURCHASE_ORDER
                         (STATUS, SUPPLIER_ID, ORDER_DATE, EXPECTED_DATE, BUYER_ID, TOTAL_AMOUNT)
-                        VALUES (:status, :supplierId, SYSDATE, :expectedDate, :buyerId, :totalAmount)
+                        VALUES (:status, :supplierId, TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)), :expectedDate, :buyerId, :totalAmount)
                         RETURNING ORDER_ID INTO :newId";
                     cmd.Parameters.Add(new OracleParameter("status", PurchaseOrderStatusMap.Db.Draft));
                     cmd.Parameters.Add(new OracleParameter("supplierId", supId));
@@ -712,7 +712,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = @"UPDATE PURCHASE_ORDER
-                        SET STATUS = :newStatus, ACTUAL_DATE = CASE WHEN :checkCompleted = :completed THEN SYSDATE ELSE ACTUAL_DATE END
+                        SET STATUS = :newStatus, ACTUAL_DATE = CASE WHEN :checkCompleted = :completed THEN TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)) ELSE ACTUAL_DATE END
                         WHERE ORDER_ID = :orderId";
                     cmd.Parameters.Add(new OracleParameter("newStatus", newStatus));
                     cmd.Parameters.Add(new OracleParameter("checkCompleted", newStatus));
@@ -727,7 +727,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                     cmd.Transaction = tx;
                     cmd.CommandText = @"UPDATE MATERIAL_STOCK
                         SET AVAILABLE_QTY = AVAILABLE_QTY + :qty,
-                            LAST_IN_DATE = SYSDATE
+                            LAST_IN_DATE = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                         WHERE MATERIAL_ID = :materialId";
                     cmd.Parameters.Add(new OracleParameter("qty", request.Quantity));
                     cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
@@ -756,8 +756,8 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         conn.Open();
 
         var reminders = new List<PurchaseOverdueReminder>();
-        var now = DateTime.Now;
-        var today = DateOnly.FromDateTime(now);
+        var now = DateTime.UtcNow;
+        var today = BusinessTime.ToDate(now);
 
         string filterClause = orderId.HasValue ? "AND o.ORDER_ID = :orderId" : "";
 
@@ -944,11 +944,11 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
 
         bool isOverdue = statusDb is not (PurchaseOrderStatusMap.Db.Completed or PurchaseOrderStatusMap.Db.Cancelled)
             && !reader.IsDBNull(7)
-            && DateOnly.FromDateTime(reader.GetDateTime(7)) < DateOnly.FromDateTime(DateTime.Now);
+            && DateOnly.FromDateTime(reader.GetDateTime(7)) < BusinessTime.Today;
 
         int overdueDays = 0;
         if (isOverdue && !reader.IsDBNull(7))
-            overdueDays = (DateOnly.FromDateTime(DateTime.Now).DayNumber
+            overdueDays = (BusinessTime.Today.DayNumber
                 - DateOnly.FromDateTime(reader.GetDateTime(7)).DayNumber);
 
         return new PurchaseOrder
@@ -1123,7 +1123,7 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
         OrderId = Convert.ToInt64(reader.GetValue(1)),
         ExpectedDate = reader.IsDBNull(2) ? default : DateOnly.FromDateTime(reader.GetDateTime(2)),
         OverdueDays = Convert.ToInt32(reader.GetValue(3)),
-        RemindTime = reader.GetDateTime(4),
+        RemindTime = reader.GetUtcDateTime(4),
         Status = PurchaseOverdueReminderStatusMap.FromDb(reader.GetString(5)),
         Remark = reader.IsDBNull(6) ? null! : reader.GetString(6),
     };
@@ -1304,8 +1304,8 @@ public class PurchaseService(string connString, ILogger<PurchaseService> logger)
                            PARTITION BY MATERIAL_ID, SUPPLIER_ID
                            ORDER BY VALID_FROM DESC) AS RN
                 FROM SUPPLIER_PRICE
-                WHERE VALID_FROM <= SYSDATE
-                  AND (VALID_TO IS NULL OR VALID_TO >= SYSDATE)
+                WHERE VALID_FROM <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                  AND (VALID_TO IS NULL OR VALID_TO >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
                   AND ({string.Join(" OR ", pairFilters)})
             )
             WHERE RN = 1";

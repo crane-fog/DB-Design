@@ -27,9 +27,9 @@ public class UserService(string connString)
         var status = reader.GetString(5);
         user.Status = status == "disabled" ? User.StatusEnum.DisabledEnum : User.StatusEnum.ValidEnum;
 
-        if (!reader.IsDBNull(6)) user.CreatedTime = reader.GetDateTime(6);
-        if (!reader.IsDBNull(7)) user.LastLoginTime = reader.GetDateTime(7);
-        if (!reader.IsDBNull(8)) user.PwdUpdateTime = reader.GetDateTime(8);
+        if (!reader.IsDBNull(6)) user.CreatedTime = reader.GetUtcDateTime(6);
+        if (!reader.IsDBNull(7)) user.LastLoginTime = reader.GetUtcDateTime(7);
+        if (!reader.IsDBNull(8)) user.PwdUpdateTime = reader.GetUtcDateTime(8);
 
         return user;
     }
@@ -121,9 +121,9 @@ public class UserService(string connString)
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"INSERT INTO SYS_USER
-                            (EMPLOYEE_NO, PASSWORD_HASH, USER_NAME, PHONE, EMAIL, STATUS, PWD_UPDATE_TIME)
+                            (EMPLOYEE_NO, PASSWORD_HASH, USER_NAME, PHONE, EMAIL, STATUS, CREATED_TIME, PWD_UPDATE_TIME)
                             VALUES
-                            (:employeeNo, :passwordHash, :userName, :phone, :email, :status, SYSTIMESTAMP)
+                            (:employeeNo, :passwordHash, :userName, :phone, :email, :status, SYS_EXTRACT_UTC(SYSTIMESTAMP), SYS_EXTRACT_UTC(SYSTIMESTAMP))
                             RETURNING USER_ID INTO :userId";
         cmd.Parameters.Add(new OracleParameter("employeeNo", request.EmployeeNo.Trim()));
         cmd.Parameters.Add(new OracleParameter("passwordHash", request.Password));
@@ -169,7 +169,7 @@ public class UserService(string connString)
         {
             sets.Add("PASSWORD_HASH = :passwordHash");
             parameters.Add(new OracleParameter("passwordHash", request.Password));
-            sets.Add("PWD_UPDATE_TIME = SYSTIMESTAMP");
+            sets.Add("PWD_UPDATE_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)");
         }
         if (!string.IsNullOrWhiteSpace(request.UserName))
         {

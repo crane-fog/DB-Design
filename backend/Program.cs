@@ -31,7 +31,10 @@ if (string.IsNullOrWhiteSpace(jwtSecret))
 var builder = WebApplication.CreateBuilder(args);
 var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
 
-builder.Services.AddControllers().AddNewtonsoftJson();
+builder.Services.AddControllers().AddNewtonsoftJson(options =>
+{
+    options.SerializerSettings.DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.Utc;
+});
 
 // 契约约定：HTTP 固定 200，业务状态通过响应体 code 表达。
 // [ApiController] 自动模型验证失败（缺 required 字段、枚举值非法等）默认返回 HTTP 400

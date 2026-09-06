@@ -11,6 +11,7 @@ import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import { businessDate } from '@/utils/time'
 import { getErrorMessage } from '@/utils/error'
 import { inventoryService } from '@/services/InventoryService'
 import { purchaseService } from '@/services/PurchaseService'
@@ -37,7 +38,7 @@ const rows = reactive<CalculationRow[]>([
   { key: 1, materialId: 0, productionQty: 1, versionId: undefined },
 ])
 const purchaseQuantities = reactive<Record<number, number>>({})
-const draftExpectedDate = ref(new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10))
+const draftExpectedDate = ref(businessDate(new Date(Date.now() + 14 * 86_400_000)))
 const selectedBuyerId = ref<number>()
 const buyerOptions = ref<BuyerOption[]>([])
 const buyerLoading = ref(false)

@@ -21,7 +21,7 @@ CREATE TABLE sys_user (
     email            VARCHAR2(100),
     status           VARCHAR2(10)  DEFAULT 'valid' NOT NULL
                      CHECK (status IN ('valid','disabled')),
-    created_time     TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+    created_time     TIMESTAMP DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL,
     last_login_time  TIMESTAMP,
     pwd_update_time  TIMESTAMP
 );
@@ -100,8 +100,8 @@ CREATE TABLE material (
     default_supplier_id  NUMBER(10) REFERENCES supplier(supplier_id),
     current_version_id   NUMBER(10),
     created_by           NUMBER(10) NOT NULL REFERENCES sys_user(user_id),
-    created_time         TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
-    updated_time         TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL
+    created_time         TIMESTAMP DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL,
+    updated_time         TIMESTAMP DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL
 );
 
 CREATE TABLE bom_version (

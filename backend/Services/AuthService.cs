@@ -97,9 +97,9 @@ public class AuthService(string connString, string jwtSecret, LoginLogService lo
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"INSERT INTO SYS_USER
-                            (EMPLOYEE_NO, PASSWORD_HASH, USER_NAME, PHONE, EMAIL, STATUS, PWD_UPDATE_TIME)
+                            (EMPLOYEE_NO, PASSWORD_HASH, USER_NAME, PHONE, EMAIL, STATUS, CREATED_TIME, PWD_UPDATE_TIME)
                             VALUES
-                            (:employeeNo, :passwordHash, :userName, :phone, :email, 'valid', SYSTIMESTAMP)
+                            (:employeeNo, :passwordHash, :userName, :phone, :email, 'valid', SYS_EXTRACT_UTC(SYSTIMESTAMP), SYS_EXTRACT_UTC(SYSTIMESTAMP))
                             RETURNING USER_ID INTO :userId";
         cmd.Parameters.Add(new OracleParameter("employeeNo", employeeNo));
         cmd.Parameters.Add(new OracleParameter("passwordHash", passwordHash));
@@ -154,7 +154,7 @@ public class AuthService(string connString, string jwtSecret, LoginLogService lo
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"UPDATE SYS_USER
-                            SET LAST_LOGIN_TIME = SYSTIMESTAMP
+                            SET LAST_LOGIN_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                             WHERE USER_ID = :userId";
         cmd.Parameters.Add(new OracleParameter("userId", userId));
         cmd.ExecuteNonQuery();

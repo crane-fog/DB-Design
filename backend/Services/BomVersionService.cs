@@ -272,8 +272,8 @@ public class BomVersionService(string connString)
 
         if (effectiveOnly == true)
         {
-            where.Add("bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)");
-            where.Add("(bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(SYSDATE))");
+            where.Add("bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))");
+            where.Add("(bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))");
         }
 
         return where;
@@ -385,7 +385,7 @@ public class BomVersionService(string connString)
     {
         using var cmd = conn.CreateCommand();
         cmd.Transaction = transaction;
-        cmd.CommandText = "SELECT TRUNC(SYSDATE) FROM DUAL";
+        cmd.CommandText = "SELECT TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)) FROM DUAL";
         var databaseDate = DateOnly.FromDateTime(Convert.ToDateTime(cmd.ExecuteScalar()));
         return effectiveDate <= databaseDate
             && (!expireDate.HasValue || expireDate.Value >= databaseDate);

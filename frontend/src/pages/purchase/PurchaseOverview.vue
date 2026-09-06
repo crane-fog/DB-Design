@@ -34,6 +34,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
+import { businessDate } from '@/utils/time'
 import { getErrorMessage } from '@/utils/error'
 import { purchaseService } from '@/services/PurchaseService'
 import { useAuthStore } from '@/stores/auth'
@@ -138,7 +139,7 @@ const receiptForm = reactive<PurchaseReceiptFormData>({
   materialId: 0,
   orderId: 0,
   quantity: 1,
-  receiveDate: new Date().toISOString().slice(0, 10),
+  receiveDate: businessDate(),
 })
 const receiptRules: FormRules<PurchaseReceiptFormData> = {
   materialId: [
@@ -656,7 +657,7 @@ function openReceiptDialog(order?: PurchaseOrderItem) {
     materialId: order?.details.find((line) => line.receivedQty < line.quantity)?.materialId ?? 0,
     orderId: order?.orderId ?? 0,
     quantity: 1,
-    receiveDate: new Date().toISOString().slice(0, 10),
+    receiveDate: businessDate(),
   })
   receiptDialogOpen.value = true
 }

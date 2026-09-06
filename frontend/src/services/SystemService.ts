@@ -23,6 +23,7 @@ import type {
 } from '@/api'
 import { PERMISSIONS } from '@/constants/permissions'
 import { getRequestStatus } from '@/services/request'
+import { toUtcDateTime } from '@/utils/time'
 
 export { getRequestStatus }
 export type { PageResult }
@@ -510,11 +511,11 @@ export const systemService = {
     includeUserDirectory = false,
   ): Promise<PageResult<SystemLoginLog>> {
     const response = await systemApi.listLoginRecordData({
-      endTime: query.endTime,
+      endTime: toUtcDateTime(query.endTime || undefined),
       page: query.page,
       pageSize: query.pageSize,
       result: query.result,
-      startTime: query.startTime,
+      startTime: toUtcDateTime(query.startTime || undefined),
       userId: query.userId,
     })
     let users = new Map<number, SystemUser>()
@@ -538,12 +539,12 @@ export const systemService = {
   ): Promise<PageResult<SystemOperationLog>> {
     const response = await systemApi.listOperationLogData({
       action: query.action || undefined,
-      endTime: query.endTime,
+      endTime: toUtcDateTime(query.endTime || undefined),
       module: query.module || undefined,
       operatorId: query.operatorId,
       page: query.page,
       pageSize: query.pageSize,
-      startTime: query.startTime,
+      startTime: toUtcDateTime(query.startTime || undefined),
     })
     let users = new Map<number, SystemUser>()
     if (includeUserDirectory) {

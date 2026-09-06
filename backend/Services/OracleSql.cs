@@ -14,6 +14,10 @@ internal sealed record SqlFilter(string Name, object Value);
 /// </summary>
 internal static class OracleSql
 {
+    /// <summary>普通 TIMESTAMP 按约定存储 UTC，读取时补齐 Kind，不改变时间数值。</summary>
+    public static DateTime GetUtcDateTime(this OracleDataReader reader, int ordinal) =>
+        DateTime.SpecifyKind(reader.GetDateTime(ordinal), DateTimeKind.Utc);
+
     /// <summary>
     /// 为命令绑定一组筛选参数。每次调用都会创建全新的 OracleParameter 实例，
     /// 因此同一个 SqlFilter 集合可以安全地复用于统计命令与数据查询命令。

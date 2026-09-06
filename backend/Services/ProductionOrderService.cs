@@ -302,7 +302,7 @@ public class ProductionOrderService(string connString)
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
-                                SET STATUS = :status, ACTUAL_START = SYSDATE
+                                SET STATUS = :status, ACTUAL_START = TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
                                 WHERE ORDER_ID = :orderId AND STATUS = :expected";
             cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.InProgress));
             cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
@@ -344,7 +344,7 @@ public class ProductionOrderService(string connString)
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE PRODUCTION_ORDER
-                                SET STATUS = :status, FINISHED_QTY = :finishedQty, ACTUAL_END = SYSDATE
+                                SET STATUS = :status, FINISHED_QTY = :finishedQty, ACTUAL_END = TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
                                 WHERE ORDER_ID = :orderId AND STATUS = :expected";
             cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.Completed));
             cmd.Parameters.Add(new OracleParameter("finishedQty", request.FinishedQty));

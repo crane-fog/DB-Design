@@ -35,6 +35,7 @@ import type {
   SupplierInfo,
 } from '@/types/purchase'
 import { materialBomApi, purchaseApi } from '@/api/client'
+import { businessDate } from '@/utils/time'
 import { cleanQuery } from '@/services/request'
 import { pinia } from '@/stores/pinia'
 import { useAuthStore } from '@/stores/auth'
@@ -138,21 +139,15 @@ function validateOrderForm(form: PurchaseOrderFormData) {
   if (!dateParts) {
     throw new Error('预计到货日期格式无效')
   }
-  const expectedDate = new Date(
-    Number(dateParts[1]),
-    Number(dateParts[2]) - 1,
-    Number(dateParts[3]),
-  )
+  const expectedDate = new Date(`${form.expectedDate}T00:00:00Z`)
   if (
-    expectedDate.getFullYear() !== Number(dateParts[1]) ||
-    expectedDate.getMonth() !== Number(dateParts[2]) - 1 ||
-    expectedDate.getDate() !== Number(dateParts[3])
+    expectedDate.getUTCFullYear() !== Number(dateParts[1]) ||
+    expectedDate.getUTCMonth() !== Number(dateParts[2]) - 1 ||
+    expectedDate.getUTCDate() !== Number(dateParts[3])
   ) {
     throw new Error('预计到货日期格式无效')
   }
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  if (expectedDate < today) {
+  if (form.expectedDate < businessDate()) {
     throw new Error('预计到货日期不能早于当前日期')
   }
   if (!form.details.length) {
@@ -305,7 +300,7 @@ export const purchaseService = {
   },
 
   async getOverview(): Promise<PurchaseOverviewSummary> {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = businessDate()
     const [all, firstOverduePage, submitted, partial, reminders] = await Promise.all([
       this.listOrders({ page: 1, pageSize: 1 }),
       this.listOrders({

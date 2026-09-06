@@ -402,7 +402,7 @@ public sealed class CapacityService(
         {
             CapacityEstimateInput input = inputResult.Data;
             MaterialReadiness material = materialResult.Data;
-            DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+            DateOnly today = BusinessTime.Today;
             DateOnly capacityStart = material.ReadyDate ?? today;
             DateOnly horizon = (input.ExpectedDate > capacityStart
                     ? input.ExpectedDate
@@ -496,7 +496,7 @@ public sealed class CapacityService(
             List<WorkInterval> plannedWorkIntervals = [];
             foreach (ScheduledCapacity schedule in schedules)
             {
-                DateTime workStart = schedule.Date.ToDateTime(StandardShiftStart);
+                DateTime workStart = BusinessTime.ToUtc(schedule.Date, StandardShiftStart);
                 DateTime workEnd = workStart.AddMinutes((double)StandardWorkMinutesPerCalendarDay);
                 decimal overlapMinutes = CalculateOverlapMinutes(
                     request.PeriodStart,
@@ -641,7 +641,7 @@ public sealed class CapacityService(
                        @"INSERT INTO CAPACITY_BALANCE
                          (BEFORE_PLAN, AFTER_PLAN, OPERATOR_ID, ADJUST_TIME, AFFECTED_ORDERS)
                          VALUES
-                         (:beforePlan, :afterPlan, :operatorId, SYSTIMESTAMP, :affectedOrders)
+                         (:beforePlan, :afterPlan, :operatorId, SYS_EXTRACT_UTC(SYSTIMESTAMP), :affectedOrders)
                          RETURNING BALANCE_ID INTO :newId"))
             {
                 command.Parameters.Add("beforePlan", OracleDbType.Clob).Value = beforePlan;
@@ -1017,8 +1017,10 @@ public sealed class CapacityService(
                 AND pc.CALENDAR_DATE <= :endDate
               ORDER BY pc.CALENDAR_DATE");
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
-        command.Parameters.Add("startDate", OracleDbType.Date).Value = periodStart.Date;
-        command.Parameters.Add("endDate", OracleDbType.Date).Value = periodEnd.Date;
+        command.Parameters.Add("startDate", OracleDbType.Date).Value =
+            BusinessTime.ToDate(periodStart).ToDateTime(TimeOnly.MinValue);
+        command.Parameters.Add("endDate", OracleDbType.Date).Value =
+            BusinessTime.ToDate(periodEnd).ToDateTime(TimeOnly.MinValue);
 
         List<ScheduledCapacity> result = [];
         using OracleDataReader reader = command.ExecuteReader();
@@ -1050,7 +1052,7 @@ public sealed class CapacityService(
               FROM FAULT_RECORD
               WHERE LINE_ID = :lineId
                 AND OCCUR_TIME < :periodEnd
-                AND NVL(RECOVER_TIME, SYSTIMESTAMP) > :periodStart");
+                AND NVL(RECOVER_TIME, SYS_EXTRACT_UTC(SYSTIMESTAMP)) > :periodStart");
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
         command.Parameters.Add("periodEnd", OracleDbType.TimeStamp).Value = periodEnd;
         command.Parameters.Add("periodStart", OracleDbType.TimeStamp).Value = periodStart;
@@ -1059,8 +1061,8 @@ public sealed class CapacityService(
         using OracleDataReader reader = command.ExecuteReader();
         while (reader.Read())
         {
-            DateTime occurTime = reader.GetDateTime(0);
-            DateTime recoverTime = reader.IsDBNull(1) ? DateTime.Now : reader.GetDateTime(1);
+            DateTime occurTime = reader.GetUtcDateTime(0);
+            DateTime recoverTime = reader.IsDBNull(1) ? DateTime.UtcNow : reader.GetUtcDateTime(1);
             foreach (WorkInterval workInterval in plannedWorkIntervals)
             {
                 WorkInterval? overlap = CalculateOverlapInterval(
@@ -1189,7 +1191,7 @@ public sealed class CapacityService(
             BeforePlan = JsonConvert.DeserializeObject<Dictionary<string, object>>(beforePlan) ?? [],
             AfterPlan = JsonConvert.DeserializeObject<Dictionary<string, object>>(afterPlan) ?? [],
             OperatorId = Convert.ToInt64(reader.GetValue(3)),
-            AdjustTime = reader.GetDateTime(4),
+            AdjustTime = reader.GetUtcDateTime(4),
             AffectedOrders = JsonConvert.DeserializeObject<List<long>>(affectedOrders) ?? [],
         };
     }

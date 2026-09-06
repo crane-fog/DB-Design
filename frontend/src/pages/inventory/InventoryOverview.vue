@@ -7,10 +7,10 @@ import type {
 } from '@/types/inventory'
 import { type InventoryStockData, inventoryService } from '@/services/InventoryService'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { formatNumber } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
 import { useRouter } from 'vue-router'
 
@@ -42,10 +42,6 @@ const stockStatusLabels: Record<VisibleInventoryStockStatus, string> = {
   low: '低库存',
   normal: '正常',
   zero: '零库存',
-}
-
-function formatStockDateTime(value?: string | null) {
-  return value?.replace('T', ' ') || '-'
 }
 
 const shortcuts = [
@@ -379,10 +375,10 @@ onBeforeUnmount(() => {
             </template>
           </el-table-column>
           <el-table-column label="最后入库" min-width="160">
-            <template #default="{ row }">{{ formatStockDateTime(row.lastInDate) }}</template>
+            <template #default="{ row }">{{ formatDateTime(row.lastInDate) }}</template>
           </el-table-column>
           <el-table-column label="最后出库" min-width="160">
-            <template #default="{ row }">{{ formatStockDateTime(row.lastOutDate) }}</template>
+            <template #default="{ row }">{{ formatDateTime(row.lastOutDate) }}</template>
           </el-table-column>
           <el-table-column fixed="right" label="操作" min-width="80">
             <template #default="{ row }">
@@ -455,10 +451,10 @@ onBeforeUnmount(() => {
             }}</el-tag>
           </div>
           <div>
-            <span>最后入库</span><strong>{{ formatStockDateTime(stockDetail.lastInDate) }}</strong>
+            <span>最后入库</span><strong>{{ formatDateTime(stockDetail.lastInDate) }}</strong>
           </div>
           <div>
-            <span>最后出库</span><strong>{{ formatStockDateTime(stockDetail.lastOutDate) }}</strong>
+            <span>最后出库</span><strong>{{ formatDateTime(stockDetail.lastOutDate) }}</strong>
           </div>
         </div>
       </div>

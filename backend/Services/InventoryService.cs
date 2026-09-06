@@ -220,8 +220,8 @@ public class InventoryService(
                     SafetyStock = reader.GetDecimal(4),
                     AvailableQty = reader.GetDecimal(5),
                     LockedQty = reader.GetDecimal(6),
-                    LastInDate = reader.IsDBNull(7) ? null : reader.GetDateTime(7),
-                    LastOutDate = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
+                    LastInDate = reader.IsDBNull(7) ? null : reader.GetUtcDateTime(7),
+                    LastOutDate = reader.IsDBNull(8) ? null : reader.GetUtcDateTime(8),
                     Status = ToMaterialStockStatus(reader.GetString(9)),
                 });
             }
@@ -353,7 +353,7 @@ public class InventoryService(
                 }
 
                 long newId;
-                var now = DateTime.Now;
+                var now = DateTime.UtcNow;
                 using (var insCmd = conn.CreateCommand())
                 {
                     insCmd.CommandText = @"INSERT INTO STOCK_ALERT
@@ -402,7 +402,7 @@ public class InventoryService(
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"UPDATE STOCK_ALERT
-                SET STATUS = :status, HANDLER_ID = :handlerId, HANDLE_TIME = SYSDATE
+                SET STATUS = :status, HANDLER_ID = :handlerId, HANDLE_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                 WHERE ALERT_ID = :alertId AND STATUS = :expected";
             cmd.Parameters.Add(new OracleParameter("status", dbStatus));
             cmd.Parameters.Add(new OracleParameter("handlerId", handlerId));
@@ -553,7 +553,7 @@ public class InventoryService(
                 cmd.CommandText = @"UPDATE MATERIAL_STOCK
                     SET AVAILABLE_QTY = AVAILABLE_QTY - :qtyDeduct,
                         LOCKED_QTY = LOCKED_QTY + :qtyAdd,
-                        LAST_OUT_DATE = SYSDATE
+                        LAST_OUT_DATE = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                     WHERE MATERIAL_ID = :materialId";
                 var quantities = lockItems.Select(item => item.LockQty).ToArray();
                 cmd.Parameters.Add("qtyDeduct", OracleDbType.Decimal).Value = quantities;
@@ -567,7 +567,7 @@ public class InventoryService(
             foreach (var item in lockItems)
             {
                 long lockId;
-                var now = DateTime.Now;
+                var now = DateTime.UtcNow;
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.Transaction = tx;
@@ -652,7 +652,7 @@ public class InventoryService(
                     SET STATUS = :newStatus, RELEASE_TIME = :releaseTime
                     WHERE LOCK_ID = :lockId AND STATUS = :expected";
                 cmd.Parameters.Add(new OracleParameter("newStatus", StockLockStatusMap.Db.Cancelled));
-                cmd.Parameters.Add(new OracleParameter("releaseTime", DateTime.Now));
+                cmd.Parameters.Add(new OracleParameter("releaseTime", DateTime.UtcNow));
                 cmd.Parameters.Add(new OracleParameter("lockId", lockId));
                 cmd.Parameters.Add(new OracleParameter("expected", StockLockStatusMap.Db.Locked));
                 affected = cmd.ExecuteNonQuery();
@@ -746,7 +746,7 @@ public class InventoryService(
         conn.Open();
 
         var detections = new List<ObsoleteMaterialDetection>();
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         var cutoff = now.AddDays(-idleDaysThreshold);
 
         string matFilter = materialId.HasValue ? "AND ms.MATERIAL_ID = :materialId" : "";
@@ -782,7 +782,7 @@ public class InventoryService(
                 candidates.Add((
                     Convert.ToInt64(reader.GetValue(0)),
                     reader.GetDecimal(1),
-                    reader.IsDBNull(2) ? null : reader.GetDateTime(2)));
+                    reader.IsDBNull(2) ? null : reader.GetUtcDateTime(2)));
             }
             reader.Close();
 
@@ -803,7 +803,9 @@ public class InventoryService(
                     insCmd.Parameters.Add(new OracleParameter("dt", now));
                     insCmd.Parameters.Add(new OracleParameter("avail", availableQty));
                     insCmd.Parameters.Add(new OracleParameter("lastOut",
-                        lastOutDate.HasValue ? lastOutDate.Value : DBNull.Value));
+                        lastOutDate.HasValue
+                            ? BusinessTime.ToDate(lastOutDate.Value).ToDateTime(TimeOnly.MinValue)
+                            : DBNull.Value));
                     insCmd.Parameters.Add(new OracleParameter("idleDays", idleDays));
                     insCmd.Parameters.Add(new OracleParameter("status", ObsoleteMaterialStatusMap.Db.Pending));
                     var idParam = new OracleParameter("newId", OracleDbType.Int64)
@@ -822,7 +824,7 @@ public class InventoryService(
                     DetectTime = now,
                     AvailableQty = availableQty,
                     LastOutDate = lastOutDate.HasValue
-                        ? DateOnly.FromDateTime(lastOutDate.Value) : null,
+                        ? BusinessTime.ToDate(lastOutDate.Value) : null,
                     IdleDays = idleDays,
                     Status = ObsoleteMaterialStatus.PendingEnum,
                     HandlerId = null,
@@ -954,7 +956,7 @@ public class InventoryService(
                     cmd.Transaction = tx;
                     cmd.CommandText = @"INSERT INTO FINISH_INBOUND
                         (ORDER_ID, MATERIAL_ID, VERSION_ID, FINISH_QTY, QUALIFIED_QTY, BATCH_NO, INBOUND_TIME, OPERATOR_ID)
-                        VALUES (:orderId,  :materialId, :versionId, :finishQty, :qualifiedQty, :batchNo, SYSDATE, :operatorId)
+                        VALUES (:orderId,  :materialId, :versionId, :finishQty, :qualifiedQty, :batchNo, SYS_EXTRACT_UTC(SYSTIMESTAMP), :operatorId)
                         RETURNING INBOUND_ID INTO :newId";
                     cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
                     cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
@@ -995,7 +997,7 @@ public class InventoryService(
                             LockQty = lockQty,
                             Status = StockLockStatus.ConsumedEnum,
                             LockTime = DateTime.MinValue,
-                            ReleaseTime = DateTime.Now,
+                            ReleaseTime = DateTime.UtcNow,
                             OperatorId = request.OperatorId,
                         });
 
@@ -1009,7 +1011,7 @@ public class InventoryService(
                 {
                     updCmd.Transaction = tx;
                     updCmd.CommandText = @"UPDATE STOCK_LOCK
-                        SET STATUS = :newStatus, RELEASE_TIME = SYSDATE
+                        SET STATUS = :newStatus, RELEASE_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                         WHERE ORDER_ID = :orderId AND STATUS = :expected";
                     updCmd.Parameters.Add(new OracleParameter("newStatus", StockLockStatusMap.Db.Consumed));
                     updCmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
@@ -1040,10 +1042,10 @@ public class InventoryService(
                         ON (ms.MATERIAL_ID = d.MAT_ID)
                         WHEN MATCHED THEN
                             UPDATE SET AVAILABLE_QTY = AVAILABLE_QTY + :qualifiedQty,
-                                       LAST_IN_DATE = SYSDATE
+                                       LAST_IN_DATE = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                         WHEN NOT MATCHED THEN
                             INSERT (MATERIAL_ID, AVAILABLE_QTY, LOCKED_QTY, LAST_IN_DATE)
-                            VALUES (:matId2, :qualifiedQty2, 0, SYSDATE)";
+                            VALUES (:matId2, :qualifiedQty2, 0, SYS_EXTRACT_UTC(SYSTIMESTAMP))";
                     finCmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
                     finCmd.Parameters.Add(new OracleParameter("qualifiedQty", request.QualifiedQty));
                     finCmd.Parameters.Add(new OracleParameter("matId2", request.MaterialId));
@@ -1075,7 +1077,7 @@ public class InventoryService(
         conn.Open();
 
         var allRecords = new List<MaterialShortageItem>();
-        var calcTime = DateTime.Now;
+        var calcTime = DateTime.UtcNow;
 
         try
         {
@@ -1138,8 +1140,8 @@ public class InventoryService(
         MaterialId = Convert.ToInt32(reader.GetValue(0)),
         AvailableQty = Convert.ToDouble(reader.GetValue(1)),
         LockedQty = Convert.ToDouble(reader.GetValue(2)),
-        LastInDate = reader.IsDBNull(3) ? null : reader.GetDateTime(3),
-        LastOutDate = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+        LastInDate = reader.IsDBNull(3) ? null : reader.GetUtcDateTime(3),
+        LastOutDate = reader.IsDBNull(4) ? null : reader.GetUtcDateTime(4),
     };
 
     private static InventoryAlertEvent MapAlert(OracleDataReader reader) => new()
@@ -1150,10 +1152,10 @@ public class InventoryService(
         AlertType = InventoryAlertEvent.AlertTypeEnum.LowStockEnum,
         AvailableQty = reader.GetDecimal(4),
         Threshold = reader.GetDecimal(5),
-        AlertTime = reader.GetDateTime(6),
+        AlertTime = reader.GetUtcDateTime(6),
         Status = InventoryAlertStatusMap.FromDb(reader.GetString(7)),
         HandlerId = reader.IsDBNull(8) ? null : Convert.ToInt64(reader.GetValue(8)),
-        HandleTime = reader.IsDBNull(9) ? null : reader.GetDateTime(9),
+        HandleTime = reader.IsDBNull(9) ? null : reader.GetUtcDateTime(9),
     };
 
     private static InventoryAlertEvent MapAlertFromInsert(
@@ -1178,8 +1180,8 @@ public class InventoryService(
         MaterialId = Convert.ToInt64(reader.GetValue(2)),
         MaterialName = reader.IsDBNull(3) ? null! : reader.GetString(3),
         LockQty = reader.GetDecimal(4),
-        LockTime = reader.GetDateTime(5),
-        ReleaseTime = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+        LockTime = reader.GetUtcDateTime(5),
+        ReleaseTime = reader.IsDBNull(6) ? null : reader.GetUtcDateTime(6),
         Status = StockLockStatusMap.FromDb(reader.GetString(7)),
         OperatorId = Convert.ToInt64(reader.GetValue(8)),
     };
@@ -1189,7 +1191,7 @@ public class InventoryService(
         DetectionId = Convert.ToInt64(reader.GetValue(0)),
         MaterialId = Convert.ToInt64(reader.GetValue(1)),
         MaterialName = reader.IsDBNull(2) ? null! : reader.GetString(2),
-        DetectTime = reader.GetDateTime(3),
+        DetectTime = reader.GetUtcDateTime(3),
         AvailableQty = reader.GetDecimal(4),
         LastOutDate = reader.IsDBNull(5) ? null : DateOnly.FromDateTime(reader.GetDateTime(5)),
         IdleDays = Convert.ToInt32(reader.GetValue(6)),
@@ -1213,7 +1215,7 @@ public class InventoryService(
             FinishQty = reader.GetDecimal(5),
             QualifiedQty = reader.GetDecimal(6),
             BatchNo = reader.IsDBNull(7) ? null! : reader.GetString(7),
-            InboundTime = reader.GetDateTime(8),
+            InboundTime = reader.GetUtcDateTime(8),
             OperatorId = Convert.ToInt64(reader.GetValue(9)),
             OperatorName = reader.IsDBNull(10) ? null! : reader.GetString(10),
             ConsumedLockRecords = consumedLocks,
@@ -1237,8 +1239,8 @@ public class InventoryService(
                 MaterialId = Convert.ToInt64(reader.GetValue(2)),
                 MaterialName = reader.IsDBNull(3) ? null! : reader.GetString(3),
                 LockQty = reader.GetDecimal(4),
-                LockTime = reader.GetDateTime(5),
-                ReleaseTime = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                LockTime = reader.GetUtcDateTime(5),
+                ReleaseTime = reader.IsDBNull(6) ? null : reader.GetUtcDateTime(6),
                 Status = StockLockStatusMap.FromDb(reader.GetString(7)),
                 OperatorId = Convert.ToInt64(reader.GetValue(8)),
             });

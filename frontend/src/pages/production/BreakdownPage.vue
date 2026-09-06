@@ -16,6 +16,7 @@ import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { formatDateTime } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
+import { toBusinessDateTimeInput } from '@/utils/time'
 import { useAuthStore } from '@/stores/auth'
 
 const pageSize = 10
@@ -114,7 +115,7 @@ function openUpdate(record?: FaultRecordItem) {
   }
   Object.assign(updateForm, {
     faultId: record?.faultId ?? 0,
-    recoverTime: record?.recoverTime ?? '',
+    recoverTime: toBusinessDateTimeInput(record?.recoverTime),
     repairerId: record?.repairerId ?? auth.currentUser?.id,
     status,
   })
@@ -309,10 +310,11 @@ onMounted(() => void loadLines())
         </el-form-item>
         <el-form-item v-if="updateForm.status === 'recovered'" label="恢复时间" prop="recoverTime">
           <el-date-picker
+            :show-now="false"
             v-model="updateForm.recoverTime"
             type="datetime"
             value-format="YYYY-MM-DDTHH:mm:ss"
-            placeholder="留空使用服务器时间"
+            placeholder="北京时间，留空使用当前时间"
             style="width: 100%"
           />
         </el-form-item>

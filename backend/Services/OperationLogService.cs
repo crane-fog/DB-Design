@@ -23,7 +23,7 @@ public class OperationLogService(string connString)
             Module = reader.GetString(1),
             Action = reader.GetString(2),
             OperatorId = Convert.ToInt32(reader.GetValue(3)),
-            OperateTime = reader.GetDateTime(4),
+            OperateTime = reader.GetUtcDateTime(4),
             IpAddress = reader.IsDBNull(5) ? null! : reader.GetString(5),
         };
         if (!reader.IsDBNull(6)) log.BeforeData = ParseJsonObject(reader.GetString(6));
@@ -123,7 +123,7 @@ public class OperationLogService(string connString)
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"INSERT INTO OPERATION_LOG (MODULE, ACTION, OPERATOR_ID, OPERATE_TIME, IP_ADDRESS, BEFORE_DATA, AFTER_DATA)
-                            VALUES (:module, :action, :operatorId, SYSTIMESTAMP, :ipAddress, :beforeData, :afterData)
+                            VALUES (:module, :action, :operatorId, SYS_EXTRACT_UTC(SYSTIMESTAMP), :ipAddress, :beforeData, :afterData)
                             RETURNING LOG_ID INTO :logId";
         // MODULE / ACTION 为 VARCHAR2(50)，超长会触发 ORA-12899；写入前截断防御
         var module = Truncate(request.Module.Trim(), 50);

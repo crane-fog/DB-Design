@@ -249,7 +249,7 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                            @"INSERT INTO LINE_STATUS
                              (LINE_ID, STATUS, CURRENT_ORDER_ID, CURRENT_MATERIAL_ID,
                               FINISHED_QTY, EFFICIENCY, UPDATED_TIME)
-                             VALUES (:lineId, :status, NULL, NULL, 0, 0, SYSTIMESTAMP)",
+                             VALUES (:lineId, :status, NULL, NULL, 0, 0, SYS_EXTRACT_UTC(SYSTIMESTAMP))",
                            transaction))
                 {
                     statusCommand.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
@@ -421,7 +421,7 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                            @"INSERT INTO FAULT_RECORD
                              (LINE_ID, FAULT_TYPE, DESCRIPTION, OCCUR_TIME, RECOVER_TIME,
                               STATUS, REPORTER_ID, REPAIRER_ID)
-                             VALUES (:lineId, :faultType, :description, SYSTIMESTAMP, NULL,
+                             VALUES (:lineId, :faultType, :description, SYS_EXTRACT_UTC(SYSTIMESTAMP), NULL,
                                      :status, :reporterId, NULL)
                              RETURNING FAULT_ID INTO :newId",
                            transaction))
@@ -547,7 +547,7 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                                           THEN CASE
                                               WHEN :currentStatus = '已恢复'
                                               THEN NVL(:recoverTime, RECOVER_TIME)
-                                              ELSE NVL(:recoverTime, SYSTIMESTAMP)
+                                              ELSE NVL(:recoverTime, SYS_EXTRACT_UTC(SYSTIMESTAMP))
                                           END
                                           ELSE NULL
                                      END
@@ -739,13 +739,13 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                                  target.CURRENT_MATERIAL_ID = :currentMaterialId,
                                  target.FINISHED_QTY = :finishedQty,
                                  target.EFFICIENCY = NVL(:efficiency, target.EFFICIENCY),
-                                 target.UPDATED_TIME = SYSTIMESTAMP
+                                 target.UPDATED_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                              WHEN NOT MATCHED THEN INSERT
                                  (LINE_ID, STATUS, CURRENT_ORDER_ID, CURRENT_MATERIAL_ID,
                                   FINISHED_QTY, EFFICIENCY, UPDATED_TIME)
                              VALUES
                                  (:lineId, :status, :currentOrderId, :currentMaterialId,
-                                  :finishedQty, NVL(:efficiency, 0), SYSTIMESTAMP)",
+                                  :finishedQty, NVL(:efficiency, 0), SYS_EXTRACT_UTC(SYSTIMESTAMP))",
                            transaction))
                 {
                     command.Parameters.Add("lineId", OracleDbType.Int64).Value = request.LineId;
@@ -868,8 +868,8 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
         LineId = Convert.ToInt64(reader.GetValue(1)),
         FaultType = reader.GetString(2),
         Description = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-        OccurTime = reader.GetDateTime(4),
-        RecoverTime = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
+        OccurTime = reader.GetUtcDateTime(4),
+        RecoverTime = reader.IsDBNull(5) ? null : reader.GetUtcDateTime(5),
         Status = FaultStatusMap.FromDb(reader.GetString(6)),
         ReporterId = Convert.ToInt64(reader.GetValue(7)),
         RepairerId = reader.IsDBNull(8) ? null : Convert.ToInt64(reader.GetValue(8)),
@@ -883,7 +883,7 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
         CurrentMaterialId = reader.IsDBNull(3) ? null : Convert.ToInt64(reader.GetValue(3)),
         FinishedQty = Convert.ToDecimal(reader.GetValue(4)),
         Efficiency = reader.IsDBNull(5) ? 0 : Convert.ToDecimal(reader.GetValue(5)),
-        UpdatedTime = reader.GetDateTime(6),
+        UpdatedTime = reader.GetUtcDateTime(6),
     };
 
     private static LineType? GetLineType(OracleConnection connection, long typeId)
@@ -1133,7 +1133,7 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
             connection,
             @"INSERT INTO LINE_OUTPUT_RECORD
               (LINE_ID, ORDER_ID, OUTPUT_QTY, RECORDED_TIME, OPERATOR_ID)
-              VALUES (:lineId, :orderId, :outputQty, SYSTIMESTAMP, :operatorId)",
+              VALUES (:lineId, :orderId, :outputQty, SYS_EXTRACT_UTC(SYSTIMESTAMP), :operatorId)",
             transaction);
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
         command.Parameters.Add("orderId", OracleDbType.Int64).Value =
@@ -1155,12 +1155,12 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
               ON (target.LINE_ID = source.LINE_ID)
               WHEN MATCHED THEN UPDATE SET
                   target.STATUS = :status,
-                  target.UPDATED_TIME = SYSTIMESTAMP
+                  target.UPDATED_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
               WHEN NOT MATCHED THEN INSERT
                   (LINE_ID, STATUS, CURRENT_ORDER_ID, CURRENT_MATERIAL_ID,
                    FINISHED_QTY, EFFICIENCY, UPDATED_TIME)
               VALUES
-                  (:lineId, :status, NULL, NULL, 0, 0, SYSTIMESTAMP)",
+                  (:lineId, :status, NULL, NULL, 0, 0, SYS_EXTRACT_UTC(SYSTIMESTAMP))",
             transaction);
         command.Parameters.Add("lineId", OracleDbType.Int64).Value = lineId;
         command.Parameters.Add("status", OracleDbType.Varchar2).Value =
@@ -1201,7 +1201,7 @@ public sealed class ProductionLineService(string connString) : IProductionLineSe
                   CURRENT_ORDER_ID = NULL,
                   CURRENT_MATERIAL_ID = NULL,
                   EFFICIENCY = 0,
-                  UPDATED_TIME = SYSTIMESTAMP
+                  UPDATED_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
               WHERE LINE_ID = :lineId",
             transaction);
         command.Parameters.Add("status", OracleDbType.Varchar2).Value =

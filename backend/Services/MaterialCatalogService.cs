@@ -57,8 +57,8 @@ public class MaterialStockIntegrationService(string connString) : IStockReadQuer
                 materialId,
                 reader.GetDecimal(1),
                 reader.GetDecimal(2),
-                reader.IsDBNull(3) ? null : reader.GetDateTime(3),
-                reader.IsDBNull(4) ? null : reader.GetDateTime(4));
+                reader.IsDBNull(3) ? null : reader.GetUtcDateTime(3),
+                reader.IsDBNull(4) ? null : reader.GetUtcDateTime(4));
         }
 
         return result;
@@ -358,7 +358,7 @@ public class MaterialCatalogService(
                                      DEFAULT_SUPPLIER_ID, CURRENT_VERSION_ID, CREATED_BY, CREATED_TIME, UPDATED_TIME)
                                     VALUES
                                     (:materialName, :materialType, :model, :unit, :categoryId, :safetyStock,
-                                     :defaultSupplierId, :currentVersionId, :createdBy, SYSTIMESTAMP, SYSTIMESTAMP)
+                                     :defaultSupplierId, :currentVersionId, :createdBy, SYS_EXTRACT_UTC(SYSTIMESTAMP), SYS_EXTRACT_UTC(SYSTIMESTAMP))
                                     RETURNING MATERIAL_ID INTO :newId";
                 AddMaterialWriteParameters(
                     cmd,
@@ -468,7 +468,7 @@ public class MaterialCatalogService(
                                         SAFETY_STOCK = :safetyStock,
                                         DEFAULT_SUPPLIER_ID = :defaultSupplierId,
                                         CURRENT_VERSION_ID = :currentVersionId,
-                                        UPDATED_TIME = SYSTIMESTAMP
+                                        UPDATED_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
                                     WHERE MATERIAL_ID = :materialId";
                 AddMaterialWriteParameters(
                     cmd,
@@ -557,8 +557,8 @@ public class MaterialCatalogService(
         JOIN MATERIAL_CATEGORY c ON c.CATEGORY_ID = m.CATEGORY_ID
         LEFT JOIN SUPPLIER s ON s.SUPPLIER_ID = m.DEFAULT_SUPPLIER_ID
         LEFT JOIN BOM_VERSION bv ON bv.VERSION_ID = m.CURRENT_VERSION_ID
-                                AND bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
-                                AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(SYSDATE))
+                                AND bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                                AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
         LEFT JOIN MATERIAL_STOCK ms ON ms.MATERIAL_ID = m.MATERIAL_ID";
 
     private static List<string> BuildMaterialWhere(
@@ -788,8 +788,8 @@ public class MaterialCatalogService(
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"SELECT MATERIAL_ID,
                                        CASE
-                                           WHEN EFFECTIVE_DATE <= TRUNC(SYSDATE)
-                                            AND (EXPIRE_DATE IS NULL OR EXPIRE_DATE >= TRUNC(SYSDATE))
+                                           WHEN EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                                            AND (EXPIRE_DATE IS NULL OR EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
                                            THEN 1 ELSE 0
                                        END AS IS_EFFECTIVE
                                 FROM BOM_VERSION
@@ -879,12 +879,12 @@ public class MaterialCatalogService(
         CurrentVersionId = reader.IsDBNull(10) ? null : Convert.ToInt32(reader.GetValue(10)),
         CurrentVersionNo = reader.IsDBNull(11) ? null! : reader.GetString(11),
         CreatedBy = Convert.ToInt32(reader.GetValue(12)),
-        CreatedTime = reader.GetDateTime(13),
-        UpdatedTime = reader.GetDateTime(14),
+        CreatedTime = reader.GetUtcDateTime(13),
+        UpdatedTime = reader.GetUtcDateTime(14),
         AvailableQty = reader.IsDBNull(15) ? 0 : decimal.ToDouble(reader.GetDecimal(15)),
         LockedQty = reader.IsDBNull(16) ? 0 : decimal.ToDouble(reader.GetDecimal(16)),
-        LastInDate = reader.IsDBNull(17) ? null : reader.GetDateTime(17),
-        LastOutDate = reader.IsDBNull(18) ? null : reader.GetDateTime(18),
+        LastInDate = reader.IsDBNull(17) ? null : reader.GetUtcDateTime(17),
+        LastOutDate = reader.IsDBNull(18) ? null : reader.GetUtcDateTime(18),
     };
 
     private static bool HasMaterialReferences(OracleConnection conn, long materialId) =>

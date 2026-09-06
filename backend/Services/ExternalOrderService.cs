@@ -131,7 +131,7 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
                                 (CUSTOMER_ID, MATERIAL_ID, QUANTITY, EXPECTED_DATE,
                                  CONTACT_PERSON, CONTACT_PHONE, STATUS, SUBMIT_TIME)
                                 VALUES (:customerId, :materialId, :quantity, :expectedDate,
-                                        :contactPerson, :contactPhone, :status, SYSTIMESTAMP)
+                                        :contactPerson, :contactPhone, :status, SYS_EXTRACT_UTC(SYSTIMESTAMP))
                                 RETURNING EXT_ORDER_ID INTO :newId";
             cmd.Parameters.Add(new OracleParameter("customerId", customerId));
             cmd.Parameters.Add(new OracleParameter("materialId", request.MaterialId));
@@ -429,7 +429,7 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
         ContactPerson = reader.IsDBNull(7) ? null! : reader.GetString(7),
         ContactPhone = reader.IsDBNull(8) ? null! : reader.GetString(8),
         Status = ExternalOrderStatusMap.FromDb(reader.GetString(9)),
-        SubmitTime = reader.GetDateTime(10),
+        SubmitTime = reader.GetUtcDateTime(10),
         ReviewComment = reader.IsDBNull(11) ? null! : reader.GetString(11),
     };
 
