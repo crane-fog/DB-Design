@@ -13092,14 +13092,15 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
          * @summary 查询登录日志
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
-         * @param {number} [userId] 用户编号。
+         * @param {string} [employeeNo] 用户工号，支持模糊匹配。
+         * @param {string} [userName] 用户姓名，支持模糊匹配。
          * @param {ListLoginRecordDataResultEnum} [result] 登录结果。
          * @param {string} [startTime] 登录开始时间。
          * @param {string} [endTime] 登录结束时间。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listLoginRecordData: async (page?: number, pageSize?: number, userId?: number, result?: ListLoginRecordDataResultEnum, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listLoginRecordData: async (page?: number, pageSize?: number, employeeNo?: string, userName?: string, result?: ListLoginRecordDataResultEnum, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/listLoginRecordData`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -13124,8 +13125,12 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
                 localVarQueryParameter['page_size'] = pageSize;
             }
 
-            if (userId !== undefined) {
-                localVarQueryParameter['user_id'] = userId;
+            if (employeeNo !== undefined) {
+                localVarQueryParameter['employee_no'] = employeeNo;
+            }
+
+            if (userName !== undefined) {
+                localVarQueryParameter['user_name'] = userName;
             }
 
             if (result !== undefined) {
@@ -13162,13 +13167,14 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {number} [pageSize] 每页数据数量。
          * @param {string} [module] 操作模块，支持模糊匹配。
          * @param {string} [action] 操作类型，支持模糊匹配。
-         * @param {number} [operatorId] 操作人编号。
+         * @param {string} [employeeNo] 操作人工号，支持模糊匹配。
+         * @param {string} [userName] 操作人姓名，支持模糊匹配。
          * @param {string} [startTime] 操作开始时间。
          * @param {string} [endTime] 操作结束时间。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listOperationLogData: async (page?: number, pageSize?: number, module?: string, action?: string, operatorId?: number, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listOperationLogData: async (page?: number, pageSize?: number, module?: string, action?: string, employeeNo?: string, userName?: string, startTime?: string, endTime?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/listOperationLogData`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -13201,8 +13207,12 @@ export const SystemApiAxiosParamCreator = function (configuration?: Configuratio
                 localVarQueryParameter['action'] = action;
             }
 
-            if (operatorId !== undefined) {
-                localVarQueryParameter['operator_id'] = operatorId;
+            if (employeeNo !== undefined) {
+                localVarQueryParameter['employee_no'] = employeeNo;
+            }
+
+            if (userName !== undefined) {
+                localVarQueryParameter['user_name'] = userName;
             }
 
             if (startTime !== undefined) {
@@ -13884,15 +13894,16 @@ export const SystemApiFp = function(configuration?: Configuration) {
          * @summary 查询登录日志
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
-         * @param {number} [userId] 用户编号。
+         * @param {string} [employeeNo] 用户工号，支持模糊匹配。
+         * @param {string} [userName] 用户姓名，支持模糊匹配。
          * @param {ListLoginRecordDataResultEnum} [result] 登录结果。
          * @param {string} [startTime] 登录开始时间。
          * @param {string} [endTime] 登录结束时间。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listLoginRecordData(page?: number, pageSize?: number, userId?: number, result?: ListLoginRecordDataResultEnum, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginLogPageResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listLoginRecordData(page, pageSize, userId, result, startTime, endTime, options);
+        async listLoginRecordData(page?: number, pageSize?: number, employeeNo?: string, userName?: string, result?: ListLoginRecordDataResultEnum, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginLogPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listLoginRecordData(page, pageSize, employeeNo, userName, result, startTime, endTime, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['SystemApi.listLoginRecordData']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -13904,14 +13915,15 @@ export const SystemApiFp = function(configuration?: Configuration) {
          * @param {number} [pageSize] 每页数据数量。
          * @param {string} [module] 操作模块，支持模糊匹配。
          * @param {string} [action] 操作类型，支持模糊匹配。
-         * @param {number} [operatorId] 操作人编号。
+         * @param {string} [employeeNo] 操作人工号，支持模糊匹配。
+         * @param {string} [userName] 操作人姓名，支持模糊匹配。
          * @param {string} [startTime] 操作开始时间。
          * @param {string} [endTime] 操作结束时间。
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listOperationLogData(page?: number, pageSize?: number, module?: string, action?: string, operatorId?: number, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OperationLogPageResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listOperationLogData(page, pageSize, module, action, operatorId, startTime, endTime, options);
+        async listOperationLogData(page?: number, pageSize?: number, module?: string, action?: string, employeeNo?: string, userName?: string, startTime?: string, endTime?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OperationLogPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listOperationLogData(page, pageSize, module, action, employeeNo, userName, startTime, endTime, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['SystemApi.listOperationLogData']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -14186,7 +14198,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
          * @throws {RequiredError}
          */
         listLoginRecordData(requestParameters: SystemApiListLoginRecordDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginLogPageResponse> {
-            return localVarFp.listLoginRecordData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.result, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
+            return localVarFp.listLoginRecordData(requestParameters.page, requestParameters.pageSize, requestParameters.employeeNo, requestParameters.userName, requestParameters.result, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
         },
         /**
          * 分页查询系统操作日志。需具备 system:audit:operation:view；未登录或登录失效返回 code 401；权限不足返回 code 403。日志为追踪写入，正式业务不提供修改或删除接口。
@@ -14196,7 +14208,7 @@ export const SystemApiFactory = function (configuration?: Configuration, basePat
          * @throws {RequiredError}
          */
         listOperationLogData(requestParameters: SystemApiListOperationLogDataRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<OperationLogPageResponse> {
-            return localVarFp.listOperationLogData(requestParameters.page, requestParameters.pageSize, requestParameters.module, requestParameters.action, requestParameters.operatorId, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
+            return localVarFp.listOperationLogData(requestParameters.page, requestParameters.pageSize, requestParameters.module, requestParameters.action, requestParameters.employeeNo, requestParameters.userName, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(axios, basePath));
         },
         /**
          * 分页查询只读权限目录。需具备 system:permission:view；权限码是稳定的系统契约，不通过运行时接口新增、修改或删除。
@@ -14391,9 +14403,14 @@ export interface SystemApiListLoginRecordDataRequest {
     readonly pageSize?: number
 
     /**
-     * 用户编号。
+     * 用户工号，支持模糊匹配。
      */
-    readonly userId?: number
+    readonly employeeNo?: string
+
+    /**
+     * 用户姓名，支持模糊匹配。
+     */
+    readonly userName?: string
 
     /**
      * 登录结果。
@@ -14436,9 +14453,14 @@ export interface SystemApiListOperationLogDataRequest {
     readonly action?: string
 
     /**
-     * 操作人编号。
+     * 操作人工号，支持模糊匹配。
      */
-    readonly operatorId?: number
+    readonly employeeNo?: string
+
+    /**
+     * 操作人姓名，支持模糊匹配。
+     */
+    readonly userName?: string
 
     /**
      * 操作开始时间。
@@ -14758,7 +14780,7 @@ export class SystemApi extends BaseAPI {
      * @throws {RequiredError}
      */
     public listLoginRecordData(requestParameters: SystemApiListLoginRecordDataRequest = {}, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).listLoginRecordData(requestParameters.page, requestParameters.pageSize, requestParameters.userId, requestParameters.result, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
+        return SystemApiFp(this.configuration).listLoginRecordData(requestParameters.page, requestParameters.pageSize, requestParameters.employeeNo, requestParameters.userName, requestParameters.result, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -14769,7 +14791,7 @@ export class SystemApi extends BaseAPI {
      * @throws {RequiredError}
      */
     public listOperationLogData(requestParameters: SystemApiListOperationLogDataRequest = {}, options?: RawAxiosRequestConfig) {
-        return SystemApiFp(this.configuration).listOperationLogData(requestParameters.page, requestParameters.pageSize, requestParameters.module, requestParameters.action, requestParameters.operatorId, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
+        return SystemApiFp(this.configuration).listOperationLogData(requestParameters.page, requestParameters.pageSize, requestParameters.module, requestParameters.action, requestParameters.employeeNo, requestParameters.userName, requestParameters.startTime, requestParameters.endTime, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
