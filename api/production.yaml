@@ -94,7 +94,11 @@ paths:
   /api/updateProductionOrder:
     post:
       summary: 修改生产订单计划
-      description: 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
+      description: >
+        修改生产订单。pending_review 状态下可修改产品、BOM 版本、计划数量和计划起止日期；
+        pending_schedule 状态下物料已经锁定，material_id、version_id 和 plan_qty 必须与订单当前值一致，
+        仅允许调整计划起止日期。需具备 production:order:update；状态不允许修改或审核后试图修改
+        物料需求字段时返回 code 409。
       operationId: updateProductionOrder
       tags: [production]
       security:
@@ -112,10 +116,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/previewProductionOrderMaterialLock:
+    post:
+      summary: 预览生产订单物料锁定
+      description: >
+        根据 pending_review 生产订单选定的 BOM 版本和计划数量，计算该 BOM 的直接子项物料需求，
+        展示订单已有有效锁定、本次待锁定数量、当前可用库存和库存缺口，不修改订单或库存。
+        物料需求按 BOM 损耗率计算并汇总到 material_id；缺少 BOM 明细、BOM 数据非法或订单状态非法时
+        返回 code 409。需具备 production:order:approve，不额外要求库存锁定权限。
+      operationId: previewProductionOrderMaterialLock
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderMaterialLockPreviewRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderMaterialLockPreviewResponse'
   /api/approveProductionOrder:
     post:
       summary: 审核生产订单
-      description: 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
+      description: >
+        审核 pending_review 生产订单。approved=true 时，后端必须重新计算该订单 BOM 直接子项的
+        物料需求，在同一个事务中锁定尚未锁定的需求差额并将订单置为 pending_schedule；任一物料库存
+        不足时返回 code 409，库存和订单状态均不得改变。approved=false 时将订单置为 cancelled，
+        不创建库存锁定。审核人从当前登录用户推导，整个操作仅需 production:order:approve，
+        不额外要求库存锁定权限。
       operationId: approveProductionOrder
       tags: [production]
       security:
@@ -136,7 +170,10 @@ paths:
   /api/startProductionOrder:
     post:
       summary: 开始生产订单
-      description: 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
+      description: >
+        将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。开工前后端必须校验
+        订单的有效库存锁定完整覆盖当前 BOM 直接子项需求；锁定不完整时返回 code 409，订单状态不变。
+        需具备 production:order:start；非法状态返回 code 409。
       operationId: startProductionOrder
       tags: [production]
       security:
@@ -207,7 +244,11 @@ paths:
   /api/cancelProductionOrder:
     post:
       summary: 取消生产订单
-      description: 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
+      description: >
+        将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为
+        cancelled。后端必须在同一个事务中释放该订单全部 locked 状态的库存锁定，减少 locked_qty 并
+        恢复 available_qty；任一步失败时订单状态和库存均不得改变。需具备 production:order:cancel；
+        已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
       operationId: cancelProductionOrder
       tags: [production]
       security:
@@ -729,7 +770,10 @@ components:
   schemas:
     ProductionOrderStatus:
       type: string
-      description: 生产订单状态。pending_review 待审核，可审核或取消；pending_schedule 待排产，可修改、开始或取消；in_progress 生产中，可完工或取消；completed 已完工，流程结束；cancelled 已取消，流程结束。
+      description: >
+        生产订单状态。pending_review 待审核，可修改、预览物料锁定、审核或取消；pending_schedule
+        待排产且物料已经锁定，仅可修改计划日期、开始或取消；in_progress 生产中，可报工或取消；
+        completed 已完工，流程结束；cancelled 已取消，流程结束。
       enum: [pending_review, pending_schedule, in_progress, completed, cancelled]
     ExternalOrderStatus:
       type: string
@@ -833,6 +877,109 @@ components:
             order_id:
               type: integer
               format: int64
+      description: >
+        pending_review 状态允许修改全部计划字段；pending_schedule 状态仅允许修改 plan_start 和
+        plan_end，其他字段仍需传入且必须与订单当前值一致。
+    ProductionOrderMaterialLockPreviewRequest:
+      type: object
+      required: [order_id]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+          minimum: 1
+      description: 物料需求完全由生产订单推导，客户端不得提交物料明细或操作人。
+    ProductionOrderMaterialLockItem:
+      type: object
+      required:
+        - material_id
+        - material_name
+        - unit
+        - bom_quantity
+        - loss_rate
+        - required_qty
+        - locked_qty
+        - pending_lock_qty
+        - available_qty
+        - shortage_qty
+      properties:
+        material_id:
+          type: integer
+          format: int64
+          readOnly: true
+        material_name:
+          type: string
+          readOnly: true
+        unit:
+          type: string
+          readOnly: true
+        bom_quantity:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: BOM 中生产一件父项所需的直接子项净用量。
+        loss_rate:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          maximum: 1
+          exclusiveMaximum: true
+        required_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: >
+            订单完整需求量。按 plan_qty * bom_quantity / (1 - loss_rate) 计算，并向上保留两位小数；
+            同一物料存在多条直接 BOM 明细时按 material_id 汇总。
+        locked_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 该订单已经持有的 locked 状态库存数量。
+        pending_lock_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 本次审核通过时需要补充锁定的数量，等于 max(required_qty - locked_qty, 0)。
+        available_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 当前未被其他订单锁定的可用库存数量。
+        shortage_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 当前锁定缺口，等于 max(pending_lock_qty - available_qty, 0)。
+    ProductionOrderMaterialLockPreview:
+      type: object
+      required: [order_id, can_approve, items]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+          readOnly: true
+        can_approve:
+          type: boolean
+          readOnly: true
+          description: 所有直接子项 shortage_qty 均为 0 时为 true。
+        items:
+          type: array
+          readOnly: true
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ProductionOrderMaterialLockItem'
+      description: >
+        仅用于审核前展示，不预留库存。若订单存在不属于当前直接 BOM 的有效锁定，或某物料有效锁定
+        超过 required_qty，后端返回 code 409，要求先修正异常锁定记录。
     ProductionOrderApproveRequest:
       type: object
       required: [order_id, approved]
@@ -846,7 +993,10 @@ components:
         review_comment:
           type: string
           nullable: true
-      description: 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+      description: >
+        审核人从当前登录用户推导，客户端不得传 reviewer_id。approved=true 时物料明细也由订单和
+        BOM 推导，客户端不得提交锁定数量；后端重新校验库存并只补充 required_qty 与已有有效锁定
+        之间的差额。
     ProductionOrderActionRequest:
       type: object
       required: [order_id]
@@ -1483,6 +1633,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ProductionOrderDetail'
+    ProductionOrderMaterialLockPreviewResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionOrderMaterialLockPreview'
     ProductionCompletionReportResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'

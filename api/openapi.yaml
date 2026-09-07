@@ -135,6 +135,8 @@ paths:
     $ref: './production.yaml#/paths/~1api~1addProductionOrder'
   /api/updateProductionOrder:
     $ref: './production.yaml#/paths/~1api~1updateProductionOrder'
+  /api/previewProductionOrderMaterialLock:
+    $ref: './production.yaml#/paths/~1api~1previewProductionOrderMaterialLock'
   /api/approveProductionOrder:
     $ref: './production.yaml#/paths/~1api~1approveProductionOrder'
   /api/startProductionOrder:
