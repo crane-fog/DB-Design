@@ -540,7 +540,7 @@ paths:
   /api/listExternalOrder:
     get:
       summary: 查询外部订单列表
-      description: 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+      description: 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_name 模糊过滤；仅具备 external-order:view-own 时忽略客户名并强制查询当前用户自己的订单；两项权限均无时返回 code 403。
       operationId: listExternalOrder
       tags: [production]
       security:
@@ -548,13 +548,12 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: customer_id
+        - name: customer_name
           in: query
           required: false
-          description: 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
+          description: 仅具备 external-order:view-all 时作为客户名称模糊过滤条件；仅具备 external-order:view-own 时忽略该参数。
           schema:
-            type: integer
-            format: int64
+            type: string
         - name: status
           in: query
           required: false
@@ -567,10 +566,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExternalOrderPageResponse'
+  /api/listExternalOrderFormOptions:
+    get:
+      summary: 查询外部订单表单选项
+      description: >
+        返回提交外部订单所需的下拉选项，复用 external-order:create-own 或
+        external-order:create-for-customer 权限，不增加新的权限种类。产品物料仅返回成品。
+        仅具备 create-own 的外部客户只能为自己提交，customers 固定返回空数组；具备
+        create-for-customer 的内部用户可获得状态有效且具有“外部客户”角色的用户列表，
+        提交时必须从中选择 customer_id。
+      operationId: listExternalOrderFormOptions
+      tags: [production]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderFormOptionsResponse'
   /api/addExternalOrder:
     post:
       summary: 外部客户提交订单
-      description: 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
+      description: 提交产品预订订单，初始状态为 pending_review。仅具备 external-order:create-own 的外部客户只能为当前用户提交且不得传 customer_id；具备 external-order:create-for-customer 的内部用户代录时必须传表单选项中的 customer_id；两项权限均无时返回 code 403。
       operationId: addExternalOrder
       tags: [production]
       security:
@@ -1385,6 +1404,55 @@ components:
               nullable: true
               readOnly: true
               description: 已交货订单对应的整单交货记录，尚未交货时为 null。
+    ExternalOrderCustomerOption:
+      type: object
+      required: [user_id, employee_no, user_name]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          readOnly: true
+        employee_no:
+          type: string
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+      description: 状态有效且具有“外部客户”角色的用户，仅向具备 external-order:create-for-customer 的调用方返回。
+    ExternalOrderMaterialOption:
+      type: object
+      required: [material_id, material_name, model, unit]
+      properties:
+        material_id:
+          type: integer
+          format: int64
+          readOnly: true
+        material_name:
+          type: string
+          readOnly: true
+        model:
+          type: string
+          readOnly: true
+        unit:
+          type: string
+          readOnly: true
+      description: 可用于提交外部订单的成品物料。
+    ExternalOrderFormOptions:
+      type: object
+      required: [customers, materials]
+      properties:
+        customers:
+          type: array
+          readOnly: true
+          description: 管理员可代录的外部客户；仅具备 create-own 权限时为空数组。
+          items:
+            $ref: '#/components/schemas/ExternalOrderCustomerOption'
+        materials:
+          type: array
+          readOnly: true
+          description: 可下单的全部成品物料。
+          items:
+            $ref: '#/components/schemas/ExternalOrderMaterialOption'
     ExternalOrderCreateRequest:
       type: object
       required: [material_id, quantity, expected_date, contact_person, contact_phone]
@@ -1393,7 +1461,7 @@ components:
           type: integer
           format: int64
           nullable: true
-          description: 使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。
+          description: 仅具备 external-order:create-own 时不得传并由当前登录用户推导；具备 external-order:create-for-customer 时必须传，且必须是表单选项中状态有效的外部客户。
         material_id:
           type: integer
           format: int64
@@ -1408,7 +1476,7 @@ components:
           type: string
         contact_phone:
           type: string
-      description: 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时可传 customer_id。
+      description: 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时必须传 customer_id。
     ExternalOrderReviewRequest:
       type: object
       required: [ext_order_id, accepted]
@@ -1886,6 +1954,14 @@ components:
                       type: array
                       items:
                         $ref: '#/components/schemas/ExternalOrderListItem'
+    ExternalOrderFormOptionsResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ExternalOrderFormOptions'
     ExternalOrderConvertResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'

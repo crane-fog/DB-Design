@@ -171,6 +171,8 @@ paths:
     $ref: './production.yaml#/paths/~1api~1estimateProductionCapacity'
   /api/listExternalOrder:
     $ref: './production.yaml#/paths/~1api~1listExternalOrder'
+  /api/listExternalOrderFormOptions:
+    $ref: './production.yaml#/paths/~1api~1listExternalOrderFormOptions'
   /api/addExternalOrder:
     $ref: './production.yaml#/paths/~1api~1addExternalOrder'
   /api/reviewExternalOrder:
