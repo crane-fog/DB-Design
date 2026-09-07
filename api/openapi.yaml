@@ -141,6 +141,8 @@ paths:
     $ref: './production.yaml#/paths/~1api~1startProductionOrder'
   /api/finishProductionOrder:
     $ref: './production.yaml#/paths/~1api~1finishProductionOrder'
+  /api/reportProductionCompletion:
+    $ref: './production.yaml#/paths/~1api~1reportProductionCompletion'
   /api/cancelProductionOrder:
     $ref: './production.yaml#/paths/~1api~1cancelProductionOrder'
   /api/listProductionLine:
