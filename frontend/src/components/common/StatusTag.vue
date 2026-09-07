@@ -11,6 +11,7 @@ const { labels = {}, value } = defineProps<{
 const defaults: Record<string, { label: string; tone: StatusTone }> = {
   cancelled: { label: '已取消', tone: 'neutral' },
   completed: { label: '已完成', tone: 'success' },
+  delivered: { label: '已交货', tone: 'success' },
   disabled: { label: '停用', tone: 'neutral' },
   draft: { label: '草稿', tone: 'neutral' },
   fault: { label: '故障', tone: 'danger' },

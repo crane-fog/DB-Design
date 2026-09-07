@@ -45,7 +45,7 @@ public static class ProductionStatusMap
 }
 
 /// <summary>
-/// 外部订单状态映射：数据库中文状态与 API 英文枚举之间的转换，包含审核、接受、转换和拒绝状态。
+/// 外部订单状态映射：数据库中文状态与 API 英文枚举之间的转换，包含审核、接受、转换、交货和拒绝状态。
 /// </summary>
 public static class ExternalOrderStatusMap
 {
@@ -55,6 +55,7 @@ public static class ExternalOrderStatusMap
         public const string PendingReview = "待审核";
         public const string Accepted = "已接受";
         public const string Converted = "已转换";
+        public const string Delivered = "已交货";
         public const string Rejected = "已拒绝";
     }
 
@@ -63,6 +64,7 @@ public static class ExternalOrderStatusMap
         [Db.PendingReview] = ExternalOrderStatus.PendingReviewEnum,
         [Db.Accepted] = ExternalOrderStatus.AcceptedEnum,
         [Db.Converted] = ExternalOrderStatus.ConvertedEnum,
+        [Db.Delivered] = ExternalOrderStatus.DeliveredEnum,
         [Db.Rejected] = ExternalOrderStatus.RejectedEnum,
     };
 

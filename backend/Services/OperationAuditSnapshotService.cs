@@ -182,6 +182,17 @@ public sealed class OperationAuditSnapshotService(string connString)
                   WHERE EOP.EXT_ORDER_ID = :id
                   ORDER BY PO.ORDER_ID",
                 ("id", orderId)),
+            ["delivery"] = QueryOne(
+                connection,
+                "SELECT * FROM EXTERNAL_ORDER_DELIVERY WHERE EXT_ORDER_ID = :id",
+                ("id", orderId))!,
+            ["material_stock"] = QueryOne(
+                connection,
+                @"SELECT MS.*
+                  FROM MATERIAL_STOCK MS
+                  JOIN EXTERNAL_ORDER EO ON EO.MATERIAL_ID = MS.MATERIAL_ID
+                  WHERE EO.EXT_ORDER_ID = :id",
+                ("id", orderId))!,
         };
     }
 

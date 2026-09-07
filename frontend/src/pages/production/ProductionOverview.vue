@@ -70,19 +70,16 @@ const shortcuts: OverviewShortcut[] = [
     title: '故障反馈',
   },
   {
-    description: '处理外部订单、交付评估、产能检测与平衡。',
+    description: '提交、审核、转换并交付外部订单。',
     icon: Van,
     permissions: [
       PermissionCode.ExternalOrderViewOwn,
       PermissionCode.ExternalOrderViewAll,
       PermissionCode.ExternalOrderCreateOwn,
       PermissionCode.ExternalOrderCreateForCustomer,
-      PermissionCode.ProductionCapacityEstimate,
-      PermissionCode.ProductionCapacityDetect,
-      PermissionCode.ProductionCapacityBalance,
     ],
     route: '/production/operations',
-    title: '生产运营',
+    title: '外部订单',
   },
 ]
 

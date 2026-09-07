@@ -24,7 +24,7 @@ public class ExternalOrderController(
     public IActionResult List(
         [FromQuery(Name = "page")] int? page,
         [FromQuery(Name = "page_size")] int? pageSize,
-        [FromQuery(Name = "customer_id")] long? customerId,
+        [FromQuery(Name = "customer_name")] string? customerName,
         [FromQuery(Name = "status")] ExternalOrderStatus? status)
     {
         AuthResult auth = authorization.RequireAnyPermission(
@@ -37,13 +37,17 @@ public class ExternalOrderController(
         }
 
         CurrentUser user = auth.User!;
-        long? effectiveCustomerId = user.HasPermission(PermissionCode.ExternalOrderViewAllEnum)
-            ? customerId
-            : user.UserId;
+        bool canViewAll = user.HasPermission(PermissionCode.ExternalOrderViewAllEnum);
+        long? effectiveCustomerId = canViewAll ? null : user.UserId;
+        string? effectiveCustomerName = canViewAll ? customerName : null;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = externalOrderService.List(
-            currentPage, size, effectiveCustomerId, ExternalOrderStatusMap.ToDbOrNull(status));
+            currentPage,
+            size,
+            effectiveCustomerId,
+            effectiveCustomerName,
+            ExternalOrderStatusMap.ToDbOrNull(status));
 
         return Ok(new ExternalOrderPageResponse
         {
@@ -57,6 +61,32 @@ public class ExternalOrderController(
                 Records = records,
             },
         });
+    }
+
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("listExternalOrderFormOptions")]
+    public IActionResult ListFormOptions()
+    {
+        AuthResult auth = authorization.RequireAnyPermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ExternalOrderCreateForCustomerEnum,
+            PermissionCode.ExternalOrderCreateOwnEnum);
+        if (!auth.Ok)
+        {
+            return Ok(FormOptionsResp(
+                (ExternalOrderFormOptionsResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权查询外部订单表单选项",
+                null));
+        }
+
+        bool includeCustomers = auth.User!.HasPermission(
+            PermissionCode.ExternalOrderCreateForCustomerEnum);
+        ExternalOrderFormOptions options = externalOrderService.GetFormOptions(includeCustomers);
+        return Ok(FormOptionsResp(
+            ExternalOrderFormOptionsResponse.CodeEnum._200Enum,
+            "查询成功",
+            options));
     }
 
     [HttpPost]
@@ -81,22 +111,37 @@ public class ExternalOrderController(
         }
 
         CurrentUser user = auth.User!;
+        bool canCreateForCustomer = user.HasPermission(
+            PermissionCode.ExternalOrderCreateForCustomerEnum);
         long customerId;
-        if (user.HasPermission(PermissionCode.ExternalOrderCreateForCustomerEnum)
-            && request.CustomerId is not null and not 0)
+        if (canCreateForCustomer)
         {
+            if (request.CustomerId is null or <= 0)
+            {
+                return Ok(Single(
+                    ExternalOrderResponse.CodeEnum._400Enum,
+                    "代录外部订单必须选择客户",
+                    null));
+            }
+
             customerId = request.CustomerId.Value;
-        }
-        else if (user.HasPermission(PermissionCode.ExternalOrderCreateOwnEnum))
-        {
-            customerId = user.UserId;
         }
         else
         {
-            return Ok(Single(ExternalOrderResponse.CodeEnum._400Enum, "代录外部订单需指定客户", null));
+            if (request.CustomerId is not null and not 0)
+            {
+                return Ok(Single(
+                    ExternalOrderResponse.CodeEnum._400Enum,
+                    "外部客户只能为本人提交订单",
+                    null));
+            }
+
+            customerId = user.UserId;
         }
 
-        return FromResult(externalOrderService.Create(request, customerId), "提交成功");
+        return FromResult(
+            externalOrderService.Create(request, customerId, canCreateForCustomer),
+            "提交成功");
     }
 
     [HttpPost]
@@ -150,6 +195,48 @@ public class ExternalOrderController(
         return Ok(ConvertResp(code, outcome.ErrorMessage ?? "转换失败", null));
     }
 
+    [HttpPost]
+    [Consumes("application/json")]
+    [Produces("application/json")]
+    [Route("deliverExternalOrder")]
+    [OperationAudit("外部订单", "整单交货", OperationAuditSnapshotKind.ExternalOrder)]
+    [RequireJsonFields("ext_order_id")]
+    public IActionResult Deliver([FromBody] ExternalOrderDeliveryRequest? request)
+    {
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ExternalOrderConvertEnum);
+        if (!auth.Ok)
+        {
+            return Ok(DeliveryResp(
+                (ExternalOrderDeliveryResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权交付外部订单",
+                null));
+        }
+
+        if (request is null)
+        {
+            return Ok(DeliveryResp(
+                ExternalOrderDeliveryResponse.CodeEnum._400Enum,
+                "请求体不能为空",
+                null));
+        }
+
+        ExternalOrderDeliveryOutcome outcome = externalOrderService.Deliver(
+            request.ExtOrderId,
+            auth.User!.UserId);
+        if (outcome.Ok)
+        {
+            return Ok(DeliveryResp(
+                ExternalOrderDeliveryResponse.CodeEnum._200Enum,
+                "交货成功",
+                outcome.Result));
+        }
+
+        var code = (ExternalOrderDeliveryResponse.CodeEnum)outcome.ErrorCode;
+        return Ok(DeliveryResp(code, outcome.ErrorMessage ?? "交货失败", null));
+    }
+
     private IActionResult? RequirePermission(PermissionCode permissionCode)
     {
         AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
@@ -189,10 +276,30 @@ public class ExternalOrderController(
             Data = data!,
         };
 
+    private static ExternalOrderFormOptionsResponse FormOptionsResp(
+        ExternalOrderFormOptionsResponse.CodeEnum code,
+        string message,
+        ExternalOrderFormOptions? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
     private static ExternalOrderConvertResponse ConvertResp(
         ExternalOrderConvertResponse.CodeEnum code,
         string message,
         ExternalOrderConvertResult? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static ExternalOrderDeliveryResponse DeliveryResp(
+        ExternalOrderDeliveryResponse.CodeEnum code,
+        string message,
+        ExternalOrderDeliveryResult? data) => new()
         {
             Code = code,
             Message = message,

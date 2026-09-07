@@ -15,6 +15,10 @@ import type {
   CapacityDetection,
   ExternalOrder,
   ExternalOrderConvertResult,
+  ExternalOrderDelivery,
+  ExternalOrderDeliveryResult,
+  ExternalOrderFormOptions,
+  ExternalOrderListItem,
   FaultRecord,
   FaultStatus,
   LineType,
@@ -78,7 +82,7 @@ export interface LineTypeQuery extends PageRequest {
 }
 
 export interface ExternalOrderQuery extends PageRequest {
-  customerId?: number
+  customerName?: string
   status?: ExternalOrderStatusValue
 }
 
@@ -208,6 +212,9 @@ export interface ExternalOrderItem {
   contactPhone: string
   customerId: number
   customerName?: string
+  delivery?: ExternalOrderDeliveryItem
+  deliveryBlockReason?: string
+  deliveryReady: boolean
   expectedDate: string
   extOrderId: number
   materialId: number
@@ -216,6 +223,48 @@ export interface ExternalOrderItem {
   reviewComment?: string
   status: ExternalOrderStatusValue
   submitTime: string
+  productionOrders: ExternalOrderProductionOrderItem[]
+}
+
+export interface ExternalOrderProductionOrderItem {
+  finishedQty?: number
+  materialId: number
+  materialName?: string
+  orderId: number
+  planQty: number
+  status: ProductionOrderStatus
+}
+
+export interface ExternalOrderDeliveryItem {
+  deliveryId: number
+  deliveryTime: string
+  operatorId: number
+  operatorName?: string
+  quantity: number
+}
+
+export interface ExternalOrderDeliveryResultItem {
+  delivery: ExternalOrderDeliveryItem
+  externalOrder: ExternalOrderItem
+  remainingAvailableQty: number
+}
+
+export interface ExternalOrderCustomerOptionItem {
+  employeeNo: string
+  userId: number
+  userName: string
+}
+
+export interface ExternalOrderMaterialOptionItem {
+  materialId: number
+  materialName: string
+  model: string
+  unit: string
+}
+
+export interface ExternalOrderFormOptionsItem {
+  customers: ExternalOrderCustomerOptionItem[]
+  materials: ExternalOrderMaterialOptionItem[]
 }
 
 export interface ExternalOrderCreateFormData {
@@ -411,14 +460,50 @@ function toExternalOrder(order: ExternalOrder): ExternalOrderItem {
     contactPhone: order.contact_phone,
     customerId: order.customer_id,
     customerName: optionalText(order.customer_name),
+    delivery: undefined,
+    deliveryBlockReason: undefined,
+    deliveryReady: false,
     expectedDate: order.expected_date,
     extOrderId: order.ext_order_id,
     materialId: order.material_id,
     materialName: optionalText(order.material_name),
+    productionOrders: [],
     quantity: order.quantity,
     reviewComment: optionalText(order.review_comment),
     status: order.status,
     submitTime: order.submit_time,
+  }
+}
+
+function toExternalOrderDelivery(delivery: ExternalOrderDelivery): ExternalOrderDeliveryItem {
+  return {
+    deliveryId: delivery.delivery_id,
+    deliveryTime: delivery.delivery_time,
+    operatorId: delivery.operator_id,
+    operatorName: optionalText(delivery.operator_name),
+    quantity: delivery.quantity,
+  }
+}
+
+function toExternalOrderListItem(order: ExternalOrderListItem): ExternalOrderItem {
+  let delivery: ExternalOrderDeliveryItem | undefined = undefined
+  if (order.delivery) {
+    delivery = toExternalOrderDelivery(order.delivery)
+  }
+  const productionOrders = order.production_orders ?? []
+  return {
+    ...toExternalOrder(order),
+    delivery,
+    deliveryBlockReason: optionalText(order.delivery_block_reason),
+    deliveryReady: order.delivery_ready ?? false,
+    productionOrders: productionOrders.map((productionOrder) => ({
+      finishedQty: productionOrder.finished_qty,
+      materialId: productionOrder.material_id,
+      materialName: optionalText(productionOrder.material_name),
+      orderId: productionOrder.order_id,
+      planQty: productionOrder.plan_qty,
+      status: productionOrder.status,
+    })),
   }
 }
 
@@ -632,6 +717,18 @@ export const productionService = {
     return unwrap(response.data as ApiEnvelope<unknown>)
   },
 
+  async deliverExternalOrder(extOrderId: number): Promise<ExternalOrderDeliveryResultItem> {
+    const response = await productionApi.deliverExternalOrder({
+      externalOrderDeliveryRequest: { ext_order_id: extOrderId },
+    })
+    const data = requireData(response.data as ApiEnvelope<ExternalOrderDeliveryResult | undefined>)
+    return {
+      delivery: toExternalOrderDelivery(data.delivery),
+      externalOrder: toExternalOrderListItem(data.external_order),
+      remainingAvailableQty: data.remaining_available_qty,
+    }
+  },
+
   async estimateCapacity(form: ProductionCapacityEstimateFormData) {
     const response = await productionApi.estimateProductionCapacity({
       productionCapacityEstimateRequest: {
@@ -708,15 +805,33 @@ export const productionService = {
     return { items, ...metadata }
   },
 
+  async listExternalOrderFormOptions(): Promise<ExternalOrderFormOptionsItem> {
+    const response = await productionApi.listExternalOrderFormOptions()
+    const data = requireData(response.data as ApiEnvelope<ExternalOrderFormOptions | undefined>)
+    return {
+      customers: data.customers.map((customer) => ({
+        employeeNo: customer.employee_no,
+        userId: customer.user_id,
+        userName: customer.user_name,
+      })),
+      materials: data.materials.map((material) => ({
+        materialId: material.material_id,
+        materialName: material.material_name,
+        model: material.model,
+        unit: material.unit,
+      })),
+    }
+  },
+
   async listExternalOrders(query: ExternalOrderQuery): Promise<PageResult<ExternalOrderItem>> {
     const response = await productionApi.listExternalOrder({
-      customerId: query.customerId,
+      customerName: query.customerName,
       page: query.page,
       pageSize: query.pageSize,
       status: query.status,
     })
     const data = requireData(response.data as ApiEnvelope<unknown>)
-    const items = getPageItems<ExternalOrder>(data).map(toExternalOrder)
+    const items = getPageItems<ExternalOrderListItem>(data).map(toExternalOrderListItem)
     const metadata = getPageMetadata(data, {
       page: query.page,
       pageSize: query.pageSize,
