@@ -21,24 +21,32 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 所有生产订单的 material_id 必须等于外部订单 material_id，plan_qty 合计必须精确等于外部订单 quantity；允许将同一产品拆分为多个生产订单。
+    /// 
     /// </summary>
     [DataContract]
-    public partial class ExternalOrderConvertRequest : IEquatable<ExternalOrderConvertRequest>
+    public partial class ExternalOrderDeliveryResult : IEquatable<ExternalOrderDeliveryResult>
     {
         /// <summary>
-        /// Gets or Sets ExtOrderId
+        /// Gets or Sets ExternalOrder
         /// </summary>
         [Required]
-        [DataMember(Name="ext_order_id", EmitDefaultValue=true)]
-        public long ExtOrderId { get; set; }
+        [DataMember(Name="external_order", EmitDefaultValue=false)]
+        public ExternalOrderListItem ExternalOrder { get; set; }
 
         /// <summary>
-        /// Gets or Sets ProductionOrders
+        /// Gets or Sets Delivery
         /// </summary>
         [Required]
-        [DataMember(Name="production_orders", EmitDefaultValue=false)]
-        public List<ProductionOrderCreateRequest> ProductionOrders { get; set; }
+        [DataMember(Name="delivery", EmitDefaultValue=false)]
+        public ExternalOrderDelivery Delivery { get; set; }
+
+        /// <summary>
+        /// 交货事务完成后该产品的可用库存数量。
+        /// </summary>
+        /// <value>交货事务完成后该产品的可用库存数量。</value>
+        [Required]
+        [DataMember(Name="remaining_available_qty", EmitDefaultValue=true)]
+        public decimal RemainingAvailableQty { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -47,9 +55,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class ExternalOrderConvertRequest {\n");
-            sb.Append("  ExtOrderId: ").Append(ExtOrderId).Append("\n");
-            sb.Append("  ProductionOrders: ").Append(ProductionOrders).Append("\n");
+            sb.Append("class ExternalOrderDeliveryResult {\n");
+            sb.Append("  ExternalOrder: ").Append(ExternalOrder).Append("\n");
+            sb.Append("  Delivery: ").Append(Delivery).Append("\n");
+            sb.Append("  RemainingAvailableQty: ").Append(RemainingAvailableQty).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,30 +81,34 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((ExternalOrderConvertRequest)obj);
+            return obj.GetType() == GetType() && Equals((ExternalOrderDeliveryResult)obj);
         }
 
         /// <summary>
-        /// Returns true if ExternalOrderConvertRequest instances are equal
+        /// Returns true if ExternalOrderDeliveryResult instances are equal
         /// </summary>
-        /// <param name="other">Instance of ExternalOrderConvertRequest to be compared</param>
+        /// <param name="other">Instance of ExternalOrderDeliveryResult to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(ExternalOrderConvertRequest other)
+        public bool Equals(ExternalOrderDeliveryResult other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    ExtOrderId == other.ExtOrderId ||
-                    
-                    ExtOrderId.Equals(other.ExtOrderId)
+                    ExternalOrder == other.ExternalOrder ||
+                    ExternalOrder != null &&
+                    ExternalOrder.Equals(other.ExternalOrder)
                 ) && 
                 (
-                    ProductionOrders == other.ProductionOrders ||
-                    ProductionOrders != null &&
-                    other.ProductionOrders != null &&
-                    ProductionOrders.SequenceEqual(other.ProductionOrders)
+                    Delivery == other.Delivery ||
+                    Delivery != null &&
+                    Delivery.Equals(other.Delivery)
+                ) && 
+                (
+                    RemainingAvailableQty == other.RemainingAvailableQty ||
+                    
+                    RemainingAvailableQty.Equals(other.RemainingAvailableQty)
                 );
         }
 
@@ -109,10 +122,12 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
+                    if (ExternalOrder != null)
+                    hashCode = hashCode * 59 + ExternalOrder.GetHashCode();
+                    if (Delivery != null)
+                    hashCode = hashCode * 59 + Delivery.GetHashCode();
                     
-                    hashCode = hashCode * 59 + ExtOrderId.GetHashCode();
-                    if (ProductionOrders != null)
-                    hashCode = hashCode * 59 + ProductionOrders.GetHashCode();
+                    hashCode = hashCode * 59 + RemainingAvailableQty.GetHashCode();
                 return hashCode;
             }
         }
@@ -120,12 +135,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(ExternalOrderConvertRequest left, ExternalOrderConvertRequest right)
+        public static bool operator ==(ExternalOrderDeliveryResult left, ExternalOrderDeliveryResult right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(ExternalOrderConvertRequest left, ExternalOrderConvertRequest right)
+        public static bool operator !=(ExternalOrderDeliveryResult left, ExternalOrderDeliveryResult right)
         {
             return !Equals(left, right);
         }

@@ -825,6 +825,9 @@ export interface ExternalOrder {
 }
 
 
+/**
+ * 所有生产订单的 material_id 必须等于外部订单 material_id，plan_qty 合计必须精确等于外部订单 quantity；允许将同一产品拆分为多个生产订单。
+ */
 export interface ExternalOrderConvertRequest {
     'ext_order_id': number;
     'production_orders': Array<ProductionOrderCreateRequest>;
@@ -875,6 +878,100 @@ export interface ExternalOrderCreateRequest {
     'contact_person': string;
     'contact_phone': string;
 }
+export interface ExternalOrderDelivery {
+    'delivery_id': number;
+    'ext_order_id': number;
+    /**
+     * 交货时的外部订单产品快照。
+     */
+    'material_id': number;
+    /**
+     * 交货时的外部订单数量快照；当前仅支持整单交货。
+     */
+    'quantity': number;
+    'delivery_time': string;
+    'operator_id': number;
+    /**
+     * 根据 operator_id 关联 sys_user.user_name 得到的展示字段。
+     */
+    'operator_name'?: string | null;
+}
+/**
+ * 整单交货请求。交货数量、产品、交货时间和操作人均由后端推导，客户端不得传入。
+ */
+export interface ExternalOrderDeliveryRequest {
+    'ext_order_id': number;
+}
+export interface ExternalOrderDeliveryResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ExternalOrderDeliveryResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ExternalOrderDeliveryResult;
+}
+
+export const ExternalOrderDeliveryResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ExternalOrderDeliveryResponseCodeEnum = typeof ExternalOrderDeliveryResponseCodeEnum[keyof typeof ExternalOrderDeliveryResponseCodeEnum];
+
+export interface ExternalOrderDeliveryResult {
+    'external_order': ExternalOrderListItem;
+    'delivery': ExternalOrderDelivery;
+    /**
+     * 交货事务完成后该产品的可用库存数量。
+     */
+    'remaining_available_qty': number;
+}
+export interface ExternalOrderListItem {
+    'ext_order_id': number;
+    'customer_id': number;
+    /**
+     * 跨表展示字段，根据 external_order.customer_id 关联 sys_user.user_id，取 sys_user.user_name。
+     */
+    'customer_name'?: string | null;
+    'material_id': number;
+    /**
+     * 跨表展示字段，来源于物料表 material.material_name，通过 external_order.material_id = material.material_id 关联查询得到。
+     */
+    'material_name'?: string | null;
+    'quantity': number;
+    'expected_date': string;
+    'contact_person': string;
+    'contact_phone': string;
+    'status': ExternalOrderStatus;
+    'submit_time': string;
+    'review_comment'?: string | null;
+    /**
+     * 通过 external_order_production 关联的全部生产订单；未转换时为空数组。
+     */
+    'production_orders': Array<ProductionOrderBrief>;
+    /**
+     * 后端计算字段。仅当外部订单状态为 converted、存在关联生产订单、全部关联订单均为 completed、关联产品及计划数量与外部订单一致，并且成品可用库存不少于外部订单数量时为 true。前端仅使用该字段控制交货按钮，交货接口仍须在事务内重新校验。 
+     */
+    'delivery_ready': boolean;
+    /**
+     * 不可交货原因；delivery_ready 为 false 时由后端返回可读说明。
+     */
+    'delivery_block_reason'?: string | null;
+    /**
+     * 已交货订单对应的整单交货记录，尚未交货时为 null。
+     */
+    'delivery'?: ExternalOrderDelivery | null;
+}
+
+
 export interface ExternalOrderPageResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -912,7 +1009,7 @@ export interface ExternalOrderPageResponseAllOfData {
      * 每页数据数量。
      */
     'page_size': number;
-    'records': Array<ExternalOrder>;
+    'records': Array<ExternalOrderListItem>;
 }
 export interface ExternalOrderProductionAssociation {
     'ext_order_id': number;
@@ -951,13 +1048,14 @@ export interface ExternalOrderReviewRequest {
     'review_comment'?: string | null;
 }
 /**
- * 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，已转为正式生产订单；rejected 已拒绝，流程结束。
+ * 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，等待关联生产订单完工及交货；delivered 已交货，流程结束；rejected 已拒绝，流程结束。
  */
 
 export const ExternalOrderStatus = {
     PendingReview: 'pending_review',
     Accepted: 'accepted',
     Converted: 'converted',
+    Delivered: 'delivered',
     Rejected: 'rejected',
 } as const;
 
@@ -8396,7 +8494,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。所有生产订单的产品必须与外部订单一致，计划数量合计必须等于外部订单数量。需具备 external-order:convert；非法状态或生产计划不匹配返回 code 409。
          * @summary 外部订单转生产订单
          * @param {ExternalOrderConvertRequest} externalOrderConvertRequest 
          * @param {*} [options] Override http request option.
@@ -8467,6 +8565,45 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
             localVarRequestOptions.data = serializeDataIfNeeded(productionCalendarDeleteRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 对 converted 外部订单执行一次性整单交货。后端必须在同一事务内锁定并重新读取外部订单、关联生产订单和成品库存，确认存在关联生产订单、所有关联生产订单均为 completed、关联产品均与外部订单产品一致、关联计划数量合计等于外部订单数量，并确认成品可用库存不少于外部订单数量；随后按外部订单数量扣减 material_stock.available_qty、更新 last_out_date、写入 external_order_delivery，并将外部订单状态更新为 delivered。请求不得传交货数量、产品或操作人，这些字段均由数据库记录和当前登录用户推导。不支持分批交货，同一外部订单只允许成功交货一次。复用 external-order:convert 权限；校验不通过、库存不足、重复交货或状态已变化返回 code 409。 
+         * @summary 外部订单整单交货
+         * @param {ExternalOrderDeliveryRequest} externalOrderDeliveryRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deliverExternalOrder: async (externalOrderDeliveryRequest: ExternalOrderDeliveryRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'externalOrderDeliveryRequest' is not null or undefined
+            assertParamExists('deliverExternalOrder', 'externalOrderDeliveryRequest', externalOrderDeliveryRequest)
+            const localVarPath = `/api/deliverExternalOrder`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(externalOrderDeliveryRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -8647,7 +8784,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -9614,7 +9751,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。所有生产订单的产品必须与外部订单一致，计划数量合计必须等于外部订单数量。需具备 external-order:convert；非法状态或生产计划不匹配返回 code 409。
          * @summary 外部订单转生产订单
          * @param {ExternalOrderConvertRequest} externalOrderConvertRequest 
          * @param {*} [options] Override http request option.
@@ -9637,6 +9774,19 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.deleteProductionCalendar(productionCalendarDeleteRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ProductionApi.deleteProductionCalendar']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 对 converted 外部订单执行一次性整单交货。后端必须在同一事务内锁定并重新读取外部订单、关联生产订单和成品库存，确认存在关联生产订单、所有关联生产订单均为 completed、关联产品均与外部订单产品一致、关联计划数量合计等于外部订单数量，并确认成品可用库存不少于外部订单数量；随后按外部订单数量扣减 material_stock.available_qty、更新 last_out_date、写入 external_order_delivery，并将外部订单状态更新为 delivered。请求不得传交货数量、产品或操作人，这些字段均由数据库记录和当前登录用户推导。不支持分批交货，同一外部订单只允许成功交货一次。复用 external-order:convert 权限；校验不通过、库存不足、重复交货或状态已变化返回 code 409。 
+         * @summary 外部订单整单交货
+         * @param {ExternalOrderDeliveryRequest} externalOrderDeliveryRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deliverExternalOrder(externalOrderDeliveryRequest: ExternalOrderDeliveryRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderDeliveryResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deliverExternalOrder(externalOrderDeliveryRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.deliverExternalOrder']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -9695,7 +9845,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
@@ -10035,7 +10185,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.cancelProductionOrder(requestParameters.productionOrderActionRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
+         * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。所有生产订单的产品必须与外部订单一致，计划数量合计必须等于外部订单数量。需具备 external-order:convert；非法状态或生产计划不匹配返回 code 409。
          * @summary 外部订单转生产订单
          * @param {ProductionApiConvertExternalOrderToProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -10053,6 +10203,16 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
          */
         deleteProductionCalendar(requestParameters: ProductionApiDeleteProductionCalendarRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponse> {
             return localVarFp.deleteProductionCalendar(requestParameters.productionCalendarDeleteRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 对 converted 外部订单执行一次性整单交货。后端必须在同一事务内锁定并重新读取外部订单、关联生产订单和成品库存，确认存在关联生产订单、所有关联生产订单均为 completed、关联产品均与外部订单产品一致、关联计划数量合计等于外部订单数量，并确认成品可用库存不少于外部订单数量；随后按外部订单数量扣减 material_stock.available_qty、更新 last_out_date、写入 external_order_delivery，并将外部订单状态更新为 delivered。请求不得传交货数量、产品或操作人，这些字段均由数据库记录和当前登录用户推导。不支持分批交货，同一外部订单只允许成功交货一次。复用 external-order:convert 权限；校验不通过、库存不足、重复交货或状态已变化返回 code 409。 
+         * @summary 外部订单整单交货
+         * @param {ProductionApiDeliverExternalOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deliverExternalOrder(requestParameters: ProductionApiDeliverExternalOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ExternalOrderDeliveryResponse> {
+            return localVarFp.deliverExternalOrder(requestParameters.externalOrderDeliveryRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。需具备 production:capacity:estimate；权限不足返回 code 403。
@@ -10095,7 +10255,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listCapacityConfig(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.typeId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -10344,6 +10504,13 @@ export interface ProductionApiConvertExternalOrderToProductionOrderRequest {
  */
 export interface ProductionApiDeleteProductionCalendarRequest {
     readonly productionCalendarDeleteRequest: ProductionCalendarDeleteRequest
+}
+
+/**
+ * Request parameters for deliverExternalOrder operation in ProductionApi.
+ */
+export interface ProductionApiDeliverExternalOrderRequest {
+    readonly externalOrderDeliveryRequest: ExternalOrderDeliveryRequest
 }
 
 /**
@@ -10673,7 +10840,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
+     * 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。所有生产订单的产品必须与外部订单一致，计划数量合计必须等于外部订单数量。需具备 external-order:convert；非法状态或生产计划不匹配返回 code 409。
      * @summary 外部订单转生产订单
      * @param {ProductionApiConvertExternalOrderToProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10692,6 +10859,17 @@ export class ProductionApi extends BaseAPI {
      */
     public deleteProductionCalendar(requestParameters: ProductionApiDeleteProductionCalendarRequest, options?: RawAxiosRequestConfig) {
         return ProductionApiFp(this.configuration).deleteProductionCalendar(requestParameters.productionCalendarDeleteRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 对 converted 外部订单执行一次性整单交货。后端必须在同一事务内锁定并重新读取外部订单、关联生产订单和成品库存，确认存在关联生产订单、所有关联生产订单均为 completed、关联产品均与外部订单产品一致、关联计划数量合计等于外部订单数量，并确认成品可用库存不少于外部订单数量；随后按外部订单数量扣减 material_stock.available_qty、更新 last_out_date、写入 external_order_delivery，并将外部订单状态更新为 delivered。请求不得传交货数量、产品或操作人，这些字段均由数据库记录和当前登录用户推导。不支持分批交货，同一外部订单只允许成功交货一次。复用 external-order:convert 权限；校验不通过、库存不足、重复交货或状态已变化返回 code 409。 
+     * @summary 外部订单整单交货
+     * @param {ProductionApiDeliverExternalOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deliverExternalOrder(requestParameters: ProductionApiDeliverExternalOrderRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).deliverExternalOrder(requestParameters.externalOrderDeliveryRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -10739,7 +10917,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+     * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
      * @summary 查询外部订单列表
      * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.

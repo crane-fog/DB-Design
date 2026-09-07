@@ -21,10 +21,10 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 所有生产订单的 material_id 必须等于外部订单 material_id，plan_qty 合计必须精确等于外部订单 quantity；允许将同一产品拆分为多个生产订单。
+    /// 整单交货请求。交货数量、产品、交货时间和操作人均由后端推导，客户端不得传入。
     /// </summary>
     [DataContract]
-    public partial class ExternalOrderConvertRequest : IEquatable<ExternalOrderConvertRequest>
+    public partial class ExternalOrderDeliveryRequest : IEquatable<ExternalOrderDeliveryRequest>
     {
         /// <summary>
         /// Gets or Sets ExtOrderId
@@ -34,22 +34,14 @@ namespace Org.OpenAPITools.Models
         public long ExtOrderId { get; set; }
 
         /// <summary>
-        /// Gets or Sets ProductionOrders
-        /// </summary>
-        [Required]
-        [DataMember(Name="production_orders", EmitDefaultValue=false)]
-        public List<ProductionOrderCreateRequest> ProductionOrders { get; set; }
-
-        /// <summary>
         /// Returns the string presentation of the object
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class ExternalOrderConvertRequest {\n");
+            sb.Append("class ExternalOrderDeliveryRequest {\n");
             sb.Append("  ExtOrderId: ").Append(ExtOrderId).Append("\n");
-            sb.Append("  ProductionOrders: ").Append(ProductionOrders).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,15 +64,15 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((ExternalOrderConvertRequest)obj);
+            return obj.GetType() == GetType() && Equals((ExternalOrderDeliveryRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if ExternalOrderConvertRequest instances are equal
+        /// Returns true if ExternalOrderDeliveryRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of ExternalOrderConvertRequest to be compared</param>
+        /// <param name="other">Instance of ExternalOrderDeliveryRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(ExternalOrderConvertRequest other)
+        public bool Equals(ExternalOrderDeliveryRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -90,12 +82,6 @@ namespace Org.OpenAPITools.Models
                     ExtOrderId == other.ExtOrderId ||
                     
                     ExtOrderId.Equals(other.ExtOrderId)
-                ) && 
-                (
-                    ProductionOrders == other.ProductionOrders ||
-                    ProductionOrders != null &&
-                    other.ProductionOrders != null &&
-                    ProductionOrders.SequenceEqual(other.ProductionOrders)
                 );
         }
 
@@ -111,8 +97,6 @@ namespace Org.OpenAPITools.Models
                 // Suitable nullity checks etc, of course :)
                     
                     hashCode = hashCode * 59 + ExtOrderId.GetHashCode();
-                    if (ProductionOrders != null)
-                    hashCode = hashCode * 59 + ProductionOrders.GetHashCode();
                 return hashCode;
             }
         }
@@ -120,12 +104,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(ExternalOrderConvertRequest left, ExternalOrderConvertRequest right)
+        public static bool operator ==(ExternalOrderDeliveryRequest left, ExternalOrderDeliveryRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(ExternalOrderConvertRequest left, ExternalOrderConvertRequest right)
+        public static bool operator !=(ExternalOrderDeliveryRequest left, ExternalOrderDeliveryRequest right)
         {
             return !Equals(left, right);
         }
