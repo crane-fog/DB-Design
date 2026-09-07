@@ -1432,13 +1432,13 @@ onBeforeUnmount(() => {
               }}</strong
               ><el-button
                 :disabled="orderForm.details.length === 1"
-                text
+                link
                 type="danger"
                 @click="removeOrderLine(index)"
                 >移除</el-button
               >
             </div>
-            <el-button :icon="Plus" text type="primary" @click="addOrderLine">添加明细</el-button>
+            <el-button :icon="Plus" link type="primary" @click="addOrderLine">添加明细</el-button>
           </div></el-form-item
         >
         <div class="amount-summary">

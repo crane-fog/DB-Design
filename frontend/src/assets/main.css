@@ -310,14 +310,15 @@
 .admin-content:not(:has(.dashboard-page)) .el-button {
   border-radius: var(--radius-sm);
 }
-.admin-content:not(:has(.dashboard-page)) .el-button--primary {
+.admin-content:not(:has(.dashboard-page)) .el-button--primary:not(.is-link):not(.is-text) {
   border-color: #3478f6;
   background: #3478f6;
   box-shadow: 0 3px 10px rgb(38 159 211 / 14%);
   color: #ffffff;
 }
-.admin-content:not(:has(.dashboard-page)) .el-button--primary:hover,
-.admin-content:not(:has(.dashboard-page)) .el-button--primary:focus-visible {
+.admin-content:not(:has(.dashboard-page)) .el-button--primary:not(.is-link):not(.is-text):hover,
+.admin-content:not(:has(.dashboard-page))
+  .el-button--primary:not(.is-link):not(.is-text):focus-visible {
   border-color: #285fce;
   background: #285fce;
 }
@@ -327,7 +328,8 @@
   background: var(--glass-background-strong);
   color: #3478f6;
 }
-.admin-content:not(:has(.dashboard-page)) .el-button:not(.el-button--primary):not(.is-link):hover {
+.admin-content:not(:has(.dashboard-page))
+  .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
   border-color: rgb(52 120 246 / 60%);
   background: rgb(91 206 250 / 10%);
   color: #285fce;
@@ -337,23 +339,44 @@
   border-color: transparent;
   background: transparent;
 }
-.admin-content:not(:has(.dashboard-page)) .el-button--danger {
+.admin-content:not(:has(.dashboard-page)) .el-button--danger:not(.is-link):not(.is-text) {
   border-color: #d96f87;
   background: #d96f87;
   color: #ffffff;
   box-shadow: 0 3px 10px rgb(217 111 135 / 14%);
 }
-.admin-content:not(:has(.dashboard-page)) .el-button--danger:hover,
-.admin-content:not(:has(.dashboard-page)) .el-button--danger:focus-visible {
+.admin-content:not(:has(.dashboard-page)) .el-button--danger:not(.is-link):not(.is-text):hover,
+.admin-content:not(:has(.dashboard-page))
+  .el-button--danger:not(.is-link):not(.is-text):focus-visible {
   border-color: #bd526b;
   background: #bd526b;
   color: #ffffff;
 }
-.admin-content:not(:has(.dashboard-page)) .el-button.is-link {
+.admin-content:not(:has(.dashboard-page)) .el-button.is-link,
+.admin-content:not(:has(.dashboard-page)) .el-button.is-text {
   color: #3478f6;
 }
-.admin-content:not(:has(.dashboard-page)) .el-button.is-link.el-button--danger {
+.admin-content:not(:has(.dashboard-page)) .el-button.is-link:hover,
+.admin-content:not(:has(.dashboard-page)) .el-button.is-text:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #285fce;
+}
+.admin-content:not(:has(.dashboard-page)) .el-button.is-link.el-button--danger,
+.admin-content:not(:has(.dashboard-page)) .el-button.is-text.el-button--danger {
   color: #c65362;
+}
+.admin-content:not(:has(.dashboard-page)) .el-button.is-link.el-button--danger:hover,
+.admin-content:not(:has(.dashboard-page)) .el-button.is-text.el-button--danger:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #bd526b;
+}
+.admin-content:not(:has(.dashboard-page)) .el-button.is-link.is-disabled,
+.admin-content:not(:has(.dashboard-page)) .el-button.is-text.is-disabled {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--el-text-color-disabled) !important;
 }
 .admin-content:not(:has(.dashboard-page)) .el-input__wrapper,
 .admin-content:not(:has(.dashboard-page)) .el-select__wrapper,

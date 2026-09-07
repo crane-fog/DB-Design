@@ -113,14 +113,60 @@ public class ProductionOrderController(
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
+    [Route("previewProductionOrderMaterialLock")]
+    [RequireJsonFields("order_id")]
+    public IActionResult PreviewMaterialLock(
+        [FromBody] ProductionOrderMaterialLockPreviewRequest? request)
+    {
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionOrderApproveEnum);
+        if (!auth.Ok)
+        {
+            return Ok(MaterialLockPreview(
+                (ProductionOrderMaterialLockPreviewResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权预览生产订单物料锁定",
+                null));
+        }
+
+        if (request is null)
+        {
+            return Ok(MaterialLockPreview(
+                ProductionOrderMaterialLockPreviewResponse.CodeEnum._400Enum,
+                "请求体不能为空",
+                null));
+        }
+
+        ProductionOrderMaterialLockPreviewResult result =
+            orderService.PreviewMaterialLock(request.OrderId);
+        return result.Ok
+            ? Ok(MaterialLockPreview(
+                ProductionOrderMaterialLockPreviewResponse.CodeEnum._200Enum,
+                result.Data!.CanApprove ? "库存充足，可以审核通过" : "库存不足",
+                result.Data))
+            : Ok(MaterialLockPreview(
+                (ProductionOrderMaterialLockPreviewResponse.CodeEnum)result.ErrorCode,
+                result.ErrorMessage ?? "物料锁定预览失败",
+                null));
+    }
+
+    [HttpPost]
+    [Consumes("application/json")]
+    [Produces("application/json")]
     [Route("approveProductionOrder")]
     [OperationAudit("生产订单", "审核生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     [RequireJsonFields("approved")]
     public IActionResult Approve([FromBody] ProductionOrderApproveRequest? request)
     {
-        if (RequirePermission(PermissionCode.ProductionOrderApproveEnum) is { } forbidden)
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionOrderApproveEnum);
+        if (!auth.Ok)
         {
-            return forbidden;
+            return Ok(Detail(
+                (ProductionOrderResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权审核生产订单",
+                null));
         }
 
         if (request is null)
@@ -128,7 +174,9 @@ public class ProductionOrderController(
             return Ok(Detail(ProductionOrderResponse.CodeEnum._400Enum, "请求体不能为空", null));
         }
 
-        return FromResult(orderService.Approve(request), request.Approved ? "审核通过" : "已拒绝");
+        return FromResult(
+            orderService.Approve(request, auth.User!.UserId),
+            request.Approved ? "审核通过并已锁定生产物料" : "已拒绝");
     }
 
     [HttpPost]
@@ -263,6 +311,16 @@ public class ProductionOrderController(
         ProductionCompletionReportResponse.CodeEnum code,
         string message,
         ProductionCompletionReportResult? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static ProductionOrderMaterialLockPreviewResponse MaterialLockPreview(
+        ProductionOrderMaterialLockPreviewResponse.CodeEnum code,
+        string message,
+        ProductionOrderMaterialLockPreview? data) => new()
         {
             Code = code,
             Message = message,

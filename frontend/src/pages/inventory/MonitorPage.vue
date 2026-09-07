@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { Bell, Lock, Plus, Refresh, Search, Warning } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type {
   InventoryAlertItem,
   InventoryAlertQuery,
   InventoryReferenceData,
   ObsoleteMaterialItem,
   ObsoleteMaterialQuery,
-  StockLockFormData,
   StockLockItem,
   StockLockQuery,
 } from '@/types/inventory'
-import { type InventoryStockData, inventoryService } from '@/services/InventoryService'
+import { inventoryService } from '@/services/InventoryService'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -31,8 +30,6 @@ const canViewAlerts = computed(() => auth.hasPermission(PermissionCode.Inventory
 const canGenerateAlerts = computed(() => auth.hasPermission(PermissionCode.InventoryAlertGenerate))
 const canHandleAlerts = computed(() => auth.hasPermission(PermissionCode.InventoryAlertHandle))
 const canViewLocks = computed(() => auth.hasPermission(PermissionCode.InventoryLockView))
-const canCreateLocks = computed(() => auth.hasPermission(PermissionCode.InventoryLockCreate))
-const canReleaseLocks = computed(() => auth.hasPermission(PermissionCode.InventoryLockRelease))
 const canViewObsolete = computed(() => auth.hasPermission(PermissionCode.InventoryObsoleteView))
 const canDetectObsolete = computed(() => auth.hasPermission(PermissionCode.InventoryObsoleteDetect))
 const canHandleObsolete = computed(() => auth.hasPermission(PermissionCode.InventoryObsoleteHandle))
@@ -54,7 +51,6 @@ const referenceData = ref<InventoryReferenceData>({
   materials: [],
   productionOrders: [],
 })
-const lockMaterialOptions = ref<InventoryStockData[]>([])
 
 // 库存预警
 const alertLoading = ref(false)
@@ -78,21 +74,6 @@ const lockError = ref('')
 const lockItems = ref<StockLockItem[]>([])
 const lockTotal = ref(0)
 const lockQuery = reactive<StockLockQuery>({ page: 1, pageSize: 10 })
-const lockDialogOpen = ref(false)
-const locking = ref(false)
-const releasingLockId = ref<number>()
-const lockFormRef = ref<FormInstance>()
-const lockForm = reactive<StockLockFormData>({
-  items: [{ lockQty: 1, materialId: 0 }],
-  operatorId: 0,
-  orderId: 0,
-})
-const lockRules: FormRules<StockLockFormData> = {
-  orderId: [
-    { message: '请输入生产订单 ID', required: true, trigger: 'blur', type: 'number' },
-    { message: '生产订单 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
-  ],
-}
 let lockRequestId = 0
 
 // 呆滞物料
@@ -117,30 +98,18 @@ const detectionForm = reactive({
 })
 let obsoleteRequestId = 0
 
-const lockOrderOptions = computed(() =>
-  referenceData.value.productionOrders.filter(
-    (item) => item.remainingQty > 0 && !['cancelled', 'completed'].includes(item.status),
-  ),
-)
-
 async function loadReferenceData() {
-  if (!canCreateLocks.value) {
+  if (!canGenerateAlerts.value && !canDetectObsolete.value) {
     return
   }
   referenceLoading.value = true
   referenceError.value = ''
   try {
     const references = await inventoryService.getReferenceData()
-    let stockItems: InventoryStockData[] = []
-    if (auth.hasPermission(PermissionCode.InventoryStockView)) {
-      const stocks = await inventoryService.listStocks({ page: 1, pageSize: 100 })
-      stockItems = stocks.items
-    }
     if (!alive) {
       return
     }
     referenceData.value = references
-    lockMaterialOptions.value = stockItems.filter((item) => item.availableQty > 0)
   } catch (error) {
     if (alive) {
       referenceError.value = getErrorMessage(error, '库存操作选项加载失败')
@@ -369,93 +338,6 @@ async function handleAlert(item: InventoryAlertItem, status: 'handled' | 'ignore
     }
   } finally {
     handlingAlert.value = undefined
-  }
-}
-
-function openLockDialog() {
-  Object.assign(lockForm, {
-    items: [{ lockQty: 1, materialId: 0 }],
-    operatorId: operatorId.value ?? 0,
-    orderId: 0,
-  })
-  lockDialogOpen.value = true
-}
-
-function addLockLine() {
-  lockForm.items.push({ lockQty: 1, materialId: 0 })
-}
-
-function removeLockLine(index: number) {
-  if (lockForm.items.length > 1) {
-    lockForm.items.splice(index, 1)
-  }
-}
-
-async function submitLock() {
-  const valid = await lockFormRef.value?.validate().catch(() => false)
-  if (!valid || locking.value) {
-    return
-  }
-  if (!operatorId.value) {
-    ElMessage.error('当前会话缺少操作人信息，请重新登录')
-    return
-  }
-  if (lockForm.items.some((item) => item.materialId <= 0 || item.lockQty <= 0)) {
-    ElMessage.warning('请完整填写锁定物料与数量')
-    return
-  }
-  locking.value = true
-  try {
-    const totalQty = lockForm.items.reduce((total, item) => total + item.lockQty, 0)
-    await ElMessageBox.confirm(
-      `将为生产订单 #${lockForm.orderId} 锁定 ${lockForm.items.length} 种物料，合计 ${formatNumber(totalQty)}，确认继续？`,
-      '确认锁定库存',
-      { confirmButtonText: '确认锁定', type: 'warning' },
-    )
-    const result = await inventoryService.lockStock({
-      items: lockForm.items.map((item) => ({ ...item })),
-      operatorId: operatorId.value,
-      orderId: lockForm.orderId,
-    })
-    if (!result.success) {
-      const detail = result.shortages
-        .map((item) => `物料 #${item.materialId} 缺 ${formatNumber(item.shortageQty)}`)
-        .join('；')
-      ElMessage.warning(detail || '库存不足，无法完成锁定')
-      return
-    }
-    ElMessage.success(`已创建 ${result.items.length} 条库存锁定记录`)
-    lockDialogOpen.value = false
-    await Promise.all([loadLocks(), loadReferenceData()])
-  } catch (error) {
-    if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error(getErrorMessage(error, '锁定库存失败'))
-    }
-  } finally {
-    locking.value = false
-  }
-}
-
-async function releaseLock(item: StockLockItem) {
-  if (!operatorId.value || releasingLockId.value !== undefined) {
-    return
-  }
-  releasingLockId.value = item.lockId
-  try {
-    await ElMessageBox.confirm(
-      `释放后将恢复物料 #${item.materialId} 的 ${formatNumber(item.lockQty)} 库存，确认继续？`,
-      '释放库存锁定',
-      { confirmButtonText: '确认释放', type: 'warning' },
-    )
-    await inventoryService.releaseLock(item.lockId, operatorId.value)
-    ElMessage.success('库存锁定已释放')
-    await Promise.all([loadLocks(), loadReferenceData()])
-  } catch (error) {
-    if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error(getErrorMessage(error, '释放库存失败'))
-    }
-  } finally {
-    releasingLockId.value = undefined
   }
 }
 
@@ -697,9 +579,6 @@ onBeforeUnmount(() => {
               <el-button :icon="Search" type="primary" @click="searchLocks">查询</el-button
               ><el-button @click="resetLockQuery">重置</el-button>
             </div>
-            <el-button v-if="canCreateLocks" :icon="Lock" type="primary" @click="openLockDialog"
-              >锁定库存</el-button
-            >
           </div>
           <el-alert
             v-if="lockError"
@@ -744,19 +623,6 @@ onBeforeUnmount(() => {
                 ><template #default="{ row }"
                   ><StatusTag :labels="statusLabels" :value="row.status" /></template
               ></el-table-column>
-              <el-table-column fixed="right" label="操作" min-width="100"
-                ><template #default="{ row }"
-                  ><el-button
-                    v-if="canReleaseLocks && row.status === 'locked'"
-                    :disabled="releasingLockId !== undefined"
-                    link
-                    :loading="releasingLockId === row.lockId"
-                    type="danger"
-                    @click="releaseLock(row)"
-                    >释放</el-button
-                  ><span v-else>-</span></template
-                ></el-table-column
-              >
             </el-table>
           </div>
           <el-pagination
@@ -923,95 +789,6 @@ onBeforeUnmount(() => {
         ><el-button @click="generateDialogOpen = false">取消</el-button
         ><el-button :loading="generatingAlerts" type="primary" @click="generateAlerts"
           >开始生成</el-button
-        ></template
-      ></el-dialog
-    >
-
-    <el-dialog
-      v-model="lockDialogOpen"
-      title="锁定生产订单库存"
-      width="min(94vw, 680px)"
-      @closed="lockFormRef?.resetFields()"
-      ><el-form ref="lockFormRef" :model="lockForm" :rules="lockRules" label-width="100px"
-        ><el-form-item label="生产订单 ID" prop="orderId"
-          ><el-input-number
-            :controls="false"
-            v-if="!referenceData.productionOrders.length"
-            v-model="lockForm.orderId"
-            :min="1"
-            :precision="0"
-            placeholder="输入生产订单 ID" /><el-select
-            v-else
-            v-model="lockForm.orderId"
-            filterable
-            :loading="referenceLoading"
-            placeholder="选择可执行订单 ID"
-            style="width: 100%"
-            ><el-option
-              v-for="order in lockOrderOptions"
-              :key="order.orderId"
-              :label="
-                '#' +
-                order.orderId +
-                ' · ' +
-                order.materialName +
-                '（剩余 ' +
-                formatNumber(order.remainingQty) +
-                '）'
-              "
-              :value="order.orderId" /></el-select></el-form-item
-        ><el-form-item label="锁定明细"
-          ><div class="lock-lines">
-            <div v-for="(item, index) in lockForm.items" :key="index" class="lock-line">
-              <el-input-number
-                :controls="false"
-                v-if="!lockMaterialOptions.length"
-                v-model="item.materialId"
-                :min="1"
-                :precision="0"
-                placeholder="输入物料编号"
-              /><el-select
-                v-else
-                v-model="item.materialId"
-                filterable
-                :loading="referenceLoading"
-                placeholder="选择可用物料"
-                ><el-option
-                  v-for="material in lockMaterialOptions"
-                  :key="material.materialId"
-                  :label="
-                    '#' +
-                    material.materialId +
-                    ' · ' +
-                    material.materialName +
-                    '（可用 ' +
-                    formatNumber(material.availableQty) +
-                    ' ' +
-                    (material.unit || '') +
-                    '）'
-                  "
-                  :value="material.materialId" /></el-select
-              ><el-input-number
-                :controls="false"
-                v-model="item.lockQty"
-                :min="0.01"
-                :precision="2"
-                placeholder="锁定数量"
-              /><el-button
-                :disabled="lockForm.items.length === 1"
-                text
-                type="danger"
-                @click="removeLockLine(index)"
-                >移除</el-button
-              >
-            </div>
-            <el-button :icon="Plus" text type="primary" @click="addLockLine">添加物料</el-button>
-          </div></el-form-item
-        ></el-form
-      ><template #footer
-        ><el-button @click="lockDialogOpen = false">取消</el-button
-        ><el-button :loading="locking" type="primary" @click="submitLock"
-          >确认锁定</el-button
         ></template
       ></el-dialog
     >
@@ -1213,16 +990,6 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   margin-top: 16px;
 }
-.lock-lines {
-  display: grid;
-  width: 100%;
-  gap: 10px;
-}
-.lock-line {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 8px;
-}
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1255,9 +1022,6 @@ onBeforeUnmount(() => {
   }
   .filters :deep(.el-date-editor) {
     width: 100%;
-  }
-  .lock-line {
-    grid-template-columns: 1fr;
   }
   .detail-grid {
     grid-template-columns: 1fr;

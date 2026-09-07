@@ -66,7 +66,10 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddScoped(sp => new AuthService(connString, jwtSecret, sp.GetRequiredService<LoginLogService>()));
 builder.Services.AddScoped<IUserTestService>(_ => new UserTestService(connString));
 builder.Services.AddScoped(_ => new UserContextService(connString));
-builder.Services.AddScoped(_ => new ProductionOrderService(connString));
+builder.Services.AddScoped(_ => new ProductionOrderMaterialLockService(connString));
+builder.Services.AddScoped(sp => new ProductionOrderService(
+    connString,
+    sp.GetRequiredService<ProductionOrderMaterialLockService>()));
 builder.Services.AddScoped(sp => new ProductionCompletionService(
     connString,
     sp.GetRequiredService<ILogger<ProductionCompletionService>>()));

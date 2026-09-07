@@ -25,6 +25,7 @@ import type {
   ProductionLineStatus,
   ProductionCompletionReportResult,
   ProductionOrderDetail,
+  ProductionOrderMaterialLockPreview,
 } from '@/api'
 import { materialBomApi, productionApi } from '@/api/client'
 import { toUtcDateTime } from '@/utils/time'
@@ -115,6 +116,25 @@ export interface ProductionCompletionReportFormData {
 export interface ProductionCompletionReportItem {
   orderCompleted: boolean
   productionOrder: ProductionOrderItem
+}
+
+export interface ProductionOrderMaterialLockItem {
+  availableQty: number
+  bomQuantity: number
+  lockedQty: number
+  lossRate: number
+  materialId: number
+  materialName: string
+  pendingLockQty: number
+  requiredQty: number
+  shortageQty: number
+  unit: string
+}
+
+export interface ProductionOrderMaterialLockPreviewItem {
+  canApprove: boolean
+  items: ProductionOrderMaterialLockItem[]
+  orderId: number
 }
 
 export interface ProductionOrderProductOption {
@@ -827,6 +847,31 @@ export const productionService = {
       total: items.length,
     })
     return { items, ...metadata }
+  },
+
+  async previewOrderMaterialLock(orderId: number): Promise<ProductionOrderMaterialLockPreviewItem> {
+    const response = await productionApi.previewProductionOrderMaterialLock({
+      productionOrderMaterialLockPreviewRequest: { order_id: orderId },
+    })
+    const data = requireData(
+      response.data as ApiEnvelope<ProductionOrderMaterialLockPreview | undefined>,
+    )
+    return {
+      canApprove: data.can_approve,
+      items: data.items.map((item) => ({
+        availableQty: item.available_qty,
+        bomQuantity: item.bom_quantity,
+        lockedQty: item.locked_qty,
+        lossRate: item.loss_rate,
+        materialId: item.material_id,
+        materialName: item.material_name,
+        pendingLockQty: item.pending_lock_qty,
+        requiredQty: item.required_qty,
+        shortageQty: item.shortage_qty,
+        unit: item.unit,
+      })),
+      orderId: data.order_id,
+    }
   },
 
   async reportFault(form: FaultReportFormData) {

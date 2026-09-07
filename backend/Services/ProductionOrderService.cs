@@ -24,7 +24,9 @@ public sealed record ProductionOrderResult(
 /// 展示用的 material_name / version_no 通过 JOIN material、bom_version 得到，不维护这些表。
 /// 分次完工报工及其库存联动由 ProductionCompletionService 负责。
 /// </summary>
-public class ProductionOrderService(string connString)
+public class ProductionOrderService(
+    string connString,
+    ProductionOrderMaterialLockService materialLockService)
 {
     // 注：production_order 表无 review_comment 列（仅 external_order 有），
     // 契约中的 ProductionOrderDetail.review_comment 无对应存储列，故查询不选取、响应恒为 null。
@@ -205,6 +207,17 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(409, "当前状态不允许修改");
         }
 
+        if (current == ProductionStatusMap.Db.PendingSchedule)
+        {
+            ProductionOrderDetail stored = GetInternal(conn, request.OrderId)!;
+            if (stored.MaterialId != request.MaterialId
+                || stored.VersionId != request.VersionId
+                || stored.PlanQty != request.PlanQty)
+            {
+                return ProductionOrderResult.Fail(409, "订单审核后仅允许修改计划起止日期");
+            }
+        }
+
         if (!MaterialExists(conn, request.MaterialId))
         {
             return ProductionOrderResult.Fail(400, "产品不存在");
@@ -242,81 +255,14 @@ public class ProductionOrderService(string connString)
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
     }
 
-    public ProductionOrderResult Approve(ProductionOrderApproveRequest request)
-    {
-        using var conn = new OracleConnection(connString);
-        conn.Open();
+    public ProductionOrderMaterialLockPreviewResult PreviewMaterialLock(long orderId) =>
+        materialLockService.Preview(orderId);
 
-        var current = GetRawStatus(conn, request.OrderId);
-        if (current is null)
-        {
-            return ProductionOrderResult.Fail(404, "生产订单不存在");
-        }
+    public ProductionOrderResult Approve(ProductionOrderApproveRequest request, long operatorId) =>
+        materialLockService.Approve(request, operatorId);
 
-        if (current != ProductionStatusMap.Db.PendingReview)
-        {
-            return ProductionOrderResult.Fail(409, "仅待审核订单可审核");
-        }
-
-        var newStatus = request.Approved ? ProductionStatusMap.Db.PendingSchedule : ProductionStatusMap.Db.Cancelled;
-
-        // production_order 无 review_comment 列，审核意见暂不落库（仅驱动状态流转）。
-        // 状态作为 UPDATE 条件的一部分，确保并发下只有一次流转生效，避免绕过状态机。
-        int affected;
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = @"UPDATE PRODUCTION_ORDER
-                                SET STATUS = :status
-                                WHERE ORDER_ID = :orderId AND STATUS = :expected";
-            cmd.Parameters.Add(new OracleParameter("status", newStatus));
-            cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.Parameters.Add(new OracleParameter("expected", ProductionStatusMap.Db.PendingReview));
-            affected = cmd.ExecuteNonQuery();
-        }
-
-        if (affected == 0)
-        {
-            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
-        }
-
-        return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
-    }
-
-    public ProductionOrderResult Start(ProductionOrderActionRequest request)
-    {
-        using var conn = new OracleConnection(connString);
-        conn.Open();
-
-        var current = GetRawStatus(conn, request.OrderId);
-        if (current is null)
-        {
-            return ProductionOrderResult.Fail(404, "生产订单不存在");
-        }
-
-        if (current != ProductionStatusMap.Db.PendingSchedule)
-        {
-            return ProductionOrderResult.Fail(409, "仅待排产订单可开工");
-        }
-
-        int affected;
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = @"UPDATE PRODUCTION_ORDER
-                                SET STATUS = :status, ACTUAL_START = TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                                WHERE ORDER_ID = :orderId AND STATUS = :expected";
-            cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.InProgress));
-            cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.Parameters.Add(new OracleParameter("expected", ProductionStatusMap.Db.PendingSchedule));
-            affected = cmd.ExecuteNonQuery();
-        }
-
-        if (affected == 0)
-        {
-            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
-        }
-
-        return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
-    }
+    public ProductionOrderResult Start(ProductionOrderActionRequest request) =>
+        materialLockService.Start(request);
 
     public ProductionOrderResult Finish(ProductionOrderFinishRequest request)
     {
@@ -361,47 +307,8 @@ public class ProductionOrderService(string connString)
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
     }
 
-    public ProductionOrderResult Cancel(ProductionOrderActionRequest request)
-    {
-        using var conn = new OracleConnection(connString);
-        conn.Open();
-
-        var current = GetRawStatus(conn, request.OrderId);
-        if (current is null)
-        {
-            return ProductionOrderResult.Fail(404, "生产订单不存在");
-        }
-
-        if (current is ProductionStatusMap.Db.Completed or ProductionStatusMap.Db.Cancelled)
-        {
-            return ProductionOrderResult.Fail(409, "已完工或已取消订单不可取消");
-        }
-
-        if (current == ProductionStatusMap.Db.InProgress && HasCompletionReports(conn, request.OrderId))
-        {
-            return ProductionOrderResult.Fail(409, "已发生完工报工的生产订单不可取消");
-        }
-
-        int affected;
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = @"UPDATE PRODUCTION_ORDER SET STATUS = :status
-                                WHERE ORDER_ID = :orderId
-                                  AND STATUS NOT IN (:completed, :cancelled)";
-            cmd.Parameters.Add(new OracleParameter("status", ProductionStatusMap.Db.Cancelled));
-            cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.Parameters.Add(new OracleParameter("completed", ProductionStatusMap.Db.Completed));
-            cmd.Parameters.Add(new OracleParameter("cancelled", ProductionStatusMap.Db.Cancelled));
-            affected = cmd.ExecuteNonQuery();
-        }
-
-        if (affected == 0)
-        {
-            return ProductionOrderResult.Fail(409, "订单状态已变更，请刷新后重试");
-        }
-
-        return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
-    }
+    public ProductionOrderResult Cancel(ProductionOrderActionRequest request) =>
+        materialLockService.Cancel(request);
 
     internal static ProductionOrderDetail? GetInternal(
         OracleConnection conn,
@@ -441,14 +348,6 @@ public class ProductionOrderService(string connString)
                             WHERE VERSION_ID = :versionId AND MATERIAL_ID = :materialId";
         cmd.Parameters.Add(new OracleParameter("versionId", versionId));
         cmd.Parameters.Add(new OracleParameter("materialId", materialId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
-
-    private static bool HasCompletionReports(OracleConnection conn, long orderId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM FINISH_INBOUND WHERE ORDER_ID = :orderId";
-        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 

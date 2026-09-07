@@ -5,6 +5,7 @@ import {
   type ProductionCompletionReportFormData,
   type ProductionOrderFormData,
   type ProductionOrderItem,
+  type ProductionOrderMaterialLockPreviewItem,
   type ProductionOrderProductOption,
   type ProductionOrderStatus,
   productionService,
@@ -15,7 +16,7 @@ import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, formatNumber } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
 import { productionOrderStatusLabels as statusLabels } from '@/constants/status'
@@ -40,8 +41,16 @@ const orderDialogVisible = ref(false)
 const orderDialogMode = ref<'create' | 'edit'>('create')
 const orderFormRef = ref<FormInstance>()
 const editingOrderId = ref<number>()
+const editingOrderStatus = ref<ProductionOrderStatus>()
 const submitting = ref(false)
 const actionSubmitting = ref(false)
+const reviewDialogVisible = ref(false)
+const reviewLoading = ref(false)
+const reviewError = ref('')
+const reviewComment = ref('')
+const reviewingOrder = ref<ProductionOrderItem>()
+const reviewPreview = ref<ProductionOrderMaterialLockPreviewItem>()
+let reviewRequestId = 0
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
@@ -73,6 +82,7 @@ const orderDialogTitle = computed(() => {
   }
   return '修改生产订单计划'
 })
+const orderRequirementsLocked = computed(() => editingOrderStatus.value === 'pending_schedule')
 
 const orderRules: FormRules<ProductionOrderFormModel> = {
   planEnd: [{ message: '请选择计划完工日期', required: true, trigger: 'change' }],
@@ -178,6 +188,7 @@ function resetOrderForm() {
     versionId: undefined,
   })
   editingOrderId.value = undefined
+  editingOrderStatus.value = undefined
   orderFormRef.value?.clearValidate()
 }
 
@@ -224,6 +235,7 @@ function openCreateDialog() {
 
 async function openEditDialog(order: ProductionOrderItem) {
   orderDialogMode.value = 'edit'
+  editingOrderStatus.value = order.status
   Object.assign(orderForm, {
     materialId: order.materialId,
     planEnd: order.planEnd,
@@ -234,6 +246,9 @@ async function openEditDialog(order: ProductionOrderItem) {
   editingOrderId.value = order.orderId
   orderFormRef.value?.clearValidate()
   orderDialogVisible.value = true
+  if (order.status === 'pending_schedule') {
+    return
+  }
   await loadProductOptions()
   if (!orderDialogVisible.value || editingOrderId.value !== order.orderId) {
     return
@@ -255,7 +270,7 @@ async function submitOrderForm() {
   const selectedProduct = productOptions.value.find(
     (item) => item.versionId === orderForm.versionId,
   )
-  if (!selectedProduct) {
+  if (!orderRequirementsLocked.value && !selectedProduct) {
     ElMessage.warning('请选择当前生效的产品 BOM')
     return
   }
@@ -265,10 +280,17 @@ async function submitOrderForm() {
   }
   submitting.value = true
   try {
+    const selection = (() => {
+      if (orderRequirementsLocked.value) {
+        return { materialId: orderForm.materialId, versionId: orderForm.versionId! }
+      }
+      return selectedProduct!
+    })()
+    const { materialId, versionId } = selection
     const request: ProductionOrderFormData = {
       ...orderForm,
-      materialId: selectedProduct.materialId,
-      versionId: selectedProduct.versionId,
+      materialId,
+      versionId,
     }
     if (orderDialogMode.value === 'create') {
       await productionService.createOrder(request)
@@ -300,49 +322,74 @@ async function openDetail(order: ProductionOrderItem) {
   }
 }
 
-async function approveOrder(order: ProductionOrderItem) {
-  if (actionSubmitting.value) {
+async function loadReviewPreview() {
+  const order = reviewingOrder.value
+  if (!order) {
     return
   }
+  const currentRequestId = ++reviewRequestId
+  reviewLoading.value = true
+  reviewError.value = ''
+  reviewPreview.value = undefined
   try {
-    const { value } = await ElMessageBox.prompt('请输入审核意见（可选）', '审核生产订单', {
-      cancelButtonText: '拒绝',
-      confirmButtonText: '通过',
-      distinguishCancelAndClose: true,
-      inputPlaceholder: '审核意见',
-      inputType: 'textarea',
-    }).then((response) => ({ approved: true, value: response.value }))
-    actionSubmitting.value = true
-    await productionService.approveOrder(order.orderId, true, value)
-    ElMessage.success('生产订单已通过审核')
-    await loadOrders(page.value)
-  } catch (action) {
-    if (action === 'cancel') {
-      await rejectOrder(order)
-      return
+    const preview = await productionService.previewOrderMaterialLock(order.orderId)
+    if (currentRequestId === reviewRequestId) {
+      reviewPreview.value = preview
     }
-    if (action !== 'close') {
-      ElMessage.error(getErrorMessage(action, '审核生产订单失败'))
+  } catch (requestError) {
+    if (currentRequestId === reviewRequestId) {
+      reviewError.value = getErrorMessage(requestError, '物料锁定预览失败')
     }
   } finally {
-    actionSubmitting.value = false
+    if (currentRequestId === reviewRequestId) {
+      reviewLoading.value = false
+    }
   }
 }
 
-async function rejectOrder(order: ProductionOrderItem) {
+function openReviewDialog(order: ProductionOrderItem) {
+  reviewingOrder.value = order
+  reviewComment.value = ''
+  reviewDialogVisible.value = true
+  void loadReviewPreview()
+}
+
+async function submitReview(approved: boolean) {
+  const order = reviewingOrder.value
+  if (!order || actionSubmitting.value) {
+    return
+  }
+  if (approved && !reviewPreview.value?.canApprove) {
+    ElMessage.warning('物料库存不足，无法通过审核')
+    return
+  }
+
   try {
-    const { value } = await ElMessageBox.prompt('请输入拒绝原因', '拒绝生产订单', {
-      confirmButtonText: '确认拒绝',
-      inputPlaceholder: '拒绝原因',
-      inputType: 'textarea',
-    })
+    if (!approved) {
+      await ElMessageBox.confirm('确定拒绝该生产订单吗？', '拒绝生产订单', {
+        confirmButtonText: '确认拒绝',
+        type: 'warning',
+      })
+    }
     actionSubmitting.value = true
-    await productionService.approveOrder(order.orderId, false, value)
-    ElMessage.success('生产订单已拒绝')
+    await productionService.approveOrder(order.orderId, approved, reviewComment.value)
+    let successMessage = '生产订单已拒绝'
+    if (approved) {
+      successMessage = '订单已通过审核并锁定生产物料'
+    }
+    ElMessage.success(successMessage)
+    reviewDialogVisible.value = false
     await loadOrders(page.value)
   } catch (requestError) {
     if (requestError !== 'cancel' && requestError !== 'close') {
-      ElMessage.error(getErrorMessage(requestError, '拒绝生产订单失败'))
+      let failureMessage = '拒绝生产订单失败'
+      if (approved) {
+        failureMessage = '审核生产订单失败'
+      }
+      ElMessage.error(getErrorMessage(requestError, failureMessage))
+      if (approved) {
+        await loadReviewPreview()
+      }
     }
   } finally {
     actionSubmitting.value = false
@@ -567,7 +614,7 @@ onMounted(() => {
               link
               :disabled="actionSubmitting"
               type="primary"
-              @click="approveOrder(row)"
+              @click="openReviewDialog(row)"
               >审核</el-button
             >
             <el-button
@@ -641,11 +688,20 @@ onMounted(() => {
           <el-button link type="primary" @click="loadProductOptions(true)">重新加载选项</el-button>
         </template>
       </el-alert>
+      <el-alert
+        v-if="orderRequirementsLocked"
+        class="request-error"
+        :closable="false"
+        show-icon
+        title="该订单已锁定生产物料，仅允许调整计划日期。"
+        type="info"
+      />
       <el-form ref="orderFormRef" :model="orderForm" :rules="orderRules" label-width="120px">
         <el-form-item label="产品" prop="versionId">
           <el-select
             v-model="orderForm.versionId"
             clearable
+            :disabled="orderRequirementsLocked"
             filterable
             :loading="productOptionsLoading"
             no-data-text="暂无当前生效的产品 BOM"
@@ -665,6 +721,7 @@ onMounted(() => {
           <el-input-number
             :controls="false"
             v-model="orderForm.planQty"
+            :disabled="orderRequirementsLocked"
             :min="1"
             style="width: 100%"
           />
@@ -689,12 +746,118 @@ onMounted(() => {
       <template #footer>
         <el-button @click="orderDialogVisible = false">取消</el-button>
         <el-button
-          :disabled="productOptionsLoading || !productOptions.length"
+          :disabled="!orderRequirementsLocked && (productOptionsLoading || !productOptions.length)"
           :loading="submitting"
           type="primary"
           @click="submitOrderForm"
           >保存</el-button
         >
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="reviewDialogVisible"
+      :close-on-click-modal="false"
+      title="审核生产订单"
+      width="880px"
+    >
+      <el-alert
+        v-if="reviewingOrder"
+        class="request-error"
+        :closable="false"
+        :title="`订单 #${reviewingOrder.orderId} · ${
+          reviewingOrder.materialName || `物料 #${reviewingOrder.materialId}`
+        } · 计划数量 ${reviewingOrder.planQty}`"
+        type="info"
+      />
+      <el-skeleton v-if="reviewLoading" animated :rows="6" />
+      <el-alert
+        v-else-if="reviewError"
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="reviewError"
+        type="error"
+      >
+        <template #default>
+          <el-button link type="primary" @click="loadReviewPreview">重新计算</el-button>
+        </template>
+      </el-alert>
+      <template v-else-if="reviewPreview">
+        <el-alert
+          class="request-error"
+          :closable="false"
+          show-icon
+          :title="
+            reviewPreview.canApprove
+              ? '当前库存充足，审核通过后将立即锁定以下物料。'
+              : '当前库存不足，不能通过审核。'
+          "
+          :type="reviewPreview.canApprove ? 'success' : 'warning'"
+        />
+        <el-table :data="reviewPreview.items" max-height="360" stripe>
+          <el-table-column label="物料" min-width="150">
+            <template #default="{ row }">
+              {{ row.materialName }}（#{{ row.materialId }}）
+            </template>
+          </el-table-column>
+          <el-table-column label="BOM 用量" min-width="95">
+            <template #default="{ row }">{{ formatNumber(row.bomQuantity) }}</template>
+          </el-table-column>
+          <el-table-column label="损耗率" min-width="80">
+            <template #default="{ row }">{{ formatNumber(row.lossRate * 100) }}%</template>
+          </el-table-column>
+          <el-table-column label="订单需求" min-width="100">
+            <template #default="{ row }">
+              {{ formatNumber(row.requiredQty) }} {{ row.unit }}
+            </template>
+          </el-table-column>
+          <el-table-column label="已锁定" min-width="90">
+            <template #default="{ row }">{{ formatNumber(row.lockedQty) }}</template>
+          </el-table-column>
+          <el-table-column label="本次待锁" min-width="90">
+            <template #default="{ row }">{{ formatNumber(row.pendingLockQty) }}</template>
+          </el-table-column>
+          <el-table-column label="可用库存" min-width="90">
+            <template #default="{ row }">{{ formatNumber(row.availableQty) }}</template>
+          </el-table-column>
+          <el-table-column label="缺口" min-width="90">
+            <template #default="{ row }">
+              <span :class="{ 'shortage-value': row.shortageQty > 0 }">
+                {{ formatNumber(row.shortageQty) }}
+              </span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+      <el-form class="review-comment" label-width="80px">
+        <el-form-item label="审核意见">
+          <el-input
+            v-model.trim="reviewComment"
+            :disabled="actionSubmitting"
+            maxlength="200"
+            placeholder="可选"
+            :rows="3"
+            show-word-limit
+            type="textarea"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="actionSubmitting" type="danger" plain @click="submitReview(false)">
+          拒绝订单
+        </el-button>
+        <el-button :disabled="actionSubmitting" @click="reviewDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          :disabled="reviewLoading || !reviewPreview?.canApprove"
+          :loading="actionSubmitting"
+          type="primary"
+          @click="submitReview(true)"
+        >
+          通过并锁定物料
+        </el-button>
       </template>
     </el-dialog>
 
@@ -809,6 +972,13 @@ onMounted(() => {
 }
 .report-form {
   margin-top: 18px;
+}
+.review-comment {
+  margin-top: 18px;
+}
+.shortage-value {
+  color: var(--el-color-danger);
+  font-weight: 600;
 }
 .pagination {
   display: flex;
