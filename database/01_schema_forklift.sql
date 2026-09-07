@@ -375,6 +375,7 @@ CREATE TABLE finish_inbound (
     batch_no       VARCHAR2(30) NOT NULL,
     inbound_time   TIMESTAMP NOT NULL,
     operator_id    NUMBER(10) NOT NULL REFERENCES sys_user(user_id),
+    CONSTRAINT uq_finish_inbound_batch UNIQUE (batch_no),
     CONSTRAINT ck_inbound_qty CHECK (qualified_qty <= finish_qty)
 );
 
@@ -401,6 +402,7 @@ CREATE INDEX idx_prod_order_status  ON production_order(status, material_id);
 CREATE INDEX idx_line_output_time    ON line_output_record(line_id, recorded_time);
 CREATE INDEX idx_lock_order         ON stock_lock(order_id, status);
 CREATE INDEX idx_alert_material     ON stock_alert(material_id, status);
+CREATE INDEX idx_inbound_order      ON finish_inbound(order_id, inbound_time);
 CREATE INDEX idx_bc_order           ON batch_consumption(order_id);
 CREATE INDEX idx_bc_item            ON batch_consumption(item_id);
 CREATE INDEX idx_oplog_time         ON operation_log(operate_time);
@@ -637,7 +639,7 @@ WHERE r.role_name = '库存管理员'
     'inventory:obsolete:view','inventory:obsolete:detect','inventory:obsolete:handle',
     'inventory:completion:view','inventory:completion:create',
     'purchase:supplier:view','purchase:buyer:view','purchase:order:create',
-    'production:order:view'
+    'production:order:view','production:order:finish'
   );
 
 -- 质量管理员：质量追溯全流程及追溯页面依赖的跨模块只读权限。

@@ -17,6 +17,7 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class ProductionOrderController(
     ProductionOrderService orderService,
+    ProductionCompletionService completionService,
     AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
@@ -173,6 +174,45 @@ public class ProductionOrderController(
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
+    [Route("reportProductionCompletion")]
+    [OperationAudit("生产订单", "完工报工", OperationAuditSnapshotKind.ProductionOrder)]
+    [RequireJsonFields("order_id", "finish_qty", "qualified_qty", "batch_no")]
+    public IActionResult ReportCompletion([FromBody] ProductionCompletionReportRequest? request)
+    {
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionOrderFinishEnum);
+        if (!auth.Ok)
+        {
+            return Ok(ReportDetail(
+                (ProductionCompletionReportResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权进行完工报工",
+                null));
+        }
+
+        if (request is null)
+        {
+            return Ok(ReportDetail(
+                ProductionCompletionReportResponse.CodeEnum._400Enum,
+                "请求体不能为空",
+                null));
+        }
+
+        ProductionCompletionReportOutcome result = completionService.Report(request, auth.User!);
+        return result.Ok
+            ? Ok(ReportDetail(
+                ProductionCompletionReportResponse.CodeEnum._200Enum,
+                result.Data!.OrderCompleted ? "报工成功，生产订单已完工" : "报工成功",
+                result.Data))
+            : Ok(ReportDetail(
+                (ProductionCompletionReportResponse.CodeEnum)result.ErrorCode,
+                result.ErrorMessage ?? "完工报工失败",
+                null));
+    }
+
+    [HttpPost]
+    [Consumes("application/json")]
+    [Produces("application/json")]
     [Route("cancelProductionOrder")]
     [OperationAudit("生产订单", "取消生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Cancel([FromBody] ProductionOrderActionRequest? request)
@@ -213,6 +253,16 @@ public class ProductionOrderController(
         ProductionOrderResponse.CodeEnum code,
         string message,
         ProductionOrderDetail? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static ProductionCompletionReportResponse ReportDetail(
+        ProductionCompletionReportResponse.CodeEnum code,
+        string message,
+        ProductionCompletionReportResult? data) => new()
         {
             Code = code,
             Message = message,

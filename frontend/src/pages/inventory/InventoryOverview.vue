@@ -58,7 +58,7 @@ const shortcuts = [
     title: '库存监控',
   },
   {
-    description: '登记生产订单完工批次并查询入库记录。',
+    description: '查询生产订单完工批次与入库记录。',
     icon: Van,
     route: '/inventory/register',
     title: '完工入库',

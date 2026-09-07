@@ -23,6 +23,7 @@ import type {
   ProductionCapacityEstimateResult,
   ProductionLine,
   ProductionLineStatus,
+  ProductionCompletionReportResult,
   ProductionOrderDetail,
 } from '@/api'
 import { materialBomApi, productionApi } from '@/api/client'
@@ -102,6 +103,18 @@ export interface ProductionOrderFormData {
   planQty: number
   planStart: string
   versionId: number
+}
+
+export interface ProductionCompletionReportFormData {
+  batchNo: string
+  finishQty: number
+  orderId: number
+  qualifiedQty: number
+}
+
+export interface ProductionCompletionReportItem {
+  orderCompleted: boolean
+  productionOrder: ProductionOrderItem
 }
 
 export interface ProductionOrderProductOption {
@@ -826,6 +839,26 @@ export const productionService = {
     })
     const data = requireData(response.data as ApiEnvelope<FaultRecord | undefined>)
     return toFaultRecord(data)
+  },
+
+  async reportProductionCompletion(
+    form: ProductionCompletionReportFormData,
+  ): Promise<ProductionCompletionReportItem> {
+    const response = await productionApi.reportProductionCompletion({
+      productionCompletionReportRequest: {
+        batch_no: form.batchNo.trim(),
+        finish_qty: form.finishQty,
+        order_id: form.orderId,
+        qualified_qty: form.qualifiedQty,
+      },
+    })
+    const data = requireData(
+      response.data as ApiEnvelope<ProductionCompletionReportResult | undefined>,
+    )
+    return {
+      orderCompleted: data.order_completed,
+      productionOrder: toProductionOrder(data.production_order),
+    }
   },
 
   async reviewExternalOrder(extOrderId: number, accepted: boolean, reviewComment?: string) {

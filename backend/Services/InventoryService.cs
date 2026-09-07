@@ -918,10 +918,13 @@ public class InventoryService(
             while (reader.Read()) records.Add(MapInbound(reader, []));
         }
 
+        var latestInboundIds = GetLatestInboundIds(conn, records.Select(record => record.OrderId));
         var locksByOrder = GetConsumedLocks(conn, records.Select(record => record.OrderId));
         foreach (var record in records)
         {
-            record.ConsumedLockRecords = locksByOrder.GetValueOrDefault(record.OrderId) ?? [];
+            record.ConsumedLockRecords = latestInboundIds.GetValueOrDefault(record.OrderId) == record.InboundId
+                ? locksByOrder.GetValueOrDefault(record.OrderId) ?? []
+                : [];
         }
 
         return (records, total);
@@ -1282,6 +1285,40 @@ public class InventoryService(
         return locksByOrder;
     }
 
+    private static Dictionary<long, long> GetLatestInboundIds(
+        OracleConnection conn,
+        IEnumerable<long> orderIds)
+    {
+        var ids = orderIds.Distinct().ToList();
+        var latestInboundIds = new Dictionary<long, long>();
+        if (ids.Count == 0)
+        {
+            return latestInboundIds;
+        }
+
+        using var cmd = conn.CreateCommand();
+        var placeholders = new List<string>();
+        for (var index = 0; index < ids.Count; index++)
+        {
+            var name = $"orderId{index}";
+            placeholders.Add($":{name}");
+            cmd.Parameters.Add(new OracleParameter(name, ids[index]));
+        }
+
+        cmd.CommandText = @"SELECT ORDER_ID, MAX(INBOUND_ID)
+                            FROM FINISH_INBOUND" +
+            $" WHERE ORDER_ID IN ({string.Join(", ", placeholders)})" +
+            " GROUP BY ORDER_ID";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            latestInboundIds[Convert.ToInt64(reader.GetValue(0))] =
+                Convert.ToInt64(reader.GetValue(1));
+        }
+
+        return latestInboundIds;
+    }
+
     private static InventoryAlertEvent? GetAlertInternal(OracleConnection conn, long alertId)
     {
         using var cmd = conn.CreateCommand();
@@ -1323,7 +1360,10 @@ public class InventoryService(
 
         var inbound = MapInbound(reader, []);
         reader.Close();
-        inbound.ConsumedLockRecords = GetConsumedLocks(conn, inbound.OrderId);
+        var latestInboundIds = GetLatestInboundIds(conn, [inbound.OrderId]);
+        inbound.ConsumedLockRecords = latestInboundIds.GetValueOrDefault(inbound.OrderId) == inbound.InboundId
+            ? GetConsumedLocks(conn, inbound.OrderId)
+            : [];
         return inbound;
     }
 

@@ -1,55 +1,33 @@
 <script setup lang="ts">
 import type {
   CompletionInboundDetail,
-  CompletionInboundFormData,
   CompletionInboundItem,
   CompletionInboundQuery,
-  InventoryProductionOrderOption,
   InventoryReferenceData,
 } from '@/types/inventory'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { PermissionCode } from '@/constants/permissions'
+import { Refresh, Search } from '@element-plus/icons-vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getErrorMessage } from '@/utils/error'
 import { inventoryService } from '@/services/InventoryService'
-import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
-const auth = useAuthStore()
-const canCreateInbound = computed(() =>
-  auth.hasPermission(PermissionCode.InventoryCompletionCreate),
-)
 const router = useRouter()
 const loading = ref(false)
-const submitting = ref(false)
 const error = ref('')
 const items = ref<CompletionInboundItem[]>([])
 const total = ref(0)
 const dateRange = ref<[string, string]>()
 const query = reactive<CompletionInboundQuery>({ page: 1, pageSize: 10 })
-const dialogOpen = ref(false)
 const detailDrawerOpen = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
 const selectedInbound = ref<CompletionInboundDetail>()
-const formRef = ref<FormInstance>()
-const form = reactive<CompletionInboundFormData>({
-  batchNo: '',
-  finishQty: 1,
-  materialId: 0,
-  operatorId: 0,
-  orderId: 0,
-  qualifiedQty: 1,
-  versionId: 0,
-})
 let alive = true
 let requestId = 0
-const referenceLoading = ref(false)
 const referenceError = ref('')
 const referenceData = ref<InventoryReferenceData>({
   bomVersions: [],
@@ -58,54 +36,8 @@ const referenceData = ref<InventoryReferenceData>({
 })
 let referenceRequestId = 0
 
-const qualifiedRate = computed(() => calculateQualifiedRate(form.finishQty, form.qualifiedQty))
-const selectedProductionOrder = computed(() =>
-  referenceData.value.productionOrders.find((item) => item.orderId === form.orderId),
-)
-const inboundOrderOptions = computed(() =>
-  referenceData.value.productionOrders.filter(
-    (item) => item.remainingQty > 0 && !['cancelled', 'completed'].includes(item.status),
-  ),
-)
-
-function calculateQualifiedRate(finishQty: number, qualifiedQty: number) {
-  if (finishQty <= 0) {
-    return 0
-  }
-  return (qualifiedQty / finishQty) * 100
-}
-
-const formRules: FormRules<CompletionInboundFormData> = {
-  batchNo: [
-    { message: '请输入生产批次号', required: true, trigger: 'blur' },
-    { max: 80, message: '批次号不能超过 80 个字符', trigger: 'blur' },
-  ],
-  finishQty: [
-    { message: '请输入完工数量', required: true, trigger: 'blur', type: 'number' },
-    { message: '完工数量必须大于 0', min: 0.01, trigger: 'blur', type: 'number' },
-  ],
-  materialId: [{ message: '请选择产出物料', required: true, trigger: 'change', type: 'number' }],
-  orderId: [{ message: '请选择生产订单', required: true, trigger: 'change', type: 'number' }],
-  qualifiedQty: [
-    {
-      trigger: 'change',
-      validator: (_rule, value, callback) => {
-        if (typeof value !== 'number' || value < 0) {
-          callback(new Error('合格数量不能小于 0'))
-        } else if (value > form.finishQty) {
-          callback(new Error('合格数量不能大于完工数量'))
-        } else {
-          callback()
-        }
-      },
-    },
-  ],
-  versionId: [{ message: '请选择 BOM 版本', required: true, trigger: 'change', type: 'number' }],
-}
-
 async function loadReferenceData() {
   const currentRequestId = ++referenceRequestId
-  referenceLoading.value = true
   referenceError.value = ''
   try {
     const data = await inventoryService.getReferenceData()
@@ -115,10 +47,6 @@ async function loadReferenceData() {
   } catch (requestError) {
     if (alive && currentRequestId === referenceRequestId) {
       referenceError.value = getErrorMessage(requestError, '生产订单与产出物料选项加载失败')
-    }
-  } finally {
-    if (alive && currentRequestId === referenceRequestId) {
-      referenceLoading.value = false
     }
   }
 }
@@ -160,33 +88,6 @@ function searchItems() {
   void loadItems()
 }
 
-function openDialog() {
-  Object.assign(form, {
-    batchNo: '',
-    finishQty: 1,
-    materialId: 0,
-    operatorId: auth.currentUser?.id ?? 0,
-    orderId: 0,
-    qualifiedQty: 1,
-    versionId: 0,
-  })
-  dialogOpen.value = true
-}
-
-function handleProductionOrderChange(orderId: number) {
-  const order = referenceData.value.productionOrders.find((item) => item.orderId === orderId)
-  if (!order) {
-    return
-  }
-  Object.assign(form, {
-    finishQty: Math.min(1, order.remainingQty),
-    materialId: order.materialId,
-    qualifiedQty: Math.min(1, order.remainingQty),
-    versionId: order.versionId,
-  })
-  formRef.value?.clearValidate()
-}
-
 async function viewInbound(item: CompletionInboundItem) {
   selectedInbound.value = undefined
   detailError.value = ''
@@ -217,51 +118,6 @@ function closeInboundDetail() {
   detailError.value = ''
 }
 
-async function submitInbound() {
-  const operatorId = auth.currentUser?.id
-  if (!operatorId) {
-    ElMessage.error('当前会话缺少操作人信息，请重新登录')
-    return
-  }
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid || submitting.value) {
-    return
-  }
-  const productionOrder: InventoryProductionOrderOption | undefined = selectedProductionOrder.value
-  if (
-    productionOrder &&
-    (productionOrder.materialId !== form.materialId || productionOrder.versionId !== form.versionId)
-  ) {
-    ElMessage.warning('生产订单、产出物料和 BOM 版本不匹配')
-    return
-  }
-  if (productionOrder && form.finishQty > productionOrder.remainingQty) {
-    ElMessage.warning(`本次完工数量不能超过剩余数量 ${formatNumber(productionOrder.remainingQty)}`)
-    return
-  }
-  submitting.value = true
-  try {
-    const created = await inventoryService.addCompletionInbound({
-      ...form,
-      batchNo: form.batchNo.trim(),
-      operatorId,
-    })
-    const consumedCount = created?.consumedLockRecords?.length ?? 0
-    let message = '完工入库登记成功'
-    if (consumedCount > 0) {
-      message = `完工入库登记成功，已消耗 ${consumedCount} 条库存锁定记录`
-    }
-    ElMessage.success(message)
-    dialogOpen.value = false
-    query.page = 1
-    await Promise.all([loadItems(), loadReferenceData()])
-  } catch (requestError) {
-    ElMessage.error(getErrorMessage(requestError, '完工入库登记失败'))
-  } finally {
-    submitting.value = false
-  }
-}
-
 onMounted(() => {
   void loadItems()
   void loadReferenceData()
@@ -275,15 +131,9 @@ onBeforeUnmount(() => {
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="完工入库登记"
-      description="登记生产完工批次，核对合格数量并追踪历史入库记录。"
-    >
+    <PageHeader title="完工入库记录" description="查询生产完工批次、核对合格数量并查看入库详情。">
       <template #actions>
         <el-button :icon="Refresh" :loading="loading" @click="loadItems">刷新</el-button>
-        <el-button v-if="canCreateInbound" :icon="Plus" type="primary" @click="openDialog"
-          >登记入库</el-button
-        >
       </template>
     </PageHeader>
 
@@ -420,102 +270,6 @@ onBeforeUnmount(() => {
       />
     </el-card>
 
-    <el-dialog
-      v-model="dialogOpen"
-      title="登记完工入库"
-      width="min(94vw, 620px)"
-      @closed="formRef?.resetFields()"
-    >
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="115px">
-        <div class="form-grid">
-          <el-form-item label="生产订单 ID" prop="orderId"
-            ><el-input-number
-              :controls="false"
-              v-if="!referenceData.productionOrders.length"
-              v-model="form.orderId"
-              :min="1"
-              :precision="0"
-              placeholder="输入生产订单 ID" /><el-select
-              v-else
-              v-model="form.orderId"
-              filterable
-              :loading="referenceLoading"
-              placeholder="选择待入库订单 ID"
-              @change="handleProductionOrderChange"
-              ><el-option
-                v-for="order in inboundOrderOptions"
-                :key="order.orderId"
-                :label="`#${order.orderId} · ${order.materialName} · 剩余 ${formatNumber(
-                  order.remainingQty,
-                )}`"
-                :value="order.orderId" /></el-select
-          ></el-form-item>
-          <el-form-item label="产出物料" prop="materialId"
-            ><el-input-number
-              :controls="false"
-              v-if="!referenceData.productionOrders.length"
-              v-model="form.materialId"
-              :min="1"
-              :precision="0"
-              placeholder="输入产出物料 ID" /><el-select v-else v-model="form.materialId" disabled
-              ><el-option
-                v-if="selectedProductionOrder"
-                :label="selectedProductionOrder.materialName"
-                :value="selectedProductionOrder.materialId" /></el-select
-          ></el-form-item>
-          <el-form-item label="BOM 版本" prop="versionId"
-            ><el-input-number
-              :controls="false"
-              v-if="!referenceData.productionOrders.length"
-              v-model="form.versionId"
-              :min="1"
-              :precision="0"
-              placeholder="输入 BOM 版本编号" /><el-select v-else v-model="form.versionId" disabled
-              ><el-option
-                v-if="selectedProductionOrder"
-                :label="
-                  selectedProductionOrder.versionNo || `#${selectedProductionOrder.versionId}`
-                "
-                :value="selectedProductionOrder.versionId" /></el-select
-          ></el-form-item>
-          <el-form-item label="生产批次号" prop="batchNo"
-            ><el-input v-model.trim="form.batchNo" maxlength="80" placeholder="如 AX100-20260727-A"
-          /></el-form-item>
-          <el-form-item label="完工数量" prop="finishQty"
-            ><el-input-number
-              :controls="false"
-              v-model="form.finishQty"
-              :max="selectedProductionOrder?.remainingQty"
-              :min="0.01"
-              :precision="2"
-          /></el-form-item>
-          <el-form-item label="合格数量" prop="qualifiedQty"
-            ><el-input-number
-              :controls="false"
-              v-model="form.qualifiedQty"
-              :max="form.finishQty"
-              :min="0"
-              :precision="2"
-          /></el-form-item>
-        </div>
-        <el-alert
-          :closable="false"
-          :title="`本批次合格率 ${formatNumber(qualifiedRate)}%${
-            selectedProductionOrder
-              ? ` · 订单剩余 ${formatNumber(selectedProductionOrder.remainingQty)}`
-              : ''
-          }`"
-          type="info"
-        />
-      </el-form>
-      <template #footer
-        ><el-button @click="dialogOpen = false">取消</el-button
-        ><el-button :loading="submitting" type="primary" @click="submitInbound"
-          >确认登记</el-button
-        ></template
-      >
-    </el-dialog>
-
     <el-drawer
       v-model="detailDrawerOpen"
       size="min(94vw, 680px)"
@@ -640,16 +394,6 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   margin-top: 16px;
 }
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 12px;
-}
-.form-grid :deep(.el-input-number),
-.form-grid :deep(.el-input),
-.form-grid :deep(.el-select) {
-  width: 100%;
-}
 .inbound-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -669,9 +413,6 @@ onBeforeUnmount(() => {
 @media (max-width: 680px) {
   .query-bar > * {
     flex: 1 1 160px;
-  }
-  .form-grid {
-    grid-template-columns: 1fr;
   }
   .inbound-detail-grid {
     grid-template-columns: 1fr;

@@ -20,9 +20,9 @@ public sealed record ProductionOrderResult(
 
 /// <summary>
 /// 生产订单主责 Service（C 模块）。维护 production_order 表及其状态机：
-/// pending_review → pending_schedule → in_progress → completed，任意非终态可 → cancelled。
+/// pending_review → pending_schedule → in_progress → completed，未报工的非终态可 → cancelled。
 /// 展示用的 material_name / version_no 通过 JOIN material、bom_version 得到，不维护这些表。
-/// 按当前分工，本阶段完工不联动库存（stock_lock / finish_inbound / material_stock 待 B 就绪后接入）。
+/// 分次完工报工及其库存联动由 ProductionCompletionService 负责。
 /// </summary>
 public class ProductionOrderService(string connString)
 {
@@ -377,6 +377,11 @@ public class ProductionOrderService(string connString)
             return ProductionOrderResult.Fail(409, "已完工或已取消订单不可取消");
         }
 
+        if (current == ProductionStatusMap.Db.InProgress && HasCompletionReports(conn, request.OrderId))
+        {
+            return ProductionOrderResult.Fail(409, "已发生完工报工的生产订单不可取消");
+        }
+
         int affected;
         using (var cmd = conn.CreateCommand())
         {
@@ -398,10 +403,14 @@ public class ProductionOrderService(string connString)
         return ProductionOrderResult.Success(GetInternal(conn, request.OrderId)!);
     }
 
-    private static ProductionOrderDetail? GetInternal(OracleConnection conn, long orderId)
+    internal static ProductionOrderDetail? GetInternal(
+        OracleConnection conn,
+        long orderId,
+        OracleTransaction? transaction = null)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = SelectColumns + " WHERE po.ORDER_ID = :orderId";
+        cmd.Transaction = transaction;
         cmd.Parameters.Add(new OracleParameter("orderId", orderId));
 
         using var reader = cmd.ExecuteReader();
@@ -432,6 +441,14 @@ public class ProductionOrderService(string connString)
                             WHERE VERSION_ID = :versionId AND MATERIAL_ID = :materialId";
         cmd.Parameters.Add(new OracleParameter("versionId", versionId));
         cmd.Parameters.Add(new OracleParameter("materialId", materialId));
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+    }
+
+    private static bool HasCompletionReports(OracleConnection conn, long orderId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM FINISH_INBOUND WHERE ORDER_ID = :orderId";
+        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 

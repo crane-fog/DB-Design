@@ -67,6 +67,9 @@ builder.Services.AddScoped(sp => new AuthService(connString, jwtSecret, sp.GetRe
 builder.Services.AddScoped<IUserTestService>(_ => new UserTestService(connString));
 builder.Services.AddScoped(_ => new UserContextService(connString));
 builder.Services.AddScoped(_ => new ProductionOrderService(connString));
+builder.Services.AddScoped(sp => new ProductionCompletionService(
+    connString,
+    sp.GetRequiredService<ILogger<ProductionCompletionService>>()));
 builder.Services.AddScoped(sp => new ExternalOrderService(connString, sp.GetRequiredService<ILogger<ExternalOrderService>>()));
 builder.Services.AddScoped(_ => new QualityTraceService(connString));
 builder.Services.AddScoped<BomGraphValidationService>();

@@ -8,8 +8,6 @@ import {
   type ProductionCapacityEstimateItem,
   type ProductionLineItem,
   type ProductionOrderProductOption,
-  type ProductionLineRunStatus,
-  type ProductionLineStatusItem,
   productionService,
 } from '@/services/ProductionService'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -26,9 +24,8 @@ import { getErrorMessage } from '@/utils/error'
 import { inventoryService } from '@/services/InventoryService'
 import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
-import { useRoute } from 'vue-router'
 
-type OperationsTab = 'balance' | 'detection' | 'estimate' | 'external' | 'status'
+type OperationsTab = 'balance' | 'detection' | 'estimate' | 'external'
 
 const externalStatusLabels = {
   accepted: '已接受',
@@ -36,10 +33,7 @@ const externalStatusLabels = {
   pending_review: '待审核',
   rejected: '已拒绝',
 }
-const lineStatusLabels = { fault: '故障', idle: '空闲', running: '运行中' }
-
 const auth = useAuthStore()
-const route = useRoute()
 const canViewOwnExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderViewOwn))
 const canViewAllExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderViewAll))
 const canViewExternal = computed(() => canViewOwnExternal.value || canViewAllExternal.value)
@@ -63,9 +57,6 @@ const canDetectCapacity = computed(() =>
 const canBalanceCapacity = computed(() =>
   auth.hasPermission(PermissionCode.ProductionCapacityBalance),
 )
-const canUpdateLineStatus = computed(() =>
-  auth.hasPermission(PermissionCode.ProductionLineStatusUpdate),
-)
 const canViewProductionOrders = computed(() =>
   auth.hasPermission(PermissionCode.ProductionOrderView),
 )
@@ -79,13 +70,9 @@ const hasOperationsAccess = computed(
     hasExternalAccess.value ||
     canEstimateCapacity.value ||
     canDetectCapacity.value ||
-    canBalanceCapacity.value ||
-    canUpdateLineStatus.value,
+    canBalanceCapacity.value,
 )
 function getInitialTab(): OperationsTab {
-  if (route.query.tab === 'status' && canUpdateLineStatus.value) {
-    return 'status'
-  }
   if (hasExternalAccess.value) {
     return 'external'
   }
@@ -98,7 +85,7 @@ function getInitialTab(): OperationsTab {
   if (canBalanceCapacity.value) {
     return 'balance'
   }
-  return 'status'
+  return 'external'
 }
 const initialTab = getInitialTab()
 const activeTab = ref<OperationsTab>(initialTab)
@@ -542,70 +529,7 @@ async function saveBalance() {
   }
 }
 
-// ---------- 生产线实时状态 ----------
-const lineStatusLoading = ref(false)
-const lineStatusError = ref('')
-const lineStatusResult = ref<ProductionLineStatusItem>()
-const lineStatusForm = reactive({
-  currentMaterialId: 0,
-  currentOrderId: 0,
-  efficiency: undefined as number | undefined,
-  finishedQty: undefined as number | undefined,
-  lineId: 0,
-  status: 'idle' as ProductionLineRunStatus,
-})
-
-async function updateLineStatus() {
-  if (lineStatusForm.lineId <= 0) {
-    ElMessage.warning('请选择生产线')
-    return
-  }
-  if (
-    lineStatusForm.efficiency !== undefined &&
-    (lineStatusForm.efficiency < 0 || lineStatusForm.efficiency > 1)
-  ) {
-    ElMessage.warning('效率必须在 0 到 1 之间')
-    return
-  }
-  lineStatusLoading.value = true
-  lineStatusError.value = ''
-  try {
-    let currentMaterialId = lineStatusForm.currentMaterialId || undefined
-    let currentOrderId = lineStatusForm.currentOrderId || undefined
-    if (lineStatusForm.status === 'idle') {
-      currentMaterialId = undefined
-      currentOrderId = undefined
-    }
-    lineStatusResult.value = await productionService.updateLineStatus({
-      currentMaterialId,
-      currentOrderId,
-      efficiency: lineStatusForm.efficiency,
-      finishedQty: lineStatusForm.finishedQty,
-      lineId: lineStatusForm.lineId,
-      status: lineStatusForm.status,
-    })
-    ElMessage.success('生产线状态已更新')
-    await loadLineOptions()
-  } catch (error) {
-    lineStatusResult.value = undefined
-    lineStatusError.value = getErrorMessage(error, '生产线状态更新失败')
-  } finally {
-    lineStatusLoading.value = false
-  }
-}
-
 onMounted(() => {
-  if (
-    route.query.tab === 'status' &&
-    canUpdateLineStatus.value &&
-    typeof route.query.orderId === 'string'
-  ) {
-    const orderId = parsePositiveInt(route.query.orderId)
-    if (orderId) {
-      lineStatusForm.currentOrderId = orderId
-      lineStatusForm.status = 'running'
-    }
-  }
   if (canViewExternal.value) {
     void loadExternalOrders()
   }
@@ -615,10 +539,7 @@ onMounted(() => {
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="生产运营"
-      description="处理外部订单、交付评估、产能检测与平衡，并维护生产线实时状态。"
-    />
+    <PageHeader title="生产运营" description="处理外部订单、交付评估、产能检测与平衡。" />
 
     <el-empty v-if="!hasOperationsAccess" description="当前账号暂无外部订单或生产运营权限" />
     <el-tabs v-else v-model="activeTab" class="operations-tabs">
@@ -1025,126 +946,6 @@ onMounted(() => {
             </el-descriptions-item>
           </el-descriptions>
           <el-empty v-else description="保存调整后显示前后方案与受影响订单" />
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane v-if="canUpdateLineStatus" label="产线状态与报工" name="status">
-        <el-card v-if="canViewLines" class="section-card table-card" shadow="never">
-          <el-table :data="lineOptions" stripe>
-            <el-table-column label="生产线" min-width="100">
-              <template #default="{ row }">#{{ row.lineId }}</template>
-            </el-table-column>
-            <el-table-column label="线型" min-width="150">
-              <template #default="{ row }">{{ row.typeName || `#${row.typeId}` }}</template>
-            </el-table-column>
-            <el-table-column label="负责人" min-width="130">
-              <template #default="{ row }">{{ row.managerName || `#${row.managerId}` }}</template>
-            </el-table-column>
-            <el-table-column label="启用日期" min-width="120" prop="startDate" />
-            <el-table-column label="当前状态" min-width="110">
-              <template #default="{ row }">
-                <StatusTag v-if="row.status" :labels="lineStatusLabels" :value="row.status" />
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-if="!lineOptions.length" description="暂无生产线数据" />
-        </el-card>
-        <el-card class="section-card" shadow="never">
-          <p>按产线当前任务记录累计产量；订单完工数量在生产订单页登记。</p>
-          <el-form :model="lineStatusForm" inline>
-            <el-form-item label="生产线">
-              <el-select
-                v-if="canViewLines"
-                v-model="lineStatusForm.lineId"
-                filterable
-                style="width: 180px"
-              >
-                <el-option
-                  v-for="line in lineOptions"
-                  :key="line.lineId"
-                  :label="`生产线 #${line.lineId}`"
-                  :value="line.lineId"
-                />
-              </el-select>
-              <el-input-number v-else v-model="lineStatusForm.lineId" :controls="false" :min="1" />
-            </el-form-item>
-            <el-form-item label="运行状态">
-              <el-select v-model="lineStatusForm.status" style="width: 120px">
-                <el-option label="空闲" value="idle" />
-                <el-option label="运行中" value="running" />
-                <el-option label="故障" value="fault" />
-              </el-select>
-            </el-form-item>
-            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前订单 ID">
-              <el-input-number :controls="false" v-model="lineStatusForm.currentOrderId" :min="0" />
-            </el-form-item>
-            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前产品">
-              <el-input-number
-                :controls="false"
-                v-model="lineStatusForm.currentMaterialId"
-                :min="0"
-              />
-            </el-form-item>
-            <el-form-item label="累计完成数量">
-              <el-input-number
-                :controls="false"
-                v-model="lineStatusForm.finishedQty"
-                :min="0"
-                placeholder="留空由后端沿用当前任务数量"
-              />
-            </el-form-item>
-            <el-form-item label="当前效率">
-              <el-input-number
-                :controls="false"
-                v-model="lineStatusForm.efficiency"
-                :max="1"
-                :min="0"
-                :precision="2"
-                :step="0.05"
-                placeholder="留空保留当前效率"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="lineStatusLoading" @click="updateLineStatus">
-                更新状态
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card class="section-card" shadow="never">
-          <el-alert
-            v-if="lineStatusError"
-            :closable="false"
-            :title="lineStatusError"
-            type="error"
-          />
-          <el-descriptions v-else-if="lineStatusResult" border :column="3">
-            <el-descriptions-item label="生产线"
-              >#{{ lineStatusResult.lineId }}</el-descriptions-item
-            >
-            <el-descriptions-item label="状态">
-              <StatusTag :labels="lineStatusLabels" :value="lineStatusResult.status" />
-            </el-descriptions-item>
-            <el-descriptions-item label="更新时间">
-              {{ formatDateTime(lineStatusResult.updatedTime) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="当前订单 ID">
-              {{ lineStatusResult.currentOrderId ? `#${lineStatusResult.currentOrderId}` : '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="当前产品">
-              {{
-                lineStatusResult.currentMaterialId ? `#${lineStatusResult.currentMaterialId}` : '-'
-              }}
-            </el-descriptions-item>
-            <el-descriptions-item label="已完成数量">
-              {{ formatNumber(lineStatusResult.finishedQty) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="当前效率">
-              {{ formatNumber(lineStatusResult.efficiency * 100) }}%
-            </el-descriptions-item>
-          </el-descriptions>
-          <el-empty v-else description="提交状态后显示生产线实时详情" />
         </el-card>
       </el-tab-pane>
     </el-tabs>

@@ -2,6 +2,7 @@
 import { EditPen, Plus, Refresh, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
+  type ProductionCompletionReportFormData,
   type ProductionOrderFormData,
   type ProductionOrderItem,
   type ProductionOrderProductOption,
@@ -19,11 +20,9 @@ import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
 import { productionOrderStatusLabels as statusLabels } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
 
 const pageSize = 10
 const auth = useAuthStore()
-const router = useRouter()
 const filters = reactive({ materialId: '', planEndEnd: '', planEndStart: '', status: '' })
 const page = ref(1)
 const loading = ref(false)
@@ -36,7 +35,6 @@ const canApproveOrder = computed(() => auth.hasPermission(PermissionCode.Product
 const canStartOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderStart))
 const canFinishOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderFinish))
 const canCancelOrder = computed(() => auth.hasPermission(PermissionCode.ProductionOrderCancel))
-const canReportLine = computed(() => auth.hasPermission(PermissionCode.ProductionLineStatusUpdate))
 
 const orderDialogVisible = ref(false)
 const orderDialogMode = ref<'create' | 'edit'>('create')
@@ -48,6 +46,10 @@ const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
 const detail = ref<ProductionOrderItem>()
+const reportDialogVisible = ref(false)
+const reportFormRef = ref<FormInstance>()
+const reportingOrder = ref<ProductionOrderItem>()
+const reportSubmitting = ref(false)
 const productOptions = ref<ProductionOrderProductOption[]>([])
 const productOptionsLoading = ref(false)
 const productOptionsError = ref('')
@@ -83,6 +85,46 @@ const orderRules: FormRules<ProductionOrderFormModel> = {
     { message: '请选择当前生效的产品 BOM', required: true, trigger: 'change', type: 'number' },
   ],
 }
+
+const reportForm = reactive<ProductionCompletionReportFormData>({
+  batchNo: '',
+  finishQty: 1,
+  orderId: 0,
+  qualifiedQty: 1,
+})
+
+const reportRules: FormRules<ProductionCompletionReportFormData> = {
+  batchNo: [
+    { message: '请输入生产批次号', required: true, trigger: 'blur' },
+    { max: 30, message: '批次号不能超过 30 个字符', trigger: 'blur' },
+  ],
+  finishQty: [
+    { message: '请输入本批完工数量', required: true, trigger: 'blur', type: 'number' },
+    { message: '本批完工数量必须大于 0', min: 0.01, trigger: 'blur', type: 'number' },
+  ],
+  qualifiedQty: [
+    {
+      trigger: 'change',
+      validator: (_rule, value, callback) => {
+        if (typeof value !== 'number' || value < 0) {
+          callback(new Error('合格数量不能小于 0'))
+        } else if (value > reportForm.finishQty) {
+          callback(new Error('合格数量不能大于本批完工数量'))
+        } else {
+          callback()
+        }
+      },
+    },
+  ],
+}
+
+const reportingRemainingQty = computed(() => {
+  const order = reportingOrder.value
+  if (!order) {
+    return 0
+  }
+  return Math.max(0, order.planQty - (order.finishedQty ?? 0))
+})
 
 function selectedStatus(): ProductionOrderStatus | undefined {
   const value = filters.status
@@ -329,30 +371,6 @@ async function startOrder(order: ProductionOrderItem) {
   }
 }
 
-async function finishOrder(order: ProductionOrderItem) {
-  if (actionSubmitting.value) {
-    return
-  }
-  try {
-    const { value } = await ElMessageBox.prompt('请输入实际完工数量', '完工生产订单', {
-      confirmButtonText: '确认完工',
-      inputErrorMessage: '完工数量必须为大于 0 的整数',
-      inputPattern: /^[1-9]\d*$/,
-      inputValue: String(order.planQty),
-    })
-    actionSubmitting.value = true
-    await productionService.finishOrder(order.orderId, Number(value))
-    ElMessage.success('生产订单已完工')
-    await loadOrders(page.value)
-  } catch (requestError) {
-    if (requestError !== 'cancel' && requestError !== 'close') {
-      ElMessage.error(getErrorMessage(requestError, '完工生产订单失败'))
-    }
-  } finally {
-    actionSubmitting.value = false
-  }
-}
-
 async function cancelOrder(order: ProductionOrderItem) {
   if (actionSubmitting.value) {
     return
@@ -376,11 +394,42 @@ async function cancelOrder(order: ProductionOrderItem) {
   }
 }
 
-function openLineReporting(order: ProductionOrderItem) {
-  void router.push({
-    name: 'production-operations',
-    query: { orderId: order.orderId, tab: 'status' },
+function openCompletionReport(order: ProductionOrderItem) {
+  const defaultQty = Math.max(0.01, order.planQty - (order.finishedQty ?? 0))
+  reportingOrder.value = order
+  Object.assign(reportForm, {
+    batchNo: '',
+    finishQty: defaultQty,
+    orderId: order.orderId,
+    qualifiedQty: defaultQty,
   })
+  reportFormRef.value?.clearValidate()
+  reportDialogVisible.value = true
+}
+
+async function submitCompletionReport() {
+  const valid = await reportFormRef.value?.validate().catch(() => false)
+  if (!valid || reportSubmitting.value) {
+    return
+  }
+  reportSubmitting.value = true
+  try {
+    const report = await productionService.reportProductionCompletion({
+      ...reportForm,
+      batchNo: reportForm.batchNo.trim(),
+    })
+    if (report.orderCompleted) {
+      ElMessage.success('本批报工成功，生产订单已自动完工')
+    } else {
+      ElMessage.success(`本批报工成功，累计合格数量 ${report.productionOrder.finishedQty ?? 0}`)
+    }
+    reportDialogVisible.value = false
+    await loadOrders(page.value)
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '生产订单报工失败'))
+  } finally {
+    reportSubmitting.value = false
+  }
 }
 
 function isReviewable(order: ProductionOrderItem) {
@@ -538,19 +587,12 @@ onMounted(() => {
               >开工</el-button
             >
             <el-button
-              v-if="isFinishable(row) && canReportLine"
-              link
-              type="primary"
-              @click="openLineReporting(row)"
-              >产线报工</el-button
-            >
-            <el-button
               v-if="canFinishOrder && isFinishable(row)"
               link
-              :disabled="actionSubmitting"
-              type="success"
-              @click="finishOrder(row)"
-              >完工</el-button
+              :disabled="reportSubmitting"
+              type="primary"
+              @click="openCompletionReport(row)"
+              >产线报工</el-button
             >
             <el-button
               v-if="canCancelOrder && isCancellable(row)"
@@ -656,6 +698,66 @@ onMounted(() => {
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="reportDialogVisible"
+      :close-on-click-modal="false"
+      title="生产订单完工报工"
+      width="520px"
+      @closed="reportFormRef?.resetFields()"
+    >
+      <el-alert
+        v-if="reportingOrder"
+        :closable="false"
+        :title="`订单 #${reportingOrder.orderId} · ${
+          reportingOrder.materialName || `物料 #${reportingOrder.materialId}`
+        } · 尚需合格 ${reportingRemainingQty}`"
+        type="info"
+      />
+      <el-form
+        ref="reportFormRef"
+        class="report-form"
+        :model="reportForm"
+        :rules="reportRules"
+        label-width="120px"
+      >
+        <el-form-item label="本批完工数量" prop="finishQty">
+          <el-input-number
+            v-model="reportForm.finishQty"
+            :controls="false"
+            :min="0.01"
+            :precision="2"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="合格数量" prop="qualifiedQty">
+          <el-input-number
+            v-model="reportForm.qualifiedQty"
+            :controls="false"
+            :max="reportForm.finishQty"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="批次号" prop="batchNo">
+          <el-input
+            v-model.trim="reportForm.batchNo"
+            maxlength="30"
+            placeholder="请输入本次报工的唯一批次号"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="reportSubmitting" @click="reportDialogVisible = false"
+          >取消</el-button
+        >
+        <el-button :loading="reportSubmitting" type="primary" @click="submitCompletionReport">
+          确认报工
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-drawer v-model="detailVisible" size="420px" title="生产订单详情">
       <el-alert v-if="detailError" :closable="false" show-icon :title="detailError" type="error" />
       <el-skeleton v-else-if="detailLoading" animated :rows="6" />
@@ -704,6 +806,9 @@ onMounted(() => {
 }
 .request-error {
   margin-bottom: 16px;
+}
+.report-form {
+  margin-top: 18px;
 }
 .pagination {
   display: flex;
