@@ -177,6 +177,8 @@ paths:
     $ref: './production.yaml#/paths/~1api~1reviewExternalOrder'
   /api/convertExternalOrderToProductionOrder:
     $ref: './production.yaml#/paths/~1api~1convertExternalOrderToProductionOrder'
+  /api/deliverExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1deliverExternalOrder'
   /api/runCapacityDetection:
     $ref: './production.yaml#/paths/~1api~1runCapacityDetection'
   /api/saveCapacityBalance:

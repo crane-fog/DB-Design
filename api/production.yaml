@@ -540,7 +540,7 @@ paths:
   /api/listExternalOrder:
     get:
       summary: 查询外部订单列表
-      description: 分页查询外部订单。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+      description: 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
       operationId: listExternalOrder
       tags: [production]
       security:
@@ -612,7 +612,7 @@ paths:
   /api/convertExternalOrderToProductionOrder:
     post:
       summary: 外部订单转生产订单
-      description: 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。需具备 external-order:convert；非法状态返回 code 409。
+      description: 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。所有生产订单的产品必须与外部订单一致，计划数量合计必须等于外部订单数量。需具备 external-order:convert；非法状态或生产计划不匹配返回 code 409。
       operationId: convertExternalOrderToProductionOrder
       tags: [production]
       security:
@@ -630,6 +630,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExternalOrderConvertResponse'
+  /api/deliverExternalOrder:
+    post:
+      summary: 外部订单整单交货
+      description: >
+        对 converted 外部订单执行一次性整单交货。后端必须在同一事务内锁定并重新读取外部订单、关联生产订单和成品库存，确认存在关联生产订单、所有关联生产订单均为 completed、关联产品均与外部订单产品一致、关联计划数量合计等于外部订单数量，并确认成品可用库存不少于外部订单数量；随后按外部订单数量扣减 material_stock.available_qty、更新 last_out_date、写入 external_order_delivery，并将外部订单状态更新为 delivered。请求不得传交货数量、产品或操作人，这些字段均由数据库记录和当前登录用户推导。不支持分批交货，同一外部订单只允许成功交货一次。复用 external-order:convert 权限；校验不通过、库存不足、重复交货或状态已变化返回 code 409。
+      operationId: deliverExternalOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalOrderDeliveryRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderDeliveryResponse'
   /api/runCapacityDetection:
     post:
       summary: 执行产能检测
@@ -777,8 +799,8 @@ components:
       enum: [pending_review, pending_schedule, in_progress, completed, cancelled]
     ExternalOrderStatus:
       type: string
-      description: 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，已转为正式生产订单；rejected 已拒绝，流程结束。
-      enum: [pending_review, accepted, converted, rejected]
+      description: 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，等待关联生产订单完工及交货；delivered 已交货，流程结束；rejected 已拒绝，流程结束。
+      enum: [pending_review, accepted, converted, delivered, rejected]
     ProductionLineRunStatus:
       type: string
       description: 生产线状态。idle 空闲；running 运行中；fault 故障。
@@ -1335,6 +1357,34 @@ components:
         review_comment:
           type: string
           nullable: true
+    ExternalOrderListItem:
+      allOf:
+        - $ref: '#/components/schemas/ExternalOrder'
+        - type: object
+          required: [production_orders, delivery_ready]
+          properties:
+            production_orders:
+              type: array
+              readOnly: true
+              description: 通过 external_order_production 关联的全部生产订单；未转换时为空数组。
+              items:
+                $ref: '#/components/schemas/ProductionOrderBrief'
+            delivery_ready:
+              type: boolean
+              readOnly: true
+              description: >
+                后端计算字段。仅当外部订单状态为 converted、存在关联生产订单、全部关联订单均为 completed、关联产品及计划数量与外部订单一致，并且成品可用库存不少于外部订单数量时为 true。前端仅使用该字段控制交货按钮，交货接口仍须在事务内重新校验。
+            delivery_block_reason:
+              type: string
+              nullable: true
+              readOnly: true
+              description: 不可交货原因；delivery_ready 为 false 时由后端返回可读说明。
+            delivery:
+              allOf:
+                - $ref: '#/components/schemas/ExternalOrderDelivery'
+              nullable: true
+              readOnly: true
+              description: 已交货订单对应的整单交货记录，尚未交货时为 null。
     ExternalOrderCreateRequest:
       type: object
       required: [material_id, quantity, expected_date, contact_person, contact_phone]
@@ -1384,6 +1434,7 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/ProductionOrderCreateRequest'
+      description: 所有生产订单的 material_id 必须等于外部订单 material_id，plan_qty 合计必须精确等于外部订单 quantity；允许将同一产品拆分为多个生产订单。
     ExternalOrderConvertResult:
       type: object
       required: [ext_order_id, production_orders, associations]
@@ -1410,6 +1461,54 @@ components:
         order_id:
           type: integer
           format: int64
+    ExternalOrderDeliveryRequest:
+      type: object
+      required: [ext_order_id]
+      properties:
+        ext_order_id:
+          type: integer
+          format: int64
+          minimum: 1
+      description: 整单交货请求。交货数量、产品、交货时间和操作人均由后端推导，客户端不得传入。
+    ExternalOrderDelivery:
+      type: object
+      required: [delivery_id, ext_order_id, material_id, quantity, delivery_time, operator_id]
+      properties:
+        delivery_id:
+          type: integer
+          format: int64
+        ext_order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
+          description: 交货时的外部订单产品快照。
+        quantity:
+          type: number
+          description: 交货时的外部订单数量快照；当前仅支持整单交货。
+        delivery_time:
+          type: string
+          format: date-time
+        operator_id:
+          type: integer
+          format: int64
+        operator_name:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 根据 operator_id 关联 sys_user.user_name 得到的展示字段。
+    ExternalOrderDeliveryResult:
+      type: object
+      required: [external_order, delivery, remaining_available_qty]
+      properties:
+        external_order:
+          $ref: '#/components/schemas/ExternalOrderListItem'
+        delivery:
+          $ref: '#/components/schemas/ExternalOrderDelivery'
+        remaining_available_qty:
+          type: number
+          description: 交货事务完成后该产品的可用库存数量。
     CapacityDetection:
       type: object
       required: [detection_id, line_id, period_start, period_end, plan_capacity, actual_capacity, diff_qty, diff_rate, reason_type]
@@ -1786,7 +1885,7 @@ components:
                     records:
                       type: array
                       items:
-                        $ref: '#/components/schemas/ExternalOrder'
+                        $ref: '#/components/schemas/ExternalOrderListItem'
     ExternalOrderConvertResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
@@ -1795,6 +1894,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ExternalOrderConvertResult'
+    ExternalOrderDeliveryResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ExternalOrderDeliveryResult'
     CapacityDetectionResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
