@@ -63,6 +63,7 @@ public class ExternalOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addExternalOrder")]
+    [OperationAudit("外部订单", "新增外部订单")]
     public IActionResult Add([FromBody] ExternalOrderCreateRequest? request)
     {
         AuthResult auth = authorization.RequireAnyPermission(
@@ -102,6 +103,7 @@ public class ExternalOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("reviewExternalOrder")]
+    [OperationAudit("外部订单", "审核外部订单", OperationAuditSnapshotKind.ExternalOrder)]
     [RequireJsonFields("accepted")]
     public IActionResult Review([FromBody] ExternalOrderReviewRequest? request)
     {
@@ -122,6 +124,7 @@ public class ExternalOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("convertExternalOrderToProductionOrder")]
+    [OperationAudit("外部订单", "转为生产订单", OperationAuditSnapshotKind.ExternalOrder)]
     public IActionResult Convert([FromBody] ExternalOrderConvertRequest? request)
     {
         AuthResult auth = authorization.RequirePermission(

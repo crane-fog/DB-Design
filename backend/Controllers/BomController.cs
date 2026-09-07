@@ -76,6 +76,7 @@ public class BomController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addBomData")]
+    [OperationAudit("BOM管理", "新增BOM明细")]
     [RequireJsonFields("loss_rate")]
     public IActionResult AddBom([FromBody] BomCreateRequest? request)
     {
@@ -96,6 +97,7 @@ public class BomController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateBomData")]
+    [OperationAudit("BOM管理", "修改BOM明细", OperationAuditSnapshotKind.Bom)]
     [RequireJsonFields("loss_rate")]
     public IActionResult UpdateBom([FromBody] BomUpdateRequest? request)
     {
@@ -116,6 +118,7 @@ public class BomController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteBomData")]
+    [OperationAudit("BOM管理", "删除BOM明细", OperationAuditSnapshotKind.Bom)]
     public IActionResult DeleteBom([FromBody] BomDeleteRequest? request)
     {
         if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialBomDeleteEnum) is { } forbidden)
@@ -138,6 +141,7 @@ public class BomController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("checkBomCycleDependency")]
+    [OperationAudit("BOM管理", "检查BOM循环依赖")]
     public IActionResult CheckCycle([FromBody] BomCycleCheckRequest? request)
     {
         if (ResolveCycleManagerOrForbidden() is { } forbidden)

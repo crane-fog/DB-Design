@@ -73,6 +73,7 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addProductionOrder")]
+    [OperationAudit("生产订单", "新增生产订单")]
     public IActionResult Add([FromBody] ProductionOrderCreateRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionOrderCreateEnum) is { } forbidden)
@@ -92,6 +93,7 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateProductionOrder")]
+    [OperationAudit("生产订单", "修改生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Update([FromBody] ProductionOrderUpdateRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionOrderUpdateEnum) is { } forbidden)
@@ -111,6 +113,7 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("approveProductionOrder")]
+    [OperationAudit("生产订单", "审核生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     [RequireJsonFields("approved")]
     public IActionResult Approve([FromBody] ProductionOrderApproveRequest? request)
     {
@@ -131,6 +134,7 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("startProductionOrder")]
+    [OperationAudit("生产订单", "开始生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Start([FromBody] ProductionOrderActionRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionOrderStartEnum) is { } forbidden)
@@ -150,6 +154,7 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("finishProductionOrder")]
+    [OperationAudit("生产订单", "完成生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Finish([FromBody] ProductionOrderFinishRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionOrderFinishEnum) is { } forbidden)
@@ -169,6 +174,7 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("cancelProductionOrder")]
+    [OperationAudit("生产订单", "取消生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Cancel([FromBody] ProductionOrderActionRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionOrderCancelEnum) is { } forbidden)

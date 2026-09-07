@@ -1,5 +1,6 @@
 using System.Text;
 
+using Backend.Filters;
 using Backend.Services;
 using Backend.Services.Interfaces;
 
@@ -31,10 +32,12 @@ if (string.IsNullOrWhiteSpace(jwtSecret))
 var builder = WebApplication.CreateBuilder(args);
 var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
 
-builder.Services.AddControllers().AddNewtonsoftJson(options =>
-{
-    options.SerializerSettings.DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.Utc;
-});
+builder.Services
+    .AddControllers(options => options.Filters.AddService<OperationAuditFilter>())
+    .AddNewtonsoftJson(options =>
+    {
+        options.SerializerSettings.DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.Utc;
+    });
 
 // 契约约定：HTTP 固定 200，业务状态通过响应体 code 表达。
 // [ApiController] 自动模型验证失败（缺 required 字段、枚举值非法等）默认返回 HTTP 400
@@ -84,6 +87,8 @@ builder.Services.AddScoped(_ => new UserRoleService(connString));
 builder.Services.AddScoped(_ => new RolePermissionService(connString));
 builder.Services.AddScoped(_ => new LoginLogService(connString));
 builder.Services.AddScoped(_ => new OperationLogService(connString));
+builder.Services.AddScoped(_ => new OperationAuditSnapshotService(connString));
+builder.Services.AddScoped<OperationAuditFilter>();
 builder.Services.AddScoped(sp => new MaterialCatalogService(
     connString,
     sp.GetRequiredService<IStockReadQuery>(),

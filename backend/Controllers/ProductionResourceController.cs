@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -60,6 +61,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("saveProductionLineType")]
+    [OperationAudit("生产资源", "保存生产线类型", OperationAuditSnapshotKind.LineType)]
     public IActionResult SaveProductionLineType([FromBody] LineTypeSaveRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionLineTypeUpdateEnum, LineTypeError) is { } error)
@@ -76,6 +78,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addProductionLine")]
+    [OperationAudit("生产资源", "新增生产线")]
     public IActionResult AddProductionLine([FromBody] ProductionLineCreateRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionLineCreateEnum, ProductionLineError) is { } error)
@@ -92,6 +95,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateProductionLine")]
+    [OperationAudit("生产资源", "修改生产线", OperationAuditSnapshotKind.ProductionLine)]
     public IActionResult UpdateProductionLine([FromBody] ProductionLineUpdateRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionLineUpdateEnum, ProductionLineError) is { } error)
@@ -127,6 +131,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("saveCapacityConfig")]
+    [OperationAudit("生产资源", "保存产能配置", OperationAuditSnapshotKind.CapacityConfig)]
     public IActionResult SaveCapacityConfig([FromBody] CapacityConfigSaveRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionCapacityConfigUpdateEnum, CapacityConfigError) is { } error)
@@ -170,6 +175,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("saveProductionCalendar")]
+    [OperationAudit("生产资源", "保存生产日历", OperationAuditSnapshotKind.ProductionCalendar)]
     public IActionResult SaveProductionCalendar([FromBody] ProductionCalendarSaveRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionCalendarUpdateEnum, ProductionCalendarError) is { } error)
@@ -186,6 +192,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteProductionCalendar")]
+    [OperationAudit("生产资源", "删除生产日历", OperationAuditSnapshotKind.ProductionCalendar)]
     public IActionResult DeleteProductionCalendar([FromBody] ProductionCalendarDeleteRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionCalendarDeleteEnum, ApiError) is { } error)
@@ -202,6 +209,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("estimateProductionCapacity")]
+    [OperationAudit("生产资源", "估算生产产能")]
     public IActionResult EstimateProductionCapacity(
         [FromBody] ProductionCapacityEstimateRequest? request)
     {
@@ -219,6 +227,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("runCapacityDetection")]
+    [OperationAudit("生产资源", "执行产能检测")]
     public IActionResult RunCapacityDetection([FromBody] CapacityDetectionRunRequest? request)
     {
         if (RequirePermission(PermissionCode.ProductionCapacityDetectEnum, CapacityDetectionError) is { } error)
@@ -235,6 +244,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("saveCapacityBalance")]
+    [OperationAudit("生产资源", "保存产能平衡方案")]
     public IActionResult SaveCapacityBalance([FromBody] CapacityBalanceSaveRequest? request)
     {
         AuthResult auth = authorization.RequirePermission(
@@ -254,6 +264,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("reportProductionLineFault")]
+    [OperationAudit("生产资源", "上报生产线故障")]
     public IActionResult ReportProductionLineFault([FromBody] FaultRecordCreateRequest? request)
     {
         AuthResult auth = authorization.RequirePermission(
@@ -273,6 +284,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateProductionLineFault")]
+    [OperationAudit("生产资源", "修改生产线故障", OperationAuditSnapshotKind.FaultRecord)]
     public IActionResult UpdateProductionLineFault([FromBody] FaultRecordUpdateRequest? request)
     {
         AuthResult auth = authorization.RequireAnyPermission(
@@ -313,6 +325,7 @@ public sealed class ProductionResourceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateProductionLineStatus")]
+    [OperationAudit("生产资源", "修改生产线状态", OperationAuditSnapshotKind.LineStatus)]
     public IActionResult UpdateProductionLineStatus(
         [FromBody] ProductionLineStatusUpdateRequest? request)
     {

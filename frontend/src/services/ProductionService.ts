@@ -9,6 +9,7 @@ import {
   unwrap,
 } from '@/services/pagination'
 import type {
+  BomVersion,
   CapacityBalance,
   CapacityConfig,
   CapacityDetection,
@@ -17,13 +18,14 @@ import type {
   FaultRecord,
   FaultStatus,
   LineType,
+  MaterialDetail,
   ProductionCalendar,
   ProductionCapacityEstimateResult,
   ProductionLine,
   ProductionLineStatus,
   ProductionOrderDetail,
 } from '@/api'
-import { productionApi } from '@/api/client'
+import { materialBomApi, productionApi } from '@/api/client'
 import { toUtcDateTime } from '@/utils/time'
 
 export type { PageResult }
@@ -100,6 +102,13 @@ export interface ProductionOrderFormData {
   planQty: number
   planStart: string
   versionId: number
+}
+
+export interface ProductionOrderProductOption {
+  materialId: number
+  materialName: string
+  versionId: number
+  versionNo: string
 }
 
 export interface ProductionLineItem {
@@ -476,6 +485,32 @@ function requireData<TData>(response: ApiEnvelope<TData>): NonNullable<TData> {
   return data
 }
 
+async function loadAllPageItems<TItem>(
+  loadPage: (page: number, pageSize: number) => Promise<{ data: unknown }>,
+): Promise<TItem[]> {
+  const pageSize = 200
+  const firstResponse = await loadPage(1, pageSize)
+  const firstPayload = requireData(firstResponse.data as ApiEnvelope<unknown>)
+  const firstItems = getPageItems<TItem>(firstPayload)
+  const metadata = getPageMetadata(firstPayload, { page: 1, pageSize, total: firstItems.length })
+  const pageCount = Math.ceil(metadata.total / metadata.pageSize)
+  const remainingResponses = await Promise.all(
+    Array.from({ length: Math.max(0, pageCount - 1) }, (_value, index) =>
+      loadPage(index + 2, pageSize),
+    ),
+  )
+  const items = [
+    ...firstItems,
+    ...remainingResponses.flatMap((response) =>
+      getPageItems<TItem>(requireData(response.data as ApiEnvelope<unknown>)),
+    ),
+  ]
+  if (items.length !== metadata.total) {
+    throw new Error('产品与 BOM 版本分页数据不完整，请刷新重试')
+  }
+  return items
+}
+
 export const productionService = {
   async addExternalOrder(form: ExternalOrderCreateFormData) {
     const response = await productionApi.addExternalOrder({
@@ -710,6 +745,56 @@ export const productionService = {
       total: items.length,
     })
     return { items, ...metadata }
+  },
+
+  async listOrderProductOptions(): Promise<ProductionOrderProductOption[]> {
+    const [materials, effectiveVersions] = await Promise.all([
+      loadAllPageItems<MaterialDetail>((page, pageSize) =>
+        materialBomApi.listMaterialData({ page, pageSize }),
+      ),
+      loadAllPageItems<BomVersion>((page, pageSize) =>
+        materialBomApi.listBomVersionData({ effectiveOnly: true, page, pageSize }),
+      ),
+    ])
+    const effectiveVersionById = new Map(
+      effectiveVersions
+        .filter(
+          (
+            version,
+          ): version is BomVersion & {
+            material_id: number
+            version_id: number
+            version_no: string
+          } =>
+            Number.isSafeInteger(version.material_id) &&
+            Number.isSafeInteger(version.version_id) &&
+            Boolean(version.version_no?.trim()),
+        )
+        .map((version) => [version.version_id, version]),
+    )
+
+    return materials.flatMap((material) => {
+      if (
+        (material.material_type !== 'finished' && material.material_type !== 'semi_finished') ||
+        !Number.isSafeInteger(material.material_id) ||
+        !Number.isSafeInteger(material.current_version_id) ||
+        !material.material_name?.trim()
+      ) {
+        return []
+      }
+      const version = effectiveVersionById.get(material.current_version_id!)
+      if (!version || version.material_id !== material.material_id) {
+        return []
+      }
+      return [
+        {
+          materialId: material.material_id!,
+          materialName: material.material_name,
+          versionId: version.version_id,
+          versionNo: version.version_no,
+        },
+      ]
+    })
   },
 
   async listOrders(query: ProductionOrderQuery): Promise<PageResult<ProductionOrderItem>> {

@@ -37,6 +37,7 @@ const permissionTreeRef = ref<{
 const permissionTarget = ref<SystemRoleSummary>()
 const permissionTree = ref<PermissionTreeNode[]>([])
 const allPermissionNodeKeys = ref<string[]>([])
+const checkedPermissionNodeKeys = ref<string[]>([])
 const selectedPermissionIds = ref<number[]>([])
 const permissionLoading = ref(false)
 const permissionError = ref('')
@@ -203,18 +204,23 @@ async function loadRolePermissionAssignment() {
   permissionError.value = ''
   permissionTree.value = []
   allPermissionNodeKeys.value = []
+  checkedPermissionNodeKeys.value = []
   selectedPermissionIds.value = []
   try {
     const assignment = await systemService.loadRolePermissionAssignment(permissionTarget.value.id)
     permissionTree.value = assignment.tree
     allPermissionNodeKeys.value = assignment.allPermissionNodeKeys
-    await nextTick()
-    permissionTreeRef.value?.setCheckedKeys(assignment.checkedPermissionNodeKeys, true)
-    syncSelectedPermissions()
+    checkedPermissionNodeKeys.value = assignment.checkedPermissionNodeKeys
   } catch (requestError) {
     permissionError.value = getErrorMessage(requestError, '权限信息加载失败')
   } finally {
     permissionLoading.value = false
+  }
+
+  if (!permissionError.value) {
+    await nextTick()
+    permissionTreeRef.value?.setCheckedKeys(checkedPermissionNodeKeys.value, true)
+    syncSelectedPermissions()
   }
 }
 
@@ -474,6 +480,7 @@ onMounted(() => void loadRoles())
           ref="permissionTreeRef"
           class="permission-tree"
           :data="permissionTree"
+          :default-checked-keys="checkedPermissionNodeKeys"
           default-expand-all
           node-key="id"
           show-checkbox

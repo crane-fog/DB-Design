@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import {
   type ProductionOrderFormData,
   type ProductionOrderItem,
+  type ProductionOrderProductOption,
   type ProductionOrderStatus,
   productionService,
 } from '@/services/ProductionService'
@@ -47,13 +48,22 @@ const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
 const detail = ref<ProductionOrderItem>()
+const productOptions = ref<ProductionOrderProductOption[]>([])
+const productOptionsLoading = ref(false)
+const productOptionsError = ref('')
+let productOptionsLoaded = false
+let productOptionsPromise: Promise<void> | undefined = undefined
 
-const orderForm = reactive<ProductionOrderFormData>({
+interface ProductionOrderFormModel extends Omit<ProductionOrderFormData, 'versionId'> {
+  versionId?: number
+}
+
+const orderForm = reactive<ProductionOrderFormModel>({
   materialId: 0,
   planEnd: '',
   planQty: 1,
   planStart: '',
-  versionId: 0,
+  versionId: undefined,
 })
 const orderDialogTitle = computed(() => {
   if (orderDialogMode.value === 'create') {
@@ -62,11 +72,7 @@ const orderDialogTitle = computed(() => {
   return '修改生产订单计划'
 })
 
-const orderRules: FormRules<ProductionOrderFormData> = {
-  materialId: [
-    { message: '请输入产品物料 ID', required: true, trigger: 'blur', type: 'number' },
-    { message: '物料 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
-  ],
+const orderRules: FormRules<ProductionOrderFormModel> = {
   planEnd: [{ message: '请选择计划完工日期', required: true, trigger: 'change' }],
   planQty: [
     { message: '请输入计划数量', required: true, trigger: 'blur', type: 'number' },
@@ -74,8 +80,7 @@ const orderRules: FormRules<ProductionOrderFormData> = {
   ],
   planStart: [{ message: '请选择计划开工日期', required: true, trigger: 'change' }],
   versionId: [
-    { message: '请输入 BOM 版本 ID', required: true, trigger: 'blur', type: 'number' },
-    { message: 'BOM 版本 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
+    { message: '请选择当前生效的产品 BOM', required: true, trigger: 'change', type: 'number' },
   ],
 }
 
@@ -128,19 +133,54 @@ function resetOrderForm() {
     planEnd: '',
     planQty: 1,
     planStart: '',
-    versionId: 0,
+    versionId: undefined,
   })
   editingOrderId.value = undefined
   orderFormRef.value?.clearValidate()
+}
+
+async function loadProductOptions(force = false) {
+  if (productOptionsPromise) {
+    await productOptionsPromise
+    return
+  }
+  if (productOptionsLoaded && !force) {
+    return
+  }
+  productOptionsPromise = (async () => {
+    productOptionsLoading.value = true
+    productOptionsError.value = ''
+    try {
+      productOptions.value = await productionService.listOrderProductOptions()
+      productOptionsLoaded = true
+    } catch (requestError) {
+      productOptions.value = []
+      productOptionsLoaded = false
+      productOptionsError.value = getErrorMessage(requestError, '产品与 BOM 版本加载失败')
+    } finally {
+      productOptionsLoading.value = false
+    }
+  })()
+  try {
+    await productOptionsPromise
+  } finally {
+    productOptionsPromise = undefined
+  }
+}
+
+function handleProductChange(versionId?: number) {
+  const option = productOptions.value.find((item) => item.versionId === versionId)
+  orderForm.materialId = option?.materialId ?? 0
 }
 
 function openCreateDialog() {
   orderDialogMode.value = 'create'
   resetOrderForm()
   orderDialogVisible.value = true
+  void loadProductOptions()
 }
 
-function openEditDialog(order: ProductionOrderItem) {
+async function openEditDialog(order: ProductionOrderItem) {
   orderDialogMode.value = 'edit'
   Object.assign(orderForm, {
     materialId: order.materialId,
@@ -152,11 +192,29 @@ function openEditDialog(order: ProductionOrderItem) {
   editingOrderId.value = order.orderId
   orderFormRef.value?.clearValidate()
   orderDialogVisible.value = true
+  await loadProductOptions()
+  if (!orderDialogVisible.value || editingOrderId.value !== order.orderId) {
+    return
+  }
+  const currentOption = productOptions.value.find(
+    (item) => item.materialId === order.materialId && item.versionId === order.versionId,
+  )
+  const replacementOption =
+    currentOption ?? productOptions.value.find((item) => item.materialId === order.materialId)
+  orderForm.versionId = replacementOption?.versionId
+  orderForm.materialId = replacementOption?.materialId ?? 0
 }
 
 async function submitOrderForm() {
   const valid = await orderFormRef.value?.validate().catch(() => false)
   if (!valid || submitting.value) {
+    return
+  }
+  const selectedProduct = productOptions.value.find(
+    (item) => item.versionId === orderForm.versionId,
+  )
+  if (!selectedProduct) {
+    ElMessage.warning('请选择当前生效的产品 BOM')
     return
   }
   if (orderForm.planEnd < orderForm.planStart) {
@@ -165,11 +223,16 @@ async function submitOrderForm() {
   }
   submitting.value = true
   try {
+    const request: ProductionOrderFormData = {
+      ...orderForm,
+      materialId: selectedProduct.materialId,
+      versionId: selectedProduct.versionId,
+    }
     if (orderDialogMode.value === 'create') {
-      await productionService.createOrder({ ...orderForm })
+      await productionService.createOrder(request)
       ElMessage.success('生产订单已创建')
     } else if (editingOrderId.value !== undefined) {
-      await productionService.updateOrder(editingOrderId.value, { ...orderForm })
+      await productionService.updateOrder(editingOrderId.value, request)
       ElMessage.success('生产订单计划已更新')
     }
     orderDialogVisible.value = false
@@ -345,6 +408,9 @@ function progressPercentage(order: ProductionOrderItem) {
 
 onMounted(() => {
   void loadOrders()
+  if (canCreateOrder.value || canUpdateOrder.value) {
+    void loadProductOptions()
+  }
 })
 </script>
 
@@ -447,55 +513,53 @@ onMounted(() => {
         <el-table-column fixed="right" label="操作" min-width="260">
           <template #default="{ row }">
             <el-button link type="primary" :icon="View" @click="openDetail(row)">详情</el-button>
-            <template>
-              <el-button
-                v-if="canApproveOrder && isReviewable(row)"
-                link
-                :disabled="actionSubmitting"
-                type="primary"
-                @click="approveOrder(row)"
-                >审核</el-button
-              >
-              <el-button
-                v-if="canUpdateOrder && isEditable(row)"
-                link
-                type="primary"
-                :icon="EditPen"
-                @click="openEditDialog(row)"
-                >计划排期</el-button
-              >
-              <el-button
-                v-if="canStartOrder && isStartable(row)"
-                link
-                :disabled="actionSubmitting"
-                type="success"
-                @click="startOrder(row)"
-                >开工</el-button
-              >
-              <el-button
-                v-if="isFinishable(row) && canReportLine"
-                link
-                type="primary"
-                @click="openLineReporting(row)"
-                >产线报工</el-button
-              >
-              <el-button
-                v-if="canFinishOrder && isFinishable(row)"
-                link
-                :disabled="actionSubmitting"
-                type="success"
-                @click="finishOrder(row)"
-                >完工</el-button
-              >
-              <el-button
-                v-if="canCancelOrder && isCancellable(row)"
-                link
-                :disabled="actionSubmitting"
-                type="danger"
-                @click="cancelOrder(row)"
-                >取消</el-button
-              >
-            </template>
+            <el-button
+              v-if="canApproveOrder && isReviewable(row)"
+              link
+              :disabled="actionSubmitting"
+              type="primary"
+              @click="approveOrder(row)"
+              >审核</el-button
+            >
+            <el-button
+              v-if="canUpdateOrder && isEditable(row)"
+              link
+              type="primary"
+              :icon="EditPen"
+              @click="openEditDialog(row)"
+              >计划排期</el-button
+            >
+            <el-button
+              v-if="canStartOrder && isStartable(row)"
+              link
+              :disabled="actionSubmitting"
+              type="success"
+              @click="startOrder(row)"
+              >开工</el-button
+            >
+            <el-button
+              v-if="isFinishable(row) && canReportLine"
+              link
+              type="primary"
+              @click="openLineReporting(row)"
+              >产线报工</el-button
+            >
+            <el-button
+              v-if="canFinishOrder && isFinishable(row)"
+              link
+              :disabled="actionSubmitting"
+              type="success"
+              @click="finishOrder(row)"
+              >完工</el-button
+            >
+            <el-button
+              v-if="canCancelOrder && isCancellable(row)"
+              link
+              :disabled="actionSubmitting"
+              type="danger"
+              @click="cancelOrder(row)"
+              >取消</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -523,22 +587,37 @@ onMounted(() => {
       :title="orderDialogTitle"
       width="560px"
     >
+      <el-alert
+        v-if="productOptionsError"
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="productOptionsError"
+        type="error"
+      >
+        <template #default>
+          <el-button link type="primary" @click="loadProductOptions(true)">重新加载选项</el-button>
+        </template>
+      </el-alert>
       <el-form ref="orderFormRef" :model="orderForm" :rules="orderRules" label-width="120px">
-        <el-form-item label="产品物料 ID" prop="materialId">
-          <el-input-number
-            :controls="false"
-            v-model="orderForm.materialId"
-            :min="1"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="BOM 版本 ID" prop="versionId">
-          <el-input-number
-            :controls="false"
+        <el-form-item label="产品" prop="versionId">
+          <el-select
             v-model="orderForm.versionId"
-            :min="1"
+            clearable
+            filterable
+            :loading="productOptionsLoading"
+            no-data-text="暂无当前生效的产品 BOM"
+            placeholder="请选择当前生效的产品 BOM"
             style="width: 100%"
-          />
+            @change="handleProductChange"
+          >
+            <el-option
+              v-for="option in productOptions"
+              :key="option.versionId"
+              :label="`${option.materialName} ${option.versionNo} #${option.materialId}`"
+              :value="option.versionId"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="计划数量" prop="planQty">
           <el-input-number
@@ -567,7 +646,13 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="orderDialogVisible = false">取消</el-button>
-        <el-button :loading="submitting" type="primary" @click="submitOrderForm">保存</el-button>
+        <el-button
+          :disabled="productOptionsLoading || !productOptions.length"
+          :loading="submitting"
+          type="primary"
+          @click="submitOrderForm"
+          >保存</el-button
+        >
       </template>
     </el-dialog>
 

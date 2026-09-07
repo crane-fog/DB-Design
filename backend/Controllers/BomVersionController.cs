@@ -66,6 +66,7 @@ public class BomVersionController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addBomVersionData")]
+    [OperationAudit("BOM管理", "新增BOM版本")]
     [RequireJsonFields("effective_date")]
     public IActionResult AddVersion([FromBody] BomVersionCreateRequest? request)
     {
@@ -87,6 +88,7 @@ public class BomVersionController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateBomVersionData")]
+    [OperationAudit("BOM管理", "修改BOM版本", OperationAuditSnapshotKind.BomVersion)]
     [RequireJsonFields("effective_date")]
     public IActionResult UpdateVersion([FromBody] BomVersionUpdateRequest? request)
     {
@@ -107,6 +109,7 @@ public class BomVersionController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteBomVersionData")]
+    [OperationAudit("BOM管理", "删除BOM版本", OperationAuditSnapshotKind.BomVersion)]
     public IActionResult DeleteVersion([FromBody] BomVersionDeleteRequest? request)
     {
         if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialBomVersionDeleteEnum) is { } forbidden)

@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -71,6 +72,7 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addBatchConsumption")]
+    [OperationAudit("质量追溯", "新增批次消耗")]
     public IActionResult AddConsumption([FromBody] BatchConsumptionCreateRequest? request)
     {
         AuthResult auth = Authorize(PermissionCode.TraceConsumptionCreateEnum);
@@ -91,6 +93,7 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateBatchConsumption")]
+    [OperationAudit("质量追溯", "修改批次消耗", OperationAuditSnapshotKind.BatchConsumption)]
     public IActionResult UpdateConsumption([FromBody] BatchConsumptionUpdateRequest? request)
     {
         AuthResult auth = Authorize(PermissionCode.TraceConsumptionUpdateEnum);
@@ -111,6 +114,7 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteBatchConsumption")]
+    [OperationAudit("质量追溯", "删除批次消耗", OperationAuditSnapshotKind.BatchConsumption)]
     public IActionResult DeleteConsumption([FromBody] BatchConsumptionDeleteRequest? request)
     {
         AuthResult auth = Authorize(PermissionCode.TraceConsumptionDeleteEnum);
@@ -192,6 +196,7 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("analyzeQualityImpact")]
+    [OperationAudit("质量追溯", "分析质量影响")]
     public IActionResult AnalyzeImpact([FromBody] QualityImpactAnalyzeRequest? request)
     {
         AuthResult auth = Authorize(PermissionCode.TraceImpactAnalyzeEnum);

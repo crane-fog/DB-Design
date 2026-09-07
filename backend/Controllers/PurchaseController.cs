@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -151,6 +152,7 @@ public class PurchaseController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addPurchaseOrder")]
+    [OperationAudit("采购管理", "新增采购订单")]
     public IActionResult Add([FromBody] PurchaseOrderCreateRequest? request)
     {
         if (RequirePermission(PermissionCode.PurchaseOrderCreateEnum) is { } forbidden) return forbidden;
@@ -169,6 +171,7 @@ public class PurchaseController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("createPurchaseOrderDraftFromShortage")]
+    [OperationAudit("采购管理", "从缺口创建采购草稿")]
     public IActionResult CreateDraftsFromShortage([FromBody] PurchaseDraftFromShortageRequest? request)
     {
         if (RequirePermission(PermissionCode.PurchaseOrderCreateEnum) is { } forbidden) return forbidden;
@@ -207,6 +210,7 @@ public class PurchaseController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("submitPurchaseOrder")]
+    [OperationAudit("采购管理", "提交采购订单", OperationAuditSnapshotKind.PurchaseOrder)]
     public IActionResult Submit([FromBody] PurchaseOrderActionRequest? request)
     {
         if (RequirePermission(PermissionCode.PurchaseOrderSubmitEnum) is { } forbidden) return forbidden;
@@ -225,6 +229,7 @@ public class PurchaseController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("cancelPurchaseOrder")]
+    [OperationAudit("采购管理", "取消采购订单", OperationAuditSnapshotKind.PurchaseOrder)]
     public IActionResult Cancel([FromBody] PurchaseOrderActionRequest? request)
     {
         if (RequirePermission(PermissionCode.PurchaseOrderCancelEnum) is { } forbidden) return forbidden;
@@ -243,6 +248,7 @@ public class PurchaseController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addPurchaseReceipt")]
+    [OperationAudit("采购管理", "新增采购收货", OperationAuditSnapshotKind.PurchaseOrder)]
     public IActionResult AddReceipt([FromBody] PurchaseReceiptCreateRequest? request)
     {
         if (RequirePermission(PermissionCode.PurchaseReceiptCreateEnum) is { } forbidden) return forbidden;
@@ -303,6 +309,7 @@ public class PurchaseController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("generatePurchaseOverdueReminder")]
+    [OperationAudit("采购管理", "生成逾期催交")]
     public IActionResult GenerateReminders([FromBody] PurchaseOverdueReminderGenerateRequest? request)
     {
         if (RequirePermission(PermissionCode.PurchaseOverdueGenerateEnum) is { } forbidden) return forbidden;
@@ -355,6 +362,7 @@ public class PurchaseController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("handlePurchaseOverdueReminder")]
+    [OperationAudit("采购管理", "处理逾期催交", OperationAuditSnapshotKind.OverdueReminder)]
     public IActionResult HandleReminder([FromBody] PurchaseOverdueReminderHandleRequest? request)
     {
         if (RequirePermission(PermissionCode.PurchaseOverdueHandleEnum) is { } forbidden) return forbidden;

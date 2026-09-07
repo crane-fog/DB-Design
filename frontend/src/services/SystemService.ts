@@ -48,18 +48,20 @@ export interface RoleQuery extends PageRequest {
 export type LoginResult = 'failure' | 'success'
 
 export interface LoginLogQuery extends PageRequest {
+  employeeNo?: string
   endTime?: string
   result?: LoginResult
   startTime?: string
-  userId?: number
+  userName?: string
 }
 
 export interface OperationLogQuery extends PageRequest {
   action?: string
+  employeeNo?: string
   endTime?: string
   module?: string
-  operatorId?: number
   startTime?: string
+  userName?: string
 }
 
 export interface SystemUser {
@@ -149,6 +151,7 @@ export interface SystemOperationLog {
   ipAddress?: string
   module?: string
   operateTime?: string
+  operatorEmployeeNo?: string
   operatorId?: number
   operatorName?: string
 }
@@ -261,6 +264,7 @@ function toSystemOperationLog(
     ipAddress: optionalText(log.ip_address),
     module: optionalText(log.module),
     operateTime: optionalText(log.operate_time),
+    operatorEmployeeNo: user?.employeeNo,
     operatorId: log.operator_id,
     operatorName: user?.name,
   }
@@ -458,12 +462,13 @@ export const systemService = {
     includeUserDirectory = false,
   ): Promise<PageResult<SystemLoginLog>> {
     const response = await systemApi.listLoginRecordData({
+      employeeNo: query.employeeNo || undefined,
       endTime: toUtcDateTime(query.endTime || undefined),
       page: query.page,
       pageSize: query.pageSize,
       result: query.result,
       startTime: toUtcDateTime(query.startTime || undefined),
-      userId: query.userId,
+      userName: query.userName || undefined,
     })
     let users = new Map<number, SystemUser>()
     if (includeUserDirectory) {
@@ -486,12 +491,13 @@ export const systemService = {
   ): Promise<PageResult<SystemOperationLog>> {
     const response = await systemApi.listOperationLogData({
       action: query.action || undefined,
+      employeeNo: query.employeeNo || undefined,
       endTime: toUtcDateTime(query.endTime || undefined),
       module: query.module || undefined,
-      operatorId: query.operatorId,
       page: query.page,
       pageSize: query.pageSize,
       startTime: toUtcDateTime(query.startTime || undefined),
+      userName: query.userName || undefined,
     })
     let users = new Map<number, SystemUser>()
     if (includeUserDirectory) {

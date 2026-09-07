@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -139,6 +140,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addUserData")]
+    [OperationAudit("系统管理", "新增用户")]
     public IActionResult AddUser([FromBody] UserCreateRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemUserCreateEnum) is { } forbidden) return forbidden;
@@ -176,6 +178,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateUserData")]
+    [OperationAudit("系统管理", "修改用户", OperationAuditSnapshotKind.User)]
     public IActionResult UpdateUser([FromBody] UserUpdateRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemUserUpdateEnum) is { } forbidden) return forbidden;
@@ -214,6 +217,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteUserData")]
+    [OperationAudit("系统管理", "删除用户", OperationAuditSnapshotKind.User)]
     public IActionResult DeleteUser([FromBody] UserDeleteRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemUserDeleteEnum) is { } forbidden) return forbidden;
@@ -308,6 +312,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addRoleData")]
+    [OperationAudit("系统管理", "新增角色")]
     public IActionResult AddRole([FromBody] RoleCreateRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemRoleCreateEnum) is { } forbidden) return forbidden;
@@ -345,6 +350,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateRoleData")]
+    [OperationAudit("系统管理", "修改角色", OperationAuditSnapshotKind.Role)]
     public IActionResult UpdateRole([FromBody] RoleUpdateRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemRoleUpdateEnum) is { } forbidden) return forbidden;
@@ -380,6 +386,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteRoleData")]
+    [OperationAudit("系统管理", "删除角色", OperationAuditSnapshotKind.Role)]
     public IActionResult DeleteRole([FromBody] RoleDeleteRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemRoleDeleteEnum) is { } forbidden) return forbidden;
@@ -513,6 +520,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("setUserRoles")]
+    [OperationAudit("系统管理", "分配用户角色", OperationAuditSnapshotKind.UserRoles)]
     public IActionResult SetUserRoles([FromBody] UserRoleSetRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemUserAssignRoleEnum) is { } forbidden) return forbidden;
@@ -580,6 +588,7 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("setRolePermissions")]
+    [OperationAudit("系统管理", "分配角色权限", OperationAuditSnapshotKind.RolePermissions)]
     public IActionResult SetRolePermissions([FromBody] RolePermissionSetRequest? request)
     {
         if (RequirePermission(PermissionCode.SystemRoleAssignPermissionEnum) is { } forbidden) return forbidden;
@@ -621,7 +630,8 @@ public class SystemController(
     public IActionResult ListLoginLog(
         [FromQuery(Name = "page")] int? page,
         [FromQuery(Name = "page_size")] int? pageSize,
-        [FromQuery(Name = "user_id")] int? userId,
+        [FromQuery(Name = "employee_no")] string? employeeNo,
+        [FromQuery(Name = "user_name")] string? userName,
         [FromQuery(Name = "result")] string? result,
         [FromQuery(Name = "start_time")] DateTime? startTime,
         [FromQuery(Name = "end_time")] DateTime? endTime)
@@ -629,7 +639,8 @@ public class SystemController(
         if (RequirePermission(PermissionCode.SystemAuditLoginViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
-        var (records, total) = loginLogService.List(currentPage, size, userId, result, startTime, endTime);
+        var (records, total) = loginLogService.List(
+            currentPage, size, employeeNo, userName, result, startTime, endTime);
 
         return Ok(new LoginLogPageResponse
         {
@@ -655,14 +666,16 @@ public class SystemController(
         [FromQuery(Name = "page_size")] int? pageSize,
         [FromQuery(Name = "module")] string? module,
         [FromQuery(Name = "action")] string? action,
-        [FromQuery(Name = "operator_id")] int? operatorId,
+        [FromQuery(Name = "employee_no")] string? employeeNo,
+        [FromQuery(Name = "user_name")] string? userName,
         [FromQuery(Name = "start_time")] DateTime? startTime,
         [FromQuery(Name = "end_time")] DateTime? endTime)
     {
         if (RequirePermission(PermissionCode.SystemAuditOperationViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
-        var (records, total) = operationLogService.List(currentPage, size, module, action, operatorId, startTime, endTime);
+        var (records, total) = operationLogService.List(
+            currentPage, size, module, action, employeeNo, userName, startTime, endTime);
 
         return Ok(new OperationLogPageResponse
         {

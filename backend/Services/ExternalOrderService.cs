@@ -211,6 +211,11 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
             return ExternalOrderConvertOutcome.Fail(404, "外部订单不存在");
         }
 
+        if (HasProductionAssociation(conn, request.ExtOrderId))
+        {
+            return ExternalOrderConvertOutcome.Fail(409, "外部订单已转换，请勿重复操作");
+        }
+
         if (current != ExternalOrderStatusMap.Db.Accepted)
         {
             return ExternalOrderConvertOutcome.Fail(409, "仅已接受外部订单可转换");
@@ -366,6 +371,16 @@ public class ExternalOrderService(string connString, ILogger<ExternalOrderServic
         cmd.Parameters.Add(new OracleParameter("extOrderId", extOrderId));
         var value = cmd.ExecuteScalar();
         return value is null or DBNull ? null : value.ToString();
+    }
+
+    private static bool HasProductionAssociation(OracleConnection conn, long extOrderId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT COUNT(*)
+                            FROM EXTERNAL_ORDER_PRODUCTION
+                            WHERE EXT_ORDER_ID = :extOrderId";
+        cmd.Parameters.Add(new OracleParameter("extOrderId", extOrderId));
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
     private static ProductionOrderReferences GetProductionOrderReferences(

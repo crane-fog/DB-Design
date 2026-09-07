@@ -427,13 +427,13 @@ onMounted(async () => {
           <el-table-column label="消耗 ID" min-width="90" prop="consumptionId" />
           <el-table-column label="生产订单 ID / 产品" min-width="180">
             <template #default="{ row }">
-              <p class="cell-sub">#{{ row.orderId }}</p>
+              <strong>#{{ row.orderId }}</strong>
               <p>{{ row.productMaterialName || '-' }}</p>
             </template>
           </el-table-column>
           <el-table-column label="采购明细 ID / 原材料" min-width="185">
             <template #default="{ row }">
-              <p class="cell-sub">#{{ row.itemId }}</p>
+              <strong>#{{ row.itemId }}</strong>
               <p>{{ row.materialName || '-' }}</p>
             </template>
           </el-table-column>

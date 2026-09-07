@@ -165,40 +165,6 @@ onUnmounted(() => {
         </button>
       </div>
     </el-card>
-
-    <el-card class="overview-card table-card table-card--accent" shadow="never">
-      <template #header>
-        <div class="card-header table-card__header">
-          <span>最近系统操作</span
-          ><el-button
-            v-if="canAccess(PermissionCode.SystemAuditOperationView)"
-            link
-            type="primary"
-            @click="navigateTo('/system/audit-logs', PermissionCode.SystemAuditOperationView)"
-            >查看更多</el-button
-          >
-        </div>
-      </template>
-      <el-skeleton v-if="loading && !dashboard" :rows="4" animated />
-      <el-empty
-        v-else-if="!visibleOperations.length"
-        :image-size="70"
-        :description="operationsEmptyText"
-      />
-      <el-table v-else :data="visibleOperations" stripe>
-        <el-table-column label="操作人编号" min-width="120">
-          <template #default="{ row }">{{ row.operatorId ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column label="业务模块" min-width="130" prop="module" />
-        <el-table-column label="操作类型" min-width="140" prop="action" />
-        <el-table-column label="操作时间" min-width="180"
-          ><template #default="{ row }">{{
-            formatDateTime(row.operateTime)
-          }}</template></el-table-column
-        >
-        <el-table-column label="IP 地址" min-width="130" prop="ipAddress" />
-      </el-table>
-    </el-card>
   </PageContainer>
 </template>
 

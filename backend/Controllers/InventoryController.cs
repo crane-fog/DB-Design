@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 using Backend.Services.Interfaces;
 
@@ -133,6 +134,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("generateInventoryAlert")]
+    [OperationAudit("库存管理", "生成库存预警")]
     public IActionResult GenerateAlerts([FromBody] InventoryAlertGenerateRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryAlertGenerateEnum) is { } forbidden) return forbidden;
@@ -158,6 +160,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("handleInventoryAlert")]
+    [OperationAudit("库存管理", "处理库存预警", OperationAuditSnapshotKind.StockAlert)]
     public IActionResult HandleAlert([FromBody] InventoryAlertHandleRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryAlertHandleEnum) is { } forbidden) return forbidden;
@@ -190,6 +193,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("lockMaterialStock")]
+    [OperationAudit("库存管理", "锁定物料库存", OperationAuditSnapshotKind.StockLockByOrder)]
     public IActionResult LockStock([FromBody] MaterialStockLockRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryLockCreateEnum) is { } forbidden) return forbidden;
@@ -219,6 +223,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("releaseMaterialStock")]
+    [OperationAudit("库存管理", "释放物料库存", OperationAuditSnapshotKind.StockLockById)]
     public IActionResult ReleaseStock([FromBody] MaterialStockReleaseRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryLockReleaseEnum) is { } forbidden) return forbidden;
@@ -274,6 +279,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("detectObsoleteMaterial")]
+    [OperationAudit("库存管理", "检测呆滞物料")]
     public IActionResult DetectObsolete([FromBody] ObsoleteMaterialDetectRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryObsoleteDetectEnum) is { } forbidden) return forbidden;
@@ -350,6 +356,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("handleObsoleteMaterialDetection")]
+    [OperationAudit("库存管理", "处理呆滞物料", OperationAuditSnapshotKind.WasteDetection)]
     public IActionResult HandleDetection([FromBody] ObsoleteMaterialHandleRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryObsoleteHandleEnum) is { } forbidden) return forbidden;
@@ -382,6 +389,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addCompletionInbound")]
+    [OperationAudit("库存管理", "新增完工入库")]
     public IActionResult AddInbound([FromBody] CompletionInboundCreateRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryCompletionCreateEnum) is { } forbidden) return forbidden;
@@ -454,6 +462,7 @@ public class InventoryController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("calculateMaterialShortage")]
+    [OperationAudit("库存管理", "计算物料缺口")]
     public IActionResult CalculateShortage([FromBody] MaterialShortageCalculateRequest? request)
     {
         if (RequirePermission(PermissionCode.InventoryShortageCalculateEnum) is { } forbidden) return forbidden;

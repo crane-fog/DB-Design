@@ -8,8 +8,13 @@ namespace Backend.Services;
 public class LoginLogService(string connString)
 {
     private const string SelectColumns = @"
-        SELECT LOG_ID, USER_ID, LOGIN_TIME, IP_ADDRESS, RESULT, FAIL_REASON
-        FROM LOGIN_LOG";
+        SELECT L.LOG_ID, L.USER_ID, L.LOGIN_TIME, L.IP_ADDRESS, L.RESULT, L.FAIL_REASON
+        FROM LOGIN_LOG L
+        LEFT JOIN SYS_USER U ON U.USER_ID = L.USER_ID";
+
+    private const string FromClause = @"
+        FROM LOGIN_LOG L
+        LEFT JOIN SYS_USER U ON U.USER_ID = L.USER_ID";
 
     private static LoginLog ReadLoginLog(OracleDataReader reader)
     {
@@ -30,7 +35,8 @@ public class LoginLogService(string connString)
     }
 
     public (List<LoginLog> Records, int Total) List(
-        int page, int pageSize, int? userId, string? result, DateTime? startTime, DateTime? endTime)
+        int page, int pageSize, string? employeeNo, string? userName,
+        string? result, DateTime? startTime, DateTime? endTime)
     {
         using var conn = new OracleConnection(connString);
         conn.Open();
@@ -38,39 +44,44 @@ public class LoginLogService(string connString)
         var conditions = new List<string>();
         var filters = new List<SqlFilter>();
 
-        if (userId.HasValue)
+        if (!string.IsNullOrWhiteSpace(employeeNo))
         {
-            conditions.Add("USER_ID = :userId");
-            filters.Add(new SqlFilter("userId", userId.Value));
+            conditions.Add("U.EMPLOYEE_NO LIKE :employeeNo");
+            filters.Add(new SqlFilter("employeeNo", $"%{employeeNo.Trim()}%"));
+        }
+        if (!string.IsNullOrWhiteSpace(userName))
+        {
+            conditions.Add("U.USER_NAME LIKE :userName");
+            filters.Add(new SqlFilter("userName", $"%{userName.Trim()}%"));
         }
         if (!string.IsNullOrWhiteSpace(result))
         {
             var dbResult = result.Trim() == "success" ? "成功" : "失败";
-            conditions.Add("RESULT = :result");
+            conditions.Add("L.RESULT = :result");
             filters.Add(new SqlFilter("result", dbResult));
         }
         if (startTime.HasValue)
         {
-            conditions.Add("LOGIN_TIME >= :startTime");
+            conditions.Add("L.LOGIN_TIME >= :startTime");
             filters.Add(new SqlFilter("startTime", startTime.Value));
         }
         if (endTime.HasValue)
         {
-            conditions.Add("LOGIN_TIME <= :endTime");
+            conditions.Add("L.LOGIN_TIME <= :endTime");
             filters.Add(new SqlFilter("endTime", endTime.Value));
         }
 
         var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
         using var countCmd = conn.CreateCommand();
-        countCmd.CommandText = string.Concat("SELECT COUNT(*) FROM LOGIN_LOG ", where);
+        countCmd.CommandText = string.Concat("SELECT COUNT(*) ", FromClause, " ", where);
         OracleSql.AddFilters(countCmd, filters);
         var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
         // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
         var offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = string.Concat(SelectColumns, " ", where, " ORDER BY LOGIN_TIME DESC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
+        dataCmd.CommandText = string.Concat(SelectColumns, " ", where, " ORDER BY L.LOGIN_TIME DESC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
         OracleSql.AddFilters(dataCmd, filters);

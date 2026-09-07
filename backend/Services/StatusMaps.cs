@@ -45,7 +45,7 @@ public static class ProductionStatusMap
 }
 
 /// <summary>
-/// 外部订单状态映射：数据库中文（待审核/已接受/已拒绝）与英文枚举（pending_review/accepted/rejected）。
+/// 外部订单状态映射：数据库中文状态与 API 英文枚举之间的转换，包含审核、接受、转换和拒绝状态。
 /// </summary>
 public static class ExternalOrderStatusMap
 {

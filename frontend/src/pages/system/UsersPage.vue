@@ -388,23 +388,23 @@ onMounted(() => void loadUsers())
       </el-alert>
 
       <el-table v-else v-loading="loading" :data="result.items" min-height="320" stripe>
-        <el-table-column label="工号" min-width="120" prop="employeeNo" />
+        <el-table-column label="工号" min-width="80" prop="employeeNo" />
         <el-table-column label="姓名" min-width="110" prop="name" />
-        <el-table-column label="手机号" min-width="130" prop="phone" />
-        <el-table-column label="邮箱" min-width="190">
+        <el-table-column label="手机号" min-width="120" prop="phone" />
+        <el-table-column label="邮箱" min-width="170">
           <template #default="{ row }">{{ row.email || '-' }}</template>
         </el-table-column>
-        <el-table-column label="状态" min-width="90">
+        <el-table-column label="状态" min-width="70">
           <template #default="{ row }">
             <el-tag :type="row.status === 'valid' ? 'success' : 'info'" effect="light">
               {{ row.status === 'valid' ? '启用' : '停用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="最近登录" min-width="165">
+        <el-table-column label="最近登录" min-width="145">
           <template #default="{ row }">{{ formatDateTime(row.lastLoginTime) }}</template>
         </el-table-column>
-        <el-table-column label="创建时间" min-width="165">
+        <el-table-column label="创建时间" min-width="145">
           <template #default="{ row }">{{ formatDateTime(row.createdTime) }}</template>
         </el-table-column>
         <el-table-column
@@ -438,15 +438,6 @@ onMounted(() => void loadUsers())
               @click="openRoleDialog(row)"
               >分配角色</el-button
             >
-            <el-button
-              v-if="canUpdate"
-              link
-              :disabled="statusSubmitting"
-              :type="row.status === 'valid' ? 'danger' : 'success'"
-              @click="updateStatus(row)"
-            >
-              {{ row.status === 'valid' ? '停用' : '启用' }}
-            </el-button>
           </template>
         </el-table-column>
       </el-table>

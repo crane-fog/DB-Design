@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,7 @@ public class DemandAnalysisController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("calculateLossCompensation")]
+    [OperationAudit("需求分析", "计算损耗补偿")]
     public IActionResult CalculateLossCompensation([FromBody] LossCompensationCalculateRequest? request)
     {
         if (RequirePermission(
@@ -36,6 +38,7 @@ public class DemandAnalysisController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("calculateProductCost")]
+    [OperationAudit("需求分析", "计算产品成本")]
     public IActionResult CalculateProductCost([FromBody] ProductCostCalculateRequest? request)
     {
         if (RequirePermission(

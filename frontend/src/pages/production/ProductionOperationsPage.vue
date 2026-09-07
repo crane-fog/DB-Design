@@ -7,6 +7,7 @@ import {
   type ProductionCapacityEstimateFormData,
   type ProductionCapacityEstimateItem,
   type ProductionLineItem,
+  type ProductionOrderProductOption,
   type ProductionLineRunStatus,
   type ProductionLineStatusItem,
   productionService,
@@ -31,6 +32,7 @@ type OperationsTab = 'balance' | 'detection' | 'estimate' | 'external' | 'status
 
 const externalStatusLabels = {
   accepted: '已接受',
+  converted: '已转换',
   pending_review: '待审核',
   rejected: '已拒绝',
 }
@@ -128,6 +130,11 @@ const convertVisible = ref(false)
 const convertingOrder = ref<ExternalOrderItem>()
 const convertResult = ref<ExternalOrderConvertItem>()
 const convertSubmitting = ref(false)
+const convertProductOptions = ref<ProductionOrderProductOption[]>([])
+const convertProductOptionsLoading = ref(false)
+const convertProductOptionsError = ref('')
+let convertProductOptionsLoaded = false
+let convertProductOptionsPromise: Promise<void> | undefined = undefined
 const convertForm = reactive({
   materialId: 0,
   planEnd: '',
@@ -138,7 +145,12 @@ const convertForm = reactive({
 
 function selectedExternalStatus() {
   const { status } = externalFilters
-  if (status === 'accepted' || status === 'pending_review' || status === 'rejected') {
+  if (
+    status === 'accepted' ||
+    status === 'converted' ||
+    status === 'pending_review' ||
+    status === 'rejected'
+  ) {
     return status
   }
   return undefined
@@ -253,7 +265,54 @@ async function reviewExternalOrder(order: ExternalOrderItem, accepted: boolean) 
   }
 }
 
-function openConvert(order: ExternalOrderItem) {
+async function loadConvertProductOptions(force = false) {
+  if (convertProductOptionsPromise) {
+    await convertProductOptionsPromise
+    return
+  }
+  if (convertProductOptionsLoaded && !force) {
+    return
+  }
+  convertProductOptionsPromise = (async () => {
+    convertProductOptionsLoading.value = true
+    convertProductOptionsError.value = ''
+    try {
+      convertProductOptions.value = await productionService.listOrderProductOptions()
+      convertProductOptionsLoaded = true
+    } catch (error) {
+      convertProductOptions.value = []
+      convertProductOptionsLoaded = false
+      convertProductOptionsError.value = getErrorMessage(error, '产品与 BOM 版本加载失败')
+    } finally {
+      convertProductOptionsLoading.value = false
+    }
+  })()
+  try {
+    await convertProductOptionsPromise
+  } finally {
+    convertProductOptionsPromise = undefined
+  }
+}
+
+const currentConvertProductOptions = computed(() => {
+  const materialId = convertingOrder.value?.materialId
+  return convertProductOptions.value.filter((option) => option.materialId === materialId)
+})
+
+function selectCurrentConvertProduct(order: ExternalOrderItem) {
+  const option = convertProductOptions.value.find((item) => item.materialId === order.materialId)
+  convertForm.materialId = option?.materialId ?? order.materialId
+  convertForm.versionId = option?.versionId ?? 0
+}
+
+async function reloadConvertProductOptions() {
+  await loadConvertProductOptions(true)
+  if (convertingOrder.value) {
+    selectCurrentConvertProduct(convertingOrder.value)
+  }
+}
+
+async function openConvert(order: ExternalOrderItem) {
   convertingOrder.value = order
   convertResult.value = undefined
   Object.assign(convertForm, {
@@ -264,13 +323,20 @@ function openConvert(order: ExternalOrderItem) {
     versionId: 0,
   })
   convertVisible.value = true
+  await loadConvertProductOptions()
+  if (!convertVisible.value || convertingOrder.value?.extOrderId !== order.extOrderId) {
+    return
+  }
+  selectCurrentConvertProduct(order)
 }
 
 async function submitConvert() {
+  const selectedProduct = currentConvertProductOptions.value.find(
+    (option) => option.versionId === convertForm.versionId,
+  )
   if (
     !convertingOrder.value ||
-    convertForm.materialId <= 0 ||
-    convertForm.versionId <= 0 ||
+    !selectedProduct ||
     convertForm.planQty <= 0 ||
     !convertForm.planStart ||
     !convertForm.planEnd
@@ -286,7 +352,13 @@ async function submitConvert() {
   try {
     const result = await productionService.convertExternalOrder({
       extOrderId: convertingOrder.value.extOrderId,
-      productionOrders: [{ ...convertForm }],
+      productionOrders: [
+        {
+          ...convertForm,
+          materialId: selectedProduct.materialId,
+          versionId: selectedProduct.versionId,
+        },
+      ],
     })
     convertResult.value = result
     convertVisible.value = false
@@ -569,6 +641,7 @@ onMounted(() => {
               >
                 <el-option label="待审核" value="pending_review" />
                 <el-option label="已接受" value="accepted" />
+                <el-option label="已转换" value="converted" />
                 <el-option label="已拒绝" value="rejected" />
               </el-select>
             </el-form-item>
@@ -606,37 +679,37 @@ onMounted(() => {
             type="error"
           />
           <el-table v-else v-loading="externalLoading" :data="externalResult.items" stripe>
-            <el-table-column label="外部订单 ID" min-width="110">
+            <el-table-column label="外部订单 ID" min-width="100">
               <template #default="{ row }">#{{ row.extOrderId }}</template>
             </el-table-column>
-            <el-table-column v-if="canViewAllExternal" label="客户" min-width="150">
+            <el-table-column v-if="canViewAllExternal" label="客户" min-width="120">
               <template #default="{ row }">{{ row.customerName || `#${row.customerId}` }}</template>
             </el-table-column>
-            <el-table-column label="产品" min-width="170">
+            <el-table-column label="产品" min-width="100">
               <template #default="{ row }">{{ row.materialName || `#${row.materialId}` }}</template>
             </el-table-column>
-            <el-table-column label="数量" min-width="90">
+            <el-table-column label="数量" min-width="60">
               <template #default="{ row }">{{ formatNumber(row.quantity) }}</template>
             </el-table-column>
-            <el-table-column label="期望日期" min-width="120" prop="expectedDate" />
-            <el-table-column label="联系人" min-width="120" prop="contactPerson" />
-            <el-table-column label="联系电话" min-width="140" prop="contactPhone" />
-            <el-table-column label="状态" min-width="100">
+            <el-table-column label="期望日期" min-width="100" prop="expectedDate" />
+            <el-table-column label="联系人" min-width="70" prop="contactPerson" />
+            <el-table-column label="联系电话" min-width="110" prop="contactPhone" />
+            <el-table-column label="状态" min-width="80">
               <template #default="{ row }">
                 <StatusTag :labels="externalStatusLabels" :value="row.status" />
               </template>
             </el-table-column>
-            <el-table-column label="提交时间" min-width="170">
+            <el-table-column label="提交时间" min-width="140">
               <template #default="{ row }">{{ formatDateTime(row.submitTime) }}</template>
             </el-table-column>
-            <el-table-column label="审核意见" min-width="160">
+            <el-table-column label="审核意见" min-width="140">
               <template #default="{ row }">{{ row.reviewComment || '-' }}</template>
             </el-table-column>
             <el-table-column
               v-if="canReviewExternal || canConvertExternal"
               fixed="right"
               label="操作"
-              min-width="210"
+              min-width="120"
             >
               <template #default="{ row }">
                 <template v-if="canReviewExternal && row.status === 'pending_review'">
@@ -1126,22 +1199,48 @@ onMounted(() => {
     </el-dialog>
 
     <el-dialog v-model="convertVisible" title="转换为生产订单" width="560px">
+      <el-alert
+        v-if="convertProductOptionsError"
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="convertProductOptionsError"
+        type="error"
+      >
+        <template #default>
+          <el-button link type="primary" @click="reloadConvertProductOptions">
+            重新加载选项
+          </el-button>
+        </template>
+      </el-alert>
+      <el-alert
+        v-else-if="
+          !convertProductOptionsLoading &&
+          convertingOrder &&
+          currentConvertProductOptions.length === 0
+        "
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="`${convertingOrder.materialName || `物料 #${convertingOrder.materialId}`}没有当前生效的 BOM 版本，暂时无法转换`"
+        type="warning"
+      />
       <el-form :model="convertForm" label-width="120px">
-        <el-form-item label="产品物料 ID">
-          <el-input-number
-            :controls="false"
-            v-model="convertForm.materialId"
-            :min="1"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="BOM 版本 ID">
-          <el-input-number
-            :controls="false"
+        <el-form-item label="产品">
+          <el-select
             v-model="convertForm.versionId"
-            :min="1"
+            :loading="convertProductOptionsLoading"
+            no-data-text="该产品暂无当前生效的 BOM 版本"
+            placeholder="请选择当前生效的产品 BOM"
             style="width: 100%"
-          />
+          >
+            <el-option
+              v-for="option in currentConvertProductOptions"
+              :key="option.versionId"
+              :label="`${option.materialName} ${option.versionNo} #${option.materialId}`"
+              :value="option.versionId"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="计划数量">
           <el-input-number
@@ -1170,7 +1269,12 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="convertVisible = false">取消</el-button>
-        <el-button type="primary" :loading="convertSubmitting" @click="submitConvert">
+        <el-button
+          type="primary"
+          :disabled="convertProductOptionsLoading || currentConvertProductOptions.length === 0"
+          :loading="convertSubmitting"
+          @click="submitConvert"
+        >
           确认转换
         </el-button>
       </template>

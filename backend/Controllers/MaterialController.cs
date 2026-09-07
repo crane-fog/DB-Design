@@ -48,6 +48,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addMaterialCategoryData")]
+    [OperationAudit("物料管理", "新增物料分类")]
     public IActionResult AddCategory([FromBody] MaterialCategoryCreateRequest? request)
     {
         if (ResolveCategoryManagerOrForbidden(PermissionCode.MaterialCategoryCreateEnum) is { } forbidden)
@@ -67,6 +68,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateMaterialCategoryData")]
+    [OperationAudit("物料管理", "修改物料分类", OperationAuditSnapshotKind.MaterialCategory)]
     public IActionResult UpdateCategory([FromBody] MaterialCategoryUpdateRequest? request)
     {
         if (ResolveCategoryManagerOrForbidden(PermissionCode.MaterialCategoryUpdateEnum) is { } forbidden)
@@ -86,6 +88,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteMaterialCategoryData")]
+    [OperationAudit("物料管理", "删除物料分类", OperationAuditSnapshotKind.MaterialCategory)]
     public IActionResult DeleteCategory([FromBody] MaterialCategoryDeleteRequest? request)
     {
         if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialCategoryDeleteEnum) is { } forbidden)
@@ -177,6 +180,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addMaterialData")]
+    [OperationAudit("物料管理", "新增物料")]
     [RequireJsonFields("material_type")]
     public IActionResult AddMaterial([FromBody] MaterialCreateRequest? request)
     {
@@ -198,6 +202,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateMaterialData")]
+    [OperationAudit("物料管理", "修改物料", OperationAuditSnapshotKind.Material)]
     [RequireJsonFields("material_type")]
     public IActionResult UpdateMaterial([FromBody] MaterialUpdateRequest? request)
     {
@@ -218,6 +223,7 @@ public class MaterialController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteMaterialData")]
+    [OperationAudit("物料管理", "删除物料", OperationAuditSnapshotKind.Material)]
     public IActionResult DeleteMaterial([FromBody] MaterialDeleteRequest? request)
     {
         if (ResolveCommonManagerOrForbidden(PermissionCode.MaterialItemDeleteEnum) is { } forbidden)
