@@ -2656,6 +2656,56 @@ export interface ProductionCapacityEstimateResult {
      */
     'risk_reason'?: string | null;
 }
+/**
+ * 产品物料、BOM 版本和操作人分别从生产订单及当前登录用户推导，客户端不得传入。
+ */
+export interface ProductionCompletionReportRequest {
+    'order_id': number;
+    /**
+     * 本批完工数量。
+     */
+    'finish_qty': number;
+    /**
+     * 本批合格数量，不得大于 finish_qty；该数量计入生产订单累计完工进度和成品可用库存。
+     */
+    'qualified_qty': number;
+    /**
+     * 本次报工对应的成品批次号，必须全局唯一。
+     */
+    'batch_no': string;
+}
+export interface ProductionCompletionReportResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionCompletionReportResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionCompletionReportResult;
+}
+
+export const ProductionCompletionReportResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionCompletionReportResponseCodeEnum = typeof ProductionCompletionReportResponseCodeEnum[keyof typeof ProductionCompletionReportResponseCodeEnum];
+
+export interface ProductionCompletionReportResult {
+    'production_order': ProductionOrderDetail;
+    'completion_inbound': CompletionInboundOrder;
+    /**
+     * 本次报工后累计合格数量是否已达到计划数量，且订单是否已自动完工。
+     */
+    'order_completed': boolean;
+}
 export interface ProductionLine {
     'line_id': number;
     'type_id': number;
@@ -2840,6 +2890,9 @@ export interface ProductionOrderBrief {
      */
     'material_name'?: string;
     'plan_qty': number;
+    /**
+     * 生产订单累计合格数量，由完工报工的 qualified_qty 累加得到。
+     */
     'finished_qty'?: number;
     'status': ProductionOrderStatus;
 }
@@ -2860,6 +2913,9 @@ export interface ProductionOrderDetail {
      */
     'material_name'?: string;
     'plan_qty': number;
+    /**
+     * 生产订单累计合格数量，由完工报工的 qualified_qty 累加得到。
+     */
     'finished_qty'?: number;
     'status': ProductionOrderStatus;
     'version_id': number;
@@ -8227,7 +8283,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
+         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
          * @summary 取消生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -8864,6 +8920,45 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
+         * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
+         * @summary 生产订单完工报工
+         * @param {ProductionCompletionReportRequest} productionCompletionReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reportProductionCompletion: async (productionCompletionReportRequest: ProductionCompletionReportRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionCompletionReportRequest' is not null or undefined
+            assertParamExists('reportProductionCompletion', 'productionCompletionReportRequest', productionCompletionReportRequest)
+            const localVarPath = `/api/reportProductionCompletion`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionCompletionReportRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
          * @summary 上报生产线故障
          * @param {FaultRecordCreateRequest} faultRecordCreateRequest 
@@ -9393,7 +9488,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
+         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
          * @summary 取消生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -9583,6 +9678,19 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.listProductionOrder(page, pageSize, materialId, status, planEndStart, planEndEnd, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ProductionApi.listProductionOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
+         * @summary 生产订单完工报工
+         * @param {ProductionCompletionReportRequest} productionCompletionReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async reportProductionCompletion(productionCompletionReportRequest: ProductionCompletionReportRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionCompletionReportResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.reportProductionCompletion(productionCompletionReportRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.reportProductionCompletion']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -9791,7 +9899,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.approveProductionOrder(requestParameters.productionOrderApproveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
+         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
          * @summary 取消生产订单
          * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9919,6 +10027,16 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
          */
         listProductionOrder(requestParameters: ProductionApiListProductionOrderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderPageResponse> {
             return localVarFp.listProductionOrder(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.planEndStart, requestParameters.planEndEnd, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
+         * @summary 生产订单完工报工
+         * @param {ProductionApiReportProductionCompletionRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reportProductionCompletion(requestParameters: ProductionApiReportProductionCompletionRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionCompletionReportResponse> {
+            return localVarFp.reportProductionCompletion(requestParameters.productionCompletionReportRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
@@ -10262,6 +10380,13 @@ export interface ProductionApiListProductionOrderRequest {
 }
 
 /**
+ * Request parameters for reportProductionCompletion operation in ProductionApi.
+ */
+export interface ProductionApiReportProductionCompletionRequest {
+    readonly productionCompletionReportRequest: ProductionCompletionReportRequest
+}
+
+/**
  * Request parameters for reportProductionLineFault operation in ProductionApi.
  */
 export interface ProductionApiReportProductionLineFaultRequest {
@@ -10394,7 +10519,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。需具备 production:order:cancel；completed/cancelled 状态返回 code 409。
+     * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
      * @summary 取消生产订单
      * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10534,6 +10659,17 @@ export class ProductionApi extends BaseAPI {
      */
     public listProductionOrder(requestParameters: ProductionApiListProductionOrderRequest = {}, options?: RawAxiosRequestConfig) {
         return ProductionApiFp(this.configuration).listProductionOrder(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.planEndStart, requestParameters.planEndEnd, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
+     * @summary 生产订单完工报工
+     * @param {ProductionApiReportProductionCompletionRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public reportProductionCompletion(requestParameters: ProductionApiReportProductionCompletionRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).reportProductionCompletion(requestParameters.productionCompletionReportRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
