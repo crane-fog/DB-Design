@@ -21,10 +21,10 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 审核人从当前登录用户推导，客户端不得传 reviewer_id。approved&#x3D;true 时物料明细也由订单和 BOM 推导，客户端不得提交锁定数量；后端重新校验库存并只补充 required_qty 与已有有效锁定 之间的差额。 
+    /// 物料需求完全由生产订单推导，客户端不得提交物料明细或操作人。
     /// </summary>
     [DataContract]
-    public partial class ProductionOrderApproveRequest : IEquatable<ProductionOrderApproveRequest>
+    public partial class ProductionOrderMaterialLockPreviewRequest : IEquatable<ProductionOrderMaterialLockPreviewRequest>
     {
         /// <summary>
         /// Gets or Sets OrderId
@@ -34,30 +34,14 @@ namespace Org.OpenAPITools.Models
         public long OrderId { get; set; }
 
         /// <summary>
-        /// true 表示审核通过，false 表示审核拒绝。
-        /// </summary>
-        /// <value>true 表示审核通过，false 表示审核拒绝。</value>
-        [Required]
-        [DataMember(Name="approved", EmitDefaultValue=true)]
-        public bool Approved { get; set; }
-
-        /// <summary>
-        /// Gets or Sets ReviewComment
-        /// </summary>
-        [DataMember(Name="review_comment", EmitDefaultValue=true)]
-        public string ReviewComment { get; set; }
-
-        /// <summary>
         /// Returns the string presentation of the object
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class ProductionOrderApproveRequest {\n");
+            sb.Append("class ProductionOrderMaterialLockPreviewRequest {\n");
             sb.Append("  OrderId: ").Append(OrderId).Append("\n");
-            sb.Append("  Approved: ").Append(Approved).Append("\n");
-            sb.Append("  ReviewComment: ").Append(ReviewComment).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -80,15 +64,15 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((ProductionOrderApproveRequest)obj);
+            return obj.GetType() == GetType() && Equals((ProductionOrderMaterialLockPreviewRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if ProductionOrderApproveRequest instances are equal
+        /// Returns true if ProductionOrderMaterialLockPreviewRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of ProductionOrderApproveRequest to be compared</param>
+        /// <param name="other">Instance of ProductionOrderMaterialLockPreviewRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(ProductionOrderApproveRequest other)
+        public bool Equals(ProductionOrderMaterialLockPreviewRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -98,16 +82,6 @@ namespace Org.OpenAPITools.Models
                     OrderId == other.OrderId ||
                     
                     OrderId.Equals(other.OrderId)
-                ) && 
-                (
-                    Approved == other.Approved ||
-                    
-                    Approved.Equals(other.Approved)
-                ) && 
-                (
-                    ReviewComment == other.ReviewComment ||
-                    ReviewComment != null &&
-                    ReviewComment.Equals(other.ReviewComment)
                 );
         }
 
@@ -123,10 +97,6 @@ namespace Org.OpenAPITools.Models
                 // Suitable nullity checks etc, of course :)
                     
                     hashCode = hashCode * 59 + OrderId.GetHashCode();
-                    
-                    hashCode = hashCode * 59 + Approved.GetHashCode();
-                    if (ReviewComment != null)
-                    hashCode = hashCode * 59 + ReviewComment.GetHashCode();
                 return hashCode;
             }
         }
@@ -134,12 +104,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(ProductionOrderApproveRequest left, ProductionOrderApproveRequest right)
+        public static bool operator ==(ProductionOrderMaterialLockPreviewRequest left, ProductionOrderMaterialLockPreviewRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(ProductionOrderApproveRequest left, ProductionOrderApproveRequest right)
+        public static bool operator !=(ProductionOrderMaterialLockPreviewRequest left, ProductionOrderMaterialLockPreviewRequest right)
         {
             return !Equals(left, right);
         }

@@ -21,10 +21,10 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 审核人从当前登录用户推导，客户端不得传 reviewer_id。approved&#x3D;true 时物料明细也由订单和 BOM 推导，客户端不得提交锁定数量；后端重新校验库存并只补充 required_qty 与已有有效锁定 之间的差额。 
+    /// 仅用于审核前展示，不预留库存。若订单存在不属于当前直接 BOM 的有效锁定，或某物料有效锁定 超过 required_qty，后端返回 code 409，要求先修正异常锁定记录。 
     /// </summary>
     [DataContract]
-    public partial class ProductionOrderApproveRequest : IEquatable<ProductionOrderApproveRequest>
+    public partial class ProductionOrderMaterialLockPreview : IEquatable<ProductionOrderMaterialLockPreview>
     {
         /// <summary>
         /// Gets or Sets OrderId
@@ -34,18 +34,19 @@ namespace Org.OpenAPITools.Models
         public long OrderId { get; set; }
 
         /// <summary>
-        /// true 表示审核通过，false 表示审核拒绝。
+        /// 所有直接子项 shortage_qty 均为 0 时为 true。
         /// </summary>
-        /// <value>true 表示审核通过，false 表示审核拒绝。</value>
+        /// <value>所有直接子项 shortage_qty 均为 0 时为 true。</value>
         [Required]
-        [DataMember(Name="approved", EmitDefaultValue=true)]
-        public bool Approved { get; set; }
+        [DataMember(Name="can_approve", EmitDefaultValue=true)]
+        public bool CanApprove { get; set; }
 
         /// <summary>
-        /// Gets or Sets ReviewComment
+        /// Gets or Sets Items
         /// </summary>
-        [DataMember(Name="review_comment", EmitDefaultValue=true)]
-        public string ReviewComment { get; set; }
+        [Required]
+        [DataMember(Name="items", EmitDefaultValue=false)]
+        public List<ProductionOrderMaterialLockItem> Items { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -54,10 +55,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class ProductionOrderApproveRequest {\n");
+            sb.Append("class ProductionOrderMaterialLockPreview {\n");
             sb.Append("  OrderId: ").Append(OrderId).Append("\n");
-            sb.Append("  Approved: ").Append(Approved).Append("\n");
-            sb.Append("  ReviewComment: ").Append(ReviewComment).Append("\n");
+            sb.Append("  CanApprove: ").Append(CanApprove).Append("\n");
+            sb.Append("  Items: ").Append(Items).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -80,15 +81,15 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((ProductionOrderApproveRequest)obj);
+            return obj.GetType() == GetType() && Equals((ProductionOrderMaterialLockPreview)obj);
         }
 
         /// <summary>
-        /// Returns true if ProductionOrderApproveRequest instances are equal
+        /// Returns true if ProductionOrderMaterialLockPreview instances are equal
         /// </summary>
-        /// <param name="other">Instance of ProductionOrderApproveRequest to be compared</param>
+        /// <param name="other">Instance of ProductionOrderMaterialLockPreview to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(ProductionOrderApproveRequest other)
+        public bool Equals(ProductionOrderMaterialLockPreview other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -100,14 +101,15 @@ namespace Org.OpenAPITools.Models
                     OrderId.Equals(other.OrderId)
                 ) && 
                 (
-                    Approved == other.Approved ||
+                    CanApprove == other.CanApprove ||
                     
-                    Approved.Equals(other.Approved)
+                    CanApprove.Equals(other.CanApprove)
                 ) && 
                 (
-                    ReviewComment == other.ReviewComment ||
-                    ReviewComment != null &&
-                    ReviewComment.Equals(other.ReviewComment)
+                    Items == other.Items ||
+                    Items != null &&
+                    other.Items != null &&
+                    Items.SequenceEqual(other.Items)
                 );
         }
 
@@ -124,9 +126,9 @@ namespace Org.OpenAPITools.Models
                     
                     hashCode = hashCode * 59 + OrderId.GetHashCode();
                     
-                    hashCode = hashCode * 59 + Approved.GetHashCode();
-                    if (ReviewComment != null)
-                    hashCode = hashCode * 59 + ReviewComment.GetHashCode();
+                    hashCode = hashCode * 59 + CanApprove.GetHashCode();
+                    if (Items != null)
+                    hashCode = hashCode * 59 + Items.GetHashCode();
                 return hashCode;
             }
         }
@@ -134,12 +136,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(ProductionOrderApproveRequest left, ProductionOrderApproveRequest right)
+        public static bool operator ==(ProductionOrderMaterialLockPreview left, ProductionOrderMaterialLockPreview right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(ProductionOrderApproveRequest left, ProductionOrderApproveRequest right)
+        public static bool operator !=(ProductionOrderMaterialLockPreview left, ProductionOrderMaterialLockPreview right)
         {
             return !Equals(left, right);
         }

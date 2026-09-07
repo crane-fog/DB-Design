@@ -2872,7 +2872,7 @@ export interface ProductionOrderActionRequest {
     'remark'?: string | null;
 }
 /**
- * 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+ * 审核人从当前登录用户推导，客户端不得传 reviewer_id。approved=true 时物料明细也由订单和 BOM 推导，客户端不得提交锁定数量；后端重新校验库存并只补充 required_qty 与已有有效锁定 之间的差额。 
  */
 export interface ProductionOrderApproveRequest {
     'order_id': number;
@@ -2936,6 +2936,77 @@ export interface ProductionOrderFinishRequest {
     'remark'?: string | null;
     'finished_qty': number;
 }
+export interface ProductionOrderMaterialLockItem {
+    'material_id': number;
+    'material_name': string;
+    'unit': string;
+    /**
+     * BOM 中生产一件父项所需的直接子项净用量。
+     */
+    'bom_quantity': number;
+    'loss_rate': number;
+    /**
+     * 订单完整需求量。按 plan_qty * bom_quantity / (1 - loss_rate) 计算，并向上保留两位小数； 同一物料存在多条直接 BOM 明细时按 material_id 汇总。 
+     */
+    'required_qty': number;
+    /**
+     * 该订单已经持有的 locked 状态库存数量。
+     */
+    'locked_qty': number;
+    /**
+     * 本次审核通过时需要补充锁定的数量，等于 max(required_qty - locked_qty, 0)。
+     */
+    'pending_lock_qty': number;
+    /**
+     * 当前未被其他订单锁定的可用库存数量。
+     */
+    'available_qty': number;
+    /**
+     * 当前锁定缺口，等于 max(pending_lock_qty - available_qty, 0)。
+     */
+    'shortage_qty': number;
+}
+/**
+ * 仅用于审核前展示，不预留库存。若订单存在不属于当前直接 BOM 的有效锁定，或某物料有效锁定 超过 required_qty，后端返回 code 409，要求先修正异常锁定记录。 
+ */
+export interface ProductionOrderMaterialLockPreview {
+    'order_id': number;
+    /**
+     * 所有直接子项 shortage_qty 均为 0 时为 true。
+     */
+    'can_approve': boolean;
+    'items': Array<ProductionOrderMaterialLockItem>;
+}
+/**
+ * 物料需求完全由生产订单推导，客户端不得提交物料明细或操作人。
+ */
+export interface ProductionOrderMaterialLockPreviewRequest {
+    'order_id': number;
+}
+export interface ProductionOrderMaterialLockPreviewResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ProductionOrderMaterialLockPreviewResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ProductionOrderMaterialLockPreview;
+}
+
+export const ProductionOrderMaterialLockPreviewResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ProductionOrderMaterialLockPreviewResponseCodeEnum = typeof ProductionOrderMaterialLockPreviewResponseCodeEnum[keyof typeof ProductionOrderMaterialLockPreviewResponseCodeEnum];
+
 export interface ProductionOrderPageResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -3000,7 +3071,7 @@ export const ProductionOrderResponseCodeEnum = {
 export type ProductionOrderResponseCodeEnum = typeof ProductionOrderResponseCodeEnum[keyof typeof ProductionOrderResponseCodeEnum];
 
 /**
- * 生产订单状态。pending_review 待审核，可审核或取消；pending_schedule 待排产，可修改、开始或取消；in_progress 生产中，可完工或取消；completed 已完工，流程结束；cancelled 已取消，流程结束。
+ * 生产订单状态。pending_review 待审核，可修改、预览物料锁定、审核或取消；pending_schedule 待排产且物料已经锁定，仅可修改计划日期、开始或取消；in_progress 生产中，可报工或取消； completed 已完工，流程结束；cancelled 已取消，流程结束。 
  */
 
 export const ProductionOrderStatus = {
@@ -3014,6 +3085,9 @@ export const ProductionOrderStatus = {
 export type ProductionOrderStatus = typeof ProductionOrderStatus[keyof typeof ProductionOrderStatus];
 
 
+/**
+ * pending_review 状态允许修改全部计划字段；pending_schedule 状态仅允许修改 plan_start 和 plan_end，其他字段仍需传入且必须与订单当前值一致。 
+ */
 export interface ProductionOrderUpdateRequest {
     'material_id': number;
     'version_id': number;
@@ -8244,7 +8318,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
+         * 审核 pending_review 生产订单。approved=true 时，后端必须重新计算该订单 BOM 直接子项的 物料需求，在同一个事务中锁定尚未锁定的需求差额并将订单置为 pending_schedule；任一物料库存 不足时返回 code 409，库存和订单状态均不得改变。approved=false 时将订单置为 cancelled， 不创建库存锁定。审核人从当前登录用户推导，整个操作仅需 production:order:approve， 不额外要求库存锁定权限。 
          * @summary 审核生产订单
          * @param {ProductionOrderApproveRequest} productionOrderApproveRequest 
          * @param {*} [options] Override http request option.
@@ -8283,7 +8357,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
+         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。后端必须在同一个事务中释放该订单全部 locked 状态的库存锁定，减少 locked_qty 并 恢复 available_qty；任一步失败时订单状态和库存均不得改变。需具备 production:order:cancel； 已发生完工报工或处于 completed/cancelled 状态时返回 code 409。 
          * @summary 取消生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -8920,6 +8994,45 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
+         * 根据 pending_review 生产订单选定的 BOM 版本和计划数量，计算该 BOM 的直接子项物料需求， 展示订单已有有效锁定、本次待锁定数量、当前可用库存和库存缺口，不修改订单或库存。 物料需求按 BOM 损耗率计算并汇总到 material_id；缺少 BOM 明细、BOM 数据非法或订单状态非法时 返回 code 409。需具备 production:order:approve，不额外要求库存锁定权限。 
+         * @summary 预览生产订单物料锁定
+         * @param {ProductionOrderMaterialLockPreviewRequest} productionOrderMaterialLockPreviewRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        previewProductionOrderMaterialLock: async (productionOrderMaterialLockPreviewRequest: ProductionOrderMaterialLockPreviewRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productionOrderMaterialLockPreviewRequest' is not null or undefined
+            assertParamExists('previewProductionOrderMaterialLock', 'productionOrderMaterialLockPreviewRequest', productionOrderMaterialLockPreviewRequest)
+            const localVarPath = `/api/previewProductionOrderMaterialLock`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(productionOrderMaterialLockPreviewRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
          * @summary 生产订单完工报工
          * @param {ProductionCompletionReportRequest} productionCompletionReportRequest 
@@ -9232,7 +9345,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。开工前后端必须校验 订单的有效库存锁定完整覆盖当前 BOM 直接子项需求；锁定不完整时返回 code 409，订单状态不变。 需具备 production:order:start；非法状态返回 code 409。 
          * @summary 开始生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -9388,7 +9501,7 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
+         * 修改生产订单。pending_review 状态下可修改产品、BOM 版本、计划数量和计划起止日期； pending_schedule 状态下物料已经锁定，material_id、version_id 和 plan_qty 必须与订单当前值一致， 仅允许调整计划起止日期。需具备 production:order:update；状态不允许修改或审核后试图修改 物料需求字段时返回 code 409。 
          * @summary 修改生产订单计划
          * @param {ProductionOrderUpdateRequest} productionOrderUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9475,7 +9588,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
+         * 审核 pending_review 生产订单。approved=true 时，后端必须重新计算该订单 BOM 直接子项的 物料需求，在同一个事务中锁定尚未锁定的需求差额并将订单置为 pending_schedule；任一物料库存 不足时返回 code 409，库存和订单状态均不得改变。approved=false 时将订单置为 cancelled， 不创建库存锁定。审核人从当前登录用户推导，整个操作仅需 production:order:approve， 不额外要求库存锁定权限。 
          * @summary 审核生产订单
          * @param {ProductionOrderApproveRequest} productionOrderApproveRequest 
          * @param {*} [options] Override http request option.
@@ -9488,7 +9601,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
+         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。后端必须在同一个事务中释放该订单全部 locked 状态的库存锁定，减少 locked_qty 并 恢复 available_qty；任一步失败时订单状态和库存均不得改变。需具备 production:order:cancel； 已发生完工报工或处于 completed/cancelled 状态时返回 code 409。 
          * @summary 取消生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -9681,6 +9794,19 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * 根据 pending_review 生产订单选定的 BOM 版本和计划数量，计算该 BOM 的直接子项物料需求， 展示订单已有有效锁定、本次待锁定数量、当前可用库存和库存缺口，不修改订单或库存。 物料需求按 BOM 损耗率计算并汇总到 material_id；缺少 BOM 明细、BOM 数据非法或订单状态非法时 返回 code 409。需具备 production:order:approve，不额外要求库存锁定权限。 
+         * @summary 预览生产订单物料锁定
+         * @param {ProductionOrderMaterialLockPreviewRequest} productionOrderMaterialLockPreviewRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async previewProductionOrderMaterialLock(productionOrderMaterialLockPreviewRequest: ProductionOrderMaterialLockPreviewRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ProductionOrderMaterialLockPreviewResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.previewProductionOrderMaterialLock(productionOrderMaterialLockPreviewRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.previewProductionOrderMaterialLock']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
          * @summary 生产订单完工报工
          * @param {ProductionCompletionReportRequest} productionCompletionReportRequest 
@@ -9785,7 +9911,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。开工前后端必须校验 订单的有效库存锁定完整覆盖当前 BOM 直接子项需求；锁定不完整时返回 code 409，订单状态不变。 需具备 production:order:start；非法状态返回 code 409。 
          * @summary 开始生产订单
          * @param {ProductionOrderActionRequest} productionOrderActionRequest 
          * @param {*} [options] Override http request option.
@@ -9837,7 +9963,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
+         * 修改生产订单。pending_review 状态下可修改产品、BOM 版本、计划数量和计划起止日期； pending_schedule 状态下物料已经锁定，material_id、version_id 和 plan_qty 必须与订单当前值一致， 仅允许调整计划起止日期。需具备 production:order:update；状态不允许修改或审核后试图修改 物料需求字段时返回 code 409。 
          * @summary 修改生产订单计划
          * @param {ProductionOrderUpdateRequest} productionOrderUpdateRequest 
          * @param {*} [options] Override http request option.
@@ -9889,7 +10015,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.addProductionOrder(requestParameters.productionOrderCreateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
+         * 审核 pending_review 生产订单。approved=true 时，后端必须重新计算该订单 BOM 直接子项的 物料需求，在同一个事务中锁定尚未锁定的需求差额并将订单置为 pending_schedule；任一物料库存 不足时返回 code 409，库存和订单状态均不得改变。approved=false 时将订单置为 cancelled， 不创建库存锁定。审核人从当前登录用户推导，整个操作仅需 production:order:approve， 不额外要求库存锁定权限。 
          * @summary 审核生产订单
          * @param {ProductionApiApproveProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -9899,7 +10025,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.approveProductionOrder(requestParameters.productionOrderApproveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
+         * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。后端必须在同一个事务中释放该订单全部 locked 状态的库存锁定，减少 locked_qty 并 恢复 available_qty；任一步失败时订单状态和库存均不得改变。需具备 production:order:cancel； 已发生完工报工或处于 completed/cancelled 状态时返回 code 409。 
          * @summary 取消生产订单
          * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -10029,6 +10155,16 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listProductionOrder(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.status, requestParameters.planEndStart, requestParameters.planEndEnd, options).then((request) => request(axios, basePath));
         },
         /**
+         * 根据 pending_review 生产订单选定的 BOM 版本和计划数量，计算该 BOM 的直接子项物料需求， 展示订单已有有效锁定、本次待锁定数量、当前可用库存和库存缺口，不修改订单或库存。 物料需求按 BOM 损耗率计算并汇总到 material_id；缺少 BOM 明细、BOM 数据非法或订单状态非法时 返回 code 409。需具备 production:order:approve，不额外要求库存锁定权限。 
+         * @summary 预览生产订单物料锁定
+         * @param {ProductionApiPreviewProductionOrderMaterialLockRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        previewProductionOrderMaterialLock(requestParameters: ProductionApiPreviewProductionOrderMaterialLockRequest, options?: RawAxiosRequestConfig): AxiosPromise<ProductionOrderMaterialLockPreviewResponse> {
+            return localVarFp.previewProductionOrderMaterialLock(requestParameters.productionOrderMaterialLockPreviewRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
          * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
          * @summary 生产订单完工报工
          * @param {ProductionApiReportProductionCompletionRequest} requestParameters Request parameters.
@@ -10109,7 +10245,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.saveProductionLineType(requestParameters.lineTypeSaveRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
+         * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。开工前后端必须校验 订单的有效库存锁定完整覆盖当前 BOM 直接子项需求；锁定不完整时返回 code 409，订单状态不变。 需具备 production:order:start；非法状态返回 code 409。 
          * @summary 开始生产订单
          * @param {ProductionApiStartProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -10149,7 +10285,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.updateProductionLineStatus(requestParameters.productionLineStatusUpdateRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
+         * 修改生产订单。pending_review 状态下可修改产品、BOM 版本、计划数量和计划起止日期； pending_schedule 状态下物料已经锁定，material_id、version_id 和 plan_qty 必须与订单当前值一致， 仅允许调整计划起止日期。需具备 production:order:update；状态不允许修改或审核后试图修改 物料需求字段时返回 code 409。 
          * @summary 修改生产订单计划
          * @param {ProductionApiUpdateProductionOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -10380,6 +10516,13 @@ export interface ProductionApiListProductionOrderRequest {
 }
 
 /**
+ * Request parameters for previewProductionOrderMaterialLock operation in ProductionApi.
+ */
+export interface ProductionApiPreviewProductionOrderMaterialLockRequest {
+    readonly productionOrderMaterialLockPreviewRequest: ProductionOrderMaterialLockPreviewRequest
+}
+
+/**
  * Request parameters for reportProductionCompletion operation in ProductionApi.
  */
 export interface ProductionApiReportProductionCompletionRequest {
@@ -10508,7 +10651,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。需具备 production:order:approve；非法状态返回 code 409。
+     * 审核 pending_review 生产订单。approved=true 时，后端必须重新计算该订单 BOM 直接子项的 物料需求，在同一个事务中锁定尚未锁定的需求差额并将订单置为 pending_schedule；任一物料库存 不足时返回 code 409，库存和订单状态均不得改变。approved=false 时将订单置为 cancelled， 不创建库存锁定。审核人从当前登录用户推导，整个操作仅需 production:order:approve， 不额外要求库存锁定权限。 
      * @summary 审核生产订单
      * @param {ProductionApiApproveProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10519,7 +10662,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。需具备 production:order:cancel；已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
+     * 将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为 cancelled。后端必须在同一个事务中释放该订单全部 locked 状态的库存锁定，减少 locked_qty 并 恢复 available_qty；任一步失败时订单状态和库存均不得改变。需具备 production:order:cancel； 已发生完工报工或处于 completed/cancelled 状态时返回 code 409。 
      * @summary 取消生产订单
      * @param {ProductionApiCancelProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10662,6 +10805,17 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
+     * 根据 pending_review 生产订单选定的 BOM 版本和计划数量，计算该 BOM 的直接子项物料需求， 展示订单已有有效锁定、本次待锁定数量、当前可用库存和库存缺口，不修改订单或库存。 物料需求按 BOM 损耗率计算并汇总到 material_id；缺少 BOM 明细、BOM 数据非法或订单状态非法时 返回 code 409。需具备 production:order:approve，不额外要求库存锁定权限。 
+     * @summary 预览生产订单物料锁定
+     * @param {ProductionApiPreviewProductionOrderMaterialLockRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public previewProductionOrderMaterialLock(requestParameters: ProductionApiPreviewProductionOrderMaterialLockRequest, options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).previewProductionOrderMaterialLock(requestParameters.productionOrderMaterialLockPreviewRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
      * 对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。 后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。 finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。 接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单 finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留； 累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。 任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400； 订单状态非法、批次号重复或订单状态已变化返回 code 409。
      * @summary 生产订单完工报工
      * @param {ProductionApiReportProductionCompletionRequest} requestParameters Request parameters.
@@ -10750,7 +10904,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。需具备 production:order:start；非法状态返回 code 409。
+     * 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。开工前后端必须校验 订单的有效库存锁定完整覆盖当前 BOM 直接子项需求；锁定不完整时返回 code 409，订单状态不变。 需具备 production:order:start；非法状态返回 code 409。 
      * @summary 开始生产订单
      * @param {ProductionApiStartProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10794,7 +10948,7 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。需具备 production:order:update；状态不允许修改时返回 code 409。
+     * 修改生产订单。pending_review 状态下可修改产品、BOM 版本、计划数量和计划起止日期； pending_schedule 状态下物料已经锁定，material_id、version_id 和 plan_qty 必须与订单当前值一致， 仅允许调整计划起止日期。需具备 production:order:update；状态不允许修改或审核后试图修改 物料需求字段时返回 code 409。 
      * @summary 修改生产订单计划
      * @param {ProductionApiUpdateProductionOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
