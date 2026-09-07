@@ -865,11 +865,11 @@ export interface ExternalOrderConvertResult {
     'associations': Array<ExternalOrderProductionAssociation>;
 }
 /**
- * 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时可传 customer_id。
+ * 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时必须传 customer_id。
  */
 export interface ExternalOrderCreateRequest {
     /**
-     * 使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。
+     * 仅具备 external-order:create-own 时不得传并由当前登录用户推导；具备 external-order:create-for-customer 时必须传，且必须是表单选项中状态有效的外部客户。
      */
     'customer_id'?: number | null;
     'material_id': number;
@@ -877,6 +877,14 @@ export interface ExternalOrderCreateRequest {
     'expected_date': string;
     'contact_person': string;
     'contact_phone': string;
+}
+/**
+ * 状态有效且具有“外部客户”角色的用户，仅向具备 external-order:create-for-customer 的调用方返回。
+ */
+export interface ExternalOrderCustomerOption {
+    'user_id': number;
+    'employee_no': string;
+    'user_name': string;
 }
 export interface ExternalOrderDelivery {
     'delivery_id': number;
@@ -934,6 +942,40 @@ export interface ExternalOrderDeliveryResult {
      */
     'remaining_available_qty': number;
 }
+export interface ExternalOrderFormOptions {
+    /**
+     * 管理员可代录的外部客户；仅具备 create-own 权限时为空数组。
+     */
+    'customers': Array<ExternalOrderCustomerOption>;
+    /**
+     * 可下单的全部成品物料。
+     */
+    'materials': Array<ExternalOrderMaterialOption>;
+}
+export interface ExternalOrderFormOptionsResponse {
+    /**
+     * 业务状态码，只使用 200、400、401、403、404、409、500。
+     */
+    'code': ExternalOrderFormOptionsResponseCodeEnum;
+    /**
+     * 返回结果说明。
+     */
+    'message': string;
+    'data': ExternalOrderFormOptions;
+}
+
+export const ExternalOrderFormOptionsResponseCodeEnum = {
+    NUMBER_200: 200,
+    NUMBER_400: 400,
+    NUMBER_401: 401,
+    NUMBER_403: 403,
+    NUMBER_404: 404,
+    NUMBER_409: 409,
+    NUMBER_500: 500,
+} as const;
+
+export type ExternalOrderFormOptionsResponseCodeEnum = typeof ExternalOrderFormOptionsResponseCodeEnum[keyof typeof ExternalOrderFormOptionsResponseCodeEnum];
+
 export interface ExternalOrderListItem {
     'ext_order_id': number;
     'customer_id': number;
@@ -972,6 +1014,15 @@ export interface ExternalOrderListItem {
 }
 
 
+/**
+ * 可用于提交外部订单的成品物料。
+ */
+export interface ExternalOrderMaterialOption {
+    'material_id': number;
+    'material_name': string;
+    'model': string;
+    'unit': string;
+}
 export interface ExternalOrderPageResponse {
     /**
      * 业务状态码，只使用 200、400、401、403、404、409、500。
@@ -8299,7 +8350,7 @@ export class MaterialBomApi extends BaseAPI {
 export const ProductionApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
+         * 提交产品预订订单，初始状态为 pending_review。仅具备 external-order:create-own 的外部客户只能为当前用户提交且不得传 customer_id；具备 external-order:create-for-customer 的内部用户代录时必须传表单选项中的 customer_id；两项权限均无时返回 code 403。
          * @summary 外部客户提交订单
          * @param {ExternalOrderCreateRequest} externalOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -8784,16 +8835,16 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
             };
         },
         /**
-         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_name 模糊过滤；仅具备 external-order:view-own 时忽略客户名并强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
-         * @param {number} [customerId] 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
+         * @param {string} [customerName] 仅具备 external-order:view-all 时作为客户名称模糊过滤条件；仅具备 external-order:view-own 时忽略该参数。
          * @param {ExternalOrderStatus} [status] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listExternalOrder: async (page?: number, pageSize?: number, customerId?: number, status?: ExternalOrderStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listExternalOrder: async (page?: number, pageSize?: number, customerName?: string, status?: ExternalOrderStatus, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/listExternalOrder`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -8818,13 +8869,47 @@ export const ProductionApiAxiosParamCreator = function (configuration?: Configur
                 localVarQueryParameter['page_size'] = pageSize;
             }
 
-            if (customerId !== undefined) {
-                localVarQueryParameter['customer_id'] = customerId;
+            if (customerName !== undefined) {
+                localVarQueryParameter['customer_name'] = customerName;
             }
 
             if (status !== undefined) {
                 localVarQueryParameter['status'] = status;
             }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 返回提交外部订单所需的下拉选项，复用 external-order:create-own 或 external-order:create-for-customer 权限，不增加新的权限种类。产品物料仅返回成品。 仅具备 create-own 的外部客户只能为自己提交，customers 固定返回空数组；具备 create-for-customer 的内部用户可获得状态有效且具有“外部客户”角色的用户列表， 提交时必须从中选择 customer_id。 
+         * @summary 查询外部订单表单选项
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listExternalOrderFormOptions: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/listExternalOrderFormOptions`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
             localVarHeaderParameter['Accept'] = 'application/json';
 
@@ -9686,7 +9771,7 @@ export const ProductionApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = ProductionApiAxiosParamCreator(configuration)
     return {
         /**
-         * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
+         * 提交产品预订订单，初始状态为 pending_review。仅具备 external-order:create-own 的外部客户只能为当前用户提交且不得传 customer_id；具备 external-order:create-for-customer 的内部用户代录时必须传表单选项中的 customer_id；两项权限均无时返回 code 403。
          * @summary 外部客户提交订单
          * @param {ExternalOrderCreateRequest} externalOrderCreateRequest 
          * @param {*} [options] Override http request option.
@@ -9845,19 +9930,31 @@ export const ProductionApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_name 模糊过滤；仅具备 external-order:view-own 时忽略客户名并强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {number} [page] 当前页码，从 1 开始。
          * @param {number} [pageSize] 每页数据数量。
-         * @param {number} [customerId] 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
+         * @param {string} [customerName] 仅具备 external-order:view-all 时作为客户名称模糊过滤条件；仅具备 external-order:view-own 时忽略该参数。
          * @param {ExternalOrderStatus} [status] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listExternalOrder(page?: number, pageSize?: number, customerId?: number, status?: ExternalOrderStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderPageResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listExternalOrder(page, pageSize, customerId, status, options);
+        async listExternalOrder(page?: number, pageSize?: number, customerName?: string, status?: ExternalOrderStatus, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderPageResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listExternalOrder(page, pageSize, customerName, status, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ProductionApi.listExternalOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 返回提交外部订单所需的下拉选项，复用 external-order:create-own 或 external-order:create-for-customer 权限，不增加新的权限种类。产品物料仅返回成品。 仅具备 create-own 的外部客户只能为自己提交，customers 固定返回空数组；具备 create-for-customer 的内部用户可获得状态有效且具有“外部客户”角色的用户列表， 提交时必须从中选择 customer_id。 
+         * @summary 查询外部订单表单选项
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listExternalOrderFormOptions(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ExternalOrderFormOptionsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listExternalOrderFormOptions(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ProductionApi.listExternalOrderFormOptions']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -10135,7 +10232,7 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
     const localVarFp = ProductionApiFp(configuration)
     return {
         /**
-         * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
+         * 提交产品预订订单，初始状态为 pending_review。仅具备 external-order:create-own 的外部客户只能为当前用户提交且不得传 customer_id；具备 external-order:create-for-customer 的内部用户代录时必须传表单选项中的 customer_id；两项权限均无时返回 code 403。
          * @summary 外部客户提交订单
          * @param {ProductionApiAddExternalOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -10255,14 +10352,23 @@ export const ProductionApiFactory = function (configuration?: Configuration, bas
             return localVarFp.listCapacityConfig(requestParameters.page, requestParameters.pageSize, requestParameters.materialId, requestParameters.typeId, options).then((request) => request(axios, basePath));
         },
         /**
-         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+         * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_name 模糊过滤；仅具备 external-order:view-own 时忽略客户名并强制查询当前用户自己的订单；两项权限均无时返回 code 403。
          * @summary 查询外部订单列表
          * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
         listExternalOrder(requestParameters: ProductionApiListExternalOrderRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ExternalOrderPageResponse> {
-            return localVarFp.listExternalOrder(requestParameters.page, requestParameters.pageSize, requestParameters.customerId, requestParameters.status, options).then((request) => request(axios, basePath));
+            return localVarFp.listExternalOrder(requestParameters.page, requestParameters.pageSize, requestParameters.customerName, requestParameters.status, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 返回提交外部订单所需的下拉选项，复用 external-order:create-own 或 external-order:create-for-customer 权限，不增加新的权限种类。产品物料仅返回成品。 仅具备 create-own 的外部客户只能为自己提交，customers 固定返回空数组；具备 create-for-customer 的内部用户可获得状态有效且具有“外部客户”角色的用户列表， 提交时必须从中选择 customer_id。 
+         * @summary 查询外部订单表单选项
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listExternalOrderFormOptions(options?: RawAxiosRequestConfig): AxiosPromise<ExternalOrderFormOptionsResponse> {
+            return localVarFp.listExternalOrderFormOptions(options).then((request) => request(axios, basePath));
         },
         /**
          * 按生产线、日期范围和产能配置查询生产日历排产记录。需具备 production:calendar:view；权限不足返回 code 403。
@@ -10568,9 +10674,9 @@ export interface ProductionApiListExternalOrderRequest {
     readonly pageSize?: number
 
     /**
-     * 仅具备 external-order:view-all 时作为可选过滤条件；仅具备 external-order:view-own 时忽略该参数并强制使用当前用户编号。
+     * 仅具备 external-order:view-all 时作为客户名称模糊过滤条件；仅具备 external-order:view-own 时忽略该参数。
      */
-    readonly customerId?: number
+    readonly customerName?: string
 
     readonly status?: ExternalOrderStatus
 }
@@ -10785,7 +10891,7 @@ export interface ProductionApiUpdateProductionOrderRequest {
  */
 export class ProductionApi extends BaseAPI {
     /**
-     * 提交产品预订订单，初始状态为 pending_review。external-order:create-own 只能为当前用户提交；external-order:create-for-customer 可使用请求中的 customer_id 代录；两项权限均无时返回 code 403。
+     * 提交产品预订订单，初始状态为 pending_review。仅具备 external-order:create-own 的外部客户只能为当前用户提交且不得传 customer_id；具备 external-order:create-for-customer 的内部用户代录时必须传表单选项中的 customer_id；两项权限均无时返回 code 403。
      * @summary 外部客户提交订单
      * @param {ProductionApiAddExternalOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -10917,14 +11023,24 @@ export class ProductionApi extends BaseAPI {
     }
 
     /**
-     * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_id 过滤；仅具备 external-order:view-own 时强制查询当前用户自己的订单；两项权限均无时返回 code 403。
+     * 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_name 模糊过滤；仅具备 external-order:view-own 时忽略客户名并强制查询当前用户自己的订单；两项权限均无时返回 code 403。
      * @summary 查询外部订单列表
      * @param {ProductionApiListExternalOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listExternalOrder(requestParameters: ProductionApiListExternalOrderRequest = {}, options?: RawAxiosRequestConfig) {
-        return ProductionApiFp(this.configuration).listExternalOrder(requestParameters.page, requestParameters.pageSize, requestParameters.customerId, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+        return ProductionApiFp(this.configuration).listExternalOrder(requestParameters.page, requestParameters.pageSize, requestParameters.customerName, requestParameters.status, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 返回提交外部订单所需的下拉选项，复用 external-order:create-own 或 external-order:create-for-customer 权限，不增加新的权限种类。产品物料仅返回成品。 仅具备 create-own 的外部客户只能为自己提交，customers 固定返回空数组；具备 create-for-customer 的内部用户可获得状态有效且具有“外部客户”角色的用户列表， 提交时必须从中选择 customer_id。 
+     * @summary 查询外部订单表单选项
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listExternalOrderFormOptions(options?: RawAxiosRequestConfig) {
+        return ProductionApiFp(this.configuration).listExternalOrderFormOptions(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

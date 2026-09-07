@@ -21,15 +21,15 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时可传 customer_id。
+    /// 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时必须传 customer_id。
     /// </summary>
     [DataContract]
     public partial class ExternalOrderCreateRequest : IEquatable<ExternalOrderCreateRequest>
     {
         /// <summary>
-        /// 使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。
+        /// 仅具备 external-order:create-own 时不得传并由当前登录用户推导；具备 external-order:create-for-customer 时必须传，且必须是表单选项中状态有效的外部客户。
         /// </summary>
-        /// <value>使用 external-order:create-own 提交时不得传，由当前登录用户推导；具备 external-order:create-for-customer 时可传，后端必须按权限校验。</value>
+        /// <value>仅具备 external-order:create-own 时不得传并由当前登录用户推导；具备 external-order:create-for-customer 时必须传，且必须是表单选项中状态有效的外部客户。</value>
         [DataMember(Name="customer_id", EmitDefaultValue=true)]
         public long? CustomerId { get; set; }
 
