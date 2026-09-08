@@ -43,12 +43,16 @@ const moduleIcons: Record<string, Component> = {
   trace: Connection,
 }
 
-function canAccessMenu(permission?: unknown) {
-  if (typeof permission !== 'string' || !permission) {
+function canAccessMenu(permissions?: unknown) {
+  if (!Array.isArray(permissions) || !permissions.length) {
     return true
   }
 
-  return auth.hasPermission(permission)
+  return permissions.some(
+    (permission) =>
+      typeof permission === 'string' &&
+      auth.permissions.some((currentPermission) => currentPermission === permission),
+  )
 }
 
 function insertByOrder<ItemWithOrder extends { order: number }>(
@@ -77,7 +81,7 @@ const menuGroups = computed<MenuGroup[]>(() => {
         record.meta.showInMenu &&
         record.meta.module &&
         record.name &&
-        canAccessMenu(record.meta.permission),
+        canAccessMenu(record.meta.permissions),
     )
     .map((record) => ({
       isModule: Boolean(record.meta.isModule),

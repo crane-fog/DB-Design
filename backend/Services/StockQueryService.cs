@@ -38,8 +38,8 @@ public sealed class StockQueryService(string connString) : IStockReadQuery, ISto
                 materialId,
                 reader.GetDecimal(1),
                 reader.GetDecimal(2),
-                reader.IsDBNull(3) ? null : reader.GetDateTime(3),
-                reader.IsDBNull(4) ? null : reader.GetDateTime(4));
+                reader.IsDBNull(3) ? null : reader.GetUtcDateTime(3),
+                reader.IsDBNull(4) ? null : reader.GetUtcDateTime(4));
         }
         return result;
     }

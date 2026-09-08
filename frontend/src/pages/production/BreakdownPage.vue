@@ -10,13 +10,16 @@ import {
 } from '@/services/ProductionService'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { type SystemUser, systemService } from '@/services/SystemService'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { formatDateTime } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
+import { toBusinessDateTimeInput } from '@/utils/time'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 const pageSize = 10
 const faultStatusLabels = {
@@ -26,9 +29,18 @@ const faultStatusLabels = {
 }
 const lineStatusLabels = { fault: '故障', idle: '空闲', running: '运行中' }
 const auth = useAuthStore()
-const canManage = computed(() => auth.hasPermission('production:breakdown'))
-const canViewLines = computed(() => auth.hasPermission('production:capacity'))
-const selectedLineStatus = ref<ProductionLineRunStatus | ''>('fault')
+const canViewFaults = computed(() => auth.hasPermission(PermissionCode.ProductionFaultView))
+const canReportFault = computed(() => auth.hasPermission(PermissionCode.ProductionFaultReport))
+const canClaimFault = computed(() => auth.hasPermission(PermissionCode.ProductionFaultClaim))
+const canUpdateAssignedFault = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionFaultUpdateAssigned),
+)
+const canUpdateAnyFault = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionFaultUpdateAny),
+)
+const canViewLines = computed(() => auth.hasPermission(PermissionCode.ProductionLineView))
+const canViewUsers = computed(() => auth.hasPermission(PermissionCode.SystemUserView))
+const selectedLineStatus = ref<ProductionLineRunStatus | ''>('')
 const page = ref(1)
 const loading = ref(false)
 const error = ref('')
@@ -46,7 +58,23 @@ const updateForm = reactive<FaultUpdateFormData>({
   repairerId: undefined,
   status: 'repairing',
 })
-const lastRecord = ref<FaultRecordItem>()
+const faultsVisible = ref(false)
+const faultsLoading = ref(false)
+const lineFaults = ref<FaultRecordItem[]>([])
+const selectedLineId = ref<number>()
+const users = ref<SystemUser[]>([])
+const usersLoading = ref(false)
+
+function getUserName(userId: number | undefined): string {
+  if (!userId) {
+    return '-'
+  }
+  const user = users.value.find((targetUser) => targetUser.id === userId)
+  if (user) {
+    return `${user.name} (${user.employeeNo})`
+  }
+  return `#${userId}`
+}
 
 const reportRules: FormRules<FaultReportFormData> = {
   description: [{ message: '请输入故障描述', required: true, trigger: 'blur' }],
@@ -59,7 +87,7 @@ const updateRules: FormRules<FaultUpdateFormData> = {
   faultId: [
     { message: '请输入有效故障编号', min: 1, required: true, trigger: 'blur', type: 'number' },
   ],
-  repairerId: [{ message: '维修负责人编号必须大于 0', min: 1, trigger: 'blur', type: 'number' }],
+  repairerId: [{ message: '请选择维修负责人', required: true, trigger: 'change', type: 'number' }],
   status: [{ message: '请选择处理状态', required: true, trigger: 'change' }],
 }
 
@@ -96,8 +124,8 @@ async function submitReport() {
   }
   reporting.value = true
   try {
-    lastRecord.value = await productionService.reportFault({ ...reportForm })
-    ElMessage.success(`故障已上报，编号 #${lastRecord.value.faultId}`)
+    const record = await productionService.reportFault({ ...reportForm })
+    ElMessage.success(`故障已上报，编号 #${record.faultId}`)
     reportVisible.value = false
     await loadLines(1)
   } catch (requestError) {
@@ -111,15 +139,47 @@ function openUpdate(record?: FaultRecordItem) {
   let status = 'repairing'
   if (record?.status === 'recovered') {
     status = 'recovered'
+  } else if (record?.status === 'pending_repair') {
+    status = 'pending_repair'
   }
   Object.assign(updateForm, {
     faultId: record?.faultId ?? 0,
-    recoverTime: record?.recoverTime ?? '',
+    recoverTime: toBusinessDateTimeInput(record?.recoverTime),
     repairerId: record?.repairerId ?? auth.currentUser?.id,
     status,
   })
   updateFormRef.value?.clearValidate()
   updateVisible.value = true
+}
+
+function canUpdateFault(record: FaultRecordItem) {
+  return (
+    canUpdateAnyFault.value ||
+    (canUpdateAssignedFault.value && record.repairerId === auth.currentUser?.id)
+  )
+}
+
+async function loadLineFaults(lineId?: number) {
+  if (!canViewFaults.value) {
+    return
+  }
+  selectedLineId.value = lineId
+  faultsLoading.value = true
+  lineFaults.value = []
+  faultsVisible.value = true
+  try {
+    const faultsResult = await productionService.listFaults({
+      lineId,
+      page: 1,
+      pageSize: 100,
+    })
+    lineFaults.value = faultsResult.items
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '查询生产线故障失败'))
+    faultsVisible.value = false
+  } finally {
+    faultsLoading.value = false
+  }
 }
 
 async function submitUpdate() {
@@ -133,13 +193,17 @@ async function submitUpdate() {
     if (updateForm.status === 'recovered') {
       ;({ recoverTime } = updateForm)
     }
-    lastRecord.value = await productionService.updateFault({
+    const record = await productionService.updateFault({
       ...updateForm,
       recoverTime,
     })
-    ElMessage.success(`故障 #${lastRecord.value.faultId} 处理状态已更新`)
+    ElMessage.success(`故障 #${record.faultId} 处理状态已更新`)
     updateVisible.value = false
-    await loadLines(page.value)
+    const tasks: Promise<void>[] = [loadLines(page.value)]
+    if (faultsVisible.value) {
+      tasks.push(loadLineFaults(selectedLineId.value))
+    }
+    await Promise.all(tasks)
   } catch (requestError) {
     ElMessage.error(getErrorMessage(requestError, '故障处理更新失败'))
   } finally {
@@ -147,7 +211,51 @@ async function submitUpdate() {
   }
 }
 
-onMounted(() => void loadLines())
+async function claimFault(record: FaultRecordItem) {
+  const currentUserId = auth.currentUser?.id
+  if (!currentUserId || updating.value) {
+    return
+  }
+  updating.value = true
+  try {
+    await productionService.updateFault({
+      faultId: record.faultId,
+      recoverTime: undefined,
+      repairerId: currentUserId,
+      status: 'repairing',
+    })
+    ElMessage.success(`已认领故障 #${record.faultId}`)
+    await Promise.all([loadLines(page.value), loadLineFaults(selectedLineId.value)])
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '故障认领失败'))
+  } finally {
+    updating.value = false
+  }
+}
+
+async function loadUsers() {
+  if (!canViewUsers.value) {
+    return
+  }
+  usersLoading.value = true
+  try {
+    const usersResult = await systemService.listUserOptions({
+      page: 1,
+      pageSize: 100,
+      status: 'valid',
+    })
+    users.value = usersResult.items
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '加载用户列表失败'))
+  } finally {
+    usersLoading.value = false
+  }
+}
+
+onMounted(() => {
+  void loadLines()
+  void loadUsers()
+})
 </script>
 
 <template>
@@ -157,8 +265,9 @@ onMounted(() => void loadLines())
       description="查看产线运行状态，上报故障，并按故障编号进行维修和恢复处理。"
     >
       <template #actions>
-        <el-button v-if="canManage" @click="openUpdate()">按编号处理</el-button>
-        <el-button v-if="canManage" :icon="Plus" type="primary" @click="openReport()">
+        <el-button v-if="canViewFaults" @click="loadLineFaults()">查看全部故障</el-button>
+        <el-button v-if="canUpdateAnyFault" @click="openUpdate()">按编号处理</el-button>
+        <el-button v-if="canReportFault" :icon="Plus" type="primary" @click="openReport()">
           上报故障
         </el-button>
       </template>
@@ -179,7 +288,7 @@ onMounted(() => void loadLines())
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button :loading="loading" type="primary" @click="loadLines(1)">查询</el-button>
+          <el-button :loading="loading" type="primary" native-type="submit">查询</el-button>
           <el-button :disabled="loading" :icon="Refresh" @click="loadLines(page)">刷新</el-button>
         </el-form-item>
       </el-form>
@@ -198,9 +307,14 @@ onMounted(() => void loadLines())
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="canManage" label="操作" min-width="130">
+        <el-table-column v-if="canViewFaults || canReportFault" label="操作" min-width="180">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openReport(row.lineId)">上报故障</el-button>
+            <el-button v-if="canViewFaults" link type="primary" @click="loadLineFaults(row.lineId)">
+              查看故障
+            </el-button>
+            <el-button v-if="canReportFault" link type="primary" @click="openReport(row.lineId)">
+              上报故障
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -214,43 +328,6 @@ onMounted(() => void loadLines())
           @current-change="loadLines"
         />
       </div>
-    </el-card>
-
-    <el-card class="section-card" shadow="never">
-      <template #header>最近一次操作结果</template>
-      <p class="result-note">
-        显示本页最近一次上报或处理返回的记录。请保存故障编号，后续可按编号处理。
-      </p>
-      <el-descriptions v-if="lastRecord" border :column="2">
-        <el-descriptions-item label="故障编号">#{{ lastRecord.faultId }}</el-descriptions-item>
-        <el-descriptions-item label="生产线">#{{ lastRecord.lineId }}</el-descriptions-item>
-        <el-descriptions-item label="故障类型">{{ lastRecord.faultType }}</el-descriptions-item>
-        <el-descriptions-item label="处理状态">
-          <StatusTag :labels="faultStatusLabels" :value="lastRecord.status" />
-        </el-descriptions-item>
-        <el-descriptions-item label="故障描述" :span="2">{{
-          lastRecord.description
-        }}</el-descriptions-item>
-        <el-descriptions-item label="发生时间">{{
-          formatDateTime(lastRecord.occurTime)
-        }}</el-descriptions-item>
-        <el-descriptions-item label="恢复时间">{{
-          formatDateTime(lastRecord.recoverTime)
-        }}</el-descriptions-item>
-        <el-descriptions-item label="上报人">#{{ lastRecord.reporterId }}</el-descriptions-item>
-        <el-descriptions-item label="维修负责人">{{
-          lastRecord.repairerId ? `#${lastRecord.repairerId}` : '-'
-        }}</el-descriptions-item>
-      </el-descriptions>
-      <el-empty v-else description="上报或处理后查看返回记录" />
-      <el-button
-        v-if="canManage && lastRecord"
-        class="result-action"
-        type="primary"
-        @click="openUpdate(lastRecord)"
-      >
-        处理此故障
-      </el-button>
     </el-card>
 
     <el-dialog
@@ -299,20 +376,39 @@ onMounted(() => void loadLines())
             <el-option label="已恢复" value="recovered" />
           </el-select>
         </el-form-item>
-        <el-form-item label="维修负责人 ID" prop="repairerId">
-          <el-input-number
-            :controls="false"
+        <el-form-item label="维修负责人" prop="repairerId">
+          <el-select
+            v-if="canUpdateAnyFault && canViewUsers"
             v-model="updateForm.repairerId"
+            clearable
+            filterable
+            :loading="usersLoading"
+            placeholder="请选择维修负责人"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="user in users"
+              :key="user.id"
+              :label="`${user.name} (${user.employeeNo})`"
+              :value="user.id"
+            />
+          </el-select>
+          <el-input-number
+            v-else-if="canUpdateAnyFault"
+            v-model="updateForm.repairerId"
+            :controls="false"
             :min="1"
-            :precision="0"
+            style="width: 100%"
           />
+          <el-input v-else :model-value="getUserName(updateForm.repairerId)" disabled />
         </el-form-item>
         <el-form-item v-if="updateForm.status === 'recovered'" label="恢复时间" prop="recoverTime">
           <el-date-picker
+            :show-now="false"
             v-model="updateForm.recoverTime"
             type="datetime"
             value-format="YYYY-MM-DDTHH:mm:ss"
-            placeholder="留空使用服务器时间"
+            placeholder="北京时间，留空使用当前时间"
             style="width: 100%"
           />
         </el-form-item>
@@ -320,6 +416,66 @@ onMounted(() => void loadLines())
       <template #footer>
         <el-button :disabled="updating" @click="updateVisible = false">取消</el-button>
         <el-button :loading="updating" type="primary" @click="submitUpdate">保存处理</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="faultsVisible" title="生产线故障记录" width="900px">
+      <p class="result-note">
+        {{ selectedLineId ? `生产线 #${selectedLineId} 的故障记录列表` : '全部故障记录' }}
+      </p>
+      <div v-loading="faultsLoading">
+        <div v-if="lineFaults.length > 0" class="fault-list">
+          <el-card
+            v-for="fault in lineFaults"
+            :key="fault.faultId"
+            class="fault-card"
+            shadow="never"
+          >
+            <el-descriptions border :column="2">
+              <el-descriptions-item label="故障编号">#{{ fault.faultId }}</el-descriptions-item>
+              <el-descriptions-item label="故障类型">{{ fault.faultType }}</el-descriptions-item>
+              <el-descriptions-item label="处理状态">
+                <StatusTag :labels="faultStatusLabels" :value="fault.status" />
+              </el-descriptions-item>
+              <el-descriptions-item label="发生时间">{{
+                formatDateTime(fault.occurTime)
+              }}</el-descriptions-item>
+              <el-descriptions-item label="恢复时间">{{
+                formatDateTime(fault.recoverTime)
+              }}</el-descriptions-item>
+              <el-descriptions-item label="上报人">{{
+                getUserName(fault.reporterId)
+              }}</el-descriptions-item>
+              <el-descriptions-item label="维修负责人">{{
+                getUserName(fault.repairerId)
+              }}</el-descriptions-item>
+              <el-descriptions-item label="故障描述" :span="2">{{
+                fault.description
+              }}</el-descriptions-item>
+            </el-descriptions>
+            <el-button
+              v-if="canClaimFault && fault.status === 'pending_repair' && !fault.repairerId"
+              class="fault-action"
+              :loading="updating"
+              type="success"
+              @click="claimFault(fault)"
+            >
+              认领故障
+            </el-button>
+            <el-button
+              v-if="canUpdateFault(fault)"
+              class="fault-action"
+              type="primary"
+              @click="openUpdate(fault)"
+            >
+              处理此故障
+            </el-button>
+          </el-card>
+        </div>
+        <el-empty v-else description="该生产线暂无故障记录" />
+      </div>
+      <template #footer>
+        <el-button @click="faultsVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </PageContainer>
@@ -338,7 +494,17 @@ onMounted(() => void loadLines())
   margin: 0 0 16px;
   color: var(--el-text-color-secondary);
 }
-.result-action {
+.fault-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+.fault-card {
+  margin-bottom: 16px;
+}
+.fault-card:last-child {
+  margin-bottom: 0;
+}
+.fault-action {
   margin-top: 16px;
 }
 </style>

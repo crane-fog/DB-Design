@@ -35,8 +35,8 @@ public sealed class BomGraphValidationService
                             WHERE (m.MATERIAL_ID = :materialId AND bv.VERSION_ID = :versionId)
                                OR (m.MATERIAL_ID <> :materialId
                                    AND bv.VERSION_ID = m.CURRENT_VERSION_ID
-                                   AND bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
-                                   AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(SYSDATE)))";
+                                   AND bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                                   AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))))";
         cmd.Parameters.Add(new OracleParameter("materialId", materialId));
         cmd.Parameters.Add(new OracleParameter("versionId", versionId));
 

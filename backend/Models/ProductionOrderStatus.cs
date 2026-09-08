@@ -21,9 +21,9 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
         /// <summary>
-        /// 生产订单状态。pending_review 待审核，可审核或取消；pending_schedule 待排产，可修改、开始或取消；in_progress 生产中，可完工或取消；completed 已完工，流程结束；cancelled 已取消，流程结束。
+        /// 生产订单状态。pending_review 待审核，可修改、预览物料锁定、审核或取消；pending_schedule 待排产且物料已经锁定，仅可修改计划日期、开始或取消；in_progress 生产中，可报工或取消； completed 已完工，流程结束；cancelled 已取消，流程结束。 
         /// </summary>
-        /// <value>生产订单状态。pending_review 待审核，可审核或取消；pending_schedule 待排产，可修改、开始或取消；in_progress 生产中，可完工或取消；completed 已完工，流程结束；cancelled 已取消，流程结束。</value>
+        /// <value>生产订单状态。pending_review 待审核，可修改、预览物料锁定、审核或取消；pending_schedule 待排产且物料已经锁定，仅可修改计划日期、开始或取消；in_progress 生产中，可报工或取消； completed 已完工，流程结束；cancelled 已取消，流程结束。 </value>
         [TypeConverter(typeof(CustomEnumConverter<ProductionOrderStatus>))]
         [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public enum ProductionOrderStatus

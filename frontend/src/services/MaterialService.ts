@@ -27,6 +27,7 @@ import type {
   MaterialType,
 } from '@/types/material'
 import { materialBomApi, purchaseApi } from '@/api/client'
+import { toUtcDayBoundary } from '@/utils/time'
 
 const pageSize = 200
 const apiMaterialTypes = {
@@ -398,10 +399,10 @@ export const materialService = {
       filters.categoryId = idNumber(query.categoryId, '分类编号')
     }
     if (query.createdTo) {
-      filters.createdEndTime = `${query.createdTo}T23:59:59.999`
+      filters.createdEndTime = toUtcDayBoundary(query.createdTo, true)
     }
     if (query.createdFrom) {
-      filters.createdStartTime = `${query.createdFrom}T00:00:00`
+      filters.createdStartTime = toUtcDayBoundary(query.createdFrom, false)
     }
     if (query.type) {
       filters.materialType = apiMaterialTypes[query.type]

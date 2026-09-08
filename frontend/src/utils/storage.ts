@@ -1,11 +1,13 @@
+import type { PermissionCode, RoleBrief } from '@/api'
+
 const TOKEN_KEY = 'jwt'
 const EXPIRES_AT_KEY = 'expires'
 const SESSION_KEY = 'app-auth-session'
 
 export interface StoredSession {
   currentUser?: { id?: number; name?: string; employeeNo?: string }
-  permissions: string[]
-  roles: string[]
+  permissions: PermissionCode[]
+  roles: RoleBrief[]
 }
 
 export function getToken() {

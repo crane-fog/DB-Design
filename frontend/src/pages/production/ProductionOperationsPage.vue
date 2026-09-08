@@ -1,64 +1,54 @@
 <script setup lang="ts">
 import {
-  type CapacityBalanceItem,
-  type CapacityDetectionItem,
   type ExternalOrderConvertItem,
+  type ExternalOrderFormOptionsItem,
   type ExternalOrderItem,
-  type ProductionCapacityEstimateFormData,
-  type ProductionCapacityEstimateItem,
-  type ProductionLineItem,
-  type ProductionLineRunStatus,
-  type ProductionLineStatusItem,
+  type ProductionOrderProductOption,
   productionService,
 } from '@/services/ProductionService'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Refresh } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { productionOrderStatusLabels } from '@/constants/status'
 import { formatDateTime, formatNumber } from '@/utils/format'
-import type { MaterialShortageItem } from '@/types/inventory'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
-import { inventoryService } from '@/services/InventoryService'
-import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
-import { useRoute } from 'vue-router'
-
-type OperationsTab = 'balance' | 'detection' | 'estimate' | 'external' | 'status'
 
 const externalStatusLabels = {
   accepted: '已接受',
+  converted: '已转换',
+  delivered: '已交货',
   pending_review: '待审核',
   rejected: '已拒绝',
 }
-const lineStatusLabels = { fault: '故障', idle: '空闲', running: '运行中' }
-
 const auth = useAuthStore()
-const route = useRoute()
-const isExternalCustomer = computed(() => auth.hasRole('外部客户'))
-const canManageOrders = computed(() => auth.hasPermission(PERMISSIONS.production.orders))
-const canManageCapacity = computed(() => auth.hasPermission(PERMISSIONS.production.capacity))
-const hasOperationsAccess = computed(
-  () => isExternalCustomer.value || canManageOrders.value || canManageCapacity.value,
+const canViewOwnExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderViewOwn))
+const canViewAllExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderViewAll))
+const canViewExternal = computed(() => canViewOwnExternal.value || canViewAllExternal.value)
+const canCreateOwnExternal = computed(() =>
+  auth.hasPermission(PermissionCode.ExternalOrderCreateOwn),
 )
-let initialTab: OperationsTab = 'estimate'
-if (isExternalCustomer.value || canManageOrders.value) {
-  initialTab = 'external'
-}
-if (route.query.tab === 'status' && canManageCapacity.value) {
-  initialTab = 'status'
-}
-const activeTab = ref<OperationsTab>(initialTab)
+const canCreateExternalForCustomer = computed(() =>
+  auth.hasPermission(PermissionCode.ExternalOrderCreateForCustomer),
+)
+const canCreateExternal = computed(
+  () => canCreateOwnExternal.value || canCreateExternalForCustomer.value,
+)
+const canReviewExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderReview))
+const canConvertExternal = computed(() => auth.hasPermission(PermissionCode.ExternalOrderConvert))
+const hasExternalAccess = computed(() => canViewExternal.value || canCreateExternal.value)
 
 // ---------- 外部订单 ----------
 const externalPageSize = 10
 const externalPage = ref(1)
 const externalLoading = ref(false)
 const externalError = ref('')
-const externalFilters = reactive({ customerId: '', status: '' })
+const externalFilters = reactive({ customerName: '', status: '' })
 const externalResult = ref<PageResult<ExternalOrderItem>>({
   items: [],
   page: 1,
@@ -67,12 +57,18 @@ const externalResult = ref<PageResult<ExternalOrderItem>>({
 })
 const externalCreateVisible = ref(false)
 const externalSubmitting = ref(false)
+const externalFormOptions = ref<ExternalOrderFormOptionsItem>({ customers: [], materials: [] })
+const externalFormOptionsError = ref('')
+const externalFormOptionsLoading = ref(false)
+let externalFormOptionsLoaded = false
+let externalFormOptionsPromise: Promise<void> | undefined = undefined
+const deliverySubmittingId = ref<number>()
 const externalForm = reactive({
   contactPerson: '',
   contactPhone: '',
-  customerId: 0,
+  customerId: undefined as number | undefined,
   expectedDate: '',
-  materialId: 0,
+  materialId: undefined as number | undefined,
   quantity: 1,
 })
 
@@ -80,6 +76,11 @@ const convertVisible = ref(false)
 const convertingOrder = ref<ExternalOrderItem>()
 const convertResult = ref<ExternalOrderConvertItem>()
 const convertSubmitting = ref(false)
+const convertProductOptions = ref<ProductionOrderProductOption[]>([])
+const convertProductOptionsLoading = ref(false)
+const convertProductOptionsError = ref('')
+let convertProductOptionsLoaded = false
+let convertProductOptionsPromise: Promise<void> | undefined = undefined
 const convertForm = reactive({
   materialId: 0,
   planEnd: '',
@@ -90,22 +91,31 @@ const convertForm = reactive({
 
 function selectedExternalStatus() {
   const { status } = externalFilters
-  if (status === 'accepted' || status === 'pending_review' || status === 'rejected') {
+  if (
+    status === 'accepted' ||
+    status === 'converted' ||
+    status === 'delivered' ||
+    status === 'pending_review' ||
+    status === 'rejected'
+  ) {
     return status
   }
   return undefined
 }
 
 async function loadExternalOrders(targetPage = externalPage.value) {
+  if (!canViewExternal.value) {
+    return
+  }
   externalLoading.value = true
   externalError.value = ''
   try {
-    let customerId = undefined as number | undefined
-    if (canManageOrders.value) {
-      customerId = parsePositiveInt(externalFilters.customerId)
+    let customerName = undefined as string | undefined
+    if (canViewAllExternal.value) {
+      customerName = externalFilters.customerName.trim() || undefined
     }
     externalResult.value = await productionService.listExternalOrders({
-      customerId,
+      customerName,
       page: targetPage,
       pageSize: externalPageSize,
       status: selectedExternalStatus(),
@@ -119,25 +129,73 @@ async function loadExternalOrders(targetPage = externalPage.value) {
 }
 
 function resetExternalFilters() {
-  Object.assign(externalFilters, { customerId: '', status: '' })
+  Object.assign(externalFilters, { customerName: '', status: '' })
   void loadExternalOrders(1)
 }
 
-function openExternalCreate() {
+function normalizeExternalFormSelections() {
+  if (
+    !externalFormOptions.value.materials.some(
+      (material) => material.materialId === externalForm.materialId,
+    )
+  ) {
+    externalForm.materialId = undefined
+  }
+  if (
+    !externalFormOptions.value.customers.some(
+      (customer) => customer.userId === externalForm.customerId,
+    )
+  ) {
+    externalForm.customerId = undefined
+  }
+}
+
+async function loadExternalFormOptions(force = false) {
+  if (externalFormOptionsPromise) {
+    await externalFormOptionsPromise
+    return
+  }
+  if (externalFormOptionsLoaded && !force) {
+    return
+  }
+  externalFormOptionsPromise = (async () => {
+    externalFormOptionsLoading.value = true
+    externalFormOptionsError.value = ''
+    try {
+      externalFormOptions.value = await productionService.listExternalOrderFormOptions()
+      externalFormOptionsLoaded = true
+      normalizeExternalFormSelections()
+    } catch (error) {
+      externalFormOptions.value = { customers: [], materials: [] }
+      externalFormOptionsLoaded = false
+      externalFormOptionsError.value = getErrorMessage(error, '外部订单表单选项加载失败')
+    } finally {
+      externalFormOptionsLoading.value = false
+    }
+  })()
+  try {
+    await externalFormOptionsPromise
+  } finally {
+    externalFormOptionsPromise = undefined
+  }
+}
+
+async function openExternalCreate() {
   Object.assign(externalForm, {
     contactPerson: '',
     contactPhone: '',
-    customerId: 0,
+    customerId: undefined,
     expectedDate: '',
-    materialId: 0,
+    materialId: undefined,
     quantity: 1,
   })
   externalCreateVisible.value = true
+  await loadExternalFormOptions()
 }
 
 async function submitExternalOrder() {
   if (
-    externalForm.materialId <= 0 ||
+    !externalForm.materialId ||
     externalForm.quantity <= 0 ||
     !externalForm.expectedDate ||
     !externalForm.contactPerson.trim() ||
@@ -146,14 +204,14 @@ async function submitExternalOrder() {
     ElMessage.warning('请完整填写产品、数量、日期和联系方式')
     return
   }
-  if (canManageOrders.value && !isExternalCustomer.value && externalForm.customerId <= 0) {
-    ElMessage.warning('管理员代录外部订单时必须填写客户 ID')
+  if (canCreateExternalForCustomer.value && !externalForm.customerId) {
+    ElMessage.warning('请选择外部客户')
     return
   }
   externalSubmitting.value = true
   try {
     let customerId = undefined as number | undefined
-    if (canManageOrders.value && !isExternalCustomer.value) {
+    if (canCreateExternalForCustomer.value && externalForm.customerId) {
       ;({ customerId } = externalForm)
     }
     await productionService.addExternalOrder({
@@ -198,7 +256,54 @@ async function reviewExternalOrder(order: ExternalOrderItem, accepted: boolean) 
   }
 }
 
-function openConvert(order: ExternalOrderItem) {
+async function loadConvertProductOptions(force = false) {
+  if (convertProductOptionsPromise) {
+    await convertProductOptionsPromise
+    return
+  }
+  if (convertProductOptionsLoaded && !force) {
+    return
+  }
+  convertProductOptionsPromise = (async () => {
+    convertProductOptionsLoading.value = true
+    convertProductOptionsError.value = ''
+    try {
+      convertProductOptions.value = await productionService.listOrderProductOptions()
+      convertProductOptionsLoaded = true
+    } catch (error) {
+      convertProductOptions.value = []
+      convertProductOptionsLoaded = false
+      convertProductOptionsError.value = getErrorMessage(error, '产品与 BOM 版本加载失败')
+    } finally {
+      convertProductOptionsLoading.value = false
+    }
+  })()
+  try {
+    await convertProductOptionsPromise
+  } finally {
+    convertProductOptionsPromise = undefined
+  }
+}
+
+const currentConvertProductOptions = computed(() => {
+  const materialId = convertingOrder.value?.materialId
+  return convertProductOptions.value.filter((option) => option.materialId === materialId)
+})
+
+function selectCurrentConvertProduct(order: ExternalOrderItem) {
+  const option = convertProductOptions.value.find((item) => item.materialId === order.materialId)
+  convertForm.materialId = option?.materialId ?? order.materialId
+  convertForm.versionId = option?.versionId ?? 0
+}
+
+async function reloadConvertProductOptions() {
+  await loadConvertProductOptions(true)
+  if (convertingOrder.value) {
+    selectCurrentConvertProduct(convertingOrder.value)
+  }
+}
+
+async function openConvert(order: ExternalOrderItem) {
   convertingOrder.value = order
   convertResult.value = undefined
   Object.assign(convertForm, {
@@ -209,13 +314,20 @@ function openConvert(order: ExternalOrderItem) {
     versionId: 0,
   })
   convertVisible.value = true
+  await loadConvertProductOptions()
+  if (!convertVisible.value || convertingOrder.value?.extOrderId !== order.extOrderId) {
+    return
+  }
+  selectCurrentConvertProduct(order)
 }
 
 async function submitConvert() {
+  const selectedProduct = currentConvertProductOptions.value.find(
+    (option) => option.versionId === convertForm.versionId,
+  )
   if (
     !convertingOrder.value ||
-    convertForm.materialId <= 0 ||
-    convertForm.versionId <= 0 ||
+    !selectedProduct ||
     convertForm.planQty <= 0 ||
     !convertForm.planStart ||
     !convertForm.planEnd
@@ -231,7 +343,13 @@ async function submitConvert() {
   try {
     const result = await productionService.convertExternalOrder({
       extOrderId: convertingOrder.value.extOrderId,
-      productionOrders: [{ ...convertForm }],
+      productionOrders: [
+        {
+          ...convertForm,
+          materialId: selectedProduct.materialId,
+          versionId: selectedProduct.versionId,
+        },
+      ],
     })
     convertResult.value = result
     convertVisible.value = false
@@ -245,759 +363,302 @@ async function submitConvert() {
   }
 }
 
-// ---------- 交付能力评估 ----------
-const estimateMode = ref<'order' | 'temporary'>('order')
-const estimateLoading = ref(false)
-const estimateError = ref('')
-const estimateResult = ref<ProductionCapacityEstimateItem>()
-const estimateShortages = ref<MaterialShortageItem[]>([])
-const estimateForm = reactive({
-  expectedDate: '',
-  materialId: 0,
-  orderId: 0,
-  planQty: 1,
-  versionId: 0,
-})
-
-async function resolveEstimateRequest() {
-  if (estimateMode.value === 'order') {
-    const order = await productionService.getOrder(estimateForm.orderId)
-    if (!order) {
-      throw new Error('未找到生产订单')
-    }
-    return {
-      request: { orderId: order.orderId },
-      shortage: {
-        materialId: order.materialId,
-        productionQty: order.planQty,
-        versionId: order.versionId,
+async function deliverExternalOrder(order: ExternalOrderItem) {
+  if (!canConvertExternal.value || !order.deliveryReady || deliverySubmittingId.value) {
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定整单交货外部订单 #${order.extOrderId} 的 ${order.materialName || `物料 #${order.materialId}`} × ${formatNumber(order.quantity)} 吗？交货后将扣减成品库存，且不可重复交货。`,
+      '确认整单交货',
+      {
+        cancelButtonText: '取消',
+        confirmButtonText: '确认交货',
+        type: 'warning',
       },
+    )
+    deliverySubmittingId.value = order.extOrderId
+    const result = await productionService.deliverExternalOrder(order.extOrderId)
+    ElMessage.success(
+      `外部订单 #${order.extOrderId} 已交货，成品剩余可用库存 ${formatNumber(result.remainingAvailableQty)}`,
+    )
+    await loadExternalOrders(externalPage.value)
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '外部订单交货失败'))
     }
-  }
-  return {
-    request: {
-      expectedDate: estimateForm.expectedDate,
-      materialId: estimateForm.materialId,
-      planQty: estimateForm.planQty,
-      versionId: estimateForm.versionId,
-    },
-    shortage: {
-      materialId: estimateForm.materialId,
-      productionQty: estimateForm.planQty,
-      versionId: estimateForm.versionId,
-    },
-  }
-}
-
-async function estimateCapacity() {
-  if (estimateMode.value === 'order' && estimateForm.orderId <= 0) {
-    ElMessage.warning('请输入生产订单 ID')
-    return
-  }
-  if (
-    estimateMode.value === 'temporary' &&
-    (estimateForm.materialId <= 0 ||
-      estimateForm.versionId <= 0 ||
-      estimateForm.planQty <= 0 ||
-      !estimateForm.expectedDate)
-  ) {
-    ElMessage.warning('请完整填写临时评估条件')
-    return
-  }
-  estimateLoading.value = true
-  estimateError.value = ''
-  estimateResult.value = undefined
-  estimateShortages.value = []
-  try {
-    const { request, shortage } = await resolveEstimateRequest()
-    const [estimate, shortageResult] = await Promise.all([
-      productionService.estimateCapacity(request satisfies ProductionCapacityEstimateFormData),
-      inventoryService.calculateShortage([shortage]),
-    ])
-    estimateResult.value = estimate
-    estimateShortages.value = shortageResult.items
-  } catch (error) {
-    estimateError.value = getErrorMessage(error, '交付能力评估失败')
   } finally {
-    estimateLoading.value = false
-  }
-}
-
-// ---------- 产能检测 ----------
-const lineOptions = ref<ProductionLineItem[]>([])
-const detectionLoading = ref(false)
-const detectionError = ref('')
-const detectionResult = ref<CapacityDetectionItem>()
-const detectionForm = reactive({ lineId: 0, periodRange: [] as string[] })
-
-async function loadLineOptions() {
-  if (!canManageCapacity.value) {
-    return
-  }
-  try {
-    const result = await productionService.listLines({ page: 1, pageSize: 100 })
-    lineOptions.value = result.items
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, '生产线选项加载失败'))
-  }
-}
-
-async function runDetection() {
-  const [periodStart, periodEnd] = detectionForm.periodRange
-  if (detectionForm.lineId <= 0 || !periodStart || !periodEnd) {
-    ElMessage.warning('请选择生产线和完整统计周期')
-    return
-  }
-  detectionLoading.value = true
-  detectionError.value = ''
-  try {
-    detectionResult.value = await productionService.runCapacityDetection({
-      lineId: detectionForm.lineId,
-      periodEnd,
-      periodStart,
-    })
-  } catch (error) {
-    detectionResult.value = undefined
-    detectionError.value = getErrorMessage(error, '产能检测失败')
-  } finally {
-    detectionLoading.value = false
-  }
-}
-
-// ---------- 产能平衡 ----------
-const balanceLoading = ref(false)
-const balanceError = ref('')
-const balanceResult = ref<CapacityBalanceItem>()
-const balanceForm = reactive({
-  affectedOrders: '',
-  afterPlan: '',
-  beforePlan: '',
-})
-
-function parseOrderIds(value: string) {
-  return [
-    ...new Set(
-      value
-        .split(/[\s,，]+/)
-        .map((token) => Number(token))
-        .filter((id) => Number.isInteger(id) && id > 0),
-    ),
-  ]
-}
-
-async function saveBalance() {
-  const affectedOrders = parseOrderIds(balanceForm.affectedOrders)
-  if (!affectedOrders.length) {
-    ElMessage.warning('请至少填写一个受影响生产订单')
-    return
-  }
-  balanceLoading.value = true
-  balanceError.value = ''
-  try {
-    const beforePlan = JSON.parse(balanceForm.beforePlan) as Record<string, unknown>
-    const afterPlan = JSON.parse(balanceForm.afterPlan) as Record<string, unknown>
-    balanceResult.value = await productionService.saveCapacityBalance({
-      affectedOrders,
-      afterPlan,
-      beforePlan,
-    })
-    ElMessage.success('产能平衡方案记录已保存')
-  } catch (error) {
-    balanceResult.value = undefined
-    balanceError.value = getErrorMessage(error, '产能平衡保存失败，请检查 JSON 格式')
-  } finally {
-    balanceLoading.value = false
-  }
-}
-
-// ---------- 生产线实时状态 ----------
-const lineStatusLoading = ref(false)
-const lineStatusError = ref('')
-const lineStatusResult = ref<ProductionLineStatusItem>()
-const lineStatusForm = reactive({
-  currentMaterialId: 0,
-  currentOrderId: 0,
-  efficiency: undefined as number | undefined,
-  finishedQty: undefined as number | undefined,
-  lineId: 0,
-  status: 'idle' as ProductionLineRunStatus,
-})
-
-async function updateLineStatus() {
-  if (lineStatusForm.lineId <= 0) {
-    ElMessage.warning('请选择生产线')
-    return
-  }
-  if (
-    lineStatusForm.efficiency !== undefined &&
-    (lineStatusForm.efficiency < 0 || lineStatusForm.efficiency > 1)
-  ) {
-    ElMessage.warning('效率必须在 0 到 1 之间')
-    return
-  }
-  lineStatusLoading.value = true
-  lineStatusError.value = ''
-  try {
-    let currentMaterialId = lineStatusForm.currentMaterialId || undefined
-    let currentOrderId = lineStatusForm.currentOrderId || undefined
-    if (lineStatusForm.status === 'idle') {
-      currentMaterialId = undefined
-      currentOrderId = undefined
-    }
-    lineStatusResult.value = await productionService.updateLineStatus({
-      currentMaterialId,
-      currentOrderId,
-      efficiency: lineStatusForm.efficiency,
-      finishedQty: lineStatusForm.finishedQty,
-      lineId: lineStatusForm.lineId,
-      status: lineStatusForm.status,
-    })
-    ElMessage.success('生产线状态已更新')
-    await loadLineOptions()
-  } catch (error) {
-    lineStatusResult.value = undefined
-    lineStatusError.value = getErrorMessage(error, '生产线状态更新失败')
-  } finally {
-    lineStatusLoading.value = false
+    deliverySubmittingId.value = undefined
   }
 }
 
 onMounted(() => {
-  if (
-    route.query.tab === 'status' &&
-    canManageCapacity.value &&
-    typeof route.query.orderId === 'string'
-  ) {
-    const orderId = parsePositiveInt(route.query.orderId)
-    if (orderId) {
-      lineStatusForm.currentOrderId = orderId
-      lineStatusForm.status = 'running'
-    }
-  }
-  if (isExternalCustomer.value || canManageOrders.value) {
+  if (canViewExternal.value) {
     void loadExternalOrders()
   }
-  void loadLineOptions()
 })
 </script>
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="生产运营"
-      description="处理外部订单、交付评估、产能检测与平衡，并维护生产线实时状态。"
-    />
+    <PageHeader title="外部订单" description="提交、审核、转换并交付外部订单。" />
 
-    <el-empty v-if="!hasOperationsAccess" description="当前账号暂无外部订单或生产运营权限" />
-    <el-tabs v-else v-model="activeTab" class="operations-tabs">
-      <el-tab-pane v-if="isExternalCustomer || canManageOrders" label="外部订单" name="external">
-        <el-card class="section-card" shadow="never">
-          <el-form :model="externalFilters" inline @submit.prevent="loadExternalOrders(1)">
-            <el-form-item v-if="canManageOrders && !isExternalCustomer" label="客户 ID">
-              <el-input
-                v-model.trim="externalFilters.customerId"
-                clearable
-                placeholder="全部客户"
-              />
-            </el-form-item>
-            <el-form-item label="订单状态">
-              <el-select
-                v-model="externalFilters.status"
-                clearable
-                placeholder="全部"
-                style="width: 140px"
-              >
-                <el-option label="待审核" value="pending_review" />
-                <el-option label="已接受" value="accepted" />
-                <el-option label="已拒绝" value="rejected" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="externalLoading" @click="loadExternalOrders(1)">
-                查询
-              </el-button>
-              <el-button :icon="Refresh" @click="resetExternalFilters">重置</el-button>
-              <el-button type="primary" :icon="Plus" @click="openExternalCreate">
-                {{ isExternalCustomer ? '提交订单' : '代录订单' }}
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
+    <el-empty v-if="!hasExternalAccess" description="当前账号暂无外部订单权限" />
+    <template v-else>
+      <el-card class="section-card" shadow="never">
+        <el-form :model="externalFilters" inline @submit.prevent="loadExternalOrders(1)">
+          <el-form-item v-if="canViewAllExternal" label="客户名">
+            <el-input
+              v-model.trim="externalFilters.customerName"
+              clearable
+              placeholder="输入客户名模糊查询"
+            />
+          </el-form-item>
+          <el-form-item v-if="canViewExternal" label="订单状态">
+            <el-select
+              v-model="externalFilters.status"
+              clearable
+              placeholder="全部"
+              style="width: 140px"
+            >
+              <el-option label="待审核" value="pending_review" />
+              <el-option label="已接受" value="accepted" />
+              <el-option label="已转换" value="converted" />
+              <el-option label="已交货" value="delivered" />
+              <el-option label="已拒绝" value="rejected" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button
+              v-if="canViewExternal"
+              type="primary"
+              :loading="externalLoading"
+              @click="loadExternalOrders(1)"
+            >
+              查询
+            </el-button>
+            <el-button v-if="canViewExternal" :icon="Refresh" @click="resetExternalFilters">
+              重置
+            </el-button>
+            <el-button
+              v-if="canCreateExternal"
+              type="primary"
+              :icon="Plus"
+              @click="openExternalCreate"
+            >
+              提交订单
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
 
-        <el-card class="section-card table-card" shadow="never">
-          <el-alert
-            v-if="externalError"
-            class="request-error"
-            :closable="false"
-            show-icon
-            :title="externalError"
-            type="error"
-          />
-          <el-table v-else v-loading="externalLoading" :data="externalResult.items" stripe>
-            <el-table-column label="外部订单 ID" min-width="110">
-              <template #default="{ row }">#{{ row.extOrderId }}</template>
-            </el-table-column>
-            <el-table-column v-if="canManageOrders" label="客户" min-width="150">
-              <template #default="{ row }">{{ row.customerName || `#${row.customerId}` }}</template>
-            </el-table-column>
-            <el-table-column label="产品" min-width="170">
-              <template #default="{ row }">{{ row.materialName || `#${row.materialId}` }}</template>
-            </el-table-column>
-            <el-table-column label="数量" min-width="90">
-              <template #default="{ row }">{{ formatNumber(row.quantity) }}</template>
-            </el-table-column>
-            <el-table-column label="期望日期" min-width="120" prop="expectedDate" />
-            <el-table-column label="联系人" min-width="120" prop="contactPerson" />
-            <el-table-column label="联系电话" min-width="140" prop="contactPhone" />
-            <el-table-column label="状态" min-width="100">
-              <template #default="{ row }">
-                <StatusTag :labels="externalStatusLabels" :value="row.status" />
-              </template>
-            </el-table-column>
-            <el-table-column label="提交时间" min-width="170">
-              <template #default="{ row }">{{ formatDateTime(row.submitTime) }}</template>
-            </el-table-column>
-            <el-table-column label="审核意见" min-width="160">
-              <template #default="{ row }">{{ row.reviewComment || '-' }}</template>
-            </el-table-column>
-            <el-table-column v-if="canManageOrders" fixed="right" label="操作" min-width="210">
-              <template #default="{ row }">
-                <template v-if="row.status === 'pending_review'">
-                  <el-button link type="success" @click="reviewExternalOrder(row, true)">
-                    接受
-                  </el-button>
-                  <el-button link type="danger" @click="reviewExternalOrder(row, false)">
-                    拒绝
-                  </el-button>
-                </template>
-                <el-button
-                  v-if="row.status === 'accepted'"
-                  link
-                  type="primary"
-                  @click="openConvert(row)"
+      <el-card v-if="canViewExternal" class="section-card table-card" shadow="never">
+        <el-alert
+          v-if="externalError"
+          class="request-error"
+          :closable="false"
+          show-icon
+          :title="externalError"
+          type="error"
+        />
+        <el-table v-else v-loading="externalLoading" :data="externalResult.items" stripe>
+          <el-table-column label="外部订单 ID" min-width="100">
+            <template #default="{ row }">{{ row.extOrderId }}</template>
+          </el-table-column>
+          <el-table-column v-if="canViewAllExternal" label="客户" min-width="120">
+            <template #default="{ row }">{{ row.customerName || `#${row.customerId}` }}</template>
+          </el-table-column>
+          <el-table-column label="产品" min-width="100">
+            <template #default="{ row }">{{ row.materialName || `#${row.materialId}` }}</template>
+          </el-table-column>
+          <el-table-column label="数量" min-width="60">
+            <template #default="{ row }">{{ formatNumber(row.quantity) }}</template>
+          </el-table-column>
+          <el-table-column label="期望日期" min-width="100" prop="expectedDate" />
+          <el-table-column label="联系人" min-width="70" prop="contactPerson" />
+          <el-table-column label="联系电话" min-width="110" prop="contactPhone" />
+          <el-table-column label="状态" min-width="80">
+            <template #default="{ row }">
+              <StatusTag :labels="externalStatusLabels" :value="row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="关联生产订单" min-width="120">
+            <template #default="{ row }">
+              <div v-if="row.productionOrders.length" class="linked-orders">
+                <div
+                  v-for="productionOrder in row.productionOrders"
+                  :key="productionOrder.orderId"
+                  class="linked-order"
                 >
-                  转生产订单
+                  <p>#{{ productionOrder.orderId }}</p>
+                  <StatusTag
+                    :labels="productionOrderStatusLabels"
+                    :value="productionOrder.status"
+                  />
+                </div>
+              </div>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="提交时间" min-width="140">
+            <template #default="{ row }">{{ formatDateTime(row.submitTime) }}</template>
+          </el-table-column>
+          <el-table-column label="审核意见" min-width="140">
+            <template #default="{ row }">{{ row.reviewComment || '-' }}</template>
+          </el-table-column>
+          <el-table-column
+            v-if="canReviewExternal || canConvertExternal"
+            fixed="right"
+            label="操作"
+            min-width="120"
+          >
+            <template #default="{ row }">
+              <template v-if="canReviewExternal && row.status === 'pending_review'">
+                <el-button link type="success" @click="reviewExternalOrder(row, true)">
+                  接受
+                </el-button>
+                <el-button link type="danger" @click="reviewExternalOrder(row, false)">
+                  拒绝
                 </el-button>
               </template>
-            </el-table-column>
-          </el-table>
-          <el-empty
-            v-if="!externalLoading && !externalError && !externalResult.items.length"
-            description="暂无外部订单"
-          />
-          <div v-if="externalResult.total > 0" class="pagination">
-            <el-pagination
-              v-model:current-page="externalPage"
-              background
-              layout="total, prev, pager, next"
-              :page-size="externalPageSize"
-              :total="externalResult.total"
-              @current-change="loadExternalOrders"
-            />
-          </div>
-          <el-alert
-            v-if="convertResult"
-            class="conversion-result"
-            :closable="false"
-            show-icon
-            title="最近一次外部订单转换结果"
-            type="success"
-          >
-            <template #default>
-              <p>
-                外部订单 #{{ convertResult.extOrderId }} 已生成
-                {{
-                  convertResult.productionOrders
-                    .map((order) => `生产订单 #${order.orderId}`)
-                    .join('、')
-                }}
-              </p>
-              <p>
-                关联记录：
-                {{
-                  convertResult.associations
-                    .map(
-                      (association) =>
-                        `外部订单 #${association.extOrderId} → 生产订单 #${association.orderId}`,
-                    )
-                    .join('；')
-                }}
-              </p>
-            </template>
-          </el-alert>
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane v-if="canManageCapacity" label="交付评估" name="estimate">
-        <el-card class="section-card" shadow="never">
-          <el-radio-group v-model="estimateMode" class="mode-switch">
-            <el-radio-button value="order">按生产订单</el-radio-button>
-            <el-radio-button value="temporary">临时评估</el-radio-button>
-          </el-radio-group>
-          <el-form :model="estimateForm" inline>
-            <el-form-item v-if="estimateMode === 'order'" label="生产订单 ID">
-              <el-input-number :controls="false" v-model="estimateForm.orderId" :min="1" />
-            </el-form-item>
-            <template v-else>
-              <el-form-item label="产品物料 ID">
-                <el-input-number :controls="false" v-model="estimateForm.materialId" :min="1" />
-              </el-form-item>
-              <el-form-item label="BOM 版本 ID">
-                <el-input-number :controls="false" v-model="estimateForm.versionId" :min="1" />
-              </el-form-item>
-              <el-form-item label="计划数量">
-                <el-input-number :controls="false" v-model="estimateForm.planQty" :min="1" />
-              </el-form-item>
-              <el-form-item label="期望日期">
-                <el-date-picker
-                  v-model="estimateForm.expectedDate"
-                  type="date"
-                  value-format="YYYY-MM-DD"
-                />
-              </el-form-item>
-            </template>
-            <el-form-item>
               <el-button
-                :icon="Search"
-                :loading="estimateLoading"
+                v-if="canConvertExternal && row.status === 'accepted'"
+                link
                 type="primary"
-                @click="estimateCapacity"
+                @click="openConvert(row)"
               >
-                开始评估
+                转生产订单
               </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card v-loading="estimateLoading" class="section-card table-card" shadow="never">
-          <el-alert v-if="estimateError" :closable="false" :title="estimateError" type="error" />
-          <template v-else-if="estimateResult">
-            <div class="metric-grid">
-              <div class="metric">
-                <span>按期交付</span>
-                <el-tag :type="estimateResult.canDeliverOnTime ? 'success' : 'danger'">
-                  {{ estimateResult.canDeliverOnTime ? '可以' : '存在风险' }}
-                </el-tag>
-              </div>
-              <div class="metric">
-                <span>物料齐套</span>
-                <strong>{{ estimateResult.materialReady ? '是' : '否' }}</strong>
-              </div>
-              <div class="metric">
-                <span>产能满足</span>
-                <strong>{{ estimateResult.capacityReady ? '是' : '否' }}</strong>
-              </div>
-              <div class="metric">
-                <span>预计完工</span>
-                <strong>{{ estimateResult.estimatedFinishDate || '-' }}</strong>
-              </div>
-              <div class="metric">
-                <span>所需工时</span>
-                <strong>{{ formatNumber(estimateResult.requiredWorkMinutes) }} 分钟</strong>
-              </div>
-              <div class="metric">
-                <span>可用工时</span>
-                <strong>{{ formatNumber(estimateResult.availableWorkMinutes) }} 分钟</strong>
-              </div>
-            </div>
-            <el-alert
-              v-if="estimateResult.riskReason"
-              :closable="false"
-              show-icon
-              :title="estimateResult.riskReason"
-              type="warning"
-            />
-            <h3 class="section-title">物料齐套明细</h3>
-            <el-table :data="estimateShortages" stripe>
-              <el-table-column label="层级" min-width="80" prop="level" />
-              <el-table-column label="物料" min-width="180">
-                <template #default="{ row }">
-                  {{ row.materialName || `#${row.materialId}` }}
-                </template>
-              </el-table-column>
-              <el-table-column label="毛需求" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.grossRequirement) }}</template>
-              </el-table-column>
-              <el-table-column label="可用库存" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.availableQty) }}</template>
-              </el-table-column>
-              <el-table-column label="在途数量" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.inTransitQty) }}</template>
-              </el-table-column>
-              <el-table-column label="净缺口" min-width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.netShortageQty > 0 ? 'danger' : 'success'">
-                    {{ formatNumber(row.netShortageQty) }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="建议采购" min-width="100">
-                <template #default="{ row }">{{ formatNumber(row.suggestedPurchaseQty) }}</template>
-              </el-table-column>
-            </el-table>
-            <el-empty
-              v-if="!estimateShortages.length"
-              :image-size="60"
-              description="当前评估未返回物料缺口明细"
-            />
-          </template>
-          <el-empty v-else description="填写条件后开始评估交付能力" />
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane v-if="canManageCapacity" label="产能检测" name="detection">
-        <el-card class="section-card" shadow="never">
-          <el-form :model="detectionForm" inline>
-            <el-form-item label="生产线">
-              <el-select v-model="detectionForm.lineId" filterable style="width: 200px">
-                <el-option
-                  v-for="line in lineOptions"
-                  :key="line.lineId"
-                  :label="`生产线 #${line.lineId} · ${line.typeName || '-'}`"
-                  :value="line.lineId"
-                />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="统计周期">
-              <el-date-picker
-                v-model="detectionForm.periodRange"
-                end-placeholder="结束时间"
-                range-separator="至"
-                start-placeholder="开始时间"
-                type="datetimerange"
-                value-format="YYYY-MM-DDTHH:mm:ss"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="detectionLoading" @click="runDetection">
-                执行检测
+              <el-button
+                v-if="canConvertExternal && row.deliveryReady"
+                link
+                :loading="deliverySubmittingId === row.extOrderId"
+                type="success"
+                @click="deliverExternalOrder(row)"
+              >
+                交货
               </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card v-loading="detectionLoading" class="section-card" shadow="never">
-          <el-alert v-if="detectionError" :closable="false" :title="detectionError" type="error" />
-          <template v-else-if="detectionResult">
-            <div class="metric-grid">
-              <div class="metric">
-                <span>计划产能</span>
-                <strong>{{ formatNumber(detectionResult.planCapacity) }}</strong>
-              </div>
-              <div class="metric">
-                <span>实际产能</span>
-                <strong>{{ formatNumber(detectionResult.actualCapacity) }}</strong>
-              </div>
-              <div class="metric">
-                <span>差异数量</span>
-                <strong>{{ formatNumber(detectionResult.diffQty) }}</strong>
-              </div>
-              <div class="metric">
-                <span>生产效率</span>
-                <strong>{{
-                  detectionResult.efficiency === undefined
-                    ? '-'
-                    : `${formatNumber(detectionResult.efficiency * 100)}%`
-                }}</strong>
-              </div>
-              <div class="metric">
-                <span>实际工时</span>
-                <strong>{{ formatNumber(detectionResult.actualWorkHours) }} 小时</strong>
-              </div>
-              <div class="metric">
-                <span>停机时长</span>
-                <strong>{{ formatNumber(detectionResult.downtimeMinutes) }} 分钟</strong>
-              </div>
-            </div>
-            <el-progress
-              v-if="detectionResult.efficiency !== undefined"
-              :percentage="Math.min(100, Math.round(detectionResult.efficiency * 100))"
-              :status="detectionResult.efficiency >= 0.8 ? 'success' : 'warning'"
-            />
-          </template>
-          <el-empty v-else description="选择生产线与统计周期后执行产能检测" />
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane v-if="canManageCapacity" label="产能平衡" name="balance">
-        <el-card class="section-card" shadow="never">
-          <p>保存调整方案及关联订单；订单计划与生产日历在对应页面维护。</p>
-          <el-form :model="balanceForm" label-position="top">
-            <el-form-item label="受影响生产订单 ID">
-              <el-input
-                v-model.trim="balanceForm.affectedOrders"
-                placeholder="多个订单 ID 用逗号分隔"
-              />
-            </el-form-item>
-            <div class="plan-grid">
-              <el-form-item label="调整前方案（JSON）">
-                <el-input v-model="balanceForm.beforePlan" :rows="8" type="textarea" />
-              </el-form-item>
-              <el-form-item label="调整后方案（JSON）">
-                <el-input v-model="balanceForm.afterPlan" :rows="8" type="textarea" />
-              </el-form-item>
-            </div>
-            <el-button type="primary" :loading="balanceLoading" @click="saveBalance">
-              保存方案记录
-            </el-button>
-          </el-form>
-        </el-card>
-        <el-card class="section-card" shadow="never">
-          <el-alert v-if="balanceError" :closable="false" :title="balanceError" type="error" />
-          <el-descriptions v-else-if="balanceResult" border :column="2">
-            <el-descriptions-item label="调整记录"
-              >#{{ balanceResult.balanceId }}</el-descriptions-item
-            >
-            <el-descriptions-item label="调整时间">
-              {{ formatDateTime(balanceResult.adjustTime) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="调整人"
-              >#{{ balanceResult.operatorId }}</el-descriptions-item
-            >
-            <el-descriptions-item label="受影响生产订单 ID">
-              {{ balanceResult.affectedOrders.map((id) => `#${id}`).join('、') }}
-            </el-descriptions-item>
-            <el-descriptions-item label="调整前">
-              <pre>{{ JSON.stringify(balanceResult.beforePlan, null, 2) }}</pre>
-            </el-descriptions-item>
-            <el-descriptions-item label="调整后">
-              <pre>{{ JSON.stringify(balanceResult.afterPlan, null, 2) }}</pre>
-            </el-descriptions-item>
-          </el-descriptions>
-          <el-empty v-else description="保存调整后显示前后方案与受影响订单" />
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane v-if="canManageCapacity" label="产线状态与报工" name="status">
-        <el-card class="section-card table-card" shadow="never">
-          <el-table :data="lineOptions" stripe>
-            <el-table-column label="生产线" min-width="100">
-              <template #default="{ row }">#{{ row.lineId }}</template>
-            </el-table-column>
-            <el-table-column label="线型" min-width="150">
-              <template #default="{ row }">{{ row.typeName || `#${row.typeId}` }}</template>
-            </el-table-column>
-            <el-table-column label="负责人" min-width="130">
-              <template #default="{ row }">{{ row.managerName || `#${row.managerId}` }}</template>
-            </el-table-column>
-            <el-table-column label="启用日期" min-width="120" prop="startDate" />
-            <el-table-column label="当前状态" min-width="110">
-              <template #default="{ row }">
-                <StatusTag v-if="row.status" :labels="lineStatusLabels" :value="row.status" />
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-if="!lineOptions.length" description="暂无生产线数据" />
-        </el-card>
-        <el-card class="section-card" shadow="never">
-          <p>按产线当前任务记录累计产量；订单完工数量在生产订单页登记。</p>
-          <el-form :model="lineStatusForm" inline>
-            <el-form-item label="生产线">
-              <el-select v-model="lineStatusForm.lineId" filterable style="width: 180px">
-                <el-option
-                  v-for="line in lineOptions"
-                  :key="line.lineId"
-                  :label="`生产线 #${line.lineId}`"
-                  :value="line.lineId"
-                />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="运行状态">
-              <el-select v-model="lineStatusForm.status" style="width: 120px">
-                <el-option label="空闲" value="idle" />
-                <el-option label="运行中" value="running" />
-                <el-option label="故障" value="fault" />
-              </el-select>
-            </el-form-item>
-            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前订单 ID">
-              <el-input-number :controls="false" v-model="lineStatusForm.currentOrderId" :min="0" />
-            </el-form-item>
-            <el-form-item v-if="lineStatusForm.status !== 'idle'" label="当前产品">
-              <el-input-number
-                :controls="false"
-                v-model="lineStatusForm.currentMaterialId"
-                :min="0"
-              />
-            </el-form-item>
-            <el-form-item label="累计完成数量">
-              <el-input-number
-                :controls="false"
-                v-model="lineStatusForm.finishedQty"
-                :min="0"
-                placeholder="留空由后端沿用当前任务数量"
-              />
-            </el-form-item>
-            <el-form-item label="当前效率">
-              <el-input-number
-                :controls="false"
-                v-model="lineStatusForm.efficiency"
-                :max="1"
-                :min="0"
-                :precision="2"
-                :step="0.05"
-                placeholder="留空保留当前效率"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="lineStatusLoading" @click="updateLineStatus">
-                更新状态
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-        <el-card class="section-card" shadow="never">
-          <el-alert
-            v-if="lineStatusError"
-            :closable="false"
-            :title="lineStatusError"
-            type="error"
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty
+          v-if="!externalLoading && !externalError && !externalResult.items.length"
+          description="暂无外部订单"
+        />
+        <div v-if="externalResult.total > 0" class="pagination">
+          <el-pagination
+            v-model:current-page="externalPage"
+            background
+            layout="total, prev, pager, next"
+            :page-size="externalPageSize"
+            :total="externalResult.total"
+            @current-change="loadExternalOrders"
           />
-          <el-descriptions v-else-if="lineStatusResult" border :column="3">
-            <el-descriptions-item label="生产线"
-              >#{{ lineStatusResult.lineId }}</el-descriptions-item
-            >
-            <el-descriptions-item label="状态">
-              <StatusTag :labels="lineStatusLabels" :value="lineStatusResult.status" />
-            </el-descriptions-item>
-            <el-descriptions-item label="更新时间">
-              {{ formatDateTime(lineStatusResult.updatedTime) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="当前订单 ID">
-              {{ lineStatusResult.currentOrderId ? `#${lineStatusResult.currentOrderId}` : '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="当前产品">
+        </div>
+        <el-alert
+          v-if="convertResult"
+          class="conversion-result"
+          :closable="false"
+          show-icon
+          title="最近一次外部订单转换结果"
+          type="success"
+        >
+          <template #default>
+            <p>
+              外部订单 #{{ convertResult.extOrderId }} 已生成
               {{
-                lineStatusResult.currentMaterialId ? `#${lineStatusResult.currentMaterialId}` : '-'
+                convertResult.productionOrders
+                  .map((order) => `生产订单 #${order.orderId}`)
+                  .join('、')
               }}
-            </el-descriptions-item>
-            <el-descriptions-item label="已完成数量">
-              {{ formatNumber(lineStatusResult.finishedQty) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="当前效率">
-              {{ formatNumber(lineStatusResult.efficiency * 100) }}%
-            </el-descriptions-item>
-          </el-descriptions>
-          <el-empty v-else description="提交状态后显示生产线实时详情" />
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+            </p>
+            <p>
+              关联记录：
+              {{
+                convertResult.associations
+                  .map(
+                    (association) =>
+                      `外部订单 #${association.extOrderId} → 生产订单 #${association.orderId}`,
+                  )
+                  .join('；')
+              }}
+            </p>
+          </template>
+        </el-alert>
+      </el-card>
+    </template>
 
     <el-dialog v-model="externalCreateVisible" title="提交外部订单" width="540px">
+      <el-alert
+        v-if="externalFormOptionsError"
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="externalFormOptionsError"
+        type="error"
+      >
+        <template #default>
+          <el-button link type="primary" @click="loadExternalFormOptions(true)">
+            重新加载选项
+          </el-button>
+        </template>
+      </el-alert>
+      <el-alert
+        v-else-if="!externalFormOptionsLoading && !externalFormOptions.materials.length"
+        class="request-error"
+        :closable="false"
+        show-icon
+        title="暂无可下单的成品物料"
+        type="warning"
+      />
+      <el-alert
+        v-else-if="
+          canCreateExternalForCustomer &&
+          !externalFormOptionsLoading &&
+          !externalFormOptions.customers.length
+        "
+        class="request-error"
+        :closable="false"
+        show-icon
+        title="暂无可选择的外部客户"
+        type="warning"
+      />
       <el-form :model="externalForm" label-width="110px">
-        <el-form-item v-if="canManageOrders && !isExternalCustomer" label="客户 ID">
-          <el-input-number
-            :controls="false"
+        <el-form-item v-if="canCreateExternalForCustomer" label="外部客户">
+          <el-select
             v-model="externalForm.customerId"
-            :min="1"
+            clearable
+            filterable
+            :loading="externalFormOptionsLoading"
+            no-data-text="暂无可选外部客户"
+            placeholder="请选择外部客户"
             style="width: 100%"
-          />
+          >
+            <el-option
+              v-for="customer in externalFormOptions.customers"
+              :key="customer.userId"
+              :label="`${customer.userName} · ${customer.employeeNo}`"
+              :value="customer.userId"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="产品物料 ID">
-          <el-input-number
-            :controls="false"
+        <el-form-item label="产品物料">
+          <el-select
             v-model="externalForm.materialId"
-            :min="1"
+            clearable
+            filterable
+            :loading="externalFormOptionsLoading"
+            no-data-text="暂无可下单的成品物料"
+            placeholder="请选择成品物料"
             style="width: 100%"
-          />
+          >
+            <el-option
+              v-for="material in externalFormOptions.materials"
+              :key="material.materialId"
+              :label="`${material.materialName} · ${material.model} · #${material.materialId}`"
+              :value="material.materialId"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="数量">
           <el-input-number
@@ -1024,29 +685,65 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="externalCreateVisible = false">取消</el-button>
-        <el-button type="primary" :loading="externalSubmitting" @click="submitExternalOrder">
+        <el-button
+          type="primary"
+          :disabled="
+            externalFormOptionsLoading ||
+            Boolean(externalFormOptionsError) ||
+            !externalFormOptions.materials.length ||
+            (canCreateExternalForCustomer && !externalFormOptions.customers.length)
+          "
+          :loading="externalSubmitting"
+          @click="submitExternalOrder"
+        >
           提交
         </el-button>
       </template>
     </el-dialog>
 
     <el-dialog v-model="convertVisible" title="转换为生产订单" width="560px">
+      <el-alert
+        v-if="convertProductOptionsError"
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="convertProductOptionsError"
+        type="error"
+      >
+        <template #default>
+          <el-button link type="primary" @click="reloadConvertProductOptions">
+            重新加载选项
+          </el-button>
+        </template>
+      </el-alert>
+      <el-alert
+        v-else-if="
+          !convertProductOptionsLoading &&
+          convertingOrder &&
+          currentConvertProductOptions.length === 0
+        "
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="`${convertingOrder.materialName || `物料 #${convertingOrder.materialId}`}没有当前生效的 BOM 版本，暂时无法转换`"
+        type="warning"
+      />
       <el-form :model="convertForm" label-width="120px">
-        <el-form-item label="产品物料 ID">
-          <el-input-number
-            :controls="false"
-            v-model="convertForm.materialId"
-            :min="1"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="BOM 版本 ID">
-          <el-input-number
-            :controls="false"
+        <el-form-item label="产品">
+          <el-select
             v-model="convertForm.versionId"
-            :min="1"
+            :loading="convertProductOptionsLoading"
+            no-data-text="该产品暂无当前生效的 BOM 版本"
+            placeholder="请选择当前生效的产品 BOM"
             style="width: 100%"
-          />
+          >
+            <el-option
+              v-for="option in currentConvertProductOptions"
+              :key="option.versionId"
+              :label="`${option.materialName} ${option.versionNo} #${option.materialId}`"
+              :value="option.versionId"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="计划数量">
           <el-input-number
@@ -1075,7 +772,12 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="convertVisible = false">取消</el-button>
-        <el-button type="primary" :loading="convertSubmitting" @click="submitConvert">
+        <el-button
+          type="primary"
+          :disabled="convertProductOptionsLoading || currentConvertProductOptions.length === 0"
+          :loading="convertSubmitting"
+          @click="submitConvert"
+        >
           确认转换
         </el-button>
       </template>
@@ -1084,15 +786,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.operations-tabs,
 .section-card {
   min-width: 0;
-}
-.section-card {
   margin-bottom: 16px;
 }
-.request-error,
-.mode-switch {
+.request-error {
   margin-bottom: 16px;
 }
 .conversion-result {
@@ -1101,50 +799,22 @@ onMounted(() => {
 .conversion-result p {
   margin: 4px 0;
 }
-.section-title {
-  margin: 20px 0 12px;
-  font-size: 16px;
+.linked-orders {
+  display: grid;
+  gap: 6px;
+}
+.linked-order {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.linked-order p {
+  margin: 0;
 }
 .pagination {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
-}
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 16px;
-}
-.metric {
-  display: flex;
-  min-height: 86px;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 16px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  background: var(--el-fill-color-light);
-}
-.metric span {
-  color: var(--el-text-color-secondary);
-}
-.metric strong {
-  font-size: 20px;
-}
-.plan-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-}
-@media (max-width: 900px) {
-  .metric-grid,
-  .plan-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

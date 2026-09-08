@@ -10,7 +10,7 @@ paths:
   /api/calculateMaterialShortage:
     post:
       summary: 计算物料缺口
-      description: 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 根据 material_id、production_qty 和 version_id 递归展开 BOM，汇总毛需求、可用数量、在途数量和安全库存，计算净缺口。需具备 inventory:shortage:calculate；权限不足返回 code 403。
       operationId: calculateMaterialShortage
       tags: [inventory]
       security:
@@ -31,7 +31,7 @@ paths:
   /api/listMaterialStockData:
     get:
       summary: 分页查询物料库存
-      description: 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询物料主数据与库存快照，支持按物料编号、名称、类型和库存状态过滤。库存状态由后端根据 available_qty、locked_qty 和 safety_stock 统一计算。需具备 inventory:stock:view；权限不足返回 code 403。
       operationId: listMaterialStockData
       tags: [inventory]
       security:
@@ -71,7 +71,7 @@ paths:
   /api/listInventoryAlert:
     get:
       summary: 查询库存预警事件
-      description: 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询低库存预警事件，支持按 material_id、status 和触发时间过滤。需具备 inventory:alert:view；权限不足返回 code 403。
       operationId: listInventoryAlert
       tags: [inventory]
       security:
@@ -112,7 +112,7 @@ paths:
   /api/getInventoryAlert:
     get:
       summary: 查询库存预警详情
-      description: 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      description: 根据 alert_id 查询单条库存预警，避免客户端遍历分页列表定位记录。需具备 inventory:alert:view；记录不存在返回 code 404，权限不足返回 code 403。
       operationId: getInventoryAlert
       tags: [inventory]
       security:
@@ -134,7 +134,7 @@ paths:
   /api/generateInventoryAlert:
     post:
       summary: 生成库存预警事件
-      description: 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 比较物料 available_qty 与安全库存阈值，低于阈值时生成 low_stock 预警；同一 material_id 已有 pending 预警时不重复生成。需具备 inventory:alert:generate；权限不足返回 code 403。
       operationId: generateInventoryAlert
       tags: [inventory]
       security:
@@ -155,7 +155,7 @@ paths:
   /api/handleInventoryAlert:
     post:
       summary: 处理库存预警事件
-      description: 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+      description: 将库存预警事件更新为 handled 或 ignored，并记录 handler_id 和 handle_time。需具备 inventory:alert:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
       operationId: handleInventoryAlert
       tags: [inventory]
       security:
@@ -176,7 +176,7 @@ paths:
   /api/lockMaterialStock:
     post:
       summary: 锁定物料库存
-      description: 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
+      description: 为生产订单锁定物料库存，锁定前校验 available_qty；不足时拒绝并返回 shortage_qty。需具备 inventory:lock:create；权限不足返回 code 403。业务约束：lock_qty 必须大于 0，锁定成功后增加 locked_qty 并减少 available_qty。
       operationId: lockMaterialStock
       tags: [inventory]
       security:
@@ -197,7 +197,7 @@ paths:
   /api/releaseMaterialStock:
     post:
       summary: 释放物料锁定
-      description: 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
+      description: 订单取消时反向释放锁定库存，减少 locked_qty 并恢复 available_qty。需具备 inventory:lock:release；权限不足返回 code 403。状态流转：仅 locked 可释放为 cancelled，consumed/cancelled 返回 code 409。
       operationId: releaseMaterialStock
       tags: [inventory]
       security:
@@ -218,7 +218,7 @@ paths:
   /api/listMaterialStockLock:
     get:
       summary: 查询物料锁定记录
-      description: 分页查询物料 locked、cancelled 和 consumed 记录。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询物料 locked、cancelled 和 consumed 记录。需具备 inventory:lock:view；权限不足返回 code 403。
       operationId: listMaterialStockLock
       tags: [inventory]
       security:
@@ -253,7 +253,7 @@ paths:
   /api/detectObsoleteMaterial:
     post:
       summary: 检测废弃物料
-      description: 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 根据 last_out_date、available_qty 和 idle_days_threshold 检测废弃物料，并排除仍被有效 BOM 版本引用且存在活跃生产订单的物料。需具备 inventory:obsolete:detect；权限不足返回 code 403。
       operationId: detectObsoleteMaterial
       tags: [inventory]
       security:
@@ -274,7 +274,7 @@ paths:
   /api/listObsoleteMaterialDetection:
     get:
       summary: 查询废弃物料检测结果
-      description: 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询废弃物料检测结果，支持按 material_id、status 和检测时间过滤。需具备 inventory:obsolete:view；权限不足返回 code 403。
       operationId: listObsoleteMaterialDetection
       tags: [inventory]
       security:
@@ -315,7 +315,7 @@ paths:
   /api/getObsoleteMaterialDetection:
     get:
       summary: 查询废弃物料检测详情
-      description: 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      description: 根据 detection_id 查询单条废弃物料检测记录，避免客户端遍历分页列表定位记录。需具备 inventory:obsolete:view；记录不存在返回 code 404，权限不足返回 code 403。
       operationId: getObsoleteMaterialDetection
       tags: [inventory]
       security:
@@ -337,7 +337,7 @@ paths:
   /api/handleObsoleteMaterialDetection:
     post:
       summary: 处理废弃物料检测结果
-      description: 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
+      description: 将废弃物料检测结果更新为 handled 或 ignored，并记录 handler_id。需具备 inventory:obsolete:handle；权限不足返回 code 403。状态流转：pending -> handled/ignored，handled 和 ignored 不可再次处理。
       operationId: handleObsoleteMaterialDetection
       tags: [inventory]
       security:
@@ -358,7 +358,7 @@ paths:
   /api/addCompletionInbound:
     post:
       summary: 登记完工入库
-      description: 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
+      description: 登记完工入库单，将对应锁定记录置为 consumed，扣减原材料 locked_qty，增加成品 available_qty 并记录 batch_no。需具备 inventory:completion:create；权限不足返回 code 403。业务约束：qualified_qty 不得大于 finish_qty，finish_qty 必须大于 0，重复入库或订单状态非法返回 code 409。
       operationId: addCompletionInbound
       tags: [inventory]
       security:
@@ -379,7 +379,7 @@ paths:
   /api/listCompletionInbound:
     get:
       summary: 查询完工入库单
-      description: 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。权限：库存管理员、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询完工入库单，支持按 order_id、material_id 和入库时间过滤。需具备 inventory:completion:view；权限不足返回 code 403。
       operationId: listCompletionInbound
       tags: [inventory]
       security:
@@ -421,7 +421,7 @@ paths:
   /api/getCompletionInbound:
     get:
       summary: 查询完工入库详情
-      description: 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。权限：库存管理员、生产管理员、系统管理员可访问；记录不存在返回 code 404，无权限返回 code 403。
+      description: 根据 inbound_id 查询单条完工入库记录及其消耗的库存锁定记录，避免客户端遍历分页列表定位记录。需具备 inventory:completion:view；记录不存在返回 code 404，权限不足返回 code 403。
       operationId: getCompletionInbound
       tags: [inventory]
       security:

@@ -7,6 +7,7 @@ import {
   setToken as saveToken,
   setStoredSession,
 } from '@/utils/storage'
+import type { PermissionCode, RoleBrief } from '@/api'
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
@@ -20,8 +21,8 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>()
   const expiresAt = ref<number>()
   const currentUser = ref<CurrentUser>()
-  const roles = ref<string[]>([])
-  const permissions = ref<string[]>([])
+  const roles = ref<RoleBrief[]>([])
+  const permissions = ref<PermissionCode[]>([])
 
   const isTokenExpired = computed(() => !expiresAt.value || Date.now() >= expiresAt.value * 1000)
   const isAuthenticated = computed(() => Boolean(token.value) && !isTokenExpired.value)
@@ -38,21 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = value
     expiresAt.value = expiresAtSeconds
     saveToken(value, expiresAtSeconds)
-  }
-
-  function setCurrentUser(user?: CurrentUser) {
-    currentUser.value = user
-    persistSession()
-  }
-
-  function setRoles(value: string[]) {
-    roles.value = value
-    persistSession()
-  }
-
-  function setPermissions(value: string[]) {
-    permissions.value = value
-    persistSession()
   }
 
   function restoreSession() {
@@ -87,28 +73,37 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function hasRole(role: string) {
-    return roles.value.includes(role)
+  function hasPermission(permission: PermissionCode) {
+    return permissions.value.includes(permission)
   }
 
-  function hasPermission(permission: string) {
-    return permissions.value.includes(permission)
+  function hasAnyPermission(...values: PermissionCode[]) {
+    return values.some((permission) => hasPermission(permission))
+  }
+
+  function setAccess(value: {
+    currentUser: CurrentUser
+    permissions: PermissionCode[]
+    roles: RoleBrief[]
+  }) {
+    currentUser.value = value.currentUser
+    permissions.value = value.permissions
+    roles.value = value.roles
+    persistSession()
   }
 
   return {
     currentUser,
     expiresAt,
+    hasAnyPermission,
     hasPermission,
-    hasRole,
     isAuthenticated,
     isTokenExpired,
     logout,
     permissions,
     restoreSession,
     roles,
-    setCurrentUser,
-    setPermissions,
-    setRoles,
+    setAccess,
     setToken,
     token,
   }

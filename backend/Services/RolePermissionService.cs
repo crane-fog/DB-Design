@@ -4,7 +4,7 @@ using Org.OpenAPITools.Models;
 
 namespace Backend.Services;
 
-/// <summary>系统管理 — 角色权限分配 Service。</summary>
+/// <summary>系统管理中的角色权限关系查询与集合替换。</summary>
 public class RolePermissionService(string connString)
 {
     public (List<RolePermission> Records, int Total) List(int page, int pageSize, int? roleId, int? permissionId)
@@ -14,29 +14,31 @@ public class RolePermissionService(string connString)
 
         var conditions = new List<string>();
         var filters = new List<SqlFilter>();
-
         if (roleId.HasValue)
         {
             conditions.Add("RP.ROLE_ID = :roleId");
             filters.Add(new SqlFilter("roleId", roleId.Value));
         }
+
         if (permissionId.HasValue)
         {
             conditions.Add("RP.PERMISSION_ID = :permissionId");
             filters.Add(new SqlFilter("permissionId", permissionId.Value));
         }
 
-        var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
-
+        string where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : string.Empty;
         using var countCmd = conn.CreateCommand();
+        countCmd.BindByName = true;
         countCmd.CommandText = string.Concat("SELECT COUNT(*) FROM SYS_ROLE_PERMISSION RP ", where);
         OracleSql.AddFilters(countCmd, filters);
-        var total = Convert.ToInt32(countCmd.ExecuteScalar()!);
+        int total = Convert.ToInt32(countCmd.ExecuteScalar()!);
 
-        // 分页数据（long 计算 offset，防止超大 page 溢出为负值）
-        var offset = (long)(page - 1) * pageSize;
+        long offset = (long)(page - 1) * pageSize;
         using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = string.Concat("SELECT RP.ROLE_ID, RP.PERMISSION_ID FROM SYS_ROLE_PERMISSION RP ", where,
+        dataCmd.BindByName = true;
+        dataCmd.CommandText = string.Concat(
+            "SELECT RP.ROLE_ID, RP.PERMISSION_ID FROM SYS_ROLE_PERMISSION RP ",
+            where,
             " ORDER BY RP.ROLE_ID, RP.PERMISSION_ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY");
         dataCmd.Parameters.Add(new OracleParameter("offset", offset));
         dataCmd.Parameters.Add(new OracleParameter("limit", pageSize));
@@ -56,109 +58,123 @@ public class RolePermissionService(string connString)
         return (records, total);
     }
 
-    public (List<RolePermission>? RolePermissions, string? ErrorMessage) Assign(int roleId, List<int> permissionIds)
+    public (List<RolePermission>? RolePermissions, string? ErrorMessage) Set(
+        int roleId,
+        List<int> permissionIds)
     {
-        var distinctIds = permissionIds.Distinct().ToList();
-
-        // Oracle IN 列表上限 1000 项，超限触发 ORA-01795；在写入前拦截为业务错误
-        if (distinctIds.Count > 1000)
+        List<int> desiredIds = permissionIds.Distinct().OrderBy(id => id).ToList();
+        if (desiredIds.Count > 1000)
         {
-            return (null, "单次分配的权限数量不能超过 1000");
+            return (null, "单次设置的权限数量不能超过 1000");
         }
 
         using var conn = new OracleConnection(connString);
         conn.Open();
-
-        // 1. 检查角色存在且有效：disabled 角色不应再授予新权限（与 disabled 角色不参与授权一致）
-        string? roleStatus;
-        using (var roleCheck = conn.CreateCommand())
+        using OracleTransaction transaction = conn.BeginTransaction();
+        try
         {
-            roleCheck.CommandText = "SELECT STATUS FROM SYS_ROLE WHERE ROLE_ID = :roleId";
-            roleCheck.Parameters.Add(new OracleParameter("roleId", roleId));
-            var value = roleCheck.ExecuteScalar();
-            if (value is null || value is DBNull)
+            string? roleStatus = LoadRoleStatus(conn, transaction, roleId);
+            if (roleStatus is null)
             {
+                transaction.Rollback();
                 return (null, "角色不存在");
             }
 
-            roleStatus = Convert.ToString(value);
-        }
-
-        if (!string.Equals(roleStatus, "valid", StringComparison.OrdinalIgnoreCase))
-        {
-            return (null, "角色已停用，无法分配权限");
-        }
-
-        // 2. 写入前一次性校验所有权限存在；任一项不通过则整体失败，不做任何写入
-        if (distinctIds.Count > 0)
-        {
-            var existing = LoadExistingPermissionIds(conn, distinctIds);
-            foreach (var permissionId in distinctIds)
+            if (desiredIds.Count > 0
+                && !string.Equals(roleStatus, "valid", StringComparison.OrdinalIgnoreCase))
             {
-                if (!existing.Contains(permissionId))
+                transaction.Rollback();
+                return (null, "角色已停用，无法分配权限");
+            }
+
+            Dictionary<int, string> statuses = LoadPermissionStatuses(conn, transaction, desiredIds);
+            foreach (int permissionId in desiredIds)
+            {
+                if (!statuses.TryGetValue(permissionId, out string? status))
                 {
+                    transaction.Rollback();
                     return (null, $"权限 {permissionId} 不存在");
                 }
-            }
-        }
 
-        // 3. 事务内批量插入；任一项失败回滚全部修改
-        var existingAssignments = LoadAssignedPermissionIds(conn, roleId, distinctIds);
-        var idsToAssign = distinctIds.Where(id => !existingAssignments.Contains(id)).ToList();
-        using var tx = conn.BeginTransaction();
-        var assigned = idsToAssign
-            .Select(permissionId => new RolePermission { RoleId = roleId, PermissionId = permissionId })
-            .ToList();
-        try
-        {
-            if (idsToAssign.Count > 0)
+                if (!string.Equals(status, "valid", StringComparison.OrdinalIgnoreCase))
+                {
+                    transaction.Rollback();
+                    return (null, $"权限 {permissionId} 已停用，无法分配");
+                }
+            }
+
+            HashSet<int> currentIds = LoadAssignedPermissionIds(conn, transaction, roleId);
+            List<int> idsToDelete = currentIds.Except(desiredIds).ToList();
+            List<int> idsToInsert = desiredIds.Except(currentIds).ToList();
+            DeleteAssignments(conn, transaction, roleId, idsToDelete);
+            InsertAssignments(conn, transaction, roleId, idsToInsert);
+            transaction.Commit();
+
+            return (desiredIds.Select(permissionId => new RolePermission
             {
-                using var insertCmd = conn.CreateCommand();
-                insertCmd.Transaction = tx;
-                insertCmd.ArrayBindCount = idsToAssign.Count;
-                insertCmd.CommandText = @"INSERT INTO SYS_ROLE_PERMISSION (ROLE_ID, PERMISSION_ID)
-                                          VALUES (:roleId, :permissionId)";
-                insertCmd.Parameters.Add("roleId", OracleDbType.Int32).Value =
-                    Enumerable.Repeat(roleId, idsToAssign.Count).ToArray();
-                insertCmd.Parameters.Add("permissionId", OracleDbType.Int32).Value = idsToAssign.ToArray();
-                insertCmd.ExecuteNonQuery();
-            }
-
-            tx.Commit();
-            return (assigned, null);
+                RoleId = roleId,
+                PermissionId = permissionId,
+            }).ToList(), null);
         }
         catch
         {
-            tx.Rollback();
+            transaction.Rollback();
             throw;
         }
     }
 
-    private static HashSet<int> LoadAssignedPermissionIds(
+    private static string? LoadRoleStatus(OracleConnection conn, OracleTransaction transaction, int roleId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = "SELECT STATUS FROM SYS_ROLE WHERE ROLE_ID = :roleId";
+        cmd.Parameters.Add(new OracleParameter("roleId", roleId));
+        object? value = cmd.ExecuteScalar();
+        return value is null or DBNull ? null : Convert.ToString(value);
+    }
+
+    private static Dictionary<int, string> LoadPermissionStatuses(
         OracleConnection conn,
-        int roleId,
+        OracleTransaction transaction,
         IReadOnlyList<int> permissionIds)
     {
-        var result = new HashSet<int>();
+        var result = new Dictionary<int, string>();
         if (permissionIds.Count == 0)
         {
             return result;
         }
 
         using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.BindByName = true;
         var binds = new List<string>();
-        for (var index = 0; index < permissionIds.Count; index++)
+        for (int index = 0; index < permissionIds.Count; index++)
         {
-            var name = $"assignedPermissionId{index}";
+            string name = $"permissionId{index}";
             binds.Add($":{name}");
             cmd.Parameters.Add(new OracleParameter(name, permissionIds[index]));
         }
 
-        cmd.CommandText = $@"SELECT PERMISSION_ID
-                             FROM SYS_ROLE_PERMISSION
-                             WHERE ROLE_ID = :roleId
-                               AND PERMISSION_ID IN ({string.Join(", ", binds)})";
+        cmd.CommandText = $"SELECT PERMISSION_ID, STATUS FROM SYS_PERMISSION WHERE PERMISSION_ID IN ({string.Join(", ", binds)})";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result[Convert.ToInt32(reader.GetValue(0))] = reader.GetString(1);
+        }
+
+        return result;
+    }
+
+    private static HashSet<int> LoadAssignedPermissionIds(
+        OracleConnection conn,
+        OracleTransaction transaction,
+        int roleId)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = "SELECT PERMISSION_ID FROM SYS_ROLE_PERMISSION WHERE ROLE_ID = :roleId FOR UPDATE";
         cmd.Parameters.Add(new OracleParameter("roleId", roleId));
+        var result = new HashSet<int>();
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
@@ -168,47 +184,43 @@ public class RolePermissionService(string connString)
         return result;
     }
 
-    /// <summary>一次查询所有目标权限 ID，避免逐项查询的 N+1 模式。</summary>
-    private static HashSet<int> LoadExistingPermissionIds(OracleConnection conn, List<int> permissionIds)
+    private static void DeleteAssignments(
+        OracleConnection conn,
+        OracleTransaction transaction,
+        int roleId,
+        IReadOnlyList<int> permissionIds)
     {
-        var result = new HashSet<int>();
         if (permissionIds.Count == 0)
         {
-            return result;
+            return;
         }
 
         using var cmd = conn.CreateCommand();
-        var binds = new List<string>();
-        for (var i = 0; i < permissionIds.Count; i++)
-        {
-            var name = $":pid{i}";
-            binds.Add(name);
-            cmd.Parameters.Add(new OracleParameter(name, permissionIds[i]));
-        }
-
-        // 注意：Oracle IN 列表上限为 1000 项，权限分配场景远小于该限制。
-        // 参数名由循环生成的绑定变量名组成（:pid0、:pid1…），非用户输入。
-        cmd.CommandText = "SELECT PERMISSION_ID FROM SYS_PERMISSION WHERE PERMISSION_ID IN (" + string.Join(", ", binds) + ")";
-
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            result.Add(Convert.ToInt32(reader.GetValue(0)));
-        }
-
-        return result;
+        cmd.Transaction = transaction;
+        cmd.ArrayBindCount = permissionIds.Count;
+        cmd.CommandText = "DELETE FROM SYS_ROLE_PERMISSION WHERE ROLE_ID = :roleId AND PERMISSION_ID = :permissionId";
+        cmd.Parameters.Add("roleId", OracleDbType.Int32).Value = Enumerable.Repeat(roleId, permissionIds.Count).ToArray();
+        cmd.Parameters.Add("permissionId", OracleDbType.Int32).Value = permissionIds.ToArray();
+        cmd.ExecuteNonQuery();
     }
 
-    public bool Delete(int roleId, int permissionId)
+    private static void InsertAssignments(
+        OracleConnection conn,
+        OracleTransaction transaction,
+        int roleId,
+        IReadOnlyList<int> permissionIds)
     {
-        using var conn = new OracleConnection(connString);
-        conn.Open();
+        if (permissionIds.Count == 0)
+        {
+            return;
+        }
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM SYS_ROLE_PERMISSION WHERE ROLE_ID = :roleId AND PERMISSION_ID = :permissionId";
-        cmd.Parameters.Add(new OracleParameter("roleId", roleId));
-        cmd.Parameters.Add(new OracleParameter("permissionId", permissionId));
-
-        return cmd.ExecuteNonQuery() > 0;
+        cmd.Transaction = transaction;
+        cmd.ArrayBindCount = permissionIds.Count;
+        cmd.CommandText = "INSERT INTO SYS_ROLE_PERMISSION (ROLE_ID, PERMISSION_ID) VALUES (:roleId, :permissionId)";
+        cmd.Parameters.Add("roleId", OracleDbType.Int32).Value = Enumerable.Repeat(roleId, permissionIds.Count).ToArray();
+        cmd.Parameters.Add("permissionId", OracleDbType.Int32).Value = permissionIds.ToArray();
+        cmd.ExecuteNonQuery();
     }
 }

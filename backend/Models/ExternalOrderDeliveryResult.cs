@@ -24,14 +24,29 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class PermissionDeleteRequest : IEquatable<PermissionDeleteRequest>
+    public partial class ExternalOrderDeliveryResult : IEquatable<ExternalOrderDeliveryResult>
     {
         /// <summary>
-        /// Gets or Sets PermissionId
+        /// Gets or Sets ExternalOrder
         /// </summary>
         [Required]
-        [DataMember(Name="permission_id", EmitDefaultValue=true)]
-        public int PermissionId { get; set; }
+        [DataMember(Name="external_order", EmitDefaultValue=false)]
+        public ExternalOrderListItem ExternalOrder { get; set; }
+
+        /// <summary>
+        /// Gets or Sets Delivery
+        /// </summary>
+        [Required]
+        [DataMember(Name="delivery", EmitDefaultValue=false)]
+        public ExternalOrderDelivery Delivery { get; set; }
+
+        /// <summary>
+        /// 交货事务完成后该产品的可用库存数量。
+        /// </summary>
+        /// <value>交货事务完成后该产品的可用库存数量。</value>
+        [Required]
+        [DataMember(Name="remaining_available_qty", EmitDefaultValue=true)]
+        public decimal RemainingAvailableQty { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -40,8 +55,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class PermissionDeleteRequest {\n");
-            sb.Append("  PermissionId: ").Append(PermissionId).Append("\n");
+            sb.Append("class ExternalOrderDeliveryResult {\n");
+            sb.Append("  ExternalOrder: ").Append(ExternalOrder).Append("\n");
+            sb.Append("  Delivery: ").Append(Delivery).Append("\n");
+            sb.Append("  RemainingAvailableQty: ").Append(RemainingAvailableQty).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -64,24 +81,34 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((PermissionDeleteRequest)obj);
+            return obj.GetType() == GetType() && Equals((ExternalOrderDeliveryResult)obj);
         }
 
         /// <summary>
-        /// Returns true if PermissionDeleteRequest instances are equal
+        /// Returns true if ExternalOrderDeliveryResult instances are equal
         /// </summary>
-        /// <param name="other">Instance of PermissionDeleteRequest to be compared</param>
+        /// <param name="other">Instance of ExternalOrderDeliveryResult to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(PermissionDeleteRequest other)
+        public bool Equals(ExternalOrderDeliveryResult other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    PermissionId == other.PermissionId ||
+                    ExternalOrder == other.ExternalOrder ||
+                    ExternalOrder != null &&
+                    ExternalOrder.Equals(other.ExternalOrder)
+                ) && 
+                (
+                    Delivery == other.Delivery ||
+                    Delivery != null &&
+                    Delivery.Equals(other.Delivery)
+                ) && 
+                (
+                    RemainingAvailableQty == other.RemainingAvailableQty ||
                     
-                    PermissionId.Equals(other.PermissionId)
+                    RemainingAvailableQty.Equals(other.RemainingAvailableQty)
                 );
         }
 
@@ -95,8 +122,12 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
+                    if (ExternalOrder != null)
+                    hashCode = hashCode * 59 + ExternalOrder.GetHashCode();
+                    if (Delivery != null)
+                    hashCode = hashCode * 59 + Delivery.GetHashCode();
                     
-                    hashCode = hashCode * 59 + PermissionId.GetHashCode();
+                    hashCode = hashCode * 59 + RemainingAvailableQty.GetHashCode();
                 return hashCode;
             }
         }
@@ -104,12 +135,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(PermissionDeleteRequest left, PermissionDeleteRequest right)
+        public static bool operator ==(ExternalOrderDeliveryResult left, ExternalOrderDeliveryResult right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(PermissionDeleteRequest left, PermissionDeleteRequest right)
+        public static bool operator !=(ExternalOrderDeliveryResult left, ExternalOrderDeliveryResult right)
         {
             return !Equals(left, right);
         }

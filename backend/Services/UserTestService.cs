@@ -24,7 +24,7 @@ public class UserTestService(string connString) : IUserTestService
             {
                 Id = reader.IsDBNull(0) ? 0 : Convert.ToInt64(reader.GetValue(0)),
                 Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                CreatedAt = reader.IsDBNull(2) ? null : reader.GetDateTime(2)
+                CreatedAt = reader.IsDBNull(2) ? null : reader.GetUtcDateTime(2)
             });
         }
 

@@ -21,7 +21,7 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// pending_review 状态允许修改全部计划字段；pending_schedule 状态仅允许修改 plan_start 和 plan_end，其他字段仍需传入且必须与订单当前值一致。 
     /// </summary>
     [DataContract]
     public partial class ProductionOrderUpdateRequest : IEquatable<ProductionOrderUpdateRequest>

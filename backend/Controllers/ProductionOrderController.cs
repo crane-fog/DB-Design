@@ -9,7 +9,7 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 /// <summary>
-/// 生产订单接口（C 模块）。所有接口要求登录；外部客户不可访问生产订单。
+/// 生产订单接口（C 模块）。各接口分别检查稳定权限码。
 /// HTTP 固定 200，业务状态通过响应体 code 表达。
 /// </summary>
 [ApiController]
@@ -17,7 +17,8 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class ProductionOrderController(
     ProductionOrderService orderService,
-    UserContextService userContext) : ControllerBase
+    ProductionCompletionService completionService,
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -30,7 +31,7 @@ public class ProductionOrderController(
         [FromQuery(Name = "plan_end_start")] DateOnly? planEndStart,
         [FromQuery(Name = "plan_end_end")] DateOnly? planEndEnd)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderViewEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -58,7 +59,7 @@ public class ProductionOrderController(
     [Route("getProductionOrder")]
     public IActionResult Get([FromQuery(Name = "order_id")] long orderId)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderViewEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -73,9 +74,10 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addProductionOrder")]
+    [OperationAudit("生产订单", "新增生产订单")]
     public IActionResult Add([FromBody] ProductionOrderCreateRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderCreateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -92,9 +94,10 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateProductionOrder")]
+    [OperationAudit("生产订单", "修改生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Update([FromBody] ProductionOrderUpdateRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderUpdateEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -110,13 +113,60 @@ public class ProductionOrderController(
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
+    [Route("previewProductionOrderMaterialLock")]
+    [RequireJsonFields("order_id")]
+    public IActionResult PreviewMaterialLock(
+        [FromBody] ProductionOrderMaterialLockPreviewRequest? request)
+    {
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionOrderApproveEnum);
+        if (!auth.Ok)
+        {
+            return Ok(MaterialLockPreview(
+                (ProductionOrderMaterialLockPreviewResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权预览生产订单物料锁定",
+                null));
+        }
+
+        if (request is null)
+        {
+            return Ok(MaterialLockPreview(
+                ProductionOrderMaterialLockPreviewResponse.CodeEnum._400Enum,
+                "请求体不能为空",
+                null));
+        }
+
+        ProductionOrderMaterialLockPreviewResult result =
+            orderService.PreviewMaterialLock(request.OrderId);
+        return result.Ok
+            ? Ok(MaterialLockPreview(
+                ProductionOrderMaterialLockPreviewResponse.CodeEnum._200Enum,
+                result.Data!.CanApprove ? "库存充足，可以审核通过" : "库存不足",
+                result.Data))
+            : Ok(MaterialLockPreview(
+                (ProductionOrderMaterialLockPreviewResponse.CodeEnum)result.ErrorCode,
+                result.ErrorMessage ?? "物料锁定预览失败",
+                null));
+    }
+
+    [HttpPost]
+    [Consumes("application/json")]
+    [Produces("application/json")]
     [Route("approveProductionOrder")]
+    [OperationAudit("生产订单", "审核生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     [RequireJsonFields("approved")]
     public IActionResult Approve([FromBody] ProductionOrderApproveRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionOrderApproveEnum);
+        if (!auth.Ok)
         {
-            return forbidden;
+            return Ok(Detail(
+                (ProductionOrderResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权审核生产订单",
+                null));
         }
 
         if (request is null)
@@ -124,16 +174,19 @@ public class ProductionOrderController(
             return Ok(Detail(ProductionOrderResponse.CodeEnum._400Enum, "请求体不能为空", null));
         }
 
-        return FromResult(orderService.Approve(request), request.Approved ? "审核通过" : "已拒绝");
+        return FromResult(
+            orderService.Approve(request, auth.User!.UserId),
+            request.Approved ? "审核通过并已锁定生产物料" : "已拒绝");
     }
 
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("startProductionOrder")]
+    [OperationAudit("生产订单", "开始生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Start([FromBody] ProductionOrderActionRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderStartEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -150,9 +203,10 @@ public class ProductionOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("finishProductionOrder")]
+    [OperationAudit("生产订单", "完成生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Finish([FromBody] ProductionOrderFinishRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderFinishEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -168,10 +222,50 @@ public class ProductionOrderController(
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
+    [Route("reportProductionCompletion")]
+    [OperationAudit("生产订单", "完工报工", OperationAuditSnapshotKind.ProductionOrder)]
+    [RequireJsonFields("order_id", "finish_qty", "qualified_qty", "batch_no")]
+    public IActionResult ReportCompletion([FromBody] ProductionCompletionReportRequest? request)
+    {
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ProductionOrderFinishEnum);
+        if (!auth.Ok)
+        {
+            return Ok(ReportDetail(
+                (ProductionCompletionReportResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权进行完工报工",
+                null));
+        }
+
+        if (request is null)
+        {
+            return Ok(ReportDetail(
+                ProductionCompletionReportResponse.CodeEnum._400Enum,
+                "请求体不能为空",
+                null));
+        }
+
+        ProductionCompletionReportOutcome result = completionService.Report(request, auth.User!);
+        return result.Ok
+            ? Ok(ReportDetail(
+                ProductionCompletionReportResponse.CodeEnum._200Enum,
+                result.Data!.OrderCompleted ? "报工成功，生产订单已完工" : "报工成功",
+                result.Data))
+            : Ok(ReportDetail(
+                (ProductionCompletionReportResponse.CodeEnum)result.ErrorCode,
+                result.ErrorMessage ?? "完工报工失败",
+                null));
+    }
+
+    [HttpPost]
+    [Consumes("application/json")]
+    [Produces("application/json")]
     [Route("cancelProductionOrder")]
+    [OperationAudit("生产订单", "取消生产订单", OperationAuditSnapshotKind.ProductionOrder)]
     public IActionResult Cancel([FromBody] ProductionOrderActionRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ProductionOrderCancelEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -184,21 +278,12 @@ public class ProductionOrderController(
         return FromResult(orderService.Cancel(request), "已取消");
     }
 
-    /// <summary>校验当前用户为生产/系统管理员；否则返回 403 响应对象。</summary>
-    private IActionResult? ResolveManagerOrForbidden()
+    private IActionResult? RequirePermission(PermissionCode permissionCode)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
-        {
-            return Ok(Detail(ProductionOrderResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsProductionManager)
-        {
-            return Ok(Detail(ProductionOrderResponse.CodeEnum._403Enum, "无权访问生产订单", null));
-        }
-
-        return null;
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Detail((ProductionOrderResponse.CodeEnum)result.Code, result.Message ?? "无权访问生产订单", null));
     }
 
     private IActionResult FromResult(ProductionOrderResult result, string successMessage)
@@ -216,6 +301,26 @@ public class ProductionOrderController(
         ProductionOrderResponse.CodeEnum code,
         string message,
         ProductionOrderDetail? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static ProductionCompletionReportResponse ReportDetail(
+        ProductionCompletionReportResponse.CodeEnum code,
+        string message,
+        ProductionCompletionReportResult? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static ProductionOrderMaterialLockPreviewResponse MaterialLockPreview(
+        ProductionOrderMaterialLockPreviewResponse.CodeEnum code,
+        string message,
+        ProductionOrderMaterialLockPreview? data) => new()
         {
             Code = code,
             Message = message,

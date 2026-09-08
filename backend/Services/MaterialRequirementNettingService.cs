@@ -69,7 +69,7 @@ public sealed class MaterialRequirementNettingService
         var snapshot = new MaterialPlanningSnapshot(materials, versions,
             components.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<PlanningBomComponent>)pair.Value));
         return MaterialRequirementPlanner.Calculate(requests, snapshot, options.IncludeSafetyStock,
-            DateOnly.FromDateTime(DateTime.Today));
+            BusinessTime.Today);
     }
 
     private static Dictionary<long, PlanningMaterial> LoadMaterials(
@@ -82,8 +82,8 @@ public sealed class MaterialRequirementNettingService
               LEFT JOIN MATERIAL_STOCK ms ON ms.MATERIAL_ID = m.MATERIAL_ID
               LEFT JOIN BOM_VERSION effective_bv
                 ON effective_bv.VERSION_ID = m.CURRENT_VERSION_ID
-               AND effective_bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
-               AND (effective_bv.EXPIRE_DATE IS NULL OR effective_bv.EXPIRE_DATE >= TRUNC(SYSDATE))", transaction);
+               AND effective_bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+               AND (effective_bv.EXPIRE_DATE IS NULL OR effective_bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))", transaction);
         var result = new Dictionary<long, PlanningMaterial>();
         using var reader = cmd.ExecuteReader();
         while (reader.Read())

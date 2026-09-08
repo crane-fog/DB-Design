@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,7 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 /// <summary>
-/// 系统管理接口（E 模块）。当前用户权限查询仅要求登录，其余管理接口要求系统管理员。
+/// 系统管理接口（E 模块）。各接口分别检查稳定权限码。
 /// HTTP 固定 200，业务状态通过响应体 code 表达。
 /// </summary>
 [ApiController]
@@ -36,16 +37,18 @@ public class SystemController(
 
         try
         {
-            var currentUser = userContext.Resolve(User.GetEmployeeNo());
-            if (currentUser is null)
+            AuthResult auth = authorization.RequireLogin(User.GetEmployeeNo());
+            if (!auth.Ok)
             {
                 return Ok(new CurrentAccessResponse
                 {
                     Code = CurrentAccessResponse.CodeEnum._401Enum,
-                    Message = "未登录、登录已失效或账号不可用",
+                    Message = auth.Message ?? "未登录、登录已失效或账号不可用",
                     Data = null!,
                 });
             }
+
+            CurrentUser currentUser = auth.User!;
 
             return Ok(new CurrentAccessResponse
             {
@@ -59,9 +62,8 @@ public class SystemController(
                         EmployeeNo = currentUser.EmployeeNo,
                         UserName = currentUser.UserName,
                     },
-                    Roles = currentUser.RoleNames.Distinct(StringComparer.Ordinal)
-                        .OrderBy(role => role, StringComparer.Ordinal).ToList(),
-                    Permissions = permissionService.GetEffectivePermissions(currentUser),
+                    Roles = currentUser.Roles.ToList(),
+                    PermissionCodes = currentUser.PermissionCodes.OrderBy(code => code).ToList(),
                 },
             });
         }
@@ -89,7 +91,7 @@ public class SystemController(
         [FromQuery(Name = "user_name")] string? userName,
         [FromQuery(Name = "status")] string? status)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemUserViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = userService.List(currentPage, size, userId, employeeNo, userName, status);
@@ -113,7 +115,7 @@ public class SystemController(
     [Route("getUserData")]
     public IActionResult GetUser([FromQuery(Name = "user_id")] int userId)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemUserViewEnum) is { } forbidden) return forbidden;
 
         var user = userService.Get(userId);
         if (user is null)
@@ -138,9 +140,10 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addUserData")]
+    [OperationAudit("系统管理", "新增用户")]
     public IActionResult AddUser([FromBody] UserCreateRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemUserCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
@@ -175,9 +178,10 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateUserData")]
+    [OperationAudit("系统管理", "修改用户", OperationAuditSnapshotKind.User)]
     public IActionResult UpdateUser([FromBody] UserUpdateRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemUserUpdateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
@@ -213,9 +217,10 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteUserData")]
+    [OperationAudit("系统管理", "删除用户", OperationAuditSnapshotKind.User)]
     public IActionResult DeleteUser([FromBody] UserDeleteRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemUserDeleteEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
@@ -258,7 +263,7 @@ public class SystemController(
         [FromQuery(Name = "role_name")] string? roleName,
         [FromQuery(Name = "status")] string? status)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemRoleViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = roleService.List(currentPage, size, roleId, roleName, status);
@@ -282,7 +287,7 @@ public class SystemController(
     [Route("getRoleData")]
     public IActionResult GetRole([FromQuery(Name = "role_id")] int roleId)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemRoleViewEnum) is { } forbidden) return forbidden;
 
         var role = roleService.Get(roleId);
         if (role is null)
@@ -307,9 +312,10 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addRoleData")]
+    [OperationAudit("系统管理", "新增角色")]
     public IActionResult AddRole([FromBody] RoleCreateRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemRoleCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
@@ -344,9 +350,10 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateRoleData")]
+    [OperationAudit("系统管理", "修改角色", OperationAuditSnapshotKind.Role)]
     public IActionResult UpdateRole([FromBody] RoleUpdateRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemRoleUpdateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
@@ -379,9 +386,10 @@ public class SystemController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteRoleData")]
+    [OperationAudit("系统管理", "删除角色", OperationAuditSnapshotKind.Role)]
     public IActionResult DeleteRole([FromBody] RoleDeleteRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemRoleDeleteEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
@@ -421,13 +429,22 @@ public class SystemController(
         [FromQuery(Name = "page")] int? page,
         [FromQuery(Name = "page_size")] int? pageSize,
         [FromQuery(Name = "permission_id")] int? permissionId,
-        [FromQuery(Name = "resource")] string? resource,
-        [FromQuery(Name = "action")] string? action)
+        [FromQuery(Name = "permission_code")] string? permissionCode,
+        [FromQuery(Name = "module_name")] string? moduleName,
+        [FromQuery(Name = "resource_name")] string? resourceName,
+        [FromQuery(Name = "action_name")] string? actionName)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemPermissionViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
-        var (records, total) = permissionService.List(currentPage, size, permissionId, resource, action);
+        var (records, total) = permissionService.List(
+            currentPage,
+            size,
+            permissionId,
+            permissionCode,
+            moduleName,
+            resourceName,
+            actionName);
 
         return Ok(new PermissionPageResponse
         {
@@ -448,7 +465,7 @@ public class SystemController(
     [Route("getPermissionData")]
     public IActionResult GetPermission([FromQuery(Name = "permission_id")] int permissionId)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemPermissionViewEnum) is { } forbidden) return forbidden;
 
         var perm = permissionService.Get(permissionId);
         if (perm is null)
@@ -469,115 +486,6 @@ public class SystemController(
         });
     }
 
-    [HttpPost]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [Route("addPermissionData")]
-    public IActionResult AddPermission([FromBody] PermissionCreateRequest? request)
-    {
-        if (RequireAdmin() is { } forbidden) return forbidden;
-
-        if (request is null)
-        {
-            return Ok(new PermissionResponse
-            {
-                Code = PermissionResponse.CodeEnum._400Enum,
-                Message = "请求体不能为空",
-                Data = null!,
-            });
-        }
-
-        var (perm, error) = permissionService.Create(request);
-        if (error is not null)
-        {
-            return Ok(new PermissionResponse
-            {
-                Code = PermissionResponse.CodeEnum._409Enum,
-                Message = error,
-                Data = null!,
-            });
-        }
-
-        return Ok(new PermissionResponse
-        {
-            Code = PermissionResponse.CodeEnum._200Enum,
-            Message = "新增成功",
-            Data = perm,
-        });
-    }
-
-    [HttpPost]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [Route("updatePermissionData")]
-    public IActionResult UpdatePermission([FromBody] PermissionUpdateRequest? request)
-    {
-        if (RequireAdmin() is { } forbidden) return forbidden;
-
-        if (request is null)
-        {
-            return Ok(new PermissionResponse
-            {
-                Code = PermissionResponse.CodeEnum._400Enum,
-                Message = "请求体不能为空",
-                Data = null!,
-            });
-        }
-
-        var (perm, error) = permissionService.Update(request);
-        if (error is not null)
-        {
-            var code = error == "权限不存在"
-                ? PermissionResponse.CodeEnum._404Enum
-                : PermissionResponse.CodeEnum._409Enum;
-            return Ok(new PermissionResponse { Code = code, Message = error, Data = null! });
-        }
-
-        return Ok(new PermissionResponse
-        {
-            Code = PermissionResponse.CodeEnum._200Enum,
-            Message = "修改成功",
-            Data = perm,
-        });
-    }
-
-    [HttpPost]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [Route("deletePermissionData")]
-    public IActionResult DeletePermission([FromBody] PermissionDeleteRequest? request)
-    {
-        if (RequireAdmin() is { } forbidden) return forbidden;
-
-        if (request is null)
-        {
-            return Ok(new ApiResponse
-            {
-                Code = ApiResponse.CodeEnum._400Enum,
-                Message = "请求体不能为空",
-                Data = null!,
-            });
-        }
-
-        var (ok, error) = permissionService.Delete(request.PermissionId);
-        if (error is not null)
-        {
-            return Ok(new ApiResponse
-            {
-                Code = ApiResponse.CodeEnum._409Enum,
-                Message = error,
-                Data = null!,
-            });
-        }
-
-        return Ok(new ApiResponse
-        {
-            Code = ok ? ApiResponse.CodeEnum._200Enum : ApiResponse.CodeEnum._404Enum,
-            Message = ok ? "删除成功" : "权限不存在",
-            Data = null!,
-        });
-    }
-
     // ==================== 用户-角色分配 ====================
 
     [HttpGet]
@@ -589,7 +497,7 @@ public class SystemController(
         [FromQuery(Name = "user_id")] int? userId,
         [FromQuery(Name = "role_id")] int? roleId)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemUserAssignRoleEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = userRoleService.List(currentPage, size, userId, roleId);
@@ -611,64 +519,38 @@ public class SystemController(
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
-    [Route("addUserRole")]
-    public IActionResult AddUserRole([FromBody] UserRoleAssignRequest? request)
+    [Route("setUserRoles")]
+    [OperationAudit("系统管理", "分配用户角色", OperationAuditSnapshotKind.UserRoles)]
+    public IActionResult SetUserRoles([FromBody] UserRoleSetRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemUserAssignRoleEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
-            return Ok(new UserRoleAssignResponse
+            return Ok(new UserRoleSetResponse
             {
-                Code = UserRoleAssignResponse.CodeEnum._400Enum,
+                Code = UserRoleSetResponse.CodeEnum._400Enum,
                 Message = "请求体不能为空",
                 Data = null!,
             });
         }
 
-        var (userRoles, error) = userRoleService.Assign(request.UserId, request.RoleIds);
+        var (userRoles, error) = userRoleService.Set(request.UserId, request.RoleIds);
         if (error is not null)
         {
             var code = error.Contains("不存在")
-                ? UserRoleAssignResponse.CodeEnum._404Enum
+                ? UserRoleSetResponse.CodeEnum._404Enum
                 : error.Contains("已停用")
-                    ? UserRoleAssignResponse.CodeEnum._409Enum
-                    : UserRoleAssignResponse.CodeEnum._400Enum;
-            return Ok(new UserRoleAssignResponse { Code = code, Message = error, Data = null! });
+                    ? UserRoleSetResponse.CodeEnum._409Enum
+                    : UserRoleSetResponse.CodeEnum._400Enum;
+            return Ok(new UserRoleSetResponse { Code = code, Message = error, Data = null! });
         }
 
-        return Ok(new UserRoleAssignResponse
+        return Ok(new UserRoleSetResponse
         {
-            Code = UserRoleAssignResponse.CodeEnum._200Enum,
-            Message = "分配成功",
+            Code = UserRoleSetResponse.CodeEnum._200Enum,
+            Message = "设置成功",
             Data = userRoles,
-        });
-    }
-
-    [HttpPost]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [Route("deleteUserRole")]
-    public IActionResult DeleteUserRole([FromBody] UserRoleDeleteRequest? request)
-    {
-        if (RequireAdmin() is { } forbidden) return forbidden;
-
-        if (request is null)
-        {
-            return Ok(new ApiResponse
-            {
-                Code = ApiResponse.CodeEnum._400Enum,
-                Message = "请求体不能为空",
-                Data = null!,
-            });
-        }
-
-        var ok = userRoleService.Delete(request.UserId, request.RoleId);
-        return Ok(new ApiResponse
-        {
-            Code = ok ? ApiResponse.CodeEnum._200Enum : ApiResponse.CodeEnum._404Enum,
-            Message = ok ? "移除成功" : "用户角色关系不存在",
-            Data = null!,
         });
     }
 
@@ -683,7 +565,7 @@ public class SystemController(
         [FromQuery(Name = "role_id")] int? roleId,
         [FromQuery(Name = "permission_id")] int? permissionId)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemRoleAssignPermissionEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = rolePermissionService.List(currentPage, size, roleId, permissionId);
@@ -705,64 +587,38 @@ public class SystemController(
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
-    [Route("addRolePermission")]
-    public IActionResult AddRolePermission([FromBody] RolePermissionAssignRequest? request)
+    [Route("setRolePermissions")]
+    [OperationAudit("系统管理", "分配角色权限", OperationAuditSnapshotKind.RolePermissions)]
+    public IActionResult SetRolePermissions([FromBody] RolePermissionSetRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemRoleAssignPermissionEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
-            return Ok(new RolePermissionAssignResponse
+            return Ok(new RolePermissionSetResponse
             {
-                Code = RolePermissionAssignResponse.CodeEnum._400Enum,
+                Code = RolePermissionSetResponse.CodeEnum._400Enum,
                 Message = "请求体不能为空",
                 Data = null!,
             });
         }
 
-        var (rolePermissions, error) = rolePermissionService.Assign(request.RoleId, request.PermissionIds);
+        var (rolePermissions, error) = rolePermissionService.Set(request.RoleId, request.PermissionIds);
         if (error is not null)
         {
             var code = error.Contains("不存在")
-                ? RolePermissionAssignResponse.CodeEnum._404Enum
+                ? RolePermissionSetResponse.CodeEnum._404Enum
                 : error.Contains("已停用")
-                    ? RolePermissionAssignResponse.CodeEnum._409Enum
-                    : RolePermissionAssignResponse.CodeEnum._400Enum;
-            return Ok(new RolePermissionAssignResponse { Code = code, Message = error, Data = null! });
+                    ? RolePermissionSetResponse.CodeEnum._409Enum
+                    : RolePermissionSetResponse.CodeEnum._400Enum;
+            return Ok(new RolePermissionSetResponse { Code = code, Message = error, Data = null! });
         }
 
-        return Ok(new RolePermissionAssignResponse
+        return Ok(new RolePermissionSetResponse
         {
-            Code = RolePermissionAssignResponse.CodeEnum._200Enum,
-            Message = "分配成功",
+            Code = RolePermissionSetResponse.CodeEnum._200Enum,
+            Message = "设置成功",
             Data = rolePermissions,
-        });
-    }
-
-    [HttpPost]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [Route("deleteRolePermission")]
-    public IActionResult DeleteRolePermission([FromBody] RolePermissionDeleteRequest? request)
-    {
-        if (RequireAdmin() is { } forbidden) return forbidden;
-
-        if (request is null)
-        {
-            return Ok(new ApiResponse
-            {
-                Code = ApiResponse.CodeEnum._400Enum,
-                Message = "请求体不能为空",
-                Data = null!,
-            });
-        }
-
-        var ok = rolePermissionService.Delete(request.RoleId, request.PermissionId);
-        return Ok(new ApiResponse
-        {
-            Code = ok ? ApiResponse.CodeEnum._200Enum : ApiResponse.CodeEnum._404Enum,
-            Message = ok ? "移除成功" : "角色权限关系不存在",
-            Data = null!,
         });
     }
 
@@ -774,15 +630,17 @@ public class SystemController(
     public IActionResult ListLoginLog(
         [FromQuery(Name = "page")] int? page,
         [FromQuery(Name = "page_size")] int? pageSize,
-        [FromQuery(Name = "user_id")] int? userId,
+        [FromQuery(Name = "employee_no")] string? employeeNo,
+        [FromQuery(Name = "user_name")] string? userName,
         [FromQuery(Name = "result")] string? result,
         [FromQuery(Name = "start_time")] DateTime? startTime,
         [FromQuery(Name = "end_time")] DateTime? endTime)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemAuditLoginViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
-        var (records, total) = loginLogService.List(currentPage, size, userId, result, startTime, endTime);
+        var (records, total) = loginLogService.List(
+            currentPage, size, employeeNo, userName, result, startTime, endTime);
 
         return Ok(new LoginLogPageResponse
         {
@@ -808,14 +666,16 @@ public class SystemController(
         [FromQuery(Name = "page_size")] int? pageSize,
         [FromQuery(Name = "module")] string? module,
         [FromQuery(Name = "action")] string? action,
-        [FromQuery(Name = "operator_id")] int? operatorId,
+        [FromQuery(Name = "employee_no")] string? employeeNo,
+        [FromQuery(Name = "user_name")] string? userName,
         [FromQuery(Name = "start_time")] DateTime? startTime,
         [FromQuery(Name = "end_time")] DateTime? endTime)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemAuditOperationViewEnum) is { } forbidden) return forbidden;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
-        var (records, total) = operationLogService.List(currentPage, size, module, action, operatorId, startTime, endTime);
+        var (records, total) = operationLogService.List(
+            currentPage, size, module, action, employeeNo, userName, startTime, endTime);
 
         return Ok(new OperationLogPageResponse
         {
@@ -837,7 +697,7 @@ public class SystemController(
     [Route("addOperationLogData")]
     public IActionResult AddOperationLog([FromBody] OperationLogCreateRequest? request)
     {
-        if (RequireAdmin() is { } forbidden) return forbidden;
+        if (RequirePermission(PermissionCode.SystemAuditOperationCreateEnum) is { } forbidden) return forbidden;
 
         if (request is null)
         {
@@ -879,10 +739,9 @@ public class SystemController(
 
     // ==================== 私有辅助方法 ====================
 
-    /// <summary>要求当前用户为系统管理员；否则返回 403 响应。</summary>
-    private IActionResult? RequireAdmin()
+    private IActionResult? RequirePermission(PermissionCode permissionCode)
     {
-        var result = authorization.RequireRole(User.GetEmployeeNo(), AuthorizationService.AdminRole);
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
         if (result.Ok) return null;
 
         if (result.Code == 401)
@@ -898,7 +757,7 @@ public class SystemController(
         return Ok(new ApiResponse
         {
             Code = ApiResponse.CodeEnum._403Enum,
-            Message = result.Message ?? "仅系统管理员可访问",
+            Message = result.Message ?? "没有权限访问该接口",
             Data = null!,
         });
     }

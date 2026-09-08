@@ -11,7 +11,8 @@ namespace Backend.Controllers;
 [Route("/api")]
 public class DefaultApiController(
     IUserTestService userTestService,
-    AuthService authService) : ControllerBase
+    AuthService authService,
+    AuthorizationService authorization) : ControllerBase
 {
     private const int TokenExpiresSeconds = 7200;
 
@@ -119,6 +120,12 @@ public class DefaultApiController(
     [Route("user-test")]
     public IActionResult GetUserTest()
     {
+        AuthResult result = authorization.RequireLogin(User.GetEmployeeNo());
+        if (!result.Ok)
+        {
+            return Ok(result.ToApiResponse());
+        }
+
         var rows = userTestService.GetLatestUsers();
         return Ok(rows);
     }

@@ -24,21 +24,23 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class RolePermissionDeleteRequest : IEquatable<RolePermissionDeleteRequest>
+    public partial class ExternalOrderFormOptions : IEquatable<ExternalOrderFormOptions>
     {
         /// <summary>
-        /// Gets or Sets RoleId
+        /// 管理员可代录的外部客户；仅具备 create-own 权限时为空数组。
         /// </summary>
+        /// <value>管理员可代录的外部客户；仅具备 create-own 权限时为空数组。</value>
         [Required]
-        [DataMember(Name="role_id", EmitDefaultValue=true)]
-        public int RoleId { get; set; }
+        [DataMember(Name="customers", EmitDefaultValue=false)]
+        public List<ExternalOrderCustomerOption> Customers { get; set; }
 
         /// <summary>
-        /// Gets or Sets PermissionId
+        /// 可下单的全部成品物料。
         /// </summary>
+        /// <value>可下单的全部成品物料。</value>
         [Required]
-        [DataMember(Name="permission_id", EmitDefaultValue=true)]
-        public int PermissionId { get; set; }
+        [DataMember(Name="materials", EmitDefaultValue=false)]
+        public List<ExternalOrderMaterialOption> Materials { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -47,9 +49,9 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class RolePermissionDeleteRequest {\n");
-            sb.Append("  RoleId: ").Append(RoleId).Append("\n");
-            sb.Append("  PermissionId: ").Append(PermissionId).Append("\n");
+            sb.Append("class ExternalOrderFormOptions {\n");
+            sb.Append("  Customers: ").Append(Customers).Append("\n");
+            sb.Append("  Materials: ").Append(Materials).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,29 +74,31 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((RolePermissionDeleteRequest)obj);
+            return obj.GetType() == GetType() && Equals((ExternalOrderFormOptions)obj);
         }
 
         /// <summary>
-        /// Returns true if RolePermissionDeleteRequest instances are equal
+        /// Returns true if ExternalOrderFormOptions instances are equal
         /// </summary>
-        /// <param name="other">Instance of RolePermissionDeleteRequest to be compared</param>
+        /// <param name="other">Instance of ExternalOrderFormOptions to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(RolePermissionDeleteRequest other)
+        public bool Equals(ExternalOrderFormOptions other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    RoleId == other.RoleId ||
-                    
-                    RoleId.Equals(other.RoleId)
+                    Customers == other.Customers ||
+                    Customers != null &&
+                    other.Customers != null &&
+                    Customers.SequenceEqual(other.Customers)
                 ) && 
                 (
-                    PermissionId == other.PermissionId ||
-                    
-                    PermissionId.Equals(other.PermissionId)
+                    Materials == other.Materials ||
+                    Materials != null &&
+                    other.Materials != null &&
+                    Materials.SequenceEqual(other.Materials)
                 );
         }
 
@@ -108,10 +112,10 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    
-                    hashCode = hashCode * 59 + RoleId.GetHashCode();
-                    
-                    hashCode = hashCode * 59 + PermissionId.GetHashCode();
+                    if (Customers != null)
+                    hashCode = hashCode * 59 + Customers.GetHashCode();
+                    if (Materials != null)
+                    hashCode = hashCode * 59 + Materials.GetHashCode();
                 return hashCode;
             }
         }
@@ -119,12 +123,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(RolePermissionDeleteRequest left, RolePermissionDeleteRequest right)
+        public static bool operator ==(ExternalOrderFormOptions left, ExternalOrderFormOptions right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(RolePermissionDeleteRequest left, RolePermissionDeleteRequest right)
+        public static bool operator !=(ExternalOrderFormOptions left, ExternalOrderFormOptions right)
         {
             return !Equals(left, right);
         }

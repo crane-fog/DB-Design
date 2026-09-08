@@ -29,6 +29,12 @@ public interface IProductionLineService
         FaultRecordUpdateRequest request,
         CurrentUser currentUser);
 
+    ProductionResourceResult<ProductionResourcePage<FaultRecord>> ListFaults(
+        int page,
+        int pageSize,
+        long? lineId,
+        FaultStatus? status);
+
     ProductionResourceResult<ProductionLineStatus> UpdateLineStatus(
         ProductionLineStatusUpdateRequest request,
         CurrentUser currentUser);

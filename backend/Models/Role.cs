@@ -29,12 +29,14 @@ namespace Org.OpenAPITools.Models
         /// <summary>
         /// Gets or Sets RoleId
         /// </summary>
+        [Required]
         [DataMember(Name="role_id", EmitDefaultValue=true)]
         public int RoleId { get; set; }
 
         /// <summary>
         /// Gets or Sets RoleName
         /// </summary>
+        [Required]
         [DataMember(Name="role_name", EmitDefaultValue=false)]
         public string RoleName { get; set; }
 
@@ -65,6 +67,7 @@ namespace Org.OpenAPITools.Models
         /// 角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。
         /// </summary>
         /// <value>角色状态。valid：启用，可用于用户授权和权限校验；disabled：停用，不应继续用于新的授权或权限生效。允许通过 updateRoleData 在 valid 与 disabled 之间切换。</value>
+        [Required]
         [DataMember(Name="status", EmitDefaultValue=true)]
         public StatusEnum Status { get; set; }
 

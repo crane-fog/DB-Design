@@ -8,6 +8,7 @@ import {
 } from '@/services/SystemService'
 import { Refresh, View } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { formatDateTime } from '@/utils/format'
@@ -16,13 +17,18 @@ import { useAuthStore } from '@/stores/auth'
 
 const pageSize = 10
 const auth = useAuthStore()
-const activeTab = ref<'login' | 'operation'>('login')
-const loginFilters = reactive({ result: '', timeRange: [] as string[], userId: '' })
+const loginFilters = reactive({
+  employeeNo: '',
+  result: '',
+  timeRange: [] as string[],
+  userName: '',
+})
 const operationFilters = reactive({
   action: '',
+  employeeNo: '',
   module: '',
-  operatorId: '',
   timeRange: [] as string[],
+  userName: '',
 })
 const loginPage = ref(1)
 const operationPage = ref(1)
@@ -41,16 +47,17 @@ const operationResult = ref<PageResult<SystemOperationLog>>({
 const detailDialogVisible = ref(false)
 const selectedOperation = ref<SystemOperationLog>()
 
-const canViewAudit = computed(() => auth.hasPermission('system:audit:view'))
-const canResolveAuditUserNames = computed(() => auth.hasPermission('system:user:view'))
-
-function selectedUserId(value: string) {
-  const userId = Number(value)
-  if (Number.isInteger(userId) && userId > 0) {
-    return userId
-  }
-  return undefined
+const canViewLoginAudit = computed(() => auth.hasPermission(PermissionCode.SystemAuditLoginView))
+const canViewOperationAudit = computed(() =>
+  auth.hasPermission(PermissionCode.SystemAuditOperationView),
+)
+const canViewAudit = computed(() => canViewLoginAudit.value || canViewOperationAudit.value)
+const canResolveAuditUserNames = computed(() => auth.hasPermission(PermissionCode.SystemUserView))
+let initialTab: 'login' | 'operation' = 'operation'
+if (canViewLoginAudit.value) {
+  initialTab = 'login'
 }
+const activeTab = ref<'login' | 'operation'>(initialTab)
 
 function selectedLoginResult(): LoginResult | undefined {
   if (loginFilters.result === 'success' || loginFilters.result === 'failure') {
@@ -64,7 +71,7 @@ function getTimeRange(timeRange: string[]) {
 }
 
 async function loadLoginLogs(targetPage = loginPage.value) {
-  if (!canViewAudit.value) {
+  if (!canViewLoginAudit.value) {
     return
   }
 
@@ -74,12 +81,13 @@ async function loadLoginLogs(targetPage = loginPage.value) {
     const { endTime, startTime } = getTimeRange(loginFilters.timeRange)
     loginResult.value = await systemService.listLoginLogs(
       {
+        employeeNo: loginFilters.employeeNo,
         endTime,
         page: targetPage,
         pageSize,
         result: selectedLoginResult(),
         startTime,
-        userId: selectedUserId(loginFilters.userId),
+        userName: loginFilters.userName,
       },
       canResolveAuditUserNames.value,
     )
@@ -92,7 +100,7 @@ async function loadLoginLogs(targetPage = loginPage.value) {
 }
 
 async function loadOperationLogs(targetPage = operationPage.value) {
-  if (!canViewAudit.value) {
+  if (!canViewOperationAudit.value) {
     return
   }
 
@@ -104,12 +112,13 @@ async function loadOperationLogs(targetPage = operationPage.value) {
     operationResult.value = await systemService.listOperationLogs(
       {
         action: operationFilters.action,
+        employeeNo: operationFilters.employeeNo,
         endTime,
         module: operationFilters.module,
-        operatorId: selectedUserId(operationFilters.operatorId),
         page: targetPage,
         pageSize,
         startTime,
+        userName: operationFilters.userName,
       },
       canResolveAuditUserNames.value,
     )
@@ -122,12 +131,18 @@ async function loadOperationLogs(targetPage = operationPage.value) {
 }
 
 function resetLoginFilters() {
-  Object.assign(loginFilters, { result: '', timeRange: [], userId: '' })
+  Object.assign(loginFilters, { employeeNo: '', result: '', timeRange: [], userName: '' })
   void loadLoginLogs(1)
 }
 
 function resetOperationFilters() {
-  Object.assign(operationFilters, { action: '', module: '', operatorId: '', timeRange: [] })
+  Object.assign(operationFilters, {
+    action: '',
+    employeeNo: '',
+    module: '',
+    timeRange: [],
+    userName: '',
+  })
   void loadOperationLogs(1)
 }
 
@@ -142,7 +157,13 @@ function openOperationDetail(log: SystemOperationLog) {
   detailDialogVisible.value = true
 }
 
-onMounted(() => void loadLoginLogs())
+onMounted(() => {
+  if (canViewLoginAudit.value) {
+    void loadLoginLogs()
+  } else {
+    void loadOperationLogs()
+  }
+})
 </script>
 
 <template>
@@ -152,16 +173,23 @@ onMounted(() => void loadLoginLogs())
     <el-result
       v-if="!canViewAudit"
       icon="warning"
-      sub-title="当前账号没有 system:audit:view 权限。"
+      sub-title="当前账号没有登录日志或操作日志查看权限。"
       title="无审计日志查看权限"
     />
 
     <el-tabs v-else v-model="activeTab" class="audit-tabs" @tab-change="handleTabChange">
-      <el-tab-pane label="登录日志" name="login">
+      <el-tab-pane v-if="canViewLoginAudit" label="登录日志" name="login">
         <el-card class="audit-search-card" shadow="never">
           <el-form :model="loginFilters" inline @submit.prevent="loadLoginLogs(1)">
-            <el-form-item label="用户编号">
-              <el-input v-model.trim="loginFilters.userId" clearable placeholder="请输入用户编号" />
+            <el-form-item label="工号">
+              <el-input
+                v-model.trim="loginFilters.employeeNo"
+                clearable
+                placeholder="支持模糊查询"
+              />
+            </el-form-item>
+            <el-form-item label="姓名">
+              <el-input v-model.trim="loginFilters.userName" clearable placeholder="支持模糊查询" />
             </el-form-item>
             <el-form-item label="登录结果">
               <el-select
@@ -257,14 +285,21 @@ onMounted(() => void loadLoginLogs())
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="操作日志" name="operation">
+      <el-tab-pane v-if="canViewOperationAudit" label="操作日志" name="operation">
         <el-card class="audit-search-card" shadow="never">
           <el-form :model="operationFilters" inline @submit.prevent="loadOperationLogs(1)">
-            <el-form-item label="操作人编号">
+            <el-form-item label="操作人工号">
               <el-input
-                v-model.trim="operationFilters.operatorId"
+                v-model.trim="operationFilters.employeeNo"
                 clearable
-                placeholder="请输入用户编号"
+                placeholder="支持模糊查询"
+              />
+            </el-form-item>
+            <el-form-item label="操作人姓名">
+              <el-input
+                v-model.trim="operationFilters.userName"
+                clearable
+                placeholder="支持模糊查询"
               />
             </el-form-item>
             <el-form-item label="业务模块">
@@ -328,6 +363,9 @@ onMounted(() => void loadLoginLogs())
             min-height="320"
             stripe
           >
+            <el-table-column label="工号" min-width="120">
+              <template #default="{ row }">{{ row.operatorEmployeeNo || '-' }}</template>
+            </el-table-column>
             <el-table-column label="操作人" min-width="140">
               <template #default="{ row }">
                 {{ row.operatorName || (row.operatorId ? `用户 #${row.operatorId}` : '-') }}

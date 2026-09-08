@@ -35,9 +35,11 @@ import type {
   SupplierInfo,
 } from '@/types/purchase'
 import { materialBomApi, purchaseApi } from '@/api/client'
+import { businessDate } from '@/utils/time'
 import { cleanQuery } from '@/services/request'
 import { pinia } from '@/stores/pinia'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 export type { PageResult }
 
@@ -138,21 +140,15 @@ function validateOrderForm(form: PurchaseOrderFormData) {
   if (!dateParts) {
     throw new Error('预计到货日期格式无效')
   }
-  const expectedDate = new Date(
-    Number(dateParts[1]),
-    Number(dateParts[2]) - 1,
-    Number(dateParts[3]),
-  )
+  const expectedDate = new Date(`${form.expectedDate}T00:00:00Z`)
   if (
-    expectedDate.getFullYear() !== Number(dateParts[1]) ||
-    expectedDate.getMonth() !== Number(dateParts[2]) - 1 ||
-    expectedDate.getDate() !== Number(dateParts[3])
+    expectedDate.getUTCFullYear() !== Number(dateParts[1]) ||
+    expectedDate.getUTCMonth() !== Number(dateParts[2]) - 1 ||
+    expectedDate.getUTCDate() !== Number(dateParts[3])
   ) {
     throw new Error('预计到货日期格式无效')
   }
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  if (expectedDate < today) {
+  if (form.expectedDate < businessDate()) {
     throw new Error('预计到货日期不能早于当前日期')
   }
   if (!form.details.length) {
@@ -304,62 +300,78 @@ export const purchaseService = {
     return toOrder(data)
   },
 
-  async getOverview(): Promise<PurchaseOverviewSummary> {
-    const today = new Date().toISOString().slice(0, 10)
-    const [all, firstOverduePage, submitted, partial, reminders] = await Promise.all([
-      this.listOrders({ page: 1, pageSize: 1 }),
-      this.listOrders({
-        expectedDateEnd: today,
-        page: 1,
-        pageSize: 100,
-      }),
-      this.listOrders({ page: 1, pageSize: 1, status: 'submitted' }),
-      this.listOrders({ page: 1, pageSize: 1, status: 'partial_received' }),
-      this.listReminders({ page: 1, pageSize: 1, status: 'pending_urge' }),
-    ])
-    const remainingPageCount = Math.ceil(firstOverduePage.total / firstOverduePage.pageSize) - 1
-    let overdueItems = [...firstOverduePage.items]
-    if (remainingPageCount > 0) {
-      const remainingPages = await Promise.all(
-        Array.from({ length: remainingPageCount }, (unusedValue, index) => {
-          void unusedValue
-          return this.listOrders({
-            expectedDateEnd: today,
-            page: index + 2,
-            pageSize: firstOverduePage.pageSize,
-          })
-        }),
-      )
-      overdueItems = [...overdueItems, ...remainingPages.flatMap(({ items }) => items)]
+  async getOverview(): Promise<Partial<PurchaseOverviewSummary>> {
+    const auth = useAuthStore(pinia)
+    const today = businessDate()
+    const canViewOrders = auth.hasPermission(PermissionCode.PurchaseOrderView)
+    const canViewReminders = auth.hasPermission(PermissionCode.PurchaseOverdueView)
+    const summary: Partial<PurchaseOverviewSummary> = {}
+    if (canViewOrders) {
+      const [all, firstOverduePage, submitted, partial] = await Promise.all([
+        this.listOrders({ page: 1, pageSize: 1 }),
+        this.listOrders({ expectedDateEnd: today, page: 1, pageSize: 100 }),
+        this.listOrders({ page: 1, pageSize: 1, status: 'submitted' }),
+        this.listOrders({ page: 1, pageSize: 1, status: 'partial_received' }),
+      ])
+      const remainingPageCount = Math.ceil(firstOverduePage.total / firstOverduePage.pageSize) - 1
+      let overdueItems = [...firstOverduePage.items]
+      if (remainingPageCount > 0) {
+        const remainingPages = await Promise.all(
+          Array.from({ length: remainingPageCount }, (unusedValue, index) => {
+            void unusedValue
+            return this.listOrders({
+              expectedDateEnd: today,
+              page: index + 2,
+              pageSize: firstOverduePage.pageSize,
+            })
+          }),
+        )
+        overdueItems = [...overdueItems, ...remainingPages.flatMap(({ items }) => items)]
+      }
+      summary.overdueOrderCount = overdueItems.filter((item) => item.isOverdue).length
+      summary.receivingOrderCount = submitted.total + partial.total
+      summary.totalOrderCount = all.total
     }
-    return {
-      overdueOrderCount: overdueItems.filter((item) => item.isOverdue).length,
-      pendingReminderCount: reminders.total,
-      receivingOrderCount: submitted.total + partial.total,
-      totalOrderCount: all.total,
+    if (canViewReminders) {
+      const reminders = await this.listReminders({ page: 1, pageSize: 1, status: 'pending_urge' })
+      summary.pendingReminderCount = reminders.total
     }
+    return summary
   },
 
   async getReferenceData(): Promise<PurchaseReferenceData> {
     const auth = useAuthStore(pinia)
-    const canReadMaterials = auth.roles.some((role) =>
-      ['系统管理员', '生产管理员', '采购员'].includes(role),
-    )
+    const canReadMaterials = auth.hasPermission(PermissionCode.MaterialItemView)
     let materialsPromise = Promise.resolve<Material[]>([])
     if (canReadMaterials) {
       materialsPromise = loadAllRecords<Material>((page, pageSize) =>
         materialBomApi.listMaterialData({ page, pageSize }),
       )
     }
-    const buyersPromise = loadAllRecords<PurchaseBuyerBrief>((page, pageSize) =>
-      purchaseApi.listPurchaseBuyerData({ page, pageSize }),
-    )
-    const suppliersPromise = loadAllRecords<SupplierDetail>((page, pageSize) =>
-      purchaseApi.listSupplierData({ page, pageSize }),
-    )
+    let buyersPromise = Promise.resolve<PurchaseBuyerBrief[]>([])
+    if (auth.hasPermission(PermissionCode.PurchaseBuyerView)) {
+      buyersPromise = loadAllRecords<PurchaseBuyerBrief>((page, pageSize) =>
+        purchaseApi.listPurchaseBuyerData({ page, pageSize }),
+      )
+    }
+    let suppliersPromise = Promise.resolve<SupplierDetail[]>([])
+    if (auth.hasPermission(PermissionCode.PurchaseSupplierView)) {
+      suppliersPromise = loadAllRecords<SupplierDetail>((page, pageSize) =>
+        purchaseApi.listSupplierData({ page, pageSize }),
+      )
+    }
+    let firstOrderPagePromise = Promise.resolve<PageResult<PurchaseOrderItem>>({
+      items: [],
+      page: 1,
+      pageSize: 100,
+      total: 0,
+    })
+    if (auth.hasPermission(PermissionCode.PurchaseOrderView)) {
+      firstOrderPagePromise = this.listOrders({ page: 1, pageSize: 100 })
+    }
     const [materialItems, firstOrderPage, buyerItems, supplierItems] = await Promise.all([
       materialsPromise,
-      this.listOrders({ page: 1, pageSize: 100 }),
+      firstOrderPagePromise,
       buyersPromise,
       suppliersPromise,
     ])
@@ -402,12 +414,6 @@ export const purchaseService = {
       buyerId: buyer.buyer_id,
       buyerName: buyer.buyer_name,
     }))
-    if (auth.currentUser?.id && !buyers.some((buyer) => buyer.buyerId === auth.currentUser?.id)) {
-      buyers.unshift({
-        buyerId: auth.currentUser.id,
-        buyerName: auth.currentUser.name ?? `采购员 #${auth.currentUser.id}`,
-      })
-    }
     return { buyers, materials, orders, suppliers }
   },
 

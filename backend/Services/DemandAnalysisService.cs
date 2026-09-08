@@ -154,7 +154,7 @@ public sealed class DemandAnalysisService(
 
     private DateOnly GetDatabaseDate()
     {
-        using var conn = new OracleConnection(connString); conn.Open(); using var cmd = conn.CreateCommand(); cmd.CommandText = "SELECT TRUNC(SYSDATE) FROM DUAL";
+        using var conn = new OracleConnection(connString); conn.Open(); using var cmd = conn.CreateCommand(); cmd.CommandText = "SELECT TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)) FROM DUAL";
         return DateOnly.FromDateTime(Convert.ToDateTime(cmd.ExecuteScalar()));
     }
     private static string? ValidateInput(long materialId, long versionId, double quantity, string name) =>
@@ -170,8 +170,8 @@ public sealed class DemandAnalysisService(
                             FROM MATERIAL m
                             LEFT JOIN BOM_VERSION current_bv
                               ON current_bv.VERSION_ID = m.CURRENT_VERSION_ID
-                             AND current_bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
-                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(SYSDATE))
+                             AND current_bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
                             LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
                             LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
                             ORDER BY m.MATERIAL_ID, bv.VERSION_ID, b.BOM_ID";

@@ -1,3 +1,4 @@
+using Backend.Filters;
 using Backend.Services;
 
 using Microsoft.AspNetCore.Authorization;
@@ -8,14 +9,14 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 /// <summary>
-/// 质量追溯接口（C 模块）。要求登录；具体细粒度角色鉴权待 E 的公共鉴权设施接入。
+/// 质量追溯接口（C 模块）。各接口分别检查稳定权限码。
 /// </summary>
 [ApiController]
 [Authorize]
 [Route("/api")]
 public class QualityTraceController(
     QualityTraceService traceService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -27,9 +28,10 @@ public class QualityTraceController(
         [FromQuery(Name = "item_id")] long? itemId,
         [FromQuery(Name = "material_id")] long? materialId)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceConsumptionViewEnum);
+        if (!auth.Ok)
         {
-            return Ok(PageResp(BatchConsumptionPageResponse.CodeEnum._401Enum, unauth, null));
+            return Ok(PageResp((BatchConsumptionPageResponse.CodeEnum)auth.Code, auth.Message ?? "无权查询批次消耗", null));
         }
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
@@ -54,9 +56,10 @@ public class QualityTraceController(
     [Route("getBatchConsumption")]
     public IActionResult GetConsumption([FromQuery(Name = "consumption_id")] long consumptionId)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceConsumptionViewEnum);
+        if (!auth.Ok)
         {
-            return Ok(Single(BatchConsumptionResponse.CodeEnum._401Enum, unauth, null));
+            return Ok(Single((BatchConsumptionResponse.CodeEnum)auth.Code, auth.Message ?? "无权查询批次消耗", null));
         }
 
         var consumption = traceService.GetConsumption(consumptionId);
@@ -69,11 +72,13 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addBatchConsumption")]
+    [OperationAudit("质量追溯", "新增批次消耗")]
     public IActionResult AddConsumption([FromBody] BatchConsumptionCreateRequest? request)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceConsumptionCreateEnum);
+        if (!auth.Ok)
         {
-            return Ok(Single(BatchConsumptionResponse.CodeEnum._401Enum, unauth, null));
+            return Ok(Single((BatchConsumptionResponse.CodeEnum)auth.Code, auth.Message ?? "无权新增批次消耗", null));
         }
 
         if (request is null)
@@ -88,11 +93,13 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("updateBatchConsumption")]
+    [OperationAudit("质量追溯", "修改批次消耗", OperationAuditSnapshotKind.BatchConsumption)]
     public IActionResult UpdateConsumption([FromBody] BatchConsumptionUpdateRequest? request)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceConsumptionUpdateEnum);
+        if (!auth.Ok)
         {
-            return Ok(Single(BatchConsumptionResponse.CodeEnum._401Enum, unauth, null));
+            return Ok(Single((BatchConsumptionResponse.CodeEnum)auth.Code, auth.Message ?? "无权修改批次消耗", null));
         }
 
         if (request is null)
@@ -107,11 +114,13 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("deleteBatchConsumption")]
+    [OperationAudit("质量追溯", "删除批次消耗", OperationAuditSnapshotKind.BatchConsumption)]
     public IActionResult DeleteConsumption([FromBody] BatchConsumptionDeleteRequest? request)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceConsumptionDeleteEnum);
+        if (!auth.Ok)
         {
-            return Ok(Envelope(ApiResponse.CodeEnum._401Enum, unauth));
+            return Ok(Envelope((ApiResponse.CodeEnum)auth.Code, auth.Message ?? "无权删除批次消耗"));
         }
 
         if (request is null)
@@ -132,9 +141,10 @@ public class QualityTraceController(
         [FromQuery(Name = "batch_no")] string? batchNo,
         [FromQuery(Name = "include_supplier")] bool? includeSupplier)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceProductViewEnum);
+        if (!auth.Ok)
         {
-            return Ok(ProductResp(ProductBatchTraceResponse.CodeEnum._401Enum, unauth, null));
+            return Ok(ProductResp((ProductBatchTraceResponse.CodeEnum)auth.Code, auth.Message ?? "无权追溯成品批次", null));
         }
 
         if (orderId is null && string.IsNullOrWhiteSpace(batchNo))
@@ -158,9 +168,10 @@ public class QualityTraceController(
         [FromQuery(Name = "receive_date_start")] DateOnly? receiveDateStart,
         [FromQuery(Name = "receive_date_end")] DateOnly? receiveDateEnd)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceMaterialViewEnum);
+        if (!auth.Ok)
         {
-            return Ok(MaterialResp(MaterialBatchTraceResponse.CodeEnum._401Enum, unauth, null));
+            return Ok(MaterialResp((MaterialBatchTraceResponse.CodeEnum)auth.Code, auth.Message ?? "无权追溯原材料批次", null));
         }
 
         var hasDateRange = receiveDateStart.HasValue && receiveDateEnd.HasValue;
@@ -185,11 +196,13 @@ public class QualityTraceController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("analyzeQualityImpact")]
+    [OperationAudit("质量追溯", "分析质量影响")]
     public IActionResult AnalyzeImpact([FromBody] QualityImpactAnalyzeRequest? request)
     {
-        if (EnsureLoggedIn() is { } unauth)
+        AuthResult auth = Authorize(PermissionCode.TraceImpactAnalyzeEnum);
+        if (!auth.Ok)
         {
-            return Ok(ImpactResp(QualityImpactAnalyzeResponse.CodeEnum._401Enum, unauth, null));
+            return Ok(ImpactResp((QualityImpactAnalyzeResponse.CodeEnum)auth.Code, auth.Message ?? "无权执行质量影响分析", null));
         }
 
         var hasItemIds = request?.ItemIds is { Count: > 0 };
@@ -209,12 +222,8 @@ public class QualityTraceController(
         return Ok(ImpactResp(QualityImpactAnalyzeResponse.CodeEnum._200Enum, "分析成功", result));
     }
 
-    /// <summary>要求已登录；返回非 null 的错误消息表示未通过。</summary>
-    private string? EnsureLoggedIn()
-    {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        return user is null ? "登录状态无效" : null;
-    }
+    private AuthResult Authorize(PermissionCode permissionCode) =>
+        authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
 
     private IActionResult FromResult(BatchConsumptionResult result, string successMessage)
     {

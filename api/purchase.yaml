@@ -10,7 +10,7 @@ paths:
   /api/listSupplierData:
     get:
       summary: 查询供应商列表
-      description: 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。权限：采购员、采购主管、生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询供应商主数据，支持按供应商编号和名称过滤。该接口返回完整供应商集合，不依赖供应商是否已被物料设为默认供应商或是否已有采购订单。需具备 purchase:supplier:view；权限不足返回 code 403。
       operationId: listSupplierData
       tags: [purchase]
       security:
@@ -39,7 +39,7 @@ paths:
   /api/listPurchaseBuyerData:
     get:
       summary: 查询采购员列表
-      description: 分页查询具有有效采购角色的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询通过有效角色获得 purchase:buyer:eligible 权限的系统用户，支持按采购员编号和名称过滤，供采购订单和采购草稿表单选择使用。调用方需具备 purchase:buyer:view；权限不足返回 code 403。
       operationId: listPurchaseBuyerData
       tags: [purchase]
       security:
@@ -68,7 +68,7 @@ paths:
   /api/listPurchaseOrder:
     get:
       summary: 查询采购订单列表
-      description: 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+      description: 关联采购订单主表、明细表和供应商表进行组合查询，返回到货进度和是否逾期。需具备 purchase:order:view；权限不足返回 code 403。
       operationId: listPurchaseOrder
       tags: [purchase]
       security:
@@ -133,7 +133,7 @@ paths:
   /api/getPurchaseOrder:
     get:
       summary: 查询采购订单详情
-      description: 根据采购订单编号查询主表、明细、供应商和收货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+      description: 根据采购订单编号查询主表、明细、供应商和收货进度。需具备 purchase:order:view；权限不足返回 code 403。
       operationId: getPurchaseOrder
       tags: [purchase]
       security:
@@ -155,7 +155,7 @@ paths:
   /api/addPurchaseOrder:
     post:
       summary: 新增采购订单草稿
-      description: 手工新增采购订单草稿及明细，初始状态为 draft。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
+      description: 手工新增采购订单草稿及明细，初始状态为 draft。需具备 purchase:order:create；权限不足返回 code 403。业务约束：采购数量 quantity 必须大于 0，明细物料必须存在。
       operationId: addPurchaseOrder
       tags: [purchase]
       security:
@@ -176,7 +176,7 @@ paths:
   /api/createPurchaseOrderDraftFromShortage:
     post:
       summary: 根据缺口生成采购订单草稿
-      description: 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
+      description: 根据前端确认的缺口采购数量，关联物料默认供应商，并按供应商生成采购订单草稿。需具备 purchase:order:create；权限不足返回 code 403。业务约束：purchase_qty 必须大于 0，未找到 supplier_id 的物料进入 unassigned_items。
       operationId: createPurchaseOrderDraftFromShortage
       tags: [purchase]
       security:
@@ -197,7 +197,7 @@ paths:
   /api/submitPurchaseOrder:
     post:
       summary: 提交采购订单
-      description: 将采购订单从 draft 状态提交为 submitted 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
+      description: 将采购订单从 draft 状态提交为 submitted 状态。需具备 purchase:order:submit；权限不足返回 code 403。状态流转：仅 draft 可提交，其他状态返回 code 409。
       operationId: submitPurchaseOrder
       tags: [purchase]
       security:
@@ -218,7 +218,7 @@ paths:
   /api/cancelPurchaseOrder:
     post:
       summary: 取消采购订单
-      description: 将可取消的采购订单更新为 cancelled 状态。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
+      description: 将可取消的采购订单更新为 cancelled 状态。需具备 purchase:order:cancel；权限不足返回 code 403。状态流转：draft、submitted 可取消，partial_received、completed、cancelled 返回 code 409。
       operationId: cancelPurchaseOrder
       tags: [purchase]
       security:
@@ -239,7 +239,7 @@ paths:
   /api/addPurchaseReceipt:
     post:
       summary: 新增采购收货记录
-      description: 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
+      description: 支持分批到货，新增收货记录后自动更新明细已到货数量、订单状态和到货进度。需具备 purchase:receipt:create；权限不足返回 code 403。业务约束：本次 quantity 加历史 received_qty 不得超过采购明细 quantity，超出返回 code 409。
       operationId: addPurchaseReceipt
       tags: [purchase]
       security:
@@ -260,7 +260,7 @@ paths:
   /api/listPurchaseReceipt:
     get:
       summary: 查询采购收货记录
-      description: 分页查询采购订单分批收货记录。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询采购订单分批收货记录。需具备 purchase:receipt:view；权限不足返回 code 403。
       operationId: listPurchaseReceipt
       tags: [purchase]
       security:
@@ -290,7 +290,7 @@ paths:
   /api/generatePurchaseOverdueReminder:
     post:
       summary: 生成采购逾期提醒
-      description: 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
+      description: 对超过预计交货日期且状态未 completed/cancelled 的采购订单生成逾期提醒。需具备 purchase:overdue:generate；权限不足返回 code 403。同一订单存在 pending_urge 提醒时不重复生成。
       operationId: generatePurchaseOverdueReminder
       tags: [purchase]
       security:
@@ -311,7 +311,7 @@ paths:
   /api/listPurchaseOverdueReminder:
     get:
       summary: 查询采购逾期提醒
-      description: 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询采购订单逾期提醒，支持按采购订单和处理状态过滤。需具备 purchase:overdue:view；权限不足返回 code 403。
       operationId: listPurchaseOverdueReminder
       tags: [purchase]
       security:
@@ -340,7 +340,7 @@ paths:
   /api/handlePurchaseOverdueReminder:
     post:
       summary: 处理采购逾期提醒
-      description: 将逾期提醒更新为 urged 或 received，并记录处理备注。权限：采购员、采购主管、系统管理员可访问；无权限返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
+      description: 将逾期提醒更新为 urged 或 received，并记录处理备注。需具备 purchase:overdue:handle；权限不足返回 code 403。状态流转：pending_urge 可变为 urged，urged 或 pending_urge 可变为 received，received 不可再处理。
       operationId: handlePurchaseOverdueReminder
       tags: [purchase]
       security:

@@ -21,24 +21,17 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// 物料需求完全由生产订单推导，客户端不得提交物料明细或操作人。
     /// </summary>
     [DataContract]
-    public partial class UserRoleAssignRequest : IEquatable<UserRoleAssignRequest>
+    public partial class ProductionOrderMaterialLockPreviewRequest : IEquatable<ProductionOrderMaterialLockPreviewRequest>
     {
         /// <summary>
-        /// Gets or Sets UserId
+        /// Gets or Sets OrderId
         /// </summary>
         [Required]
-        [DataMember(Name="user_id", EmitDefaultValue=true)]
-        public int UserId { get; set; }
-
-        /// <summary>
-        /// Gets or Sets RoleIds
-        /// </summary>
-        [Required]
-        [DataMember(Name="role_ids", EmitDefaultValue=false)]
-        public List<int> RoleIds { get; set; }
+        [DataMember(Name="order_id", EmitDefaultValue=true)]
+        public long OrderId { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -47,9 +40,8 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class UserRoleAssignRequest {\n");
-            sb.Append("  UserId: ").Append(UserId).Append("\n");
-            sb.Append("  RoleIds: ").Append(RoleIds).Append("\n");
+            sb.Append("class ProductionOrderMaterialLockPreviewRequest {\n");
+            sb.Append("  OrderId: ").Append(OrderId).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,30 +64,24 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((UserRoleAssignRequest)obj);
+            return obj.GetType() == GetType() && Equals((ProductionOrderMaterialLockPreviewRequest)obj);
         }
 
         /// <summary>
-        /// Returns true if UserRoleAssignRequest instances are equal
+        /// Returns true if ProductionOrderMaterialLockPreviewRequest instances are equal
         /// </summary>
-        /// <param name="other">Instance of UserRoleAssignRequest to be compared</param>
+        /// <param name="other">Instance of ProductionOrderMaterialLockPreviewRequest to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(UserRoleAssignRequest other)
+        public bool Equals(ProductionOrderMaterialLockPreviewRequest other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    UserId == other.UserId ||
+                    OrderId == other.OrderId ||
                     
-                    UserId.Equals(other.UserId)
-                ) && 
-                (
-                    RoleIds == other.RoleIds ||
-                    RoleIds != null &&
-                    other.RoleIds != null &&
-                    RoleIds.SequenceEqual(other.RoleIds)
+                    OrderId.Equals(other.OrderId)
                 );
         }
 
@@ -110,9 +96,7 @@ namespace Org.OpenAPITools.Models
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
                     
-                    hashCode = hashCode * 59 + UserId.GetHashCode();
-                    if (RoleIds != null)
-                    hashCode = hashCode * 59 + RoleIds.GetHashCode();
+                    hashCode = hashCode * 59 + OrderId.GetHashCode();
                 return hashCode;
             }
         }
@@ -120,12 +104,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(UserRoleAssignRequest left, UserRoleAssignRequest right)
+        public static bool operator ==(ProductionOrderMaterialLockPreviewRequest left, ProductionOrderMaterialLockPreviewRequest right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(UserRoleAssignRequest left, UserRoleAssignRequest right)
+        public static bool operator !=(ProductionOrderMaterialLockPreviewRequest left, ProductionOrderMaterialLockPreviewRequest right)
         {
             return !Equals(left, right);
         }

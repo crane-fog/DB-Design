@@ -9,21 +9,30 @@ import {
   unwrap,
 } from '@/services/pagination'
 import type {
+  BomVersion,
   CapacityBalance,
   CapacityConfig,
   CapacityDetection,
   ExternalOrder,
   ExternalOrderConvertResult,
+  ExternalOrderDelivery,
+  ExternalOrderDeliveryResult,
+  ExternalOrderFormOptions,
+  ExternalOrderListItem,
   FaultRecord,
+  FaultStatus,
   LineType,
+  MaterialDetail,
   ProductionCalendar,
   ProductionCapacityEstimateResult,
   ProductionLine,
   ProductionLineStatus,
+  ProductionCompletionReportResult,
   ProductionOrderDetail,
+  ProductionOrderMaterialLockPreview,
 } from '@/api'
-import { productionApi } from '@/api/client'
-import { useAuthStore } from '@/stores/auth'
+import { materialBomApi, productionApi } from '@/api/client'
+import { toUtcDateTime } from '@/utils/time'
 
 export type { PageResult }
 
@@ -73,7 +82,7 @@ export interface LineTypeQuery extends PageRequest {
 }
 
 export interface ExternalOrderQuery extends PageRequest {
-  customerId?: number
+  customerName?: string
   status?: ExternalOrderStatusValue
 }
 
@@ -99,6 +108,44 @@ export interface ProductionOrderFormData {
   planQty: number
   planStart: string
   versionId: number
+}
+
+export interface ProductionCompletionReportFormData {
+  batchNo: string
+  finishQty: number
+  orderId: number
+  qualifiedQty: number
+}
+
+export interface ProductionCompletionReportItem {
+  orderCompleted: boolean
+  productionOrder: ProductionOrderItem
+}
+
+export interface ProductionOrderMaterialLockItem {
+  availableQty: number
+  bomQuantity: number
+  lockedQty: number
+  lossRate: number
+  materialId: number
+  materialName: string
+  pendingLockQty: number
+  requiredQty: number
+  shortageQty: number
+  unit: string
+}
+
+export interface ProductionOrderMaterialLockPreviewItem {
+  canApprove: boolean
+  items: ProductionOrderMaterialLockItem[]
+  orderId: number
+}
+
+export interface ProductionOrderProductOption {
+  materialId: number
+  materialName: string
+  versionId: number
+  versionNo: string
 }
 
 export interface ProductionLineItem {
@@ -165,6 +212,9 @@ export interface ExternalOrderItem {
   contactPhone: string
   customerId: number
   customerName?: string
+  delivery?: ExternalOrderDeliveryItem
+  deliveryBlockReason?: string
+  deliveryReady: boolean
   expectedDate: string
   extOrderId: number
   materialId: number
@@ -173,6 +223,48 @@ export interface ExternalOrderItem {
   reviewComment?: string
   status: ExternalOrderStatusValue
   submitTime: string
+  productionOrders: ExternalOrderProductionOrderItem[]
+}
+
+export interface ExternalOrderProductionOrderItem {
+  finishedQty?: number
+  materialId: number
+  materialName?: string
+  orderId: number
+  planQty: number
+  status: ProductionOrderStatus
+}
+
+export interface ExternalOrderDeliveryItem {
+  deliveryId: number
+  deliveryTime: string
+  operatorId: number
+  operatorName?: string
+  quantity: number
+}
+
+export interface ExternalOrderDeliveryResultItem {
+  delivery: ExternalOrderDeliveryItem
+  externalOrder: ExternalOrderItem
+  remainingAvailableQty: number
+}
+
+export interface ExternalOrderCustomerOptionItem {
+  employeeNo: string
+  userId: number
+  userName: string
+}
+
+export interface ExternalOrderMaterialOptionItem {
+  materialId: number
+  materialName: string
+  model: string
+  unit: string
+}
+
+export interface ExternalOrderFormOptionsItem {
+  customers: ExternalOrderCustomerOptionItem[]
+  materials: ExternalOrderMaterialOptionItem[]
 }
 
 export interface ExternalOrderCreateFormData {
@@ -368,14 +460,50 @@ function toExternalOrder(order: ExternalOrder): ExternalOrderItem {
     contactPhone: order.contact_phone,
     customerId: order.customer_id,
     customerName: optionalText(order.customer_name),
+    delivery: undefined,
+    deliveryBlockReason: undefined,
+    deliveryReady: false,
     expectedDate: order.expected_date,
     extOrderId: order.ext_order_id,
     materialId: order.material_id,
     materialName: optionalText(order.material_name),
+    productionOrders: [],
     quantity: order.quantity,
     reviewComment: optionalText(order.review_comment),
     status: order.status,
     submitTime: order.submit_time,
+  }
+}
+
+function toExternalOrderDelivery(delivery: ExternalOrderDelivery): ExternalOrderDeliveryItem {
+  return {
+    deliveryId: delivery.delivery_id,
+    deliveryTime: delivery.delivery_time,
+    operatorId: delivery.operator_id,
+    operatorName: optionalText(delivery.operator_name),
+    quantity: delivery.quantity,
+  }
+}
+
+function toExternalOrderListItem(order: ExternalOrderListItem): ExternalOrderItem {
+  let delivery: ExternalOrderDeliveryItem | undefined = undefined
+  if (order.delivery) {
+    delivery = toExternalOrderDelivery(order.delivery)
+  }
+  const productionOrders = order.production_orders ?? []
+  return {
+    ...toExternalOrder(order),
+    delivery,
+    deliveryBlockReason: optionalText(order.delivery_block_reason),
+    deliveryReady: order.delivery_ready ?? false,
+    productionOrders: productionOrders.map((productionOrder) => ({
+      finishedQty: productionOrder.finished_qty,
+      materialId: productionOrder.material_id,
+      materialName: optionalText(productionOrder.material_name),
+      orderId: productionOrder.order_id,
+      planQty: productionOrder.plan_qty,
+      status: productionOrder.status,
+    })),
   }
 }
 
@@ -475,18 +603,39 @@ function requireData<TData>(response: ApiEnvelope<TData>): NonNullable<TData> {
   return data
 }
 
+async function loadAllPageItems<TItem>(
+  loadPage: (page: number, pageSize: number) => Promise<{ data: unknown }>,
+): Promise<TItem[]> {
+  const pageSize = 200
+  const firstResponse = await loadPage(1, pageSize)
+  const firstPayload = requireData(firstResponse.data as ApiEnvelope<unknown>)
+  const firstItems = getPageItems<TItem>(firstPayload)
+  const metadata = getPageMetadata(firstPayload, { page: 1, pageSize, total: firstItems.length })
+  const pageCount = Math.ceil(metadata.total / metadata.pageSize)
+  const remainingResponses = await Promise.all(
+    Array.from({ length: Math.max(0, pageCount - 1) }, (_value, index) =>
+      loadPage(index + 2, pageSize),
+    ),
+  )
+  const items = [
+    ...firstItems,
+    ...remainingResponses.flatMap((response) =>
+      getPageItems<TItem>(requireData(response.data as ApiEnvelope<unknown>)),
+    ),
+  ]
+  if (items.length !== metadata.total) {
+    throw new Error('产品与 BOM 版本分页数据不完整，请刷新重试')
+  }
+  return items
+}
+
 export const productionService = {
   async addExternalOrder(form: ExternalOrderCreateFormData) {
-    const auth = useAuthStore()
-    let { customerId } = form
-    if (auth.hasRole('外部客户')) {
-      customerId = undefined
-    }
     const response = await productionApi.addExternalOrder({
       externalOrderCreateRequest: {
         contact_person: form.contactPerson.trim(),
         contact_phone: form.contactPhone.trim(),
-        customer_id: customerId,
+        customer_id: form.customerId,
         expected_date: form.expectedDate,
         material_id: form.materialId,
         quantity: form.quantity,
@@ -568,6 +717,18 @@ export const productionService = {
     return unwrap(response.data as ApiEnvelope<unknown>)
   },
 
+  async deliverExternalOrder(extOrderId: number): Promise<ExternalOrderDeliveryResultItem> {
+    const response = await productionApi.deliverExternalOrder({
+      externalOrderDeliveryRequest: { ext_order_id: extOrderId },
+    })
+    const data = requireData(response.data as ApiEnvelope<ExternalOrderDeliveryResult | undefined>)
+    return {
+      delivery: toExternalOrderDelivery(data.delivery),
+      externalOrder: toExternalOrderListItem(data.external_order),
+      remainingAvailableQty: data.remaining_available_qty,
+    }
+  },
+
   async estimateCapacity(form: ProductionCapacityEstimateFormData) {
     const response = await productionApi.estimateProductionCapacity({
       productionCapacityEstimateRequest: {
@@ -644,15 +805,55 @@ export const productionService = {
     return { items, ...metadata }
   },
 
+  async listExternalOrderFormOptions(): Promise<ExternalOrderFormOptionsItem> {
+    const response = await productionApi.listExternalOrderFormOptions()
+    const data = requireData(response.data as ApiEnvelope<ExternalOrderFormOptions | undefined>)
+    return {
+      customers: data.customers.map((customer) => ({
+        employeeNo: customer.employee_no,
+        userId: customer.user_id,
+        userName: customer.user_name,
+      })),
+      materials: data.materials.map((material) => ({
+        materialId: material.material_id,
+        materialName: material.material_name,
+        model: material.model,
+        unit: material.unit,
+      })),
+    }
+  },
+
   async listExternalOrders(query: ExternalOrderQuery): Promise<PageResult<ExternalOrderItem>> {
     const response = await productionApi.listExternalOrder({
-      customerId: query.customerId,
+      customerName: query.customerName,
       page: query.page,
       pageSize: query.pageSize,
       status: query.status,
     })
     const data = requireData(response.data as ApiEnvelope<unknown>)
-    const items = getPageItems<ExternalOrder>(data).map(toExternalOrder)
+    const items = getPageItems<ExternalOrderListItem>(data).map(toExternalOrderListItem)
+    const metadata = getPageMetadata(data, {
+      page: query.page,
+      pageSize: query.pageSize,
+      total: items.length,
+    })
+    return { items, ...metadata }
+  },
+
+  async listFaults(query: {
+    page: number
+    pageSize: number
+    lineId?: number
+    status?: FaultStatus
+  }) {
+    const response = await productionApi.listProductionLineFault({
+      lineId: query.lineId,
+      page: query.page,
+      pageSize: query.pageSize,
+      status: query.status,
+    })
+    const data = requireData(response.data as ApiEnvelope<unknown>)
+    const items = getPageItems<FaultRecord>(data).map(toFaultRecord)
     const metadata = getPageMetadata(data, {
       page: query.page,
       pageSize: query.pageSize,
@@ -694,6 +895,56 @@ export const productionService = {
     return { items, ...metadata }
   },
 
+  async listOrderProductOptions(): Promise<ProductionOrderProductOption[]> {
+    const [materials, effectiveVersions] = await Promise.all([
+      loadAllPageItems<MaterialDetail>((page, pageSize) =>
+        materialBomApi.listMaterialData({ page, pageSize }),
+      ),
+      loadAllPageItems<BomVersion>((page, pageSize) =>
+        materialBomApi.listBomVersionData({ effectiveOnly: true, page, pageSize }),
+      ),
+    ])
+    const effectiveVersionById = new Map(
+      effectiveVersions
+        .filter(
+          (
+            version,
+          ): version is BomVersion & {
+            material_id: number
+            version_id: number
+            version_no: string
+          } =>
+            Number.isSafeInteger(version.material_id) &&
+            Number.isSafeInteger(version.version_id) &&
+            Boolean(version.version_no?.trim()),
+        )
+        .map((version) => [version.version_id, version]),
+    )
+
+    return materials.flatMap((material) => {
+      if (
+        (material.material_type !== 'finished' && material.material_type !== 'semi_finished') ||
+        !Number.isSafeInteger(material.material_id) ||
+        !Number.isSafeInteger(material.current_version_id) ||
+        !material.material_name?.trim()
+      ) {
+        return []
+      }
+      const version = effectiveVersionById.get(material.current_version_id!)
+      if (!version || version.material_id !== material.material_id) {
+        return []
+      }
+      return [
+        {
+          materialId: material.material_id!,
+          materialName: material.material_name,
+          versionId: version.version_id,
+          versionNo: version.version_no,
+        },
+      ]
+    })
+  },
+
   async listOrders(query: ProductionOrderQuery): Promise<PageResult<ProductionOrderItem>> {
     const response = await productionApi.listProductionOrder({
       materialId: query.materialId,
@@ -713,6 +964,31 @@ export const productionService = {
     return { items, ...metadata }
   },
 
+  async previewOrderMaterialLock(orderId: number): Promise<ProductionOrderMaterialLockPreviewItem> {
+    const response = await productionApi.previewProductionOrderMaterialLock({
+      productionOrderMaterialLockPreviewRequest: { order_id: orderId },
+    })
+    const data = requireData(
+      response.data as ApiEnvelope<ProductionOrderMaterialLockPreview | undefined>,
+    )
+    return {
+      canApprove: data.can_approve,
+      items: data.items.map((item) => ({
+        availableQty: item.available_qty,
+        bomQuantity: item.bom_quantity,
+        lockedQty: item.locked_qty,
+        lossRate: item.loss_rate,
+        materialId: item.material_id,
+        materialName: item.material_name,
+        pendingLockQty: item.pending_lock_qty,
+        requiredQty: item.required_qty,
+        shortageQty: item.shortage_qty,
+        unit: item.unit,
+      })),
+      orderId: data.order_id,
+    }
+  },
+
   async reportFault(form: FaultReportFormData) {
     const response = await productionApi.reportProductionLineFault({
       faultRecordCreateRequest: {
@@ -723,6 +999,26 @@ export const productionService = {
     })
     const data = requireData(response.data as ApiEnvelope<FaultRecord | undefined>)
     return toFaultRecord(data)
+  },
+
+  async reportProductionCompletion(
+    form: ProductionCompletionReportFormData,
+  ): Promise<ProductionCompletionReportItem> {
+    const response = await productionApi.reportProductionCompletion({
+      productionCompletionReportRequest: {
+        batch_no: form.batchNo.trim(),
+        finish_qty: form.finishQty,
+        order_id: form.orderId,
+        qualified_qty: form.qualifiedQty,
+      },
+    })
+    const data = requireData(
+      response.data as ApiEnvelope<ProductionCompletionReportResult | undefined>,
+    )
+    return {
+      orderCompleted: data.order_completed,
+      productionOrder: toProductionOrder(data.production_order),
+    }
   },
 
   async reviewExternalOrder(extOrderId: number, accepted: boolean, reviewComment?: string) {
@@ -741,8 +1037,8 @@ export const productionService = {
     const response = await productionApi.runCapacityDetection({
       capacityDetectionRunRequest: {
         line_id: form.lineId,
-        period_end: form.periodEnd,
-        period_start: form.periodStart,
+        period_end: toUtcDateTime(form.periodEnd),
+        period_start: toUtcDateTime(form.periodStart),
       },
     })
     const data = requireData(response.data as ApiEnvelope<CapacityDetection | undefined>)
@@ -806,7 +1102,7 @@ export const productionService = {
     const response = await productionApi.updateProductionLineFault({
       faultRecordUpdateRequest: {
         fault_id: form.faultId,
-        recover_time: nullableText(form.recoverTime),
+        recover_time: toUtcDateTime(form.recoverTime || undefined),
         repairer_id: form.repairerId ?? undefined,
         status: form.status,
       },

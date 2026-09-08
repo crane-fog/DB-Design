@@ -21,31 +21,31 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// 状态有效且具有“外部客户”角色的用户，仅向具备 external-order:create-for-customer 的调用方返回。
     /// </summary>
     [DataContract]
-    public partial class PermissionUpdateRequest : IEquatable<PermissionUpdateRequest>
+    public partial class ExternalOrderCustomerOption : IEquatable<ExternalOrderCustomerOption>
     {
         /// <summary>
-        /// Gets or Sets Resource
+        /// Gets or Sets UserId
         /// </summary>
         [Required]
-        [DataMember(Name="resource", EmitDefaultValue=false)]
-        public string Resource { get; set; }
+        [DataMember(Name="user_id", EmitDefaultValue=true)]
+        public long UserId { get; set; }
 
         /// <summary>
-        /// Gets or Sets Action
+        /// Gets or Sets EmployeeNo
         /// </summary>
         [Required]
-        [DataMember(Name="action", EmitDefaultValue=false)]
-        public string Action { get; set; }
+        [DataMember(Name="employee_no", EmitDefaultValue=false)]
+        public string EmployeeNo { get; set; }
 
         /// <summary>
-        /// Gets or Sets PermissionId
+        /// Gets or Sets UserName
         /// </summary>
         [Required]
-        [DataMember(Name="permission_id", EmitDefaultValue=true)]
-        public int PermissionId { get; set; }
+        [DataMember(Name="user_name", EmitDefaultValue=false)]
+        public string UserName { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -54,10 +54,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class PermissionUpdateRequest {\n");
-            sb.Append("  Resource: ").Append(Resource).Append("\n");
-            sb.Append("  Action: ").Append(Action).Append("\n");
-            sb.Append("  PermissionId: ").Append(PermissionId).Append("\n");
+            sb.Append("class ExternalOrderCustomerOption {\n");
+            sb.Append("  UserId: ").Append(UserId).Append("\n");
+            sb.Append("  EmployeeNo: ").Append(EmployeeNo).Append("\n");
+            sb.Append("  UserName: ").Append(UserName).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -80,34 +80,34 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((PermissionUpdateRequest)obj);
+            return obj.GetType() == GetType() && Equals((ExternalOrderCustomerOption)obj);
         }
 
         /// <summary>
-        /// Returns true if PermissionUpdateRequest instances are equal
+        /// Returns true if ExternalOrderCustomerOption instances are equal
         /// </summary>
-        /// <param name="other">Instance of PermissionUpdateRequest to be compared</param>
+        /// <param name="other">Instance of ExternalOrderCustomerOption to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(PermissionUpdateRequest other)
+        public bool Equals(ExternalOrderCustomerOption other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    Resource == other.Resource ||
-                    Resource != null &&
-                    Resource.Equals(other.Resource)
-                ) && 
-                (
-                    Action == other.Action ||
-                    Action != null &&
-                    Action.Equals(other.Action)
-                ) && 
-                (
-                    PermissionId == other.PermissionId ||
+                    UserId == other.UserId ||
                     
-                    PermissionId.Equals(other.PermissionId)
+                    UserId.Equals(other.UserId)
+                ) && 
+                (
+                    EmployeeNo == other.EmployeeNo ||
+                    EmployeeNo != null &&
+                    EmployeeNo.Equals(other.EmployeeNo)
+                ) && 
+                (
+                    UserName == other.UserName ||
+                    UserName != null &&
+                    UserName.Equals(other.UserName)
                 );
         }
 
@@ -121,12 +121,12 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                    if (Resource != null)
-                    hashCode = hashCode * 59 + Resource.GetHashCode();
-                    if (Action != null)
-                    hashCode = hashCode * 59 + Action.GetHashCode();
                     
-                    hashCode = hashCode * 59 + PermissionId.GetHashCode();
+                    hashCode = hashCode * 59 + UserId.GetHashCode();
+                    if (EmployeeNo != null)
+                    hashCode = hashCode * 59 + EmployeeNo.GetHashCode();
+                    if (UserName != null)
+                    hashCode = hashCode * 59 + UserName.GetHashCode();
                 return hashCode;
             }
         }
@@ -134,12 +134,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(PermissionUpdateRequest left, PermissionUpdateRequest right)
+        public static bool operator ==(ExternalOrderCustomerOption left, ExternalOrderCustomerOption right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(PermissionUpdateRequest left, PermissionUpdateRequest right)
+        public static bool operator !=(ExternalOrderCustomerOption left, ExternalOrderCustomerOption right)
         {
             return !Equals(left, right);
         }

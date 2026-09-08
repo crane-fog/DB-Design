@@ -28,6 +28,7 @@
         }
       }
     ],
-    "max-statements": ["error", 30]
+    "max-statements": ["error", 30],
+    "sort-imports": "off"
   }
 }

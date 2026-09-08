@@ -1,7 +1,5 @@
-export function hasRole(roles: string[], role: string) {
-  return roles.includes(role)
-}
+import type { PermissionCode } from '@/api'
 
-export function hasPermission(permissions: string[], permission: string) {
+export function hasPermission(permissions: readonly PermissionCode[], permission: PermissionCode) {
   return permissions.includes(permission)
 }

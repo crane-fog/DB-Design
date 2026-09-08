@@ -47,7 +47,9 @@ import type {
 import { inventoryApi, materialBomApi, productionApi } from '@/api/client'
 import { cleanQuery } from '@/services/request'
 import { pinia } from '@/stores/pinia'
+import { toUtcDayBoundary } from '@/utils/time'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 export type { PageResult }
 
@@ -58,9 +60,7 @@ export type InventoryStockData = Omit<
   Partial<Pick<InventoryStockItem, 'materialType' | 'safetyStock' | 'status'>>
 
 function canReadMaterialReferences() {
-  return useAuthStore(pinia).roles.some((role) =>
-    ['系统管理员', '生产管理员', '采购员'].includes(role),
-  )
+  return useAuthStore(pinia).hasPermission(PermissionCode.MaterialItemView)
 }
 
 interface AlertGeneratePayload {
@@ -177,21 +177,6 @@ function toStock(item: MaterialStockDetail): InventoryStockItem {
     status: item.status,
     unit: item.unit,
   }
-}
-
-function toIsoDayBoundary(value: string | undefined, endOfDay: boolean) {
-  if (!value || value.length > 10) {
-    return value
-  }
-  let time = '00:00:00.000'
-  if (endOfDay) {
-    time = '23:59:59.999'
-  }
-  const parsed = new Date(`${value}T${time}`)
-  if (Number.isNaN(parsed.getTime())) {
-    return value
-  }
-  return parsed.toISOString()
 }
 
 async function loadAllPageItems<TItem>(
@@ -345,26 +330,28 @@ export const inventoryService = {
   },
 
   async getOverview(): Promise<Partial<InventoryOverviewSummary>> {
-    let stocksPromise: Promise<PageResult<InventoryStockData>> | undefined = undefined
-    if (canReadMaterialReferences()) {
-      stocksPromise = this.listStocks({ page: 1, pageSize: 100 })
+    const auth = useAuthStore(pinia)
+    const summary: Partial<InventoryOverviewSummary> = {}
+    if (auth.hasPermission(PermissionCode.InventoryAlertView)) {
+      const alerts = await this.listAlerts({ page: 1, pageSize: 1, status: 'pending' })
+      summary.pendingAlertCount = alerts.total
     }
-    const [alerts, locks, obsolete, inbound, firstStockPage] = await Promise.all([
-      this.listAlerts({ page: 1, pageSize: 1, status: 'pending' }),
-      this.listLocks({ page: 1, pageSize: 1, status: 'locked' }),
-      this.listObsolete({ page: 1, pageSize: 1, status: 'pending' }),
-      this.listCompletionInbound({ page: 1, pageSize: 1 }),
-      stocksPromise,
-    ])
-    const summary = {
-      inboundCount: inbound.total,
-      lockedCount: locks.total,
-      obsoletePendingCount: obsolete.total,
-      pendingAlertCount: alerts.total,
+    if (auth.hasPermission(PermissionCode.InventoryLockView)) {
+      const locks = await this.listLocks({ page: 1, pageSize: 1, status: 'locked' })
+      summary.lockedCount = locks.total
     }
-    if (!firstStockPage) {
+    if (auth.hasPermission(PermissionCode.InventoryObsoleteView)) {
+      const obsolete = await this.listObsolete({ page: 1, pageSize: 1, status: 'pending' })
+      summary.obsoletePendingCount = obsolete.total
+    }
+    if (auth.hasPermission(PermissionCode.InventoryCompletionView)) {
+      const inbound = await this.listCompletionInbound({ page: 1, pageSize: 1 })
+      summary.inboundCount = inbound.total
+    }
+    if (!auth.hasPermission(PermissionCode.InventoryStockView)) {
       return summary
     }
+    const firstStockPage = await this.listStocks({ page: 1, pageSize: 100 })
     const remainingPageCount = Math.ceil(firstStockPage.total / firstStockPage.pageSize) - 1
     let stocks = [...firstStockPage.items]
     if (remainingPageCount > 0) {
@@ -387,21 +374,21 @@ export const inventoryService = {
   },
 
   async getReferenceData(includeProductionOrders = true): Promise<InventoryReferenceData> {
+    const auth = useAuthStore(pinia)
     let materialItemsPromise = Promise.resolve<Material[]>([])
     let versionItemsPromise = Promise.resolve<BomVersion[]>([])
-    if (canReadMaterialReferences()) {
+    if (auth.hasPermission(PermissionCode.MaterialItemView)) {
       materialItemsPromise = loadAllPageItems<Material>((page, pageSize) =>
         materialBomApi.listMaterialData({ page, pageSize }),
       )
+    }
+    if (auth.hasPermission(PermissionCode.MaterialBomVersionView)) {
       versionItemsPromise = loadAllPageItems<BomVersion>((page, pageSize) =>
         materialBomApi.listBomVersionData({ effectiveOnly: true, page, pageSize }),
       )
     }
     let orderItemsPromise: Promise<ProductionOrderDetail[]> = Promise.resolve([])
-    if (
-      includeProductionOrders &&
-      useAuthStore(pinia).roles.some((role) => ['系统管理员', '生产管理员'].includes(role))
-    ) {
+    if (includeProductionOrders && auth.hasPermission(PermissionCode.ProductionOrderView)) {
       orderItemsPromise = loadAllPageItems<ProductionOrderDetail>((page, pageSize) =>
         productionApi.listProductionOrder({ page, pageSize }),
       )
@@ -502,8 +489,8 @@ export const inventoryService = {
   async listAlerts(query: InventoryAlertQuery) {
     const normalizedQuery = cleanQuery({
       ...query,
-      endTime: toIsoDayBoundary(query.endTime, true),
-      startTime: toIsoDayBoundary(query.startTime, false),
+      endTime: toUtcDayBoundary(query.endTime, true),
+      startTime: toUtcDayBoundary(query.startTime, false),
     })
     const response = await inventoryApi.listInventoryAlert({
       endTime: normalizedQuery.endTime,
@@ -520,8 +507,8 @@ export const inventoryService = {
   async listCompletionInbound(query: CompletionInboundQuery) {
     const normalizedQuery = cleanQuery({
       ...query,
-      endTime: toIsoDayBoundary(query.endTime, true),
-      startTime: toIsoDayBoundary(query.startTime, false),
+      endTime: toUtcDayBoundary(query.endTime, true),
+      startTime: toUtcDayBoundary(query.startTime, false),
     })
     const response = await inventoryApi.listCompletionInbound({
       inboundTimeEnd: normalizedQuery.endTime,
@@ -555,8 +542,8 @@ export const inventoryService = {
   async listObsolete(query: ObsoleteMaterialQuery) {
     const normalizedQuery = cleanQuery({
       ...query,
-      endTime: toIsoDayBoundary(query.endTime, true),
-      startTime: toIsoDayBoundary(query.startTime, false),
+      endTime: toUtcDayBoundary(query.endTime, true),
+      startTime: toUtcDayBoundary(query.startTime, false),
     })
     const response = await inventoryApi.listObsoleteMaterialDetection({
       detectTimeEnd: normalizedQuery.endTime,

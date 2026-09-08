@@ -21,7 +21,7 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// 所有生产订单的 material_id 必须等于外部订单 material_id，plan_qty 合计必须精确等于外部订单 quantity；允许将同一产品拆分为多个生产订单。
     /// </summary>
     [DataContract]
     public partial class ExternalOrderConvertRequest : IEquatable<ExternalOrderConvertRequest>

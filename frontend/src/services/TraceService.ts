@@ -21,6 +21,7 @@ import {
 } from '@/services/pagination'
 import { inventoryApi, productionApi, purchaseApi, qualityTraceabilityApi } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 export type { PageResult }
 
@@ -180,19 +181,12 @@ function requireData<TPayload>(payload: ApiEnvelope<TPayload>): TPayload {
   return data
 }
 
-// 遵循 UserContextService 的跨模块读权限，避免辅助查询触发无权限跳转。
 function canReadProduction() {
-  const auth = useAuthStore()
-  return auth.hasRole('系统管理员') || auth.hasRole('生产管理员')
-}
-
-function canReadPurchase() {
-  const auth = useAuthStore()
-  return ['系统管理员', '采购员', '采购主管'].some((role) => auth.hasRole(role))
+  return useAuthStore().hasPermission(PermissionCode.ProductionOrderView)
 }
 
 function canReadInventory() {
-  return canReadProduction() || useAuthStore().hasRole('库存管理员')
+  return useAuthStore().hasPermission(PermissionCode.InventoryCompletionView)
 }
 
 async function readAllPages<TRecord>(
@@ -268,15 +262,11 @@ export const traceService = {
         status: order.status,
       }))
     }
-    if (canReadPurchase()) {
-      const [orders, suppliers] = await Promise.all([
-        readAllPages<PurchaseOrder>((page, pageSize) =>
-          purchaseApi.listPurchaseOrder({ page, pageSize }),
-        ),
-        readAllPages<SupplierDetail>((page, pageSize) =>
-          purchaseApi.listSupplierData({ page, pageSize }),
-        ),
-      ])
+    const auth = useAuthStore()
+    if (auth.hasPermission(PermissionCode.PurchaseOrderView)) {
+      const orders = await readAllPages<PurchaseOrder>((page, pageSize) =>
+        purchaseApi.listPurchaseOrder({ page, pageSize }),
+      )
       references.purchaseItems = orders.flatMap((order) =>
         (order.details ?? []).map((item) => ({
           itemId: item.item_id,
@@ -284,6 +274,11 @@ export const traceService = {
           purchaseOrderId: order.order_id,
           supplierName: optionalText(order.supplier?.supplier_name),
         })),
+      )
+    }
+    if (auth.hasPermission(PermissionCode.PurchaseSupplierView)) {
+      const suppliers = await readAllPages<SupplierDetail>((page, pageSize) =>
+        purchaseApi.listSupplierData({ page, pageSize }),
       )
       references.suppliers = suppliers.map((supplier) => ({
         supplierId: supplier.supplier_id,

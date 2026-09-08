@@ -10,7 +10,7 @@ paths:
   /api/listMaterialData:
     get:
       summary: 查询物料列表
-      description: 分页查询物料基础信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询物料基础信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listMaterialData
       tags:
         - material_bom
@@ -91,7 +91,7 @@ paths:
   /api/getMaterialData:
     get:
       summary: 查询物料详情
-      description: 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 按物料唯一标识查询物料、库存、分类、供应商和当前 BOM 版本信息。需具备 material:item:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getMaterialData
       tags:
         - material_bom
@@ -115,7 +115,7 @@ paths:
   /api/addMaterialData:
     post:
       summary: 新增物料
-      description: 新增物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 新增物料基础信息。需具备 material:item:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: addMaterialData
       tags:
         - material_bom
@@ -138,7 +138,7 @@ paths:
   /api/updateMaterialData:
     post:
       summary: 修改物料
-      description: 修改物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 修改物料基础信息。需具备 material:item:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: updateMaterialData
       tags:
         - material_bom
@@ -161,7 +161,7 @@ paths:
   /api/deleteMaterialData:
     post:
       summary: 删除物料
-      description: 删除物料基础信息。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 删除物料基础信息。需具备 material:item:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: deleteMaterialData
       tags:
         - material_bom
@@ -184,7 +184,7 @@ paths:
   /api/listMaterialCategoryData:
     get:
       summary: 查询物料分类列表
-      description: 分页查询物料分类。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询物料分类。需具备 material:category:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listMaterialCategoryData
       tags:
         - material_bom
@@ -209,7 +209,7 @@ paths:
   /api/addMaterialCategoryData:
     post:
       summary: 新增物料分类
-      description: 新增物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 新增物料分类。需具备 material:category:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: addMaterialCategoryData
       tags:
         - material_bom
@@ -232,7 +232,7 @@ paths:
   /api/updateMaterialCategoryData:
     post:
       summary: 修改物料分类
-      description: 修改物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 修改物料分类。需具备 material:category:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: updateMaterialCategoryData
       tags:
         - material_bom
@@ -255,7 +255,7 @@ paths:
   /api/deleteMaterialCategoryData:
     post:
       summary: 删除物料分类
-      description: 删除物料分类。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 删除物料分类。需具备 material:category:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: deleteMaterialCategoryData
       tags:
         - material_bom
@@ -278,7 +278,7 @@ paths:
   /api/listBomVersionData:
     get:
       summary: 查询 BOM 版本列表
-      description: 分页查询 BOM 版本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询 BOM 版本。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listBomVersionData
       tags:
         - material_bom
@@ -313,7 +313,7 @@ paths:
   /api/getBomVersionData:
     get:
       summary: 查询 BOM 版本详情
-      description: 查询 BOM 版本详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 查询 BOM 版本详情。需具备 material:bom-version:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getBomVersionData
       tags:
         - material_bom
@@ -337,7 +337,7 @@ paths:
   /api/addBomVersionData:
     post:
       summary: 新增 BOM 版本
-      description: 新增 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 新增 BOM 版本。需具备 material:bom-version:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: addBomVersionData
       tags:
         - material_bom
@@ -360,7 +360,7 @@ paths:
   /api/updateBomVersionData:
     post:
       summary: 修改 BOM 版本
-      description: 修改 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 修改 BOM 版本。需具备 material:bom-version:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: updateBomVersionData
       tags:
         - material_bom
@@ -383,7 +383,7 @@ paths:
   /api/deleteBomVersionData:
     post:
       summary: 删除 BOM 版本
-      description: 删除 BOM 版本。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 删除 BOM 版本。需具备 material:bom-version:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: deleteBomVersionData
       tags:
         - material_bom
@@ -406,7 +406,7 @@ paths:
   /api/listBomData:
     get:
       summary: 查询 BOM 明细列表
-      description: 分页查询 BOM 明细。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 分页查询 BOM 明细。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: listBomData
       tags:
         - material_bom
@@ -442,7 +442,7 @@ paths:
   /api/getBomData:
     get:
       summary: 查询 BOM 明细详情
-      description: 查询 BOM 明细详情。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 查询 BOM 明细详情。需具备 material:bom:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getBomData
       tags:
         - material_bom
@@ -466,7 +466,7 @@ paths:
   /api/addBomData:
     post:
       summary: 新增 BOM 明细
-      description: 新增 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 新增 BOM 明细。需具备 material:bom:create；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: addBomData
       tags:
         - material_bom
@@ -489,7 +489,7 @@ paths:
   /api/updateBomData:
     post:
       summary: 修改 BOM 明细
-      description: 修改 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 修改 BOM 明细。需具备 material:bom:update；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: updateBomData
       tags:
         - material_bom
@@ -512,7 +512,7 @@ paths:
   /api/deleteBomData:
     post:
       summary: 删除 BOM 明细
-      description: 删除 BOM 明细。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 删除 BOM 明细。需具备 material:bom:delete；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: deleteBomData
       tags:
         - material_bom
@@ -535,7 +535,7 @@ paths:
   /api/checkBomCycleDependency:
     post:
       summary: 检查 BOM 循环依赖
-      description: 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 在新增或修改 BOM 明细前，按版本读取父子物料关系并判断是否形成循环依赖。需具备 material:bom:check-cycle；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: checkBomCycleDependency
       tags:
         - material_bom
@@ -558,7 +558,7 @@ paths:
   /api/getBomTreeData:
     get:
       summary: 查询 BOM 层级树
-      description: 按产品和版本递归展开 BOM 层级关系。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 按产品和版本递归展开 BOM 层级关系。需具备 material:bom:tree:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getBomTreeData
       tags:
         - material_bom
@@ -588,7 +588,7 @@ paths:
   /api/getReverseTraceData:
     get:
       summary: 反向产品追溯
-      description: 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 以指定物料为子项，并按指定 BOM 版本递归向上查找所有受影响的父项和最终产品。需具备 material:bom:reverse:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getReverseTraceData
       tags:
         - material_bom
@@ -624,7 +624,7 @@ paths:
   /api/calculateProductCost:
     post:
       summary: 产品成本核算
-      description: 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需登录；系统管理员、生产管理员、采购员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 读取 BOM 层级关系、损耗率和采购价格数据计算产品成本。需具备 material:cost:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: calculateProductCost
       tags:
         - material_bom
@@ -647,7 +647,7 @@ paths:
   /api/calculateLossCompensation:
     post:
       summary: 生产损耗补偿计算
-      description: 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需登录；系统管理员、生产管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 按 BOM 损耗率计算实际需求量，实际需求 = 净需求 / (1 - 损耗率)，结果向上取整。需具备 material:loss:calculate；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: calculateLossCompensation
       tags:
         - material_bom
@@ -670,7 +670,7 @@ paths:
   /api/getMaterialStockData:
     get:
       summary: 查询物料库存
-      description: 查询指定物料库存。需登录；库存管理员、生产管理员、系统管理员可访问；未登录或登录失效返回 code 401；已登录但权限不足返回 code 403。
+      description: 查询指定物料库存。需具备 inventory:stock:view；未登录或登录失效返回 code 401；权限不足返回 code 403。
       operationId: getMaterialStockData
       tags:
         - material_bom

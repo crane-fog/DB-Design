@@ -313,8 +313,8 @@ public class BomService(string connString)
                             FROM MATERIAL m
                             LEFT JOIN BOM_VERSION current_bv
                               ON current_bv.VERSION_ID = m.CURRENT_VERSION_ID
-                             AND current_bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
-                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(SYSDATE))
+                             AND current_bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
                             LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
                             LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
                             ORDER BY m.MATERIAL_ID, bv.VERSION_ID, b.BOM_ID";
@@ -707,8 +707,8 @@ public class BomService(string connString)
                             JOIN MATERIAL m ON m.MATERIAL_ID = b.PARENT_MATERIAL_ID
                             JOIN BOM_VERSION bv ON bv.VERSION_ID = b.VERSION_ID
                             WHERE m.CURRENT_VERSION_ID = b.VERSION_ID
-                              AND bv.EFFECTIVE_DATE <= TRUNC(SYSDATE)
-                              AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(SYSDATE))
+                              AND bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                              AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
                               AND (:bomId IS NULL OR b.BOM_ID <> :bomId)";
         cmd.Parameters.Add(new OracleParameter("bomId", excludingBomId.HasValue ? excludingBomId.Value : DBNull.Value));
 

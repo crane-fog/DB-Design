@@ -21,7 +21,7 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+    /// 审核人从当前登录用户推导，客户端不得传 reviewer_id。approved&#x3D;true 时物料明细也由订单和 BOM 推导，客户端不得提交锁定数量；后端重新校验库存并只补充 required_qty 与已有有效锁定 之间的差额。 
     /// </summary>
     [DataContract]
     public partial class ProductionOrderApproveRequest : IEquatable<ProductionOrderApproveRequest>

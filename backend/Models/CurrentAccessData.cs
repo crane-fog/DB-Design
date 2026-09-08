@@ -34,20 +34,20 @@ namespace Org.OpenAPITools.Models
         public CurrentAccessUser CurrentUser { get; set; }
 
         /// <summary>
-        /// 当前用户全部有效角色的名称，去重且不分页；无有效角色时为空数组。系统管理员保留现有全权限语义。
+        /// 当前用户全部有效角色，仅用于身份展示和角色管理，不参与前后端授权判断。
         /// </summary>
-        /// <value>当前用户全部有效角色的名称，去重且不分页；无有效角色时为空数组。系统管理员保留现有全权限语义。</value>
+        /// <value>当前用户全部有效角色，仅用于身份展示和角色管理，不参与前后端授权判断。</value>
         [Required]
         [DataMember(Name="roles", EmitDefaultValue=false)]
-        public List<string> Roles { get; set; }
+        public List<RoleBrief> Roles { get; set; }
 
         /// <summary>
-        /// 当前用户有效角色关联的全部权限，按 permission_id 去重且不分页；无有效角色时为空数组。有效系统管理员返回全部已登记权限。
+        /// 当前用户全部有效角色关联权限码的并集。无有效角色或角色均未配置权限时为空数组。
         /// </summary>
-        /// <value>当前用户有效角色关联的全部权限，按 permission_id 去重且不分页；无有效角色时为空数组。有效系统管理员返回全部已登记权限。</value>
+        /// <value>当前用户全部有效角色关联权限码的并集。无有效角色或角色均未配置权限时为空数组。</value>
         [Required]
-        [DataMember(Name="permissions", EmitDefaultValue=false)]
-        public List<Permission> Permissions { get; set; }
+        [DataMember(Name="permission_codes", EmitDefaultValue=false)]
+        public List<PermissionCode> PermissionCodes { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -59,7 +59,7 @@ namespace Org.OpenAPITools.Models
             sb.Append("class CurrentAccessData {\n");
             sb.Append("  CurrentUser: ").Append(CurrentUser).Append("\n");
             sb.Append("  Roles: ").Append(Roles).Append("\n");
-            sb.Append("  Permissions: ").Append(Permissions).Append("\n");
+            sb.Append("  PermissionCodes: ").Append(PermissionCodes).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -108,10 +108,10 @@ namespace Org.OpenAPITools.Models
                     Roles.SequenceEqual(other.Roles)
                 ) && 
                 (
-                    Permissions == other.Permissions ||
-                    Permissions != null &&
-                    other.Permissions != null &&
-                    Permissions.SequenceEqual(other.Permissions)
+                    PermissionCodes == other.PermissionCodes ||
+                    PermissionCodes != null &&
+                    other.PermissionCodes != null &&
+                    PermissionCodes.SequenceEqual(other.PermissionCodes)
                 );
         }
 
@@ -129,8 +129,8 @@ namespace Org.OpenAPITools.Models
                     hashCode = hashCode * 59 + CurrentUser.GetHashCode();
                     if (Roles != null)
                     hashCode = hashCode * 59 + Roles.GetHashCode();
-                    if (Permissions != null)
-                    hashCode = hashCode * 59 + Permissions.GetHashCode();
+                    if (PermissionCodes != null)
+                    hashCode = hashCode * 59 + PermissionCodes.GetHashCode();
                 return hashCode;
             }
         }

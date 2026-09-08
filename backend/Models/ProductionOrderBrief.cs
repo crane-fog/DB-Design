@@ -59,8 +59,9 @@ namespace Org.OpenAPITools.Models
         public decimal PlanQty { get; set; }
 
         /// <summary>
-        /// Gets or Sets FinishedQty
+        /// 生产订单累计合格数量，由完工报工的 qualified_qty 累加得到。
         /// </summary>
+        /// <value>生产订单累计合格数量，由完工报工的 qualified_qty 累加得到。</value>
         /* <example>10</example> */
         [DataMember(Name="finished_qty", EmitDefaultValue=true)]
         public decimal FinishedQty { get; set; }

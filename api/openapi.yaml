@@ -135,12 +135,16 @@ paths:
     $ref: './production.yaml#/paths/~1api~1addProductionOrder'
   /api/updateProductionOrder:
     $ref: './production.yaml#/paths/~1api~1updateProductionOrder'
+  /api/previewProductionOrderMaterialLock:
+    $ref: './production.yaml#/paths/~1api~1previewProductionOrderMaterialLock'
   /api/approveProductionOrder:
     $ref: './production.yaml#/paths/~1api~1approveProductionOrder'
   /api/startProductionOrder:
     $ref: './production.yaml#/paths/~1api~1startProductionOrder'
   /api/finishProductionOrder:
     $ref: './production.yaml#/paths/~1api~1finishProductionOrder'
+  /api/reportProductionCompletion:
+    $ref: './production.yaml#/paths/~1api~1reportProductionCompletion'
   /api/cancelProductionOrder:
     $ref: './production.yaml#/paths/~1api~1cancelProductionOrder'
   /api/listProductionLine:
@@ -167,12 +171,16 @@ paths:
     $ref: './production.yaml#/paths/~1api~1estimateProductionCapacity'
   /api/listExternalOrder:
     $ref: './production.yaml#/paths/~1api~1listExternalOrder'
+  /api/listExternalOrderFormOptions:
+    $ref: './production.yaml#/paths/~1api~1listExternalOrderFormOptions'
   /api/addExternalOrder:
     $ref: './production.yaml#/paths/~1api~1addExternalOrder'
   /api/reviewExternalOrder:
     $ref: './production.yaml#/paths/~1api~1reviewExternalOrder'
   /api/convertExternalOrderToProductionOrder:
     $ref: './production.yaml#/paths/~1api~1convertExternalOrderToProductionOrder'
+  /api/deliverExternalOrder:
+    $ref: './production.yaml#/paths/~1api~1deliverExternalOrder'
   /api/runCapacityDetection:
     $ref: './production.yaml#/paths/~1api~1runCapacityDetection'
   /api/saveCapacityBalance:
@@ -181,6 +189,8 @@ paths:
     $ref: './production.yaml#/paths/~1api~1reportProductionLineFault'
   /api/updateProductionLineFault:
     $ref: './production.yaml#/paths/~1api~1updateProductionLineFault'
+  /api/listProductionLineFault:
+    $ref: './production.yaml#/paths/~1api~1listProductionLineFault'
   /api/updateProductionLineStatus:
     $ref: './production.yaml#/paths/~1api~1updateProductionLineStatus'
   /api/listBatchConsumption:
@@ -229,24 +239,14 @@ paths:
     $ref: './system.yaml#/paths/~1api~1listPermissionData'
   /api/getPermissionData:
     $ref: './system.yaml#/paths/~1api~1getPermissionData'
-  /api/addPermissionData:
-    $ref: './system.yaml#/paths/~1api~1addPermissionData'
-  /api/updatePermissionData:
-    $ref: './system.yaml#/paths/~1api~1updatePermissionData'
-  /api/deletePermissionData:
-    $ref: './system.yaml#/paths/~1api~1deletePermissionData'
   /api/listUserRoleData:
     $ref: './system.yaml#/paths/~1api~1listUserRoleData'
-  /api/addUserRole:
-    $ref: './system.yaml#/paths/~1api~1addUserRole'
-  /api/deleteUserRole:
-    $ref: './system.yaml#/paths/~1api~1deleteUserRole'
+  /api/setUserRoles:
+    $ref: './system.yaml#/paths/~1api~1setUserRoles'
   /api/listRolePermissionData:
     $ref: './system.yaml#/paths/~1api~1listRolePermissionData'
-  /api/addRolePermission:
-    $ref: './system.yaml#/paths/~1api~1addRolePermission'
-  /api/deleteRolePermission:
-    $ref: './system.yaml#/paths/~1api~1deleteRolePermission'
+  /api/setRolePermissions:
+    $ref: './system.yaml#/paths/~1api~1setRolePermissions'
   /api/listLoginRecordData:
     $ref: './system.yaml#/paths/~1api~1listLoginRecordData'
   /api/listOperationLogData:

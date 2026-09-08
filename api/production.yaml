@@ -10,7 +10,7 @@ paths:
   /api/listProductionOrder:
     get:
       summary: 查询生产订单列表
-      description: 按产品、订单状态、计划完工日期等条件分页查询生产订单。权限：生产管理员、系统管理员可访问；外部客户不可访问；无权限返回 code 403。
+      description: 按产品、订单状态、计划完工日期等条件分页查询生产订单。需具备 production:order:view；权限不足返回 code 403。
       operationId: listProductionOrder
       tags: [production]
       security:
@@ -51,7 +51,7 @@ paths:
   /api/getProductionOrder:
     get:
       summary: 查询生产订单详情
-      description: 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 根据生产订单编号查询产品、BOM 版本、计划数量、完工数量、计划与实际起止时间和订单状态。需具备 production:order:view；权限不足返回 code 403。
       operationId: getProductionOrder
       tags: [production]
       security:
@@ -73,7 +73,7 @@ paths:
   /api/addProductionOrder:
     post:
       summary: 新增生产订单
-      description: 新增内部生产订单，初始状态为 pending_review。权限：生产管理员、系统管理员可访问；无权限返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
+      description: 新增内部生产订单，初始状态为 pending_review。需具备 production:order:create；权限不足返回 code 403。业务约束：plan_qty 必须大于 0，产品和 BOM 版本必须存在。
       operationId: addProductionOrder
       tags: [production]
       security:
@@ -94,7 +94,11 @@ paths:
   /api/updateProductionOrder:
     post:
       summary: 修改生产订单计划
-      description: 修改 pending_review 或 pending_schedule 状态下生产订单的计划数量、计划起止日期和 BOM 版本。权限：生产管理员、系统管理员可访问；状态不允许修改时返回 code 409。
+      description: >
+        修改生产订单。pending_review 状态下可修改产品、BOM 版本、计划数量和计划起止日期；
+        pending_schedule 状态下物料已经锁定，material_id、version_id 和 plan_qty 必须与订单当前值一致，
+        仅允许调整计划起止日期。需具备 production:order:update；状态不允许修改或审核后试图修改
+        物料需求字段时返回 code 409。
       operationId: updateProductionOrder
       tags: [production]
       security:
@@ -112,10 +116,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/previewProductionOrderMaterialLock:
+    post:
+      summary: 预览生产订单物料锁定
+      description: >
+        根据 pending_review 生产订单选定的 BOM 版本和计划数量，计算该 BOM 的直接子项物料需求，
+        展示订单已有有效锁定、本次待锁定数量、当前可用库存和库存缺口，不修改订单或库存。
+        物料需求按 BOM 损耗率计算并汇总到 material_id；缺少 BOM 明细、BOM 数据非法或订单状态非法时
+        返回 code 409。需具备 production:order:approve，不额外要求库存锁定权限。
+      operationId: previewProductionOrderMaterialLock
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionOrderMaterialLockPreviewRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionOrderMaterialLockPreviewResponse'
   /api/approveProductionOrder:
     post:
       summary: 审核生产订单
-      description: 审核 pending_review 生产订单。审核通过后进入 pending_schedule；审核拒绝时进入 cancelled 并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: >
+        审核 pending_review 生产订单。approved=true 时，后端必须重新计算该订单 BOM 直接子项的
+        物料需求，在同一个事务中锁定尚未锁定的需求差额并将订单置为 pending_schedule；任一物料库存
+        不足时返回 code 409，库存和订单状态均不得改变。approved=false 时将订单置为 cancelled，
+        不创建库存锁定。审核人从当前登录用户推导，整个操作仅需 production:order:approve，
+        不额外要求库存锁定权限。
       operationId: approveProductionOrder
       tags: [production]
       security:
@@ -136,7 +170,10 @@ paths:
   /api/startProductionOrder:
     post:
       summary: 开始生产订单
-      description: 将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: >
+        将 pending_schedule 状态的生产订单置为 in_progress，并记录 actual_start。开工前后端必须校验
+        订单的有效库存锁定完整覆盖当前 BOM 直接子项需求；锁定不完整时返回 code 409，订单状态不变。
+        需具备 production:order:start；非法状态返回 code 409。
       operationId: startProductionOrder
       tags: [production]
       security:
@@ -157,7 +194,7 @@ paths:
   /api/finishProductionOrder:
     post:
       summary: 完成生产订单
-      description: 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 将 in_progress 状态的生产订单置为 completed，更新 finished_qty 和 actual_end。需具备 production:order:finish；非法状态返回 code 409。
       operationId: finishProductionOrder
       tags: [production]
       security:
@@ -175,10 +212,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductionOrderResponse'
+  /api/reportProductionCompletion:
+    post:
+      summary: 生产订单完工报工
+      description: >-
+        对 in_progress 状态的生产订单登记一次完工报工，每次报工生成一条独立的完工入库批次。
+        后端从生产订单读取产品物料和 BOM 版本，并从当前登录用户推导操作人；客户端不得传入这些字段。
+        finish_qty 表示本批完工数量，qualified_qty 表示本批合格数量且不得大于 finish_qty，batch_no 必须全局唯一。
+        接口在同一事务内新增完工入库记录、按 qualified_qty 增加成品 available_qty，并将生产订单
+        finished_qty 更新为累计合格数量。累计合格数量小于 plan_qty 时订单保持 in_progress，原材料库存锁定继续保留；
+        累计合格数量达到或超过 plan_qty 时，订单自动置为 completed、记录 actual_end，并消费该订单全部原材料库存锁定。
+        任一步失败时全部回滚。需具备 production:order:finish；订单不存在返回 code 404；数量非法返回 code 400；
+        订单状态非法、批次号重复或订单状态已变化返回 code 409。
+      operationId: reportProductionCompletion
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionCompletionReportRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionCompletionReportResponse'
   /api/cancelProductionOrder:
     post:
       summary: 取消生产订单
-      description: 将 pending_review、pending_schedule 或 in_progress 状态的生产订单置为 cancelled。权限：生产管理员、系统管理员可访问；completed/cancelled 状态返回 code 409。
+      description: >
+        将 pending_review、pending_schedule 或尚未发生完工报工的 in_progress 状态生产订单置为
+        cancelled。后端必须在同一个事务中释放该订单全部 locked 状态的库存锁定，减少 locked_qty 并
+        恢复 available_qty；任一步失败时订单状态和库存均不得改变。需具备 production:order:cancel；
+        已发生完工报工或处于 completed/cancelled 状态时返回 code 409。
       operationId: cancelProductionOrder
       tags: [production]
       security:
@@ -199,7 +269,7 @@ paths:
   /api/listProductionLine:
     get:
       summary: 查询生产线列表
-      description: 分页查询生产线及其线型、启用日期、负责人和当前状态。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询生产线及其线型、启用日期、负责人和当前状态。需具备 production:line:view；权限不足返回 code 403。
       operationId: listProductionLine
       tags: [production]
       security:
@@ -228,7 +298,7 @@ paths:
   /api/listProductionLineType:
     get:
       summary: 查询生产线类型
-      description: 分页查询生产线类型。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询生产线类型。需具备 production:line-type:view；权限不足返回 code 403。
       operationId: listProductionLineType
       tags: [production]
       security:
@@ -251,7 +321,7 @@ paths:
   /api/saveProductionLineType:
     post:
       summary: 保存生产线类型
-      description: 新增或更新生产线类型。权限：生产管理员、系统管理员可访问；类型名称重复返回 code 409。
+      description: 新增或更新生产线类型。需具备 production:line-type:update；类型名称重复返回 code 409。
       operationId: saveProductionLineType
       tags: [production]
       security:
@@ -272,7 +342,7 @@ paths:
   /api/addProductionLine:
     post:
       summary: 新增生产线
-      description: 新增生产线并初始化 line_status 记录，默认状态为 idle。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 新增生产线并初始化 line_status 记录，默认状态为 idle。需具备 production:line:create；权限不足返回 code 403。
       operationId: addProductionLine
       tags: [production]
       security:
@@ -293,7 +363,7 @@ paths:
   /api/updateProductionLine:
     post:
       summary: 修改生产线
-      description: 修改生产线所属类型、启用日期或负责人。权限：生产管理员、系统管理员可访问；生产线不存在返回 code 404。
+      description: 修改生产线所属类型、启用日期或负责人。需具备 production:line:update；生产线不存在返回 code 404。
       operationId: updateProductionLine
       tags: [production]
       security:
@@ -314,7 +384,7 @@ paths:
   /api/listCapacityConfig:
     get:
       summary: 查询产品产能配置
-      description: 分页查询产品所需生产线类型和单件生产时间。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 分页查询产品所需生产线类型和单件生产时间。需具备 production:capacity-config:view；权限不足返回 code 403。
       operationId: listCapacityConfig
       tags: [production]
       security:
@@ -344,7 +414,7 @@ paths:
   /api/saveCapacityConfig:
     post:
       summary: 保存产品产能配置
-      description: 新增或更新产品产能配置。权限：生产管理员、系统管理员可访问；业务约束：unit_time 必须大于 0。
+      description: 新增或更新产品产能配置。需具备 production:capacity-config:update；业务约束：unit_time 必须大于 0。
       operationId: saveCapacityConfig
       tags: [production]
       security:
@@ -365,7 +435,7 @@ paths:
   /api/listProductionCalendar:
     get:
       summary: 查询生产日历
-      description: 按生产线、日期范围和产能配置查询生产日历排产记录。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 按生产线、日期范围和产能配置查询生产日历排产记录。需具备 production:calendar:view；权限不足返回 code 403。
       operationId: listProductionCalendar
       tags: [production]
       security:
@@ -407,7 +477,7 @@ paths:
   /api/saveProductionCalendar:
     post:
       summary: 保存生产日历
-      description: 新增或覆盖指定日期、生产线的生产日历配置。权限：生产管理员、系统管理员可访问；生产线或产能配置不存在返回 code 404。
+      description: 新增或覆盖指定日期、生产线的生产日历配置。需具备 production:calendar:update；生产线或产能配置不存在返回 code 404。
       operationId: saveProductionCalendar
       tags: [production]
       security:
@@ -428,7 +498,7 @@ paths:
   /api/deleteProductionCalendar:
     post:
       summary: 删除生产日历
-      description: 删除指定日期、生产线的生产日历排产记录。权限：生产管理员、系统管理员可访问；记录不存在返回 code 404。
+      description: 删除指定日期、生产线的生产日历排产记录。需具备 production:calendar:delete；记录不存在返回 code 404。
       operationId: deleteProductionCalendar
       tags: [production]
       security:
@@ -449,7 +519,7 @@ paths:
   /api/estimateProductionCapacity:
     post:
       summary: 估计生产订单交付能力
-      description: 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 结合物料齐套情况、采购预计到货时间、产能配置和生产线排产计划，估计订单能否按期交付。需具备 production:capacity:estimate；权限不足返回 code 403。
       operationId: estimateProductionCapacity
       tags: [production]
       security:
@@ -470,7 +540,7 @@ paths:
   /api/listExternalOrder:
     get:
       summary: 查询外部订单列表
-      description: 分页查询外部客户提交的订单。外部客户只能查询自己的订单；生产管理员和系统管理员可查询全部；无权限返回 code 403。
+      description: 分页查询外部订单，同时返回关联生产订单、整单交货记录及后端计算的可交货状态和阻塞原因。具备 external-order:view-all 时可查询全部并使用 customer_name 模糊过滤；仅具备 external-order:view-own 时忽略客户名并强制查询当前用户自己的订单；两项权限均无时返回 code 403。
       operationId: listExternalOrder
       tags: [production]
       security:
@@ -478,13 +548,12 @@ paths:
       parameters:
         - $ref: './common.yaml#/components/parameters/Page'
         - $ref: './common.yaml#/components/parameters/PageSize'
-        - name: customer_id
+        - name: customer_name
           in: query
           required: false
-          description: 外部客户角色只能传自身 user_id。
+          description: 仅具备 external-order:view-all 时作为客户名称模糊过滤条件；仅具备 external-order:view-own 时忽略该参数。
           schema:
-            type: integer
-            format: int64
+            type: string
         - name: status
           in: query
           required: false
@@ -497,10 +566,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExternalOrderPageResponse'
+  /api/listExternalOrderFormOptions:
+    get:
+      summary: 查询外部订单表单选项
+      description: >
+        返回提交外部订单所需的下拉选项，复用 external-order:create-own 或
+        external-order:create-for-customer 权限，不增加新的权限种类。产品物料仅返回成品。
+        仅具备 create-own 的外部客户只能为自己提交，customers 固定返回空数组；具备
+        create-for-customer 的内部用户可获得状态有效且具有“外部客户”角色的用户列表，
+        提交时必须从中选择 customer_id。
+      operationId: listExternalOrderFormOptions
+      tags: [production]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderFormOptionsResponse'
   /api/addExternalOrder:
     post:
       summary: 外部客户提交订单
-      description: 外部客户提交产品预订订单，初始状态为 pending_review。外部客户只能为自身提交；生产管理员、系统管理员可代录；无权限返回 code 403。
+      description: 提交产品预订订单，初始状态为 pending_review。仅具备 external-order:create-own 的外部客户只能为当前用户提交且不得传 customer_id；具备 external-order:create-for-customer 的内部用户代录时必须传表单选项中的 customer_id；两项权限均无时返回 code 403。
       operationId: addExternalOrder
       tags: [production]
       security:
@@ -521,7 +610,7 @@ paths:
   /api/reviewExternalOrder:
     post:
       summary: 审核外部订单
-      description: 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 审核 pending_review 外部订单。通过后状态为 accepted，拒绝后状态为 rejected，并记录审核意见。需具备 external-order:review；非法状态返回 code 409。
       operationId: reviewExternalOrder
       tags: [production]
       security:
@@ -542,7 +631,7 @@ paths:
   /api/convertExternalOrderToProductionOrder:
     post:
       summary: 外部订单转生产订单
-      description: 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。权限：生产管理员、系统管理员可访问；非法状态返回 code 409。
+      description: 将 accepted 外部订单转换为一个或多个正式生产订单，并维护外部订单与生产订单关联关系。所有生产订单的产品必须与外部订单一致，计划数量合计必须等于外部订单数量。需具备 external-order:convert；非法状态或生产计划不匹配返回 code 409。
       operationId: convertExternalOrderToProductionOrder
       tags: [production]
       security:
@@ -560,10 +649,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExternalOrderConvertResponse'
+  /api/deliverExternalOrder:
+    post:
+      summary: 外部订单整单交货
+      description: >
+        对 converted 外部订单执行一次性整单交货。后端必须在同一事务内锁定并重新读取外部订单、关联生产订单和成品库存，确认存在关联生产订单、所有关联生产订单均为 completed、关联产品均与外部订单产品一致、关联计划数量合计等于外部订单数量，并确认成品可用库存不少于外部订单数量；随后按外部订单数量扣减 material_stock.available_qty、更新 last_out_date、写入 external_order_delivery，并将外部订单状态更新为 delivered。请求不得传交货数量、产品或操作人，这些字段均由数据库记录和当前登录用户推导。不支持分批交货，同一外部订单只允许成功交货一次。复用 external-order:convert 权限；校验不通过、库存不足、重复交货或状态已变化返回 code 409。
+      operationId: deliverExternalOrder
+      tags: [production]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalOrderDeliveryRequest'
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalOrderDeliveryResponse'
   /api/runCapacityDetection:
     post:
       summary: 执行产能检测
-      description: 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 按生产线和统计周期记录计划产能、实际产能、实际工时、停机时间、生产效率、差异数量和差异比例。需具备 production:capacity:detect；权限不足返回 code 403。
       operationId: runCapacityDetection
       tags: [production]
       security:
@@ -584,7 +695,7 @@ paths:
   /api/saveCapacityBalance:
     post:
       summary: 保存产能平衡调整
-      description: 保存产能调整前后排产方案、调整人和受影响生产订单列表。权限：生产管理员、系统管理员可访问；无权限返回 code 403。
+      description: 保存产能调整前后排产方案、调整人和受影响生产订单列表。需具备 production:capacity:balance；权限不足返回 code 403。
       operationId: saveCapacityBalance
       tags: [production]
       security:
@@ -605,7 +716,7 @@ paths:
   /api/reportProductionLineFault:
     post:
       summary: 上报生产线故障
-      description: 上报生产线故障，初始状态为 pending_repair。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      description: 上报生产线故障，初始状态为 pending_repair。需具备 production:fault:report；权限不足返回 code 403。
       operationId: reportProductionLineFault
       tags: [production]
       security:
@@ -626,7 +737,7 @@ paths:
   /api/updateProductionLineFault:
     post:
       summary: 更新生产线故障状态
-      description: 更新故障记录状态和维修负责人。状态流转：pending_repair -> repairing -> recovered。权限：生产管理员、维修负责人、系统管理员可访问；非法状态返回 code 409。
+      description: 更新故障记录状态和维修负责人。production:fault:update-any 可更新任意故障；production:fault:update-assigned 仅可更新分配给自己的故障；production:fault:claim 可认领尚未分配的故障。三项权限均无时返回 code 403，非法状态返回 code 409。
       operationId: updateProductionLineFault
       tags: [production]
       security:
@@ -644,10 +755,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FaultRecordResponse'
+  /api/listProductionLineFault:
+    get:
+      summary: 查询生产线故障列表
+      description: 按生产线编号、故障状态分页查询故障记录。需具备 production:fault:view；权限不足返回 code 403。
+      operationId: listProductionLineFault
+      tags: [production]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+        - name: line_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 生产线编号
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/FaultStatus'
+          description: 故障状态
+      responses:
+        '200':
+          description: HTTP 状态码固定返回 200，业务状态通过响应体 code 判断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaultRecordListResponse'
   /api/updateProductionLineStatus:
     post:
       summary: 更新生产线状态
-      description: 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。权限：生产管理员、生产线负责人、系统管理员可访问；无权限返回 code 403。
+      description: 更新生产线当前状态、当前生产订单、当前产品、已完成数量、当前效率和更新时间。需具备 production:line-status:update；权限不足返回 code 403。
       operationId: updateProductionLineStatus
       tags: [production]
       security:
@@ -669,12 +811,15 @@ components:
   schemas:
     ProductionOrderStatus:
       type: string
-      description: 生产订单状态。pending_review 待审核，可审核或取消；pending_schedule 待排产，可修改、开始或取消；in_progress 生产中，可完工或取消；completed 已完工，流程结束；cancelled 已取消，流程结束。
+      description: >
+        生产订单状态。pending_review 待审核，可修改、预览物料锁定、审核或取消；pending_schedule
+        待排产且物料已经锁定，仅可修改计划日期、开始或取消；in_progress 生产中，可报工或取消；
+        completed 已完工，流程结束；cancelled 已取消，流程结束。
       enum: [pending_review, pending_schedule, in_progress, completed, cancelled]
     ExternalOrderStatus:
       type: string
-      description: 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，已转为正式生产订单；rejected 已拒绝，流程结束。
-      enum: [pending_review, accepted, converted, rejected]
+      description: 外部订单状态。pending_review 待审核；accepted 已接受，可转换为生产订单；converted 已转换，等待关联生产订单完工及交货；delivered 已交货，流程结束；rejected 已拒绝，流程结束。
+      enum: [pending_review, accepted, converted, delivered, rejected]
     ProductionLineRunStatus:
       type: string
       description: 生产线状态。idle 空闲；running 运行中；fault 故障。
@@ -705,6 +850,7 @@ components:
           example: 50
         finished_qty:
           type: number
+          description: 生产订单累计合格数量，由完工报工的 qualified_qty 累加得到。
           example: 10
         status:
           $ref: '#/components/schemas/ProductionOrderStatus'
@@ -772,6 +918,109 @@ components:
             order_id:
               type: integer
               format: int64
+      description: >
+        pending_review 状态允许修改全部计划字段；pending_schedule 状态仅允许修改 plan_start 和
+        plan_end，其他字段仍需传入且必须与订单当前值一致。
+    ProductionOrderMaterialLockPreviewRequest:
+      type: object
+      required: [order_id]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+          minimum: 1
+      description: 物料需求完全由生产订单推导，客户端不得提交物料明细或操作人。
+    ProductionOrderMaterialLockItem:
+      type: object
+      required:
+        - material_id
+        - material_name
+        - unit
+        - bom_quantity
+        - loss_rate
+        - required_qty
+        - locked_qty
+        - pending_lock_qty
+        - available_qty
+        - shortage_qty
+      properties:
+        material_id:
+          type: integer
+          format: int64
+          readOnly: true
+        material_name:
+          type: string
+          readOnly: true
+        unit:
+          type: string
+          readOnly: true
+        bom_quantity:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: BOM 中生产一件父项所需的直接子项净用量。
+        loss_rate:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          maximum: 1
+          exclusiveMaximum: true
+        required_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: >
+            订单完整需求量。按 plan_qty * bom_quantity / (1 - loss_rate) 计算，并向上保留两位小数；
+            同一物料存在多条直接 BOM 明细时按 material_id 汇总。
+        locked_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 该订单已经持有的 locked 状态库存数量。
+        pending_lock_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 本次审核通过时需要补充锁定的数量，等于 max(required_qty - locked_qty, 0)。
+        available_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 当前未被其他订单锁定的可用库存数量。
+        shortage_qty:
+          type: number
+          format: decimal
+          readOnly: true
+          minimum: 0
+          description: 当前锁定缺口，等于 max(pending_lock_qty - available_qty, 0)。
+    ProductionOrderMaterialLockPreview:
+      type: object
+      required: [order_id, can_approve, items]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+          readOnly: true
+        can_approve:
+          type: boolean
+          readOnly: true
+          description: 所有直接子项 shortage_qty 均为 0 时为 true。
+        items:
+          type: array
+          readOnly: true
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ProductionOrderMaterialLockItem'
+      description: >
+        仅用于审核前展示，不预留库存。若订单存在不属于当前直接 BOM 的有效锁定，或某物料有效锁定
+        超过 required_qty，后端返回 code 409，要求先修正异常锁定记录。
     ProductionOrderApproveRequest:
       type: object
       required: [order_id, approved]
@@ -785,7 +1034,10 @@ components:
         review_comment:
           type: string
           nullable: true
-      description: 审核人从当前登录用户推导，客户端不得传 reviewer_id。
+      description: >
+        审核人从当前登录用户推导，客户端不得传 reviewer_id。approved=true 时物料明细也由订单和
+        BOM 推导，客户端不得提交锁定数量；后端重新校验库存并只补充 required_qty 与已有有效锁定
+        之间的差额。
     ProductionOrderActionRequest:
       type: object
       required: [order_id]
@@ -807,6 +1059,41 @@ components:
               type: number
               minimum: 0
               exclusiveMinimum: true
+    ProductionCompletionReportRequest:
+      type: object
+      required: [order_id, finish_qty, qualified_qty, batch_no]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        finish_qty:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+          description: 本批完工数量。
+        qualified_qty:
+          type: number
+          format: decimal
+          minimum: 0
+          description: 本批合格数量，不得大于 finish_qty；该数量计入生产订单累计完工进度和成品可用库存。
+        batch_no:
+          type: string
+          minLength: 1
+          maxLength: 30
+          description: 本次报工对应的成品批次号，必须全局唯一。
+      description: 产品物料、BOM 版本和操作人分别从生产订单及当前登录用户推导，客户端不得传入。
+    ProductionCompletionReportResult:
+      type: object
+      required: [production_order, completion_inbound, order_completed]
+      properties:
+        production_order:
+          $ref: '#/components/schemas/ProductionOrderDetail'
+        completion_inbound:
+          $ref: './inventory.yaml#/components/schemas/CompletionInboundOrder'
+        order_completed:
+          type: boolean
+          description: 本次报工后累计合格数量是否已达到计划数量，且订单是否已自动完工。
     LineType:
       type: object
       required: [type_id, type_name]
@@ -1089,6 +1376,83 @@ components:
         review_comment:
           type: string
           nullable: true
+    ExternalOrderListItem:
+      allOf:
+        - $ref: '#/components/schemas/ExternalOrder'
+        - type: object
+          required: [production_orders, delivery_ready]
+          properties:
+            production_orders:
+              type: array
+              readOnly: true
+              description: 通过 external_order_production 关联的全部生产订单；未转换时为空数组。
+              items:
+                $ref: '#/components/schemas/ProductionOrderBrief'
+            delivery_ready:
+              type: boolean
+              readOnly: true
+              description: >
+                后端计算字段。仅当外部订单状态为 converted、存在关联生产订单、全部关联订单均为 completed、关联产品及计划数量与外部订单一致，并且成品可用库存不少于外部订单数量时为 true。前端仅使用该字段控制交货按钮，交货接口仍须在事务内重新校验。
+            delivery_block_reason:
+              type: string
+              nullable: true
+              readOnly: true
+              description: 不可交货原因；delivery_ready 为 false 时由后端返回可读说明。
+            delivery:
+              allOf:
+                - $ref: '#/components/schemas/ExternalOrderDelivery'
+              nullable: true
+              readOnly: true
+              description: 已交货订单对应的整单交货记录，尚未交货时为 null。
+    ExternalOrderCustomerOption:
+      type: object
+      required: [user_id, employee_no, user_name]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          readOnly: true
+        employee_no:
+          type: string
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+      description: 状态有效且具有“外部客户”角色的用户，仅向具备 external-order:create-for-customer 的调用方返回。
+    ExternalOrderMaterialOption:
+      type: object
+      required: [material_id, material_name, model, unit]
+      properties:
+        material_id:
+          type: integer
+          format: int64
+          readOnly: true
+        material_name:
+          type: string
+          readOnly: true
+        model:
+          type: string
+          readOnly: true
+        unit:
+          type: string
+          readOnly: true
+      description: 可用于提交外部订单的成品物料。
+    ExternalOrderFormOptions:
+      type: object
+      required: [customers, materials]
+      properties:
+        customers:
+          type: array
+          readOnly: true
+          description: 管理员可代录的外部客户；仅具备 create-own 权限时为空数组。
+          items:
+            $ref: '#/components/schemas/ExternalOrderCustomerOption'
+        materials:
+          type: array
+          readOnly: true
+          description: 可下单的全部成品物料。
+          items:
+            $ref: '#/components/schemas/ExternalOrderMaterialOption'
     ExternalOrderCreateRequest:
       type: object
       required: [material_id, quantity, expected_date, contact_person, contact_phone]
@@ -1097,7 +1461,7 @@ components:
           type: integer
           format: int64
           nullable: true
-          description: 外部客户自提交时不得传，由当前登录用户推导；仅生产管理员或系统管理员代录时可传，后端必须按登录角色校验。
+          description: 仅具备 external-order:create-own 时不得传并由当前登录用户推导；具备 external-order:create-for-customer 时必须传，且必须是表单选项中状态有效的外部客户。
         material_id:
           type: integer
           format: int64
@@ -1112,7 +1476,7 @@ components:
           type: string
         contact_phone:
           type: string
-      description: 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时可传 customer_id。
+      description: 外部客户自提交订单时 customer_id 从登录态推导；管理员代录时必须传 customer_id。
     ExternalOrderReviewRequest:
       type: object
       required: [ext_order_id, accepted]
@@ -1138,6 +1502,7 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/ProductionOrderCreateRequest'
+      description: 所有生产订单的 material_id 必须等于外部订单 material_id，plan_qty 合计必须精确等于外部订单 quantity；允许将同一产品拆分为多个生产订单。
     ExternalOrderConvertResult:
       type: object
       required: [ext_order_id, production_orders, associations]
@@ -1164,6 +1529,54 @@ components:
         order_id:
           type: integer
           format: int64
+    ExternalOrderDeliveryRequest:
+      type: object
+      required: [ext_order_id]
+      properties:
+        ext_order_id:
+          type: integer
+          format: int64
+          minimum: 1
+      description: 整单交货请求。交货数量、产品、交货时间和操作人均由后端推导，客户端不得传入。
+    ExternalOrderDelivery:
+      type: object
+      required: [delivery_id, ext_order_id, material_id, quantity, delivery_time, operator_id]
+      properties:
+        delivery_id:
+          type: integer
+          format: int64
+        ext_order_id:
+          type: integer
+          format: int64
+        material_id:
+          type: integer
+          format: int64
+          description: 交货时的外部订单产品快照。
+        quantity:
+          type: number
+          description: 交货时的外部订单数量快照；当前仅支持整单交货。
+        delivery_time:
+          type: string
+          format: date-time
+        operator_id:
+          type: integer
+          format: int64
+        operator_name:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 根据 operator_id 关联 sys_user.user_name 得到的展示字段。
+    ExternalOrderDeliveryResult:
+      type: object
+      required: [external_order, delivery, remaining_available_qty]
+      properties:
+        external_order:
+          $ref: '#/components/schemas/ExternalOrderListItem'
+        delivery:
+          $ref: '#/components/schemas/ExternalOrderDelivery'
+        remaining_available_qty:
+          type: number
+          description: 交货事务完成后该产品的可用库存数量。
     CapacityDetection:
       type: object
       required: [detection_id, line_id, period_start, period_end, plan_capacity, actual_capacity, diff_qty, diff_rate, reason_type]
@@ -1387,6 +1800,22 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ProductionOrderDetail'
+    ProductionOrderMaterialLockPreviewResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionOrderMaterialLockPreview'
+    ProductionCompletionReportResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ProductionCompletionReportResult'
     ProductionOrderPageResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
@@ -1524,7 +1953,15 @@ components:
                     records:
                       type: array
                       items:
-                        $ref: '#/components/schemas/ExternalOrder'
+                        $ref: '#/components/schemas/ExternalOrderListItem'
+    ExternalOrderFormOptionsResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ExternalOrderFormOptions'
     ExternalOrderConvertResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
@@ -1533,6 +1970,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ExternalOrderConvertResult'
+    ExternalOrderDeliveryResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/ExternalOrderDeliveryResult'
     CapacityDetectionResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'
@@ -1557,6 +2002,21 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/FaultRecord'
+    FaultRecordListResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponse'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              allOf:
+                - $ref: './common.yaml#/components/schemas/PageResult'
+                - type: object
+                  properties:
+                    records:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/FaultRecord'
     ProductionLineStatusResponse:
       allOf:
         - $ref: './common.yaml#/components/schemas/ApiResponse'

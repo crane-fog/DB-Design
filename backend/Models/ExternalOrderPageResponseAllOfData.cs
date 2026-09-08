@@ -58,7 +58,7 @@ namespace Org.OpenAPITools.Models
         /// </summary>
         [Required]
         [DataMember(Name="records", EmitDefaultValue=false)]
-        public List<ExternalOrder> Records { get; set; }
+        public List<ExternalOrderListItem> Records { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object

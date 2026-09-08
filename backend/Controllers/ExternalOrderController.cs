@@ -9,14 +9,14 @@ using Org.OpenAPITools.Models;
 namespace Backend.Controllers;
 
 /// <summary>
-/// 外部订单接口（C 模块）。外部客户只能查询/提交自己的订单；审核和转换仅管理员可用。
+/// 外部订单接口（C 模块）。数据范围由 own/all 权限决定。
 /// </summary>
 [ApiController]
 [Authorize]
 [Route("/api")]
 public class ExternalOrderController(
     ExternalOrderService externalOrderService,
-    UserContextService userContext) : ControllerBase
+    AuthorizationService authorization) : ControllerBase
 {
     [HttpGet]
     [Produces("application/json")]
@@ -24,34 +24,30 @@ public class ExternalOrderController(
     public IActionResult List(
         [FromQuery(Name = "page")] int? page,
         [FromQuery(Name = "page_size")] int? pageSize,
-        [FromQuery(Name = "customer_id")] long? customerId,
+        [FromQuery(Name = "customer_name")] string? customerName,
         [FromQuery(Name = "status")] ExternalOrderStatus? status)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
+        AuthResult auth = authorization.RequireAnyPermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ExternalOrderViewAllEnum,
+            PermissionCode.ExternalOrderViewOwnEnum);
+        if (!auth.Ok)
         {
-            return Ok(Page(ExternalOrderPageResponse.CodeEnum._401Enum, "登录状态无效", null));
+            return Ok(Page((ExternalOrderPageResponse.CodeEnum)auth.Code, auth.Message ?? "无权查看外部订单", null));
         }
 
-        // 数据自限：外部客户强制只看自己的订单（忽略传入 customer_id）；
-        // 管理员可查看全部或按 customer_id 过滤；其余内部角色无权查看外部订单。
-        long? effectiveCustomerId;
-        if (user.IsExternalCustomer)
-        {
-            effectiveCustomerId = user.UserId;
-        }
-        else if (user.IsProductionManager)
-        {
-            effectiveCustomerId = customerId;
-        }
-        else
-        {
-            return Ok(Page(ExternalOrderPageResponse.CodeEnum._403Enum, "无权查看外部订单", null));
-        }
+        CurrentUser user = auth.User!;
+        bool canViewAll = user.HasPermission(PermissionCode.ExternalOrderViewAllEnum);
+        long? effectiveCustomerId = canViewAll ? null : user.UserId;
+        string? effectiveCustomerName = canViewAll ? customerName : null;
 
         var (currentPage, size) = Paging.Normalize(page, pageSize);
         var (records, total) = externalOrderService.List(
-            currentPage, size, effectiveCustomerId, ExternalOrderStatusMap.ToDbOrNull(status));
+            currentPage,
+            size,
+            effectiveCustomerId,
+            effectiveCustomerName,
+            ExternalOrderStatusMap.ToDbOrNull(status));
 
         return Ok(new ExternalOrderPageResponse
         {
@@ -67,16 +63,46 @@ public class ExternalOrderController(
         });
     }
 
+    [HttpGet]
+    [Produces("application/json")]
+    [Route("listExternalOrderFormOptions")]
+    public IActionResult ListFormOptions()
+    {
+        AuthResult auth = authorization.RequireAnyPermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ExternalOrderCreateForCustomerEnum,
+            PermissionCode.ExternalOrderCreateOwnEnum);
+        if (!auth.Ok)
+        {
+            return Ok(FormOptionsResp(
+                (ExternalOrderFormOptionsResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权查询外部订单表单选项",
+                null));
+        }
+
+        bool includeCustomers = auth.User!.HasPermission(
+            PermissionCode.ExternalOrderCreateForCustomerEnum);
+        ExternalOrderFormOptions options = externalOrderService.GetFormOptions(includeCustomers);
+        return Ok(FormOptionsResp(
+            ExternalOrderFormOptionsResponse.CodeEnum._200Enum,
+            "查询成功",
+            options));
+    }
+
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("addExternalOrder")]
+    [OperationAudit("外部订单", "新增外部订单")]
     public IActionResult Add([FromBody] ExternalOrderCreateRequest? request)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
+        AuthResult auth = authorization.RequireAnyPermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ExternalOrderCreateForCustomerEnum,
+            PermissionCode.ExternalOrderCreateOwnEnum);
+        if (!auth.Ok)
         {
-            return Ok(Single(ExternalOrderResponse.CodeEnum._401Enum, "登录状态无效", null));
+            return Ok(Single((ExternalOrderResponse.CodeEnum)auth.Code, auth.Message ?? "无权提交外部订单", null));
         }
 
         if (request is null)
@@ -84,37 +110,49 @@ public class ExternalOrderController(
             return Ok(Single(ExternalOrderResponse.CodeEnum._400Enum, "请求体不能为空", null));
         }
 
-        // 外部客户只能为自己提交；管理员可代录并显式指定 customer_id。
+        CurrentUser user = auth.User!;
+        bool canCreateForCustomer = user.HasPermission(
+            PermissionCode.ExternalOrderCreateForCustomerEnum);
         long customerId;
-        if (user.IsExternalCustomer)
+        if (canCreateForCustomer)
         {
-            customerId = user.UserId;
-        }
-        else if (user.IsProductionManager)
-        {
-            if (request.CustomerId is null or 0)
+            if (request.CustomerId is null or <= 0)
             {
-                return Ok(Single(ExternalOrderResponse.CodeEnum._400Enum, "代录外部订单需指定客户", null));
+                return Ok(Single(
+                    ExternalOrderResponse.CodeEnum._400Enum,
+                    "代录外部订单必须选择客户",
+                    null));
             }
 
             customerId = request.CustomerId.Value;
         }
         else
         {
-            return Ok(Single(ExternalOrderResponse.CodeEnum._403Enum, "无权提交外部订单", null));
+            if (request.CustomerId is not null and not 0)
+            {
+                return Ok(Single(
+                    ExternalOrderResponse.CodeEnum._400Enum,
+                    "外部客户只能为本人提交订单",
+                    null));
+            }
+
+            customerId = user.UserId;
         }
 
-        return FromResult(externalOrderService.Create(request, customerId), "提交成功");
+        return FromResult(
+            externalOrderService.Create(request, customerId, canCreateForCustomer),
+            "提交成功");
     }
 
     [HttpPost]
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("reviewExternalOrder")]
+    [OperationAudit("外部订单", "审核外部订单", OperationAuditSnapshotKind.ExternalOrder)]
     [RequireJsonFields("accepted")]
     public IActionResult Review([FromBody] ExternalOrderReviewRequest? request)
     {
-        if (ResolveManagerOrForbidden() is { } forbidden)
+        if (RequirePermission(PermissionCode.ExternalOrderReviewEnum) is { } forbidden)
         {
             return forbidden;
         }
@@ -131,19 +169,15 @@ public class ExternalOrderController(
     [Consumes("application/json")]
     [Produces("application/json")]
     [Route("convertExternalOrderToProductionOrder")]
+    [OperationAudit("外部订单", "转为生产订单", OperationAuditSnapshotKind.ExternalOrder)]
     public IActionResult Convert([FromBody] ExternalOrderConvertRequest? request)
     {
-        // 鉴权内联：必须返回 ExternalOrderConvertResponse 而非 ExternalOrderResponse，
-        // 否则 OpenAPI 契约中 convert 接口的响应体类型不匹配。
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ExternalOrderConvertEnum);
+        if (!auth.Ok)
         {
-            return Ok(ConvertResp(ExternalOrderConvertResponse.CodeEnum._401Enum, "登录状态无效", null));
-        }
-
-        if (!user.IsProductionManager)
-        {
-            return Ok(ConvertResp(ExternalOrderConvertResponse.CodeEnum._403Enum, "无权操作外部订单", null));
+            return Ok(ConvertResp((ExternalOrderConvertResponse.CodeEnum)auth.Code, auth.Message ?? "无权转换外部订单", null));
         }
 
         if (request is null)
@@ -161,21 +195,54 @@ public class ExternalOrderController(
         return Ok(ConvertResp(code, outcome.ErrorMessage ?? "转换失败", null));
     }
 
-    /// <summary>校验当前用户为生产/系统管理员；否则返回相应响应对象。</summary>
-    private IActionResult? ResolveManagerOrForbidden()
+    [HttpPost]
+    [Consumes("application/json")]
+    [Produces("application/json")]
+    [Route("deliverExternalOrder")]
+    [OperationAudit("外部订单", "整单交货", OperationAuditSnapshotKind.ExternalOrder)]
+    [RequireJsonFields("ext_order_id")]
+    public IActionResult Deliver([FromBody] ExternalOrderDeliveryRequest? request)
     {
-        var user = userContext.Resolve(User.GetEmployeeNo());
-        if (user is null)
+        AuthResult auth = authorization.RequirePermission(
+            User.GetEmployeeNo(),
+            PermissionCode.ExternalOrderConvertEnum);
+        if (!auth.Ok)
         {
-            return Ok(Single(ExternalOrderResponse.CodeEnum._401Enum, "登录状态无效", null));
+            return Ok(DeliveryResp(
+                (ExternalOrderDeliveryResponse.CodeEnum)auth.Code,
+                auth.Message ?? "无权交付外部订单",
+                null));
         }
 
-        if (!user.IsProductionManager)
+        if (request is null)
         {
-            return Ok(Single(ExternalOrderResponse.CodeEnum._403Enum, "无权操作外部订单", null));
+            return Ok(DeliveryResp(
+                ExternalOrderDeliveryResponse.CodeEnum._400Enum,
+                "请求体不能为空",
+                null));
         }
 
-        return null;
+        ExternalOrderDeliveryOutcome outcome = externalOrderService.Deliver(
+            request.ExtOrderId,
+            auth.User!.UserId);
+        if (outcome.Ok)
+        {
+            return Ok(DeliveryResp(
+                ExternalOrderDeliveryResponse.CodeEnum._200Enum,
+                "交货成功",
+                outcome.Result));
+        }
+
+        var code = (ExternalOrderDeliveryResponse.CodeEnum)outcome.ErrorCode;
+        return Ok(DeliveryResp(code, outcome.ErrorMessage ?? "交货失败", null));
+    }
+
+    private IActionResult? RequirePermission(PermissionCode permissionCode)
+    {
+        AuthResult result = authorization.RequirePermission(User.GetEmployeeNo(), permissionCode);
+        return result.Ok
+            ? null
+            : Ok(Single((ExternalOrderResponse.CodeEnum)result.Code, result.Message ?? "无权操作外部订单", null));
     }
 
     private IActionResult FromResult(ExternalOrderResult result, string successMessage)
@@ -209,10 +276,30 @@ public class ExternalOrderController(
             Data = data!,
         };
 
+    private static ExternalOrderFormOptionsResponse FormOptionsResp(
+        ExternalOrderFormOptionsResponse.CodeEnum code,
+        string message,
+        ExternalOrderFormOptions? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
     private static ExternalOrderConvertResponse ConvertResp(
         ExternalOrderConvertResponse.CodeEnum code,
         string message,
         ExternalOrderConvertResult? data) => new()
+        {
+            Code = code,
+            Message = message,
+            Data = data!,
+        };
+
+    private static ExternalOrderDeliveryResponse DeliveryResp(
+        ExternalOrderDeliveryResponse.CodeEnum code,
+        string message,
+        ExternalOrderDeliveryResult? data) => new()
         {
             Code = code,
             Message = message,

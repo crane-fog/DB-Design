@@ -9,9 +9,14 @@ import type {
   HomeDashboardData,
   SystemDashboardData,
 } from '@/types/dashboard'
-import type { InventoryAlertEvent, OperationLog, PurchaseOverdueReminder } from '@/api'
+import type {
+  InventoryAlertEvent,
+  OperationLog,
+  PermissionCode as PermissionCodeValue,
+  PurchaseOverdueReminder,
+} from '@/api'
 import { inventoryApi, purchaseApi, systemApi } from '@/api/client'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PermissionCode } from '@/constants/permissions'
 import { getErrorMessage } from '@/utils/error'
 
 // 导航是静态配置，不依赖任何业务接口是否加载成功。
@@ -19,21 +24,21 @@ export const systemDashboardShortcuts: readonly DashboardShortcut[] = [
   {
     description: '维护账号状态和角色分配',
     icon: 'users',
-    permission: PERMISSIONS.system.userView,
+    permission: PermissionCode.SystemUserView,
     route: '/system/users',
     title: '用户管理',
   },
   {
     description: '维护角色及其权限范围',
     icon: 'roles',
-    permission: PERMISSIONS.system.roleView,
+    permission: PermissionCode.SystemRoleView,
     route: '/system/roles',
     title: '角色管理',
   },
   {
     description: '查询登录与操作审计记录',
     icon: 'audit',
-    permission: PERMISSIONS.system.auditView,
+    permission: PermissionCode.SystemAuditOperationView,
     route: '/system/audit-logs',
     title: '审计日志',
   },
@@ -44,27 +49,14 @@ export const homeDashboardShortcuts: readonly DashboardShortcut[] = [
   {
     description: '查看物料 BOM 版本和组件用量',
     icon: 'materials',
-    permission: PERMISSIONS.material.view,
+    permission: PermissionCode.MaterialItemView,
     route: '/materials',
     title: '物料管理',
   },
 ]
 
-/** 与 SystemController.RequireAdmin、UserContextService 的库存/采购角色规则一致。 */
-export function hasDashboardPermission(access: DashboardAccess, permission: string) {
-  if (!access.permissions.includes(permission)) {
-    return false
-  }
-  if (permission.startsWith('system:')) {
-    return access.roles.includes('系统管理员')
-  }
-  if (permission === PERMISSIONS.inventory.monitor) {
-    return ['系统管理员', '生产管理员', '库存管理员'].some((role) => access.roles.includes(role))
-  }
-  if (permission === PERMISSIONS.purchase.view) {
-    return ['系统管理员', '采购员', '采购主管'].some((role) => access.roles.includes(role))
-  }
-  return true
+export function hasDashboardPermission(access: DashboardAccess, permission: PermissionCodeValue) {
+  return access.permissions.includes(permission)
 }
 
 const previewQuery = { page: 1, pageSize: 5 }
@@ -75,7 +67,7 @@ async function loadSection<TSource, TItem = TSource>(
   access: DashboardAccess,
   source: {
     map: (item: TSource) => TItem
-    permission: string
+    permission: PermissionCodeValue
     request: PageRequest
     title: string
   },
@@ -135,7 +127,7 @@ async function loadSystemData(
   if (includePermissions) {
     permissionRequest = loadSection(access, {
       map: (item) => item,
-      permission: PERMISSIONS.system.roleView,
+      permission: PermissionCode.SystemPermissionView,
       request: () => systemApi.listPermissionData(countQuery),
       title: '权限统计',
     })
@@ -143,13 +135,13 @@ async function loadSystemData(
   const [users, roles, operations, permissions] = await Promise.all([
     loadSection(access, {
       map: (item) => item,
-      permission: PERMISSIONS.system.userView,
+      permission: PermissionCode.SystemUserView,
       request: () => systemApi.listUserData(countQuery),
       title: '用户统计',
     }),
     loadSection(access, {
       map: (item) => item,
-      permission: PERMISSIONS.system.roleView,
+      permission: PermissionCode.SystemRoleView,
       request: () => systemApi.listRoleData(countQuery),
       title: '角色统计',
     }),
@@ -162,7 +154,7 @@ async function loadSystemData(
         operateTime: log.operate_time,
         operatorId: log.operator_id,
       }),
-      permission: PERMISSIONS.system.auditView,
+      permission: PermissionCode.SystemAuditOperationView,
       request: () => systemApi.listOperationLogData(previewQuery),
       title: '操作日志',
     }),
@@ -176,28 +168,28 @@ async function loadSystemData(
       ...statistic(users, {
         description: '已登记账号，包含启用和停用账号',
         key: 'users',
-        permission: PERMISSIONS.system.userView,
+        permission: PermissionCode.SystemUserView,
         route: '/system/users',
         title: '用户总数',
       }),
       ...statistic(roles, {
         description: '已配置角色，包含启用和停用角色',
         key: 'roles',
-        permission: PERMISSIONS.system.roleView,
+        permission: PermissionCode.SystemRoleView,
         route: '/system/roles',
         title: '角色总数',
       }),
       ...statistic(permissions, {
         description: '系统登记的权限条目',
         key: 'permissions',
-        permission: PERMISSIONS.system.roleView,
+        permission: PermissionCode.SystemPermissionView,
         route: '/system/roles',
         title: '权限数量',
       }),
       ...statistic(operations, {
         description: '已记录的操作日志，不含登录日志',
         key: 'auditLogs',
-        permission: PERMISSIONS.system.auditView,
+        permission: PermissionCode.SystemAuditOperationView,
         route: '/system/audit-logs',
         title: '操作日志总数',
       }),
@@ -214,13 +206,13 @@ export const dashboardService = {
         map: (alert) => ({
           createdAt: alert.alert_time,
           id: `inventory-alert-${alert.alert_id}`,
-          permission: PERMISSIONS.inventory.monitor,
+          permission: PermissionCode.InventoryAlertView,
           route: '/inventory/monitor',
           statusLabel: { handled: '已处理', ignored: '已忽略', pending: '待处理' }[alert.status],
           title: `库存预警：${alert.material_name || `物料 #${alert.material_id}`}（预警 #${alert.alert_id}）`,
           type: 'warning',
         }),
-        permission: PERMISSIONS.inventory.monitor,
+        permission: PermissionCode.InventoryAlertView,
         request: () => inventoryApi.listInventoryAlert({ ...previewQuery, status: 'pending' }),
         title: '库存待处理预警',
       }),
@@ -228,7 +220,7 @@ export const dashboardService = {
         map: (reminder) => ({
           createdAt: reminder.remind_time,
           id: `purchase-reminder-${reminder.reminder_id}`,
-          permission: PERMISSIONS.purchase.view,
+          permission: PermissionCode.PurchaseOverdueView,
           route: '/purchase',
           statusLabel: { pending_urge: '待催交', received: '已到货', urged: '已催交' }[
             reminder.status
@@ -236,7 +228,7 @@ export const dashboardService = {
           title: `采购订单 #${reminder.order_id} 逾期 ${reminder.overdue_days} 天`,
           type: 'reminder',
         }),
-        permission: PERMISSIONS.purchase.view,
+        permission: PermissionCode.PurchaseOverdueView,
         request: () =>
           purchaseApi.listPurchaseOverdueReminder({ ...previewQuery, status: 'pending_urge' }),
         title: '采购待催交提醒',
@@ -274,14 +266,14 @@ export const dashboardService = {
         ...statistic(alerts, {
           description: '已生成且尚未处理的库存预警',
           key: 'inventoryAlerts',
-          permission: PERMISSIONS.inventory.monitor,
+          permission: PermissionCode.InventoryAlertView,
           route: '/inventory/monitor',
           title: '待处理库存预警',
         }),
         ...statistic(reminders, {
           description: '已生成且状态为待催交的采购提醒',
           key: 'purchaseReminders',
-          permission: PERMISSIONS.purchase.view,
+          permission: PermissionCode.PurchaseOverdueView,
           route: '/purchase',
           title: '待催交采购提醒',
         }),

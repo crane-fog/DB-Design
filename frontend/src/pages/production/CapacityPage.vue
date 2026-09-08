@@ -15,12 +15,14 @@ import {
 import { Delete, EditPen, Plus, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { type SystemUser, systemService } from '@/services/SystemService'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
+import { PermissionCode } from '@/constants/permissions'
 
 type CapacityTab = 'calendars' | 'configs' | 'lines' | 'types'
 
@@ -32,12 +34,47 @@ const lineStatusLabels: Record<ProductionLineRunStatus, string> = {
 
 const pageSize = 10
 const auth = useAuthStore()
-const canManage = computed(() => auth.hasPermission('production:capacity'))
-const activeTab = ref<CapacityTab>('configs')
+const canViewConfigs = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionCapacityConfigView),
+)
+const canUpdateConfigs = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionCapacityConfigUpdate),
+)
+const canViewLines = computed(() => auth.hasPermission(PermissionCode.ProductionLineView))
+const canCreateLines = computed(() => auth.hasPermission(PermissionCode.ProductionLineCreate))
+const canUpdateLines = computed(() => auth.hasPermission(PermissionCode.ProductionLineUpdate))
+const canViewLineTypes = computed(() => auth.hasPermission(PermissionCode.ProductionLineTypeView))
+const canUpdateLineTypes = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionLineTypeUpdate),
+)
+const canViewCalendars = computed(() => auth.hasPermission(PermissionCode.ProductionCalendarView))
+const canUpdateCalendars = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionCalendarUpdate),
+)
+const canDeleteCalendars = computed(() =>
+  auth.hasPermission(PermissionCode.ProductionCalendarDelete),
+)
+const canViewUsers = computed(() => auth.hasPermission(PermissionCode.SystemUserView))
+function getInitialTab(): CapacityTab {
+  if (canViewConfigs.value) {
+    return 'configs'
+  }
+  if (canViewLines.value) {
+    return 'lines'
+  }
+  if (canViewLineTypes.value) {
+    return 'types'
+  }
+  return 'calendars'
+}
+const activeTab = ref<CapacityTab>(getInitialTab())
 
 const lineTypeOptions = ref<LineTypeItem[]>([])
 
 async function loadLineTypeOptions() {
+  if (!canViewLineTypes.value) {
+    return
+  }
   try {
     lineTypeOptions.value = await productionService.listAllLineTypes()
   } catch {
@@ -88,6 +125,9 @@ const configRules: FormRules<CapacityConfigFormData> = {
 }
 
 async function loadConfigs(targetPage = configPage.value) {
+  if (!canViewConfigs.value) {
+    return
+  }
   configLoading.value = true
   configError.value = ''
   try {
@@ -167,6 +207,8 @@ const lineFormRef = ref<FormInstance>()
 const lineSubmitting = ref(false)
 const editingLineId = ref<number>()
 const lineForm = reactive<ProductionLineFormData>({ managerId: 0, startDate: '', typeId: 0 })
+const users = ref<SystemUser[]>([])
+const usersLoading = ref(false)
 const lineDialogTitle = computed(() => {
   if (lineDialogMode.value === 'create') {
     return '新增生产线'
@@ -175,8 +217,8 @@ const lineDialogTitle = computed(() => {
 })
 const lineRules: FormRules<ProductionLineFormData> = {
   managerId: [
-    { message: '请输入负责人用户 ID', required: true, trigger: 'blur', type: 'number' },
-    { message: '负责人 ID 必须大于 0', min: 1, trigger: 'blur', type: 'number' },
+    { message: '请选择负责人', required: true, trigger: 'change', type: 'number' },
+    { message: '请选择负责人', min: 1, trigger: 'change', type: 'number' },
   ],
   startDate: [{ message: '请选择启用日期', required: true, trigger: 'change' }],
   typeId: [
@@ -190,6 +232,9 @@ function selectedLineStatus(): ProductionLineRunStatus | undefined {
 }
 
 async function loadLines(targetPage = linePage.value) {
+  if (!canViewLines.value) {
+    return
+  }
   lineLoading.value = true
   lineError.value = ''
   try {
@@ -281,6 +326,9 @@ const typeRules: FormRules<LineTypeFormData> = {
 }
 
 async function loadTypes(targetPage = typePage.value) {
+  if (!canViewLineTypes.value) {
+    return
+  }
   typeLoading.value = true
   typeError.value = ''
   try {
@@ -375,6 +423,9 @@ const calendarRules: FormRules<ProductionCalendarFormData> = {
 }
 
 async function loadCalendars(targetPage = calendarPage.value) {
+  if (!canViewCalendars.value) {
+    return
+  }
   calendarLoading.value = true
   calendarError.value = ''
   try {
@@ -458,9 +509,29 @@ function handleTabChange(tab: string) {
   }
 }
 
+async function loadUsers() {
+  if (!canViewUsers.value) {
+    return
+  }
+  usersLoading.value = true
+  try {
+    const usersResult = await systemService.listUserOptions({
+      page: 1,
+      pageSize: 100,
+      status: 'valid',
+    })
+    users.value = usersResult.items
+  } catch (requestError) {
+    ElMessage.error(getErrorMessage(requestError, '加载用户列表失败'))
+  } finally {
+    usersLoading.value = false
+  }
+}
+
 onMounted(() => {
   void loadLineTypeOptions()
-  void loadConfigs()
+  handleTabChange(activeTab.value)
+  void loadUsers()
 })
 </script>
 
@@ -473,7 +544,7 @@ onMounted(() => {
 
     <el-tabs v-model="activeTab" class="capacity-tabs" @tab-change="handleTabChange">
       <!-- 产能配置 -->
-      <el-tab-pane label="产能配置" name="configs">
+      <el-tab-pane v-if="canViewConfigs" label="产能配置" name="configs">
         <el-card class="section-card" shadow="never">
           <el-form :model="configFilters" inline @submit.prevent="loadConfigs(1)">
             <el-form-item label="产品物料 ID">
@@ -505,7 +576,12 @@ onMounted(() => {
               <el-button :disabled="configLoading" :icon="Refresh" @click="resetConfigFilters">
                 重置
               </el-button>
-              <el-button v-if="canManage" :icon="Plus" type="primary" @click="openConfigCreate">
+              <el-button
+                v-if="canUpdateConfigs"
+                :icon="Plus"
+                type="primary"
+                @click="openConfigCreate"
+              >
                 新增配置
               </el-button>
             </el-form-item>
@@ -537,7 +613,7 @@ onMounted(() => {
               <template #default="{ row }">{{ row.typeName || `#${row.typeId}` }}</template>
             </el-table-column>
             <el-table-column label="单件工时" min-width="110" prop="unitTime" />
-            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+            <el-table-column v-if="canUpdateConfigs" fixed="right" label="操作" min-width="100">
               <template #default="{ row }">
                 <el-button link type="primary" :icon="EditPen" @click="openConfigEdit(row)">
                   修改
@@ -565,7 +641,7 @@ onMounted(() => {
       </el-tab-pane>
 
       <!-- 生产线 -->
-      <el-tab-pane label="生产线" name="lines">
+      <el-tab-pane v-if="canViewLines" label="生产线" name="lines">
         <el-card class="section-card" shadow="never">
           <el-form :model="lineFilters" inline @submit.prevent="loadLines(1)">
             <el-form-item label="生产线类型">
@@ -602,7 +678,7 @@ onMounted(() => {
               <el-button :disabled="lineLoading" :icon="Refresh" @click="resetLineFilters">
                 重置
               </el-button>
-              <el-button v-if="canManage" :icon="Plus" type="primary" @click="openLineCreate">
+              <el-button v-if="canCreateLines" :icon="Plus" type="primary" @click="openLineCreate">
                 新增生产线
               </el-button>
             </el-form-item>
@@ -641,7 +717,7 @@ onMounted(() => {
                 <StatusTag :labels="lineStatusLabels" :value="row.status" />
               </template>
             </el-table-column>
-            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+            <el-table-column v-if="canUpdateLines" fixed="right" label="操作" min-width="100">
               <template #default="{ row }">
                 <el-button link type="primary" :icon="EditPen" @click="openLineEdit(row)">
                   修改
@@ -669,7 +745,7 @@ onMounted(() => {
       </el-tab-pane>
 
       <!-- 生产线类型 -->
-      <el-tab-pane label="生产线类型" name="types">
+      <el-tab-pane v-if="canViewLineTypes" label="生产线类型" name="types">
         <el-card class="section-card" shadow="never">
           <el-form :model="typeFilters" inline @submit.prevent="loadTypes(1)">
             <el-form-item label="类型名称">
@@ -682,7 +758,12 @@ onMounted(() => {
               <el-button :disabled="typeLoading" :icon="Refresh" @click="resetTypeFilters">
                 重置
               </el-button>
-              <el-button v-if="canManage" :icon="Plus" type="primary" @click="openTypeCreate">
+              <el-button
+                v-if="canUpdateLineTypes"
+                :icon="Plus"
+                type="primary"
+                @click="openTypeCreate"
+              >
                 新增类型
               </el-button>
             </el-form-item>
@@ -706,7 +787,7 @@ onMounted(() => {
           <el-table v-else v-loading="typeLoading" :data="typeResult.items" stripe>
             <el-table-column label="类型 ID" min-width="100" prop="typeId" />
             <el-table-column label="类型名称" min-width="200" prop="typeName" />
-            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+            <el-table-column v-if="canUpdateLineTypes" fixed="right" label="操作" min-width="100">
               <template #default="{ row }">
                 <el-button link type="primary" :icon="EditPen" @click="openTypeEdit(row)">
                   修改
@@ -734,7 +815,7 @@ onMounted(() => {
       </el-tab-pane>
 
       <!-- 生产日历 -->
-      <el-tab-pane label="生产日历" name="calendars">
+      <el-tab-pane v-if="canViewCalendars" label="生产日历" name="calendars">
         <el-card class="section-card" shadow="never">
           <el-form :model="calendarFilters" inline @submit.prevent="loadCalendars(1)">
             <el-form-item label="生产线 ID">
@@ -767,7 +848,12 @@ onMounted(() => {
               <el-button :disabled="calendarLoading" :icon="Refresh" @click="resetCalendarFilters">
                 重置
               </el-button>
-              <el-button v-if="canManage" :icon="Plus" type="primary" @click="openCalendarCreate">
+              <el-button
+                v-if="canUpdateCalendars"
+                :icon="Plus"
+                type="primary"
+                @click="openCalendarCreate"
+              >
                 新增排产
               </el-button>
             </el-form-item>
@@ -806,7 +892,7 @@ onMounted(() => {
                 {{ row.typeName || (row.typeId ? `#${row.typeId}` : '-') }}
               </template>
             </el-table-column>
-            <el-table-column v-if="canManage" fixed="right" label="操作" min-width="100">
+            <el-table-column v-if="canDeleteCalendars" fixed="right" label="操作" min-width="100">
               <template #default="{ row }">
                 <el-button
                   link
@@ -857,7 +943,12 @@ onMounted(() => {
           />
         </el-form-item>
         <el-form-item label="生产线类型" prop="typeId">
-          <el-select v-model="configForm.typeId" placeholder="请选择生产线类型" style="width: 100%">
+          <el-select
+            v-if="canViewLineTypes"
+            v-model="configForm.typeId"
+            placeholder="请选择生产线类型"
+            style="width: 100%"
+          >
             <el-option
               v-for="type in lineTypeOptions"
               :key="type.typeId"
@@ -865,6 +956,13 @@ onMounted(() => {
               :value="type.typeId"
             />
           </el-select>
+          <el-input-number
+            v-else
+            v-model="configForm.typeId"
+            :controls="false"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="单件工时" prop="unitTime">
           <el-input-number
@@ -896,7 +994,12 @@ onMounted(() => {
     >
       <el-form ref="lineFormRef" :model="lineForm" :rules="lineRules" label-width="120px">
         <el-form-item label="生产线类型" prop="typeId">
-          <el-select v-model="lineForm.typeId" placeholder="请选择生产线类型" style="width: 100%">
+          <el-select
+            v-if="canViewLineTypes"
+            v-model="lineForm.typeId"
+            placeholder="请选择生产线类型"
+            style="width: 100%"
+          >
             <el-option
               v-for="type in lineTypeOptions"
               :key="type.typeId"
@@ -904,11 +1007,35 @@ onMounted(() => {
               :value="type.typeId"
             />
           </el-select>
-        </el-form-item>
-        <el-form-item label="负责人用户 ID" prop="managerId">
           <el-input-number
+            v-else
+            v-model="lineForm.typeId"
             :controls="false"
+            :min="1"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="负责人" prop="managerId">
+          <el-select
+            v-if="canViewUsers"
             v-model="lineForm.managerId"
+            clearable
+            filterable
+            :loading="usersLoading"
+            placeholder="请选择负责人"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="user in users"
+              :key="user.id"
+              :label="`${user.name} (${user.employeeNo})`"
+              :value="user.id"
+            />
+          </el-select>
+          <el-input-number
+            v-else
+            v-model="lineForm.managerId"
+            :controls="false"
             :min="1"
             style="width: 100%"
           />

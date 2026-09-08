@@ -24,21 +24,29 @@ namespace Org.OpenAPITools.Models
     /// 
     /// </summary>
     [DataContract]
-    public partial class RolePermissionAssignRequest : IEquatable<RolePermissionAssignRequest>
+    public partial class ProductionCompletionReportResult : IEquatable<ProductionCompletionReportResult>
     {
         /// <summary>
-        /// Gets or Sets RoleId
+        /// Gets or Sets ProductionOrder
         /// </summary>
         [Required]
-        [DataMember(Name="role_id", EmitDefaultValue=true)]
-        public int RoleId { get; set; }
+        [DataMember(Name="production_order", EmitDefaultValue=false)]
+        public ProductionOrderDetail ProductionOrder { get; set; }
 
         /// <summary>
-        /// Gets or Sets PermissionIds
+        /// Gets or Sets CompletionInbound
         /// </summary>
         [Required]
-        [DataMember(Name="permission_ids", EmitDefaultValue=false)]
-        public List<int> PermissionIds { get; set; }
+        [DataMember(Name="completion_inbound", EmitDefaultValue=false)]
+        public CompletionInboundOrder CompletionInbound { get; set; }
+
+        /// <summary>
+        /// 本次报工后累计合格数量是否已达到计划数量，且订单是否已自动完工。
+        /// </summary>
+        /// <value>本次报工后累计合格数量是否已达到计划数量，且订单是否已自动完工。</value>
+        [Required]
+        [DataMember(Name="order_completed", EmitDefaultValue=true)]
+        public bool OrderCompleted { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -47,9 +55,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class RolePermissionAssignRequest {\n");
-            sb.Append("  RoleId: ").Append(RoleId).Append("\n");
-            sb.Append("  PermissionIds: ").Append(PermissionIds).Append("\n");
+            sb.Append("class ProductionCompletionReportResult {\n");
+            sb.Append("  ProductionOrder: ").Append(ProductionOrder).Append("\n");
+            sb.Append("  CompletionInbound: ").Append(CompletionInbound).Append("\n");
+            sb.Append("  OrderCompleted: ").Append(OrderCompleted).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,30 +81,34 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((RolePermissionAssignRequest)obj);
+            return obj.GetType() == GetType() && Equals((ProductionCompletionReportResult)obj);
         }
 
         /// <summary>
-        /// Returns true if RolePermissionAssignRequest instances are equal
+        /// Returns true if ProductionCompletionReportResult instances are equal
         /// </summary>
-        /// <param name="other">Instance of RolePermissionAssignRequest to be compared</param>
+        /// <param name="other">Instance of ProductionCompletionReportResult to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(RolePermissionAssignRequest other)
+        public bool Equals(ProductionCompletionReportResult other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    RoleId == other.RoleId ||
-                    
-                    RoleId.Equals(other.RoleId)
+                    ProductionOrder == other.ProductionOrder ||
+                    ProductionOrder != null &&
+                    ProductionOrder.Equals(other.ProductionOrder)
                 ) && 
                 (
-                    PermissionIds == other.PermissionIds ||
-                    PermissionIds != null &&
-                    other.PermissionIds != null &&
-                    PermissionIds.SequenceEqual(other.PermissionIds)
+                    CompletionInbound == other.CompletionInbound ||
+                    CompletionInbound != null &&
+                    CompletionInbound.Equals(other.CompletionInbound)
+                ) && 
+                (
+                    OrderCompleted == other.OrderCompleted ||
+                    
+                    OrderCompleted.Equals(other.OrderCompleted)
                 );
         }
 
@@ -109,10 +122,12 @@ namespace Org.OpenAPITools.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
+                    if (ProductionOrder != null)
+                    hashCode = hashCode * 59 + ProductionOrder.GetHashCode();
+                    if (CompletionInbound != null)
+                    hashCode = hashCode * 59 + CompletionInbound.GetHashCode();
                     
-                    hashCode = hashCode * 59 + RoleId.GetHashCode();
-                    if (PermissionIds != null)
-                    hashCode = hashCode * 59 + PermissionIds.GetHashCode();
+                    hashCode = hashCode * 59 + OrderCompleted.GetHashCode();
                 return hashCode;
             }
         }
@@ -120,12 +135,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(RolePermissionAssignRequest left, RolePermissionAssignRequest right)
+        public static bool operator ==(ProductionCompletionReportResult left, ProductionCompletionReportResult right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(RolePermissionAssignRequest left, RolePermissionAssignRequest right)
+        public static bool operator !=(ProductionCompletionReportResult left, ProductionCompletionReportResult right)
         {
             return !Equals(left, right);
         }

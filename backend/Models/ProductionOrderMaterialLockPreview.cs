@@ -21,24 +21,32 @@ using Org.OpenAPITools.Converters;
 namespace Org.OpenAPITools.Models
 { 
     /// <summary>
-    /// 
+    /// 仅用于审核前展示，不预留库存。若订单存在不属于当前直接 BOM 的有效锁定，或某物料有效锁定 超过 required_qty，后端返回 code 409，要求先修正异常锁定记录。 
     /// </summary>
     [DataContract]
-    public partial class UserRoleDeleteRequest : IEquatable<UserRoleDeleteRequest>
+    public partial class ProductionOrderMaterialLockPreview : IEquatable<ProductionOrderMaterialLockPreview>
     {
         /// <summary>
-        /// Gets or Sets UserId
+        /// Gets or Sets OrderId
         /// </summary>
         [Required]
-        [DataMember(Name="user_id", EmitDefaultValue=true)]
-        public int UserId { get; set; }
+        [DataMember(Name="order_id", EmitDefaultValue=true)]
+        public long OrderId { get; set; }
 
         /// <summary>
-        /// Gets or Sets RoleId
+        /// 所有直接子项 shortage_qty 均为 0 时为 true。
+        /// </summary>
+        /// <value>所有直接子项 shortage_qty 均为 0 时为 true。</value>
+        [Required]
+        [DataMember(Name="can_approve", EmitDefaultValue=true)]
+        public bool CanApprove { get; set; }
+
+        /// <summary>
+        /// Gets or Sets Items
         /// </summary>
         [Required]
-        [DataMember(Name="role_id", EmitDefaultValue=true)]
-        public int RoleId { get; set; }
+        [DataMember(Name="items", EmitDefaultValue=false)]
+        public List<ProductionOrderMaterialLockItem> Items { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -47,9 +55,10 @@ namespace Org.OpenAPITools.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class UserRoleDeleteRequest {\n");
-            sb.Append("  UserId: ").Append(UserId).Append("\n");
-            sb.Append("  RoleId: ").Append(RoleId).Append("\n");
+            sb.Append("class ProductionOrderMaterialLockPreview {\n");
+            sb.Append("  OrderId: ").Append(OrderId).Append("\n");
+            sb.Append("  CanApprove: ").Append(CanApprove).Append("\n");
+            sb.Append("  Items: ").Append(Items).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -72,29 +81,35 @@ namespace Org.OpenAPITools.Models
         {
             if (obj is null) return false;
             if (ReferenceEquals(this, obj)) return true;
-            return obj.GetType() == GetType() && Equals((UserRoleDeleteRequest)obj);
+            return obj.GetType() == GetType() && Equals((ProductionOrderMaterialLockPreview)obj);
         }
 
         /// <summary>
-        /// Returns true if UserRoleDeleteRequest instances are equal
+        /// Returns true if ProductionOrderMaterialLockPreview instances are equal
         /// </summary>
-        /// <param name="other">Instance of UserRoleDeleteRequest to be compared</param>
+        /// <param name="other">Instance of ProductionOrderMaterialLockPreview to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(UserRoleDeleteRequest other)
+        public bool Equals(ProductionOrderMaterialLockPreview other)
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
             return 
                 (
-                    UserId == other.UserId ||
+                    OrderId == other.OrderId ||
                     
-                    UserId.Equals(other.UserId)
+                    OrderId.Equals(other.OrderId)
                 ) && 
                 (
-                    RoleId == other.RoleId ||
+                    CanApprove == other.CanApprove ||
                     
-                    RoleId.Equals(other.RoleId)
+                    CanApprove.Equals(other.CanApprove)
+                ) && 
+                (
+                    Items == other.Items ||
+                    Items != null &&
+                    other.Items != null &&
+                    Items.SequenceEqual(other.Items)
                 );
         }
 
@@ -109,9 +124,11 @@ namespace Org.OpenAPITools.Models
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
                     
-                    hashCode = hashCode * 59 + UserId.GetHashCode();
+                    hashCode = hashCode * 59 + OrderId.GetHashCode();
                     
-                    hashCode = hashCode * 59 + RoleId.GetHashCode();
+                    hashCode = hashCode * 59 + CanApprove.GetHashCode();
+                    if (Items != null)
+                    hashCode = hashCode * 59 + Items.GetHashCode();
                 return hashCode;
             }
         }
@@ -119,12 +136,12 @@ namespace Org.OpenAPITools.Models
         #region Operators
         #pragma warning disable 1591
 
-        public static bool operator ==(UserRoleDeleteRequest left, UserRoleDeleteRequest right)
+        public static bool operator ==(ProductionOrderMaterialLockPreview left, ProductionOrderMaterialLockPreview right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(UserRoleDeleteRequest left, UserRoleDeleteRequest right)
+        public static bool operator !=(ProductionOrderMaterialLockPreview left, ProductionOrderMaterialLockPreview right)
         {
             return !Equals(left, right);
         }
