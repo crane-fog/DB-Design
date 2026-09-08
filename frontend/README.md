@@ -2,7 +2,7 @@
 
 ## 环境与命令
 
-本项目使用 Vue 3、TypeScript、Vite、Element Plus 和 pnpm。`package.json` 指定 Node.js `^20.19.0 || >=22.12.0`，推荐使用当前 LTS 的 Node.js 22；pnpm 版本由 `packageManager` 固定为 `10.32.1`。
+本项目使用 Vue 3、TypeScript、Vite、Element Plus 和 pnpm。
 
 ```bash
 cd frontend
@@ -33,8 +33,6 @@ copy .env.example .env
 ```
 
 - `.env`：本机通用配置，不得包含密码、Token 或个人凭据，也不得提交。
-- `.env.development`：仅开发模式使用的覆盖项。
-- `.env.production`：仅生产构建使用的公开配置；所有 `VITE_` 前缀变量会被打包到浏览器，不能存放秘密。
 - `VITE_API_BASE_URL`：生成 API 客户端的基址。默认留空，接口仍以同源 `/api` 路径访问。
 - `VITE_API_PROXY_TARGET`：Vite 开发代理的目标地址，默认 `http://localhost:5000`。
 
