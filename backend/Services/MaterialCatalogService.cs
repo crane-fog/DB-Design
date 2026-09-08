@@ -82,8 +82,7 @@ public class MaterialStockIntegrationService(string connString) : IStockReadQuer
 public class MaterialCatalogService(
     string connString,
     IStockReadQuery stockReadQuery,
-    IStockInitialization stockInitialization,
-    BomGraphValidationService bomGraphValidation)
+    IStockInitialization stockInitialization)
 {
     public (List<MaterialCategory> Records, int Total) ListCategories(int page, int pageSize, string? categoryName)
     {
@@ -385,6 +384,12 @@ public class MaterialCatalogService(
 
             return MaterialCatalogResult<MaterialDetail>.Success(GetMaterialInternal(conn, newId)!);
         }
+        catch (OracleException ex)
+            when (OracleDomainErrorMapper.TryMap(ex, out int code, out string message))
+        {
+            transaction.Rollback();
+            return MaterialCatalogResult<MaterialDetail>.Fail((MaterialCatalogError)code, message);
+        }
         catch (OracleException ex) when (ex.Number == 1 || ex.Number == 2291 || ex.Number == 2292)
         {
             transaction.Rollback();
@@ -439,23 +444,6 @@ public class MaterialCatalogService(
         using var transaction = conn.BeginTransaction();
         try
         {
-            if (request.CurrentVersionId.HasValue
-                && existing.CurrentVersionId != request.CurrentVersionId)
-            {
-                var graphValidation = bomGraphValidation.ValidateActivation(
-                    conn,
-                    transaction,
-                    request.MaterialId,
-                    request.CurrentVersionId.Value);
-                if (graphValidation.HasCycle)
-                {
-                    transaction.Rollback();
-                    return MaterialCatalogResult<MaterialDetail>.Fail(
-                        MaterialCatalogError.Conflict,
-                        $"发布该 BOM 版本会形成循环依赖：{string.Join(" -> ", graphValidation.CyclePath)}");
-                }
-            }
-
             using (var cmd = conn.CreateCommand())
             {
                 cmd.Transaction = transaction;
@@ -485,6 +473,12 @@ public class MaterialCatalogService(
             }
 
             transaction.Commit();
+        }
+        catch (OracleException ex)
+            when (OracleDomainErrorMapper.TryMap(ex, out int code, out string message))
+        {
+            transaction.Rollback();
+            return MaterialCatalogResult<MaterialDetail>.Fail((MaterialCatalogError)code, message);
         }
         catch (OracleException ex) when (ex.Number == 1 || ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
         {
