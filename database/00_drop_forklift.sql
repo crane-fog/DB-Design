@@ -50,6 +50,7 @@ BEGIN
             'V_MATERIAL_BATCH_TRACE',
             'V_PRODUCT_BATCH_TRACE',
             'V_BATCH_CONSUMPTION_DETAIL',
+            'V_ORDER_MATERIAL_TRACE',
             'V_EFFECTIVE_BOM_EDGE'))
     ) LOOP
         drop_ddl('DROP VIEW ' || object_name.name, -942);

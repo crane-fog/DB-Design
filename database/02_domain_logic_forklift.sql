@@ -34,6 +34,14 @@ END pkg_app_error;
 /
 
 -- ---------- 2. 当前 BOM 与追溯只读视图 ----------
+--
+-- 追溯口径（定稿）：
+--   * batch_consumption 是「订单级累计消耗」，是包含在制订单的权威事实；
+--     所有对外追溯（正向、原料反查、质量影响分析）都必须以它为数据源。
+--   * finish_batch_consumption 只表示「报工时新增登记的消耗增量」，
+--     不能视为某个成品批次的真实用料分摊，因此仅供内部快照视图使用。
+--   * 若以后要做真正精确的成品批次追溯，需要在报工请求中显式提交批次用料
+--     分配，或引入独立的领料/投料事件，不能按报工数量反推。
 
 CREATE OR REPLACE VIEW v_effective_bom_edge AS
 SELECT b.bom_id,
@@ -58,7 +66,10 @@ SELECT b.bom_id,
   JOIN material child_material
     ON child_material.material_id = b.child_material_id;
 
-CREATE OR REPLACE VIEW v_batch_consumption_detail AS
+-- 订单级追溯视图（对外权威口径）。以 batch_consumption 为事实来源，
+-- 因此在制、未报工的生产订单同样有数据；batch_no 取该订单最新完工批次作为
+-- 展示用代表值，未报工时为 NULL，与历史 API 语义一致。
+CREATE OR REPLACE VIEW v_order_material_trace AS
 SELECT bc.consumption_id,
        bc.order_id,
        bc.item_id,
@@ -68,6 +79,9 @@ SELECT bc.consumption_id,
        po.plan_qty,
        po.finished_qty,
        po.status AS production_status,
+       (SELECT MAX(inbound.batch_no)
+          FROM finish_inbound inbound
+         WHERE inbound.order_id = bc.order_id) AS batch_no,
        poi.order_id AS purchase_order_id,
        poi.material_id AS input_material_id,
        input_material.material_name AS input_material_name,
@@ -94,6 +108,30 @@ SELECT bc.consumption_id,
   JOIN supplier
     ON supplier.supplier_id = purchase.supplier_id;
 
+-- 消耗记录列表/详情视图，等价于订单级追溯视图去掉成品批次号。
+CREATE OR REPLACE VIEW v_batch_consumption_detail AS
+SELECT consumption_id,
+       order_id,
+       item_id,
+       consume_qty,
+       product_material_id,
+       product_material_name,
+       plan_qty,
+       finished_qty,
+       production_status,
+       purchase_order_id,
+       input_material_id,
+       input_material_name,
+       purchase_quantity,
+       received_qty,
+       unit_price,
+       supplier_id,
+       supplier_name,
+       first_receive_date
+  FROM v_order_material_trace;
+
+-- 内部快照视图：报工增量登记明细，仅用于核对「哪一次报工登记了哪些增量」。
+-- 粒度与订单级累计消耗不同，不得作为对外追溯或质量影响分析的数据源。
 CREATE OR REPLACE VIEW v_product_batch_trace AS
 SELECT inbound.inbound_id,
        inbound.batch_no,
@@ -128,6 +166,7 @@ SELECT inbound.inbound_id,
   JOIN supplier
     ON supplier.supplier_id = purchase.supplier_id;
 
+-- 内部快照视图：v_product_batch_trace 的原材料视角投影，同样仅供内部核对。
 CREATE OR REPLACE VIEW v_material_batch_trace AS
 SELECT item_id,
        input_material_id,
@@ -240,9 +279,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_trace_domain AS
              WHERE order_id = p_order_id;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                pkg_app_error.fail(pkg_app_error.c_not_found, '生产订单不存在');
+                -- 与历史 API 语义一致：消耗记录里的订单/明细引用不合法算入参错误（400），
+                -- 只有「消耗记录本身不存在」才是 404。
+                pkg_app_error.fail(pkg_app_error.c_invalid_argument, '生产订单不存在');
         END;
 
+        -- 收紧点：旧实现只要求 actual_start 非空（已完工订单也能改），
+        -- 现在必须处于「生产中」，避免终态订单的追溯链被改动。
         IF TRIM(p_status) <> '生产中' THEN
             pkg_app_error.fail(pkg_app_error.c_state_conflict, '仅生产中订单可维护消耗记录');
         END IF;
@@ -325,7 +368,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_trace_domain AS
              WHERE item_id = p_item_id;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                pkg_app_error.fail(pkg_app_error.c_not_found, '采购订单明细不存在');
+                pkg_app_error.fail(pkg_app_error.c_invalid_argument, '采购订单明细不存在');
         END;
 
         IF pkg_bom_domain.is_order_leaf_material(p_order_id, l_input_material_id) <> 1 THEN
@@ -352,6 +395,20 @@ CREATE OR REPLACE PACKAGE BODY pkg_trace_domain AS
             IF l_allocated_qty > 0 AND l_existing_item_id <> p_item_id THEN
                 pkg_app_error.fail(pkg_app_error.c_trace_immutable, '已分配到成品批次的采购明细不可变更');
             END IF;
+
+            -- 改挂到同订单下已有消耗的采购明细，会撞 uq_bc_order_item；
+            -- 提前判成领域冲突（409），不要落到未映射的 ORA-00001（500）。
+            SELECT COUNT(*)
+              INTO l_existing_count
+              FROM batch_consumption
+             WHERE order_id = p_order_id
+               AND item_id = p_item_id
+               AND consumption_id <> p_consumption_id;
+            IF l_existing_count > 0 THEN
+                pkg_app_error.fail(
+                    pkg_app_error.c_state_conflict,
+                    '该原材料已存在消耗记录，请使用更新接口');
+            END IF;
         ELSE
             SELECT COUNT(*)
               INTO l_existing_count
@@ -377,16 +434,23 @@ CREATE OR REPLACE PACKAGE BODY pkg_trace_domain AS
                 '采购明细累计消耗超过已收数量');
         END IF;
 
-        IF p_consumption_id IS NULL THEN
-            INSERT INTO batch_consumption (order_id, item_id, consume_qty)
-            VALUES (p_order_id, p_item_id, p_consume_qty)
-            RETURNING consumption_id INTO p_consumption_id;
-        ELSE
-            UPDATE batch_consumption
-               SET item_id = p_item_id,
-                   consume_qty = p_consume_qty
-             WHERE consumption_id = p_consumption_id;
-        END IF;
+        BEGIN
+            IF p_consumption_id IS NULL THEN
+                INSERT INTO batch_consumption (order_id, item_id, consume_qty)
+                VALUES (p_order_id, p_item_id, p_consume_qty)
+                RETURNING consumption_id INTO p_consumption_id;
+            ELSE
+                UPDATE batch_consumption
+                   SET item_id = p_item_id,
+                       consume_qty = p_consume_qty
+                 WHERE consumption_id = p_consumption_id;
+            END IF;
+        EXCEPTION
+            WHEN DUP_VAL_ON_INDEX THEN
+                pkg_app_error.fail(
+                    pkg_app_error.c_state_conflict,
+                    '该原材料已存在消耗记录，请使用更新接口');
+        END;
     END save_consumption;
 
     PROCEDURE delete_consumption(p_consumption_id IN NUMBER) IS
@@ -500,10 +564,15 @@ COMPOUND TRIGGER
         l_input_material_id purchase_order_item.material_id%TYPE;
         l_allocated_qty     NUMBER;
     BEGIN
-        SELECT status
-          INTO l_status
-          FROM production_order
-         WHERE order_id = p_order_id;
+        BEGIN
+            SELECT status
+              INTO l_status
+              FROM production_order
+             WHERE order_id = p_order_id;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                pkg_app_error.fail(pkg_app_error.c_invalid_argument, '生产订单不存在');
+        END;
 
         IF TRIM(l_status) <> '生产中' THEN
             pkg_app_error.fail(pkg_app_error.c_state_conflict, '仅生产中订单可维护消耗记录');
@@ -523,10 +592,15 @@ COMPOUND TRIGGER
             RETURN;
         END IF;
 
-        SELECT material_id
-          INTO l_input_material_id
-          FROM purchase_order_item
-         WHERE item_id = p_item_id;
+        BEGIN
+            SELECT material_id
+              INTO l_input_material_id
+              FROM purchase_order_item
+             WHERE item_id = p_item_id;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                pkg_app_error.fail(pkg_app_error.c_invalid_argument, '采购订单明细不存在');
+        END;
 
         IF pkg_bom_domain.is_order_leaf_material(p_order_id, l_input_material_id) <> 1 THEN
             pkg_app_error.fail(pkg_app_error.c_state_conflict, '采购物料不是订单 BOM 的末级物料');
@@ -549,9 +623,6 @@ COMPOUND TRIGGER
         IF p_consume_qty < l_allocated_qty THEN
             pkg_app_error.fail(pkg_app_error.c_trace_immutable, '累计消耗不得小于已分配数量');
         END IF;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            pkg_app_error.fail(pkg_app_error.c_not_found, '生产订单或采购订单明细不存在');
     END assert_mutable;
 
     BEFORE EACH ROW IS
@@ -818,6 +889,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_production_domain AS
         l_locked_qty     NUMBER;
         l_pending_qty    NUMBER;
         l_lock_id        stock_lock.lock_id%TYPE;
+        l_shortage_text  VARCHAR2(4000);
     BEGIN
         IF p_approved IS NULL OR p_approved NOT IN (0, 1) THEN
             pkg_app_error.fail(pkg_app_error.c_invalid_argument, '审核结果必须为 0 或 1');
@@ -846,17 +918,17 @@ CREATE OR REPLACE PACKAGE BODY pkg_production_domain AS
         assert_direct_bom(l_material_id, l_version_id);
         assert_existing_locks_valid(p_order_id, l_material_id, l_version_id, l_plan_qty);
 
-        -- 第一遍只锁行并验证所有物料；若任何一项不足，不执行领域 DML。
+        -- 第一遍只锁行，不做判定；若任何一项不足，不执行领域 DML。
         FOR requirement IN (
-            SELECT edge.child_material_id AS material_id,
-                   CEIL(l_plan_qty * edge.quantity / (1 - edge.loss_rate) * 100) / 100
-                       AS required_qty
+            SELECT edge.child_material_id AS material_id
               FROM bom edge
              WHERE edge.version_id = l_version_id
                AND edge.parent_material_id = l_material_id
              ORDER BY edge.child_material_id
         ) LOOP
             BEGIN
+                -- 只为拿行锁，l_available_qty 本身不参与判定；
+                -- 没有库存台账行的物料没什么可锁，忽略即可。
                 SELECT available_qty
                   INTO l_available_qty
                   FROM material_stock
@@ -864,22 +936,43 @@ CREATE OR REPLACE PACKAGE BODY pkg_production_domain AS
                  FOR UPDATE;
             EXCEPTION
                 WHEN NO_DATA_FOUND THEN
-                    l_available_qty := 0;
+                    NULL;
             END;
-
-            SELECT NVL(SUM(lock_qty), 0)
-              INTO l_locked_qty
-              FROM stock_lock
-             WHERE order_id = p_order_id
-               AND material_id = requirement.material_id
-               AND status = '已锁定';
-            l_pending_qty := requirement.required_qty - l_locked_qty;
-            IF l_pending_qty > l_available_qty THEN
-                pkg_app_error.fail(
-                    pkg_app_error.c_stock_conflict,
-                    '物料 ' || requirement.material_id || ' 库存不足');
-            END IF;
         END LOOP;
+
+        -- 行锁到手后一次性汇总全部缺口，保持与旧实现一致的完整缺料清单。
+        SELECT LISTAGG(shortage.material_name || '缺少'
+                       || RTRIM(TO_CHAR(shortage.shortage_qty, 'FM99999999990.99'), '.')
+                       || shortage.unit, '；'
+                       ON OVERFLOW TRUNCATE '...' WITH COUNT)
+                   WITHIN GROUP (ORDER BY shortage.material_id)
+          INTO l_shortage_text
+          FROM (
+              SELECT edge.child_material_id AS material_id,
+                     material.material_name,
+                     material.unit,
+                     CEIL(l_plan_qty * edge.quantity / (1 - edge.loss_rate) * 100) / 100
+                     - NVL((SELECT SUM(active_lock.lock_qty)
+                              FROM stock_lock active_lock
+                             WHERE active_lock.order_id = p_order_id
+                               AND active_lock.material_id = edge.child_material_id
+                               AND active_lock.status = '已锁定'), 0)
+                     - NVL(stock.available_qty, 0) AS shortage_qty
+                FROM bom edge
+                JOIN material
+                  ON material.material_id = edge.child_material_id
+                LEFT JOIN material_stock stock
+                  ON stock.material_id = edge.child_material_id
+               WHERE edge.version_id = l_version_id
+                 AND edge.parent_material_id = l_material_id
+          ) shortage
+         WHERE shortage.shortage_qty > 0;
+
+        IF l_shortage_text IS NOT NULL THEN
+            pkg_app_error.fail(
+                pkg_app_error.c_stock_conflict,
+                '库存不足：' || l_shortage_text);
+        END IF;
 
         -- 第二遍执行库存和锁定写入。
         FOR requirement IN (
@@ -909,7 +1002,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_production_domain AS
                 IF SQL%ROWCOUNT <> 1 THEN
                     pkg_app_error.fail(
                         pkg_app_error.c_stock_conflict,
-                        '物料 ' || requirement.material_id || ' 库存不足');
+                        '物料 ' || requirement.material_id || ' 库存不足，未执行审核');
                 END IF;
 
                 IF l_lock_id IS NULL THEN
@@ -1073,7 +1166,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_production_domain AS
         l_finished_qty     production_order.finished_qty%TYPE;
         l_status           production_order.status%TYPE;
         l_new_finished_qty production_order.finished_qty%TYPE;
-        l_batch_no         finish_inbound.batch_no%TYPE := TRIM(p_batch_no);
+        l_batch_no         VARCHAR2(4000) := TRIM(p_batch_no);
     BEGIN
         IF p_finish_qty IS NULL OR p_finish_qty <= 0 THEN
             pkg_app_error.fail(pkg_app_error.c_invalid_argument, '本批完工数量必须大于 0');
@@ -1204,10 +1297,21 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
     PROCEDURE assert_version_owner(
         p_material_id IN NUMBER,
         p_version_id  IN NUMBER) IS
-        l_owner_id bom_version.material_id%TYPE;
+        l_owner_id       bom_version.material_id%TYPE;
+        l_material_count NUMBER;
     BEGIN
         assert_positive(p_material_id, '物料编号');
         assert_positive(p_version_id, 'BOM 版本编号');
+
+        -- 先判物料再判版本，保证「物料不存在」返回明确的 404，
+        -- 而不是被后面的版本归属检查掩盖成 400。
+        SELECT COUNT(*)
+          INTO l_material_count
+          FROM material
+         WHERE material_id = p_material_id;
+        IF l_material_count = 0 THEN
+            pkg_app_error.fail(pkg_app_error.c_not_found, '物料不存在');
+        END IF;
 
         BEGIN
             SELECT material_id
@@ -1233,6 +1337,9 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
     BEGIN
         assert_version_owner(p_material_id, p_version_id);
 
+        -- 只从目标根物料出发展开：根物料用候选版本 p_version_id 的边，
+        -- 更深层沿用各自的当前有效版本。不再以「图中每一条边」为起点，
+        -- 避免整图路径枚举，也避免图中其它位置的环误伤本次校验。
         WITH graph (parent_material_id, child_material_id) AS (
             SELECT b.parent_material_id, b.child_material_id
               FROM bom b
@@ -1243,15 +1350,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
               FROM v_effective_bom_edge edge
              WHERE edge.parent_material_id <> p_material_id
         ),
-        walk (root_material_id, current_material_id, depth, material_path) AS (
-            SELECT graph.parent_material_id,
-                   graph.child_material_id,
-                   1,
-                   TO_CHAR(graph.parent_material_id) || '/' || TO_CHAR(graph.child_material_id)
-              FROM graph
+        walk (current_material_id, depth, material_path) AS (
+            SELECT CAST(p_material_id AS NUMBER),
+                   0,
+                   CAST(TO_CHAR(p_material_id) AS VARCHAR2(4000))
+              FROM dual
             UNION ALL
-            SELECT walk.root_material_id,
-                   graph.child_material_id,
+            SELECT graph.child_material_id,
                    walk.depth + 1,
                    walk.material_path || '/' || TO_CHAR(graph.child_material_id)
               FROM walk
@@ -1305,7 +1410,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
             WITH walk (current_material_id, depth, material_path) AS (
                 SELECT p_child_material_id,
                        0,
-                       TO_CHAR(p_child_material_id)
+                       CAST(TO_CHAR(p_child_material_id) AS VARCHAR2(4000))
                   FROM dual
                 UNION ALL
                 SELECT edge.child_material_id,
@@ -1365,7 +1470,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
                        CAST(1 AS NUMBER),
                        p_root_qty,
                        0,
-                       TO_CHAR(material.material_id),
+                       CAST(TO_CHAR(material.material_id) AS VARCHAR2(4000)),
                        p_version_id
                   FROM material
                  WHERE material.material_id = p_material_id
@@ -1452,7 +1557,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
                        p_quantity * edge.quantity,
                        CEIL(p_quantity * edge.quantity / (1 - edge.loss_rate)),
                        1,
-                       TO_CHAR(p_material_id) || '/' || TO_CHAR(child.material_id),
+                       CAST(TO_CHAR(p_material_id) || '/' || TO_CHAR(child.material_id)
+                            AS VARCHAR2(4000)),
                        effective_version.version_id
                   FROM bom edge
                   JOIN material child
@@ -1507,8 +1613,9 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
                    SUM(net_quantity) AS net_quantity,
                    SUM(gross_quantity) AS gross_quantity,
                    loss_rate,
-                   LISTAGG(material_path, ' | ') WITHIN GROUP (ORDER BY material_path)
-                       AS material_path,
+                   LISTAGG(material_path, ' | '
+                           ON OVERFLOW TRUNCATE '...' WITH COUNT)
+                       WITHIN GROUP (ORDER BY material_path) AS material_path,
                    MIN(CASE
                        WHEN next_version_id IS NULL OR NOT EXISTS (
                            SELECT 1
@@ -1554,6 +1661,9 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
                  WHERE p_include_history = 1
                     OR parent.current_version_id = b.version_id
             ),
+            -- 起点物料本身也放进 walk（depth = 0），这样 CYCLE 能覆盖起点，
+            -- 避免 A 用于 B、B 又用于 A 时把起点自己当成上层成品返回；
+            -- 输出时用 depth > 0 过滤掉这一行。
             usage (
                 product_material_id,
                 version_id,
@@ -1563,15 +1673,14 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
                 depth,
                 material_path
             ) AS (
-                SELECT edge.parent_material_id,
-                       edge.version_id,
-                       edge.version_no,
-                       edge.quantity,
-                       edge.quantity,
-                       1,
-                       TO_CHAR(p_material_id) || '/' || TO_CHAR(edge.parent_material_id)
-                  FROM reverse_edge edge
-                 WHERE edge.child_material_id = p_material_id
+                SELECT CAST(p_material_id AS NUMBER),
+                       CAST(NULL AS NUMBER),
+                       CAST(NULL AS VARCHAR2(20)),
+                       CAST(NULL AS NUMBER),
+                       CAST(1 AS NUMBER),
+                       0,
+                       CAST(TO_CHAR(p_material_id) AS VARCHAR2(4000))
+                  FROM dual
                 UNION ALL
                 SELECT edge.parent_material_id,
                        edge.version_id,
@@ -1601,6 +1710,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_bom_domain AS
               JOIN material
                 ON material.material_id = usage.product_material_id
              WHERE cycle_flag = 'N'
+               AND usage.depth > 0
              ORDER BY traversal_order;
     END open_reverse_usage;
 

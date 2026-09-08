@@ -196,17 +196,38 @@ public class BomService(string connString)
 
         using var conn = new OracleConnection(connString);
         conn.Open();
+        using var transaction = conn.BeginTransaction();
 
-        if (GetBomInternal(conn, bomId) is null)
+        try
         {
-            return BomBusinessResult<object>.Fail(BomBusinessError.NotFound, "BOM 明细不存在");
-        }
+            if (GetBomInternal(conn, bomId, transaction) is null)
+            {
+                transaction.Rollback();
+                return BomBusinessResult<object>.Fail(BomBusinessError.NotFound, "BOM 明细不存在");
+            }
 
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM BOM WHERE BOM_ID = :bomId";
-        cmd.Parameters.Add(new OracleParameter("bomId", bomId));
-        cmd.ExecuteNonQuery();
-        return BomBusinessResult<object>.Success(new object());
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = transaction;
+                cmd.CommandText = "DELETE FROM BOM WHERE BOM_ID = :bomId";
+                cmd.Parameters.Add(new OracleParameter("bomId", bomId));
+                cmd.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+            return BomBusinessResult<object>.Success(new object());
+        }
+        catch (OracleException ex)
+            when (OracleDomainErrorMapper.TryMap(ex, out int code, out string message))
+        {
+            transaction.Rollback();
+            return BomBusinessResult<object>.Fail((BomBusinessError)code, message);
+        }
+        catch (OracleException ex) when (ex.Number == 1 || ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
+        {
+            transaction.Rollback();
+            return BomBusinessResult<object>.Fail(BomBusinessError.Conflict, "BOM 明细关联数据冲突");
+        }
     }
 
     public BomCycleCheckResult CheckCycle(BomCycleCheckRequest request)

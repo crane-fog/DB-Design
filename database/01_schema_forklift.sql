@@ -388,7 +388,7 @@ CREATE TABLE finish_inbound (
     version_id     NUMBER(10) NOT NULL REFERENCES bom_version(version_id), -- 入库时点快照
     finish_qty     NUMBER(12,2) NOT NULL CHECK (finish_qty > 0),
     qualified_qty  NUMBER(12,2) NOT NULL CHECK (qualified_qty >= 0),
-    batch_no       VARCHAR2(30) NOT NULL,
+    batch_no       VARCHAR2(30 CHAR) NOT NULL,
     inbound_time   TIMESTAMP NOT NULL,
     operator_id    NUMBER(10) NOT NULL REFERENCES sys_user(user_id),
     CONSTRAINT uq_finish_inbound_batch UNIQUE (batch_no),

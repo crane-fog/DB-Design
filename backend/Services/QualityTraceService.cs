@@ -18,8 +18,14 @@ public sealed record BatchConsumptionResult(
 
 /// <summary>
 /// 质量追溯主责 Service（C 模块）。维护 batch_consumption（生产订单↔采购明细的消耗关系），
-/// 并通过只读 JOIN 组装正向追溯（成品→原材料）、反向追溯（原材料→成品）和质量影响分析。
+/// 并通过只读视图组装正向追溯（成品→原材料）、反向追溯（原材料→成品）和质量影响分析。
 /// 采购明细 / 供应商 / 收货 / 物料等权威实体由 A、B 模块维护，本 Service 只查询不写入。
+/// <para>
+/// 追溯口径：batch_consumption 是订单级累计消耗，也是包含在制订单的权威事实，
+/// 三个对外追溯入口统一走 V_ORDER_MATERIAL_TRACE。finish_batch_consumption 只记录
+/// 「报工时新增登记的消耗增量」，不等于某个成品批次的真实用料分摊，因此其快照视图
+/// （V_PRODUCT_BATCH_TRACE / V_MATERIAL_BATCH_TRACE）仅供内部核对，不作为追溯数据源。
+/// </para>
 /// </summary>
 public class QualityTraceService(string connString)
 {
@@ -232,8 +238,9 @@ public class QualityTraceService(string connString)
     }
 
     /// <summary>
-    /// 正向追溯：从生产订单或成品批次号出发，查出该成品消耗的原材料采购批次、供应商和到货信息。
-    /// order_id 与 batch_no 至少提供一个。
+    /// 正向追溯：从生产订单或成品批次号出发，查出该订单消耗的原材料采购批次、供应商和到货信息。
+    /// order_id 与 batch_no 至少提供一个；只传 batch_no 时用它定位订单。
+    /// 返回的始终是订单级累计消耗，未报工的在制订单同样有数据，此时 batch_no 为 null。
     /// </summary>
     public ProductBatchTraceResult? TraceProductBatch(long? orderId, string? batchNo, bool includeSupplier)
     {
@@ -294,6 +301,8 @@ public class QualityTraceService(string connString)
             resolvedBatchNo = batchValue is null or DBNull ? null : batchValue.ToString();
         }
 
+        // 追溯口径：BATCH_CONSUMPTION 是订单级累计消耗，且是包含在制订单的权威事实。
+        // batch_no 只用于定位订单和展示，不参与筛选，否则未报工的订单会查不到用料。
         var consumed = new List<ConsumedMaterialBatch>();
         using (var cmd = conn.CreateCommand())
         {
@@ -301,14 +310,10 @@ public class QualityTraceService(string connString)
                 SELECT trace.ITEM_ID, trace.INPUT_MATERIAL_ID, trace.INPUT_MATERIAL_NAME,
                        trace.SUPPLIER_ID, trace.SUPPLIER_NAME, trace.PURCHASE_ORDER_ID,
                        trace.FIRST_RECEIVE_DATE, trace.CONSUME_QTY
-                FROM V_PRODUCT_BATCH_TRACE trace
+                FROM V_ORDER_MATERIAL_TRACE trace
                 WHERE trace.ORDER_ID = :orderId
-                  AND (:batchNo IS NULL OR trace.BATCH_NO = :batchNo)
                 ORDER BY trace.ITEM_ID";
             cmd.Parameters.Add(new OracleParameter("orderId", resolvedOrderId.Value));
-            cmd.Parameters.Add(new OracleParameter(
-                "batchNo",
-                string.IsNullOrWhiteSpace(resolvedBatchNo) ? DBNull.Value : resolvedBatchNo));
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -340,6 +345,7 @@ public class QualityTraceService(string connString)
     /// <summary>
     /// 反向追溯：从采购明细 / 原材料 / 到货日期范围出发，查出问题批次流入的所有生产订单和成品批次。
     /// item_id、material_id 或完整到货日期范围至少提供一种。
+    /// 在制、尚未报工的订单必须出现在结果里（其成品批次号为 null）。
     /// </summary>
     public List<MaterialBatchTraceResult> TraceMaterialBatch(
         long? itemId,
@@ -436,6 +442,7 @@ public class QualityTraceService(string connString)
 
     /// <summary>
     /// 质量影响分析：按问题采购明细 / 原材料 / 到货日期范围，汇总受影响生产订单、成品批次和建议动作。
+    /// 数据源是订单级累计消耗，因此在制订单同样计入 AffectedOrderCount 与建议动作判定。
     /// </summary>
     public QualityImpactAnalyzeResult AnalyzeImpact(QualityImpactAnalyzeRequest request)
     {
@@ -554,9 +561,9 @@ public class QualityTraceService(string connString)
                 SELECT trace.ITEM_ID, trace.ORDER_ID, trace.BATCH_NO,
                        trace.PRODUCT_MATERIAL_ID, trace.PRODUCT_MATERIAL_NAME,
                        trace.PRODUCTION_STATUS, trace.CONSUME_QTY
-                FROM V_MATERIAL_BATCH_TRACE trace
+                FROM V_ORDER_MATERIAL_TRACE trace
                 WHERE trace.ITEM_ID IN ({string.Join(", ", placeholders)})
-                ORDER BY trace.ITEM_ID, trace.ORDER_ID, trace.BATCH_NO";
+                ORDER BY trace.ITEM_ID, trace.ORDER_ID";
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
