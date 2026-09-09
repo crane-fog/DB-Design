@@ -7,6 +7,7 @@ using Backend.Services.Interfaces;
 using DotNetEnv;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
@@ -157,6 +158,13 @@ builder.Services
     });
 builder.Services.AddAuthorization();
 
+// Nginx 与后端部署在同一主机时，默认可信代理范围包含 IPv4/IPv6 回环地址。
+// 处理转发头后，RemoteIpAddress 会恢复为发起请求的客户端地址。
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
         policy.AllowAnyOrigin()
               .AllowAnyHeader()
@@ -164,6 +172,7 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -18,5 +18,6 @@ cp .env.example .env
 编辑 `.env`，配置数据库连接字符串。
 
 ```sh
+dotnet build
 dotnet run
 ```
