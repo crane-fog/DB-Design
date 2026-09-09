@@ -14,9 +14,10 @@ ALTER USER "<username>" QUOTA UNLIMITED ON USERS;
 exit;
 ```
 
-两份 .sql 脚本分别为 表结构与预置数据的初始化脚本 和 数据库层逻辑初始化脚本（包括触发器、存储过程、函数等），需按顺序执行。
+三份 .sql 脚本分别为 表结构初始化脚本、预置数据初始化脚本 和 数据库层逻辑初始化脚本（包括触发器、存储过程、函数等），需按顺序执行。
 
 ```sh
-sqlplus '<username>/<password>@//localhost:1521/FREEPDB1' @1_schema_data_init.sql
-sqlplus '<username>/<password>@//localhost:1521/FREEPDB1' @2_logic_init.sql
+sqlplus '<username>/<password>@//localhost:1521/FREEPDB1' @1_schema_init.sql
+sqlplus '<username>/<password>@//localhost:1521/FREEPDB1' @2_data_init.sql
+sqlplus '<username>/<password>@//localhost:1521/FREEPDB1' @3_logic_init.sql
 ```
