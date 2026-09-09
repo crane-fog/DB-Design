@@ -22,6 +22,8 @@ public sealed record RegisterResult(RegisteredUser? User, string? ErrorMessage);
 
 public class AuthService(string connString, string jwtSecret, LoginLogService loginLogService)
 {
+    private const int DefaultRegisteredUserRoleId = 7;
+
     public AuthenticatedUser? Authenticate(string employeeNo, string inputPasswordHash, string ipAddress)
     {
         using var conn = new OracleConnection(connString);
@@ -94,8 +96,10 @@ public class AuthService(string connString, string jwtSecret, LoginLogService lo
 
         using var conn = new OracleConnection(connString);
         conn.Open();
+        using OracleTransaction transaction = conn.BeginTransaction();
 
         using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
         cmd.CommandText = @"INSERT INTO SYS_USER
                             (EMPLOYEE_NO, PASSWORD_HASH, USER_NAME, PHONE, EMAIL, STATUS, CREATED_TIME, PWD_UPDATE_TIME)
                             VALUES
@@ -117,12 +121,28 @@ public class AuthService(string connString, string jwtSecret, LoginLogService lo
         {
             cmd.ExecuteNonQuery();
             var userId = long.Parse(userIdParameter.Value.ToString()!, CultureInfo.InvariantCulture);
+
+            using var roleCmd = conn.CreateCommand();
+            roleCmd.Transaction = transaction;
+            roleCmd.CommandText = @"INSERT INTO SYS_USER_ROLE (USER_ID, ROLE_ID)
+                                    VALUES (:userId, :roleId)";
+            roleCmd.Parameters.Add(new OracleParameter("userId", userId));
+            roleCmd.Parameters.Add(new OracleParameter("roleId", DefaultRegisteredUserRoleId));
+            roleCmd.ExecuteNonQuery();
+
+            transaction.Commit();
             var user = new RegisteredUser(userId, employeeNo, userName, phone, email, "valid");
             return new RegisterResult(user, null);
         }
         catch (OracleException ex) when (ex.Number == 1)
         {
+            transaction.Rollback();
             return new RegisterResult(null, "工号已存在");
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
         }
     }
 

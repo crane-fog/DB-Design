@@ -8,6 +8,7 @@ import {
 } from '@/services/SystemService'
 import { Refresh, View } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import AuditTextDiff from '@/components/system/AuditTextDiff.vue'
 import { PermissionCode } from '@/constants/permissions'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -409,7 +410,13 @@ onMounted(() => {
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="detailDialogVisible" title="操作日志详情" width="760px">
+    <el-dialog
+      v-model="detailDialogVisible"
+      align-center
+      class="audit-detail-dialog"
+      title="操作日志详情"
+      width="min(1080px, 92vw)"
+    >
       <template v-if="selectedOperation">
         <el-descriptions :column="2" border class="operation-detail-summary">
           <el-descriptions-item label="操作人">
@@ -428,7 +435,12 @@ onMounted(() => {
             {{ selectedOperation.ipAddress || '-' }}
           </el-descriptions-item>
         </el-descriptions>
-        <div class="operation-snapshots">
+        <AuditTextDiff
+          v-if="selectedOperation.beforeData && selectedOperation.afterData"
+          :after-text="selectedOperation.afterData"
+          :before-text="selectedOperation.beforeData"
+        />
+        <div v-else class="operation-snapshots">
           <section class="snapshot-panel">
             <h3>操作前数据</h3>
             <el-empty
@@ -493,6 +505,23 @@ onMounted(() => {
 
 .operation-detail-summary {
   margin-bottom: 20px;
+}
+
+:global(.audit-detail-dialog) {
+  display: flex;
+  max-height: 90vh;
+  flex-direction: column;
+  margin: 0 auto;
+}
+
+:global(.audit-detail-dialog .el-dialog__header),
+:global(.audit-detail-dialog .el-dialog__footer) {
+  flex-shrink: 0;
+}
+
+:global(.audit-detail-dialog .el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .operation-snapshots {

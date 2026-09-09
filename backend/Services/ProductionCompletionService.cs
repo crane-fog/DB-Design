@@ -4,7 +4,6 @@ using Org.OpenAPITools.Models;
 
 namespace Backend.Services;
 
-/// <summary>生产订单分批完工报工结果。</summary>
 public sealed record ProductionCompletionReportOutcome(
     bool Ok,
     ProductionCompletionReportResult? Data,
@@ -19,7 +18,8 @@ public sealed record ProductionCompletionReportOutcome(
 }
 
 /// <summary>
-/// 在一个事务内登记完工批次、增加合格品库存、累计订单合格数量，并在达标时结清原料锁定。
+/// Calls PKG_PRODUCTION_DOMAIN for atomic completion, consumption-snapshot allocation,
+/// finished-stock movement and final lock settlement. The API layer owns the transaction.
 /// </summary>
 public class ProductionCompletionService(
     string connString,
@@ -53,58 +53,32 @@ public class ProductionCompletionService(
         using var connection = new OracleConnection(connString);
         connection.Open();
         using OracleTransaction transaction = connection.BeginTransaction();
-
         try
         {
-            ProductionOrderReportContext? order = GetOrderForUpdate(
+            using var command = OracleCommandFactory.Create(
                 connection,
-                transaction,
-                request.OrderId);
-            if (order is null)
-            {
-                transaction.Rollback();
-                return ProductionCompletionReportOutcome.Fail(404, "生产订单不存在");
-            }
+                @"BEGIN
+                    PKG_PRODUCTION_DOMAIN.REPORT_COMPLETION(
+                        :orderId, :finishQty, :qualifiedQty, :batchNo, :operatorId,
+                        :inboundId, :orderCompleted);
+                  END;",
+                transaction);
+            command.Parameters.Add("orderId", OracleDbType.Int64).Value = request.OrderId;
+            command.Parameters.Add("finishQty", OracleDbType.Decimal).Value = request.FinishQty;
+            command.Parameters.Add("qualifiedQty", OracleDbType.Decimal).Value = request.QualifiedQty;
+            command.Parameters.Add("batchNo", OracleDbType.Varchar2).Value = batchNo;
+            command.Parameters.Add("operatorId", OracleDbType.Int64).Value = currentUser.UserId;
+            var inboundParameter = command.Parameters.Add("inboundId", OracleDbType.Int64);
+            inboundParameter.Direction = System.Data.ParameterDirection.Output;
+            var completedParameter = command.Parameters.Add("orderCompleted", OracleDbType.Int32);
+            completedParameter.Direction = System.Data.ParameterDirection.Output;
+            command.ExecuteNonQuery();
 
-            if (order.Status != ProductionStatusMap.Db.InProgress)
-            {
-                transaction.Rollback();
-                return ProductionCompletionReportOutcome.Fail(409, "仅生产中订单可进行完工报工");
-            }
-
-            if (BatchExists(connection, transaction, batchNo))
-            {
-                transaction.Rollback();
-                return ProductionCompletionReportOutcome.Fail(409, "批次号已存在");
-            }
-
-            long inboundId = InsertInbound(
-                connection,
-                transaction,
-                request,
-                order,
-                batchNo,
-                currentUser.UserId);
-
-            AddFinishedStock(
-                connection,
-                transaction,
-                order.MaterialId,
-                request.QualifiedQty);
-
-            decimal cumulativeQualifiedQty = order.FinishedQty + request.QualifiedQty;
-            bool orderCompleted = cumulativeQualifiedQty >= order.PlanQty;
-            UpdateOrderProgress(
-                connection,
-                transaction,
-                request.OrderId,
-                cumulativeQualifiedQty,
-                orderCompleted);
-
+            long inboundId = OracleCommandFactory.ReadIdentity(inboundParameter);
+            bool orderCompleted = Convert.ToInt32(completedParameter.Value.ToString()) == 1;
             List<StockLockRecord> consumedLocks = orderCompleted
-                ? ConsumeOrderLocks(connection, transaction, request.OrderId)
+                ? GetConsumedLocks(connection, transaction, request.OrderId)
                 : [];
-
             ProductionOrderDetail productionOrder = ProductionOrderService.GetInternal(
                 connection,
                 request.OrderId,
@@ -125,15 +99,11 @@ public class ProductionCompletionService(
                 OrderCompleted = orderCompleted,
             });
         }
-        catch (OracleException exception) when (exception.Number == 1)
+        catch (OracleException exception)
+            when (OracleDomainErrorMapper.TryMap(exception, out int code, out string message))
         {
             RollbackQuietly(transaction);
-            return ProductionCompletionReportOutcome.Fail(409, "批次号已存在");
-        }
-        catch (ProductionCompletionConflictException exception)
-        {
-            RollbackQuietly(transaction);
-            return ProductionCompletionReportOutcome.Fail(409, exception.Message);
+            return ProductionCompletionReportOutcome.Fail(code, message);
         }
         catch (Exception exception)
         {
@@ -141,197 +111,6 @@ public class ProductionCompletionService(
             logger.LogError(exception, "生产订单 {OrderId} 完工报工失败", request.OrderId);
             return ProductionCompletionReportOutcome.Fail(500, "完工报工失败");
         }
-    }
-
-    private static ProductionOrderReportContext? GetOrderForUpdate(
-        OracleConnection connection,
-        OracleTransaction transaction,
-        long orderId)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"SELECT MATERIAL_ID, VERSION_ID, PLAN_QTY, FINISHED_QTY, STATUS
-              FROM PRODUCTION_ORDER
-              WHERE ORDER_ID = :orderId
-              FOR UPDATE",
-            transaction);
-        command.Parameters.Add("orderId", OracleDbType.Int64).Value = orderId;
-
-        using OracleDataReader reader = command.ExecuteReader();
-        return reader.Read()
-            ? new ProductionOrderReportContext(
-                Convert.ToInt64(reader.GetValue(0)),
-                Convert.ToInt64(reader.GetValue(1)),
-                reader.GetDecimal(2),
-                reader.GetDecimal(3),
-                reader.GetString(4))
-            : null;
-    }
-
-    private static bool BatchExists(
-        OracleConnection connection,
-        OracleTransaction transaction,
-        string batchNo)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            "SELECT COUNT(*) FROM FINISH_INBOUND WHERE BATCH_NO = :batchNo",
-            transaction);
-        command.Parameters.Add("batchNo", OracleDbType.Varchar2).Value = batchNo;
-        return Convert.ToInt32(command.ExecuteScalar()) > 0;
-    }
-
-    private static long InsertInbound(
-        OracleConnection connection,
-        OracleTransaction transaction,
-        ProductionCompletionReportRequest request,
-        ProductionOrderReportContext order,
-        string batchNo,
-        long operatorId)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"INSERT INTO FINISH_INBOUND
-                (ORDER_ID, MATERIAL_ID, VERSION_ID, FINISH_QTY, QUALIFIED_QTY,
-                 BATCH_NO, INBOUND_TIME, OPERATOR_ID)
-              VALUES
-                (:orderId, :materialId, :versionId, :finishQty, :qualifiedQty,
-                 :batchNo, SYS_EXTRACT_UTC(SYSTIMESTAMP), :operatorId)
-              RETURNING INBOUND_ID INTO :newId",
-            transaction);
-        command.Parameters.Add("orderId", OracleDbType.Int64).Value = request.OrderId;
-        command.Parameters.Add("materialId", OracleDbType.Int64).Value = order.MaterialId;
-        command.Parameters.Add("versionId", OracleDbType.Int64).Value = order.VersionId;
-        command.Parameters.Add("finishQty", OracleDbType.Decimal).Value = request.FinishQty;
-        command.Parameters.Add("qualifiedQty", OracleDbType.Decimal).Value = request.QualifiedQty;
-        command.Parameters.Add("batchNo", OracleDbType.Varchar2).Value = batchNo;
-        command.Parameters.Add("operatorId", OracleDbType.Int64).Value = operatorId;
-        var identity = new OracleParameter("newId", OracleDbType.Int64)
-        {
-            Direction = System.Data.ParameterDirection.Output,
-        };
-        command.Parameters.Add(identity);
-        command.ExecuteNonQuery();
-        return OracleCommandFactory.ReadIdentity(identity);
-    }
-
-    private static void AddFinishedStock(
-        OracleConnection connection,
-        OracleTransaction transaction,
-        long materialId,
-        decimal qualifiedQty)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"MERGE INTO MATERIAL_STOCK target
-              USING (SELECT :materialId AS MATERIAL_ID FROM DUAL) source
-              ON (target.MATERIAL_ID = source.MATERIAL_ID)
-              WHEN MATCHED THEN UPDATE SET
-                  target.AVAILABLE_QTY = target.AVAILABLE_QTY + :qualifiedQty,
-                  target.LAST_IN_DATE = SYS_EXTRACT_UTC(SYSTIMESTAMP)
-              WHEN NOT MATCHED THEN INSERT
-                  (MATERIAL_ID, AVAILABLE_QTY, LOCKED_QTY, LAST_IN_DATE)
-              VALUES
-                  (:insertMaterialId, :insertQualifiedQty, 0, SYS_EXTRACT_UTC(SYSTIMESTAMP))",
-            transaction);
-        command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
-        command.Parameters.Add("qualifiedQty", OracleDbType.Decimal).Value = qualifiedQty;
-        command.Parameters.Add("insertMaterialId", OracleDbType.Int64).Value = materialId;
-        command.Parameters.Add("insertQualifiedQty", OracleDbType.Decimal).Value = qualifiedQty;
-        command.ExecuteNonQuery();
-    }
-
-    private static void UpdateOrderProgress(
-        OracleConnection connection,
-        OracleTransaction transaction,
-        long orderId,
-        decimal cumulativeQualifiedQty,
-        bool completed)
-    {
-        using OracleCommand command = OracleCommandFactory.Create(
-            connection,
-            @"UPDATE PRODUCTION_ORDER
-              SET FINISHED_QTY = :finishedQty,
-                  STATUS = :status,
-                  ACTUAL_END = CASE
-                      WHEN :isCompleted = 1
-                      THEN TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                      ELSE ACTUAL_END
-                  END
-              WHERE ORDER_ID = :orderId AND STATUS = :expectedStatus",
-            transaction);
-        command.Parameters.Add("finishedQty", OracleDbType.Decimal).Value = cumulativeQualifiedQty;
-        command.Parameters.Add("status", OracleDbType.Varchar2).Value = completed
-            ? ProductionStatusMap.Db.Completed
-            : ProductionStatusMap.Db.InProgress;
-        command.Parameters.Add("isCompleted", OracleDbType.Int32).Value = completed ? 1 : 0;
-        command.Parameters.Add("orderId", OracleDbType.Int64).Value = orderId;
-        command.Parameters.Add("expectedStatus", OracleDbType.Varchar2).Value =
-            ProductionStatusMap.Db.InProgress;
-
-        if (command.ExecuteNonQuery() != 1)
-        {
-            throw new ProductionCompletionConflictException("生产订单状态已变化，请刷新后重试");
-        }
-    }
-
-    private static List<StockLockRecord> ConsumeOrderLocks(
-        OracleConnection connection,
-        OracleTransaction transaction,
-        long orderId)
-    {
-        var lockedQuantities = new Dictionary<long, decimal>();
-        using (OracleCommand selectCommand = OracleCommandFactory.Create(
-                   connection,
-                   @"SELECT MATERIAL_ID, SUM(LOCK_QTY)
-                     FROM STOCK_LOCK
-                     WHERE ORDER_ID = :orderId AND STATUS = :status
-                     GROUP BY MATERIAL_ID",
-                   transaction))
-        {
-            selectCommand.Parameters.Add("orderId", OracleDbType.Int64).Value = orderId;
-            selectCommand.Parameters.Add("status", OracleDbType.Varchar2).Value =
-                StockLockStatusMap.Db.Locked;
-            using OracleDataReader reader = selectCommand.ExecuteReader();
-            while (reader.Read())
-            {
-                lockedQuantities[Convert.ToInt64(reader.GetValue(0))] = reader.GetDecimal(1);
-            }
-        }
-
-        using (OracleCommand updateLocksCommand = OracleCommandFactory.Create(
-                   connection,
-                   @"UPDATE STOCK_LOCK
-                     SET STATUS = :newStatus,
-                         RELEASE_TIME = SYS_EXTRACT_UTC(SYSTIMESTAMP)
-                     WHERE ORDER_ID = :orderId AND STATUS = :expectedStatus",
-                   transaction))
-        {
-            updateLocksCommand.Parameters.Add("newStatus", OracleDbType.Varchar2).Value =
-                StockLockStatusMap.Db.Consumed;
-            updateLocksCommand.Parameters.Add("orderId", OracleDbType.Int64).Value = orderId;
-            updateLocksCommand.Parameters.Add("expectedStatus", OracleDbType.Varchar2).Value =
-                StockLockStatusMap.Db.Locked;
-            updateLocksCommand.ExecuteNonQuery();
-        }
-
-        foreach ((long materialId, decimal lockedQty) in lockedQuantities)
-        {
-            using OracleCommand stockCommand = OracleCommandFactory.Create(
-                connection,
-                @"UPDATE MATERIAL_STOCK
-                  SET LOCKED_QTY = LOCKED_QTY - :lockedQty
-                  WHERE MATERIAL_ID = :materialId AND LOCKED_QTY >= :lockedQty",
-                transaction);
-            stockCommand.Parameters.Add("lockedQty", OracleDbType.Decimal).Value = lockedQty;
-            stockCommand.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
-            if (stockCommand.ExecuteNonQuery() != 1)
-            {
-                throw new InvalidOperationException($"物料 {materialId} 的锁定库存数据不一致");
-            }
-        }
-
-        return GetConsumedLocks(connection, transaction, orderId);
     }
 
     private static List<StockLockRecord> GetConsumedLocks(
@@ -420,20 +199,11 @@ public class ProductionCompletionService(
         }
         catch (InvalidOperationException)
         {
-            // 事务已经结束时无需再次回滚。
+            // The transaction has already ended.
         }
         catch (OracleException)
         {
-            // 保留原始业务异常，回滚失败由连接释放兜底。
+            // Preserve the original error; disposing the connection is the final fallback.
         }
     }
-
-    private sealed record ProductionOrderReportContext(
-        long MaterialId,
-        long VersionId,
-        decimal PlanQty,
-        decimal FinishedQty,
-        string Status);
-
-    private sealed class ProductionCompletionConflictException(string message) : Exception(message);
 }

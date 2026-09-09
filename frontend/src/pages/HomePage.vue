@@ -215,7 +215,7 @@ onUnmounted(() => {
 
     <div class="dashboard-content-grid">
       <el-card class="dashboard-section dashboard-section--todos" shadow="never">
-        <template #header><span>待办与提醒（各来源最多 5 条）</span></template>
+        <template #header><span>待办与提醒</span></template>
         <el-skeleton v-if="loading && !dashboard" :rows="4" animated />
         <el-empty v-else-if="!visibleTodos.length" :image-size="70" :description="todosEmptyText" />
         <el-timeline v-else>

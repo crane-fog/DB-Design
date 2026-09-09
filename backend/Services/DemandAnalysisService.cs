@@ -131,25 +131,41 @@ public sealed class DemandAnalysisService(
         using var ownedConnection = connection is null ? new OracleConnection(connString) : null;
         var conn = connection ?? ownedConnection!;
         if (conn.State != System.Data.ConnectionState.Open) conn.Open();
-        var graph = LoadGraph(conn, transaction);
-        if (!graph.Materials.TryGetValue(materialId, out var root)) throw new DemandAnalysisBusinessException(DemandAnalysisError.NotFound, "物料不存在");
-        if (!graph.VersionMaterialIds.TryGetValue(versionId, out var ownerId) || ownerId != materialId)
-            throw new DemandAnalysisBusinessException(DemandAnalysisError.BadRequest, "BOM 版本不属于指定物料");
-
-        var occurrences = new List<BomDemandExpansionItem>();
-        ExpandGraph(graph, root, versionId, quantity, 0, materialId.ToString(), new HashSet<long> { materialId }, occurrences);
-        return occurrences.GroupBy(item => new { item.MaterialId, item.LossRate }).Select(group =>
+        try
         {
-            var first = group.OrderBy(item => item.Depth).ThenBy(item => item.Path, StringComparer.Ordinal).First();
-            return first with
+            using var command = OracleCommandFactory.Create(
+                conn,
+                "BEGIN PKG_BOM_DOMAIN.OPEN_DEMAND(:materialId, :versionId, :quantity, :rows); END;",
+                transaction);
+            command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
+            command.Parameters.Add("versionId", OracleDbType.Int64).Value = versionId;
+            command.Parameters.Add("quantity", OracleDbType.Decimal).Value = quantity;
+            command.Parameters.Add("rows", OracleDbType.RefCursor).Direction =
+                System.Data.ParameterDirection.Output;
+
+            var results = new List<BomDemandExpansionItem>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
             {
-                NetQuantity = group.Sum(item => item.NetQuantity),
-                GrossQuantity = group.Sum(item => item.GrossQuantity),
-                Depth = group.Min(item => item.Depth),
-                Path = string.Join(" | ", group.Select(item => item.Path).Distinct().OrderBy(path => path, StringComparer.Ordinal)),
-                IsLeaf = group.All(item => item.IsLeaf)
-            };
-        }).OrderBy(item => item.Depth).ThenBy(item => item.MaterialId).ThenBy(item => item.LossRate).ToList();
+                results.Add(new BomDemandExpansionItem(
+                    Convert.ToInt64(reader.GetValue(0)),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetDecimal(5),
+                    reader.GetDecimal(6),
+                    reader.GetDecimal(7),
+                    Convert.ToInt32(reader.GetValue(4)),
+                    reader.GetString(8),
+                    Convert.ToInt32(reader.GetValue(9)) == 1));
+            }
+
+            return results;
+        }
+        catch (OracleException exception)
+            when (OracleDomainErrorMapper.TryMap(exception, out int code, out string message))
+        {
+            throw new DemandAnalysisBusinessException((DemandAnalysisError)code, message);
+        }
     }
 
     private DateOnly GetDatabaseDate()
@@ -162,50 +178,5 @@ public sealed class DemandAnalysisService(
     private static string? ValidateInput(long materialId, long versionId, decimal quantity, string name) =>
         materialId <= 0 || versionId <= 0 ? "物料和版本编号不能为空" : quantity <= 0 ? $"{name}必须大于 0" : null;
 
-    private static DemandGraph LoadGraph(OracleConnection conn, OracleTransaction? transaction)
-    {
-        using var cmd = conn.CreateCommand(); cmd.Transaction = transaction;
-        cmd.CommandText = @"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MATERIAL_TYPE, current_bv.VERSION_ID, bv.VERSION_ID, bv.MATERIAL_ID,
-                                   b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID, b.VERSION_ID, b.QUANTITY, b.LOSS_RATE
-                            FROM MATERIAL m
-                            LEFT JOIN BOM_VERSION current_bv
-                              ON current_bv.VERSION_ID = m.CURRENT_VERSION_ID
-                             AND current_bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
-                            LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
-                            LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
-                            ORDER BY m.MATERIAL_ID, bv.VERSION_ID, b.BOM_ID";
-        var materials = new Dictionary<long, DemandMaterial>(); var versions = new Dictionary<long, long>(); var children = new Dictionary<long, List<DemandEdge>>();
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var materialId = Convert.ToInt64(reader.GetValue(0));
-            materials.TryAdd(materialId, new DemandMaterial(materialId, reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : Convert.ToInt64(reader.GetValue(3))));
-            if (reader.IsDBNull(4)) continue;
-            var versionId = Convert.ToInt64(reader.GetValue(4)); versions.TryAdd(versionId, Convert.ToInt64(reader.GetValue(5)));
-            if (reader.IsDBNull(6)) continue;
-            if (!children.TryGetValue(versionId, out var edges)) { edges = []; children[versionId] = edges; }
-            edges.Add(new DemandEdge(Convert.ToInt64(reader.GetValue(6)), Convert.ToInt64(reader.GetValue(7)), reader.GetDecimal(9), reader.GetDecimal(10)));
-        }
-        return new DemandGraph(materials, versions, children);
-    }
-    private static void ExpandGraph(DemandGraph graph, DemandMaterial parent, long versionId, decimal parentGross, int parentDepth, string parentPath, IReadOnlySet<long> path, List<BomDemandExpansionItem> results)
-    {
-        if (!graph.ChildrenByVersion.TryGetValue(versionId, out var edges)) return;
-        foreach (var edge in edges.Where(edge => edge.ParentMaterialId == parent.MaterialId))
-        {
-            if (!graph.Materials.TryGetValue(edge.ChildMaterialId, out var child)) continue;
-            if (path.Contains(child.MaterialId)) throw new DemandAnalysisBusinessException(DemandAnalysisError.Conflict, "BOM 存在循环依赖，无法展开需求");
-            var net = parentGross * edge.Quantity;
-            var gross = decimal.Ceiling(net / (1 - edge.LossRate));
-            var isLeaf = !child.CurrentVersionId.HasValue || !graph.ChildrenByVersion.TryGetValue(child.CurrentVersionId.Value, out var childEdges) || childEdges.All(e => e.ParentMaterialId != child.MaterialId);
-            var itemPath = $"{parentPath}/{child.MaterialId}";
-            results.Add(new BomDemandExpansionItem(child.MaterialId, child.MaterialName, child.MaterialType, net, gross, edge.LossRate, parentDepth + 1, itemPath, isLeaf));
-            if (!isLeaf) ExpandGraph(graph, child, child.CurrentVersionId!.Value, gross, parentDepth + 1, itemPath, new HashSet<long>(path) { child.MaterialId }, results);
-        }
-    }
-    private sealed record DemandGraph(Dictionary<long, DemandMaterial> Materials, Dictionary<long, long> VersionMaterialIds, Dictionary<long, List<DemandEdge>> ChildrenByVersion);
-    private sealed record DemandMaterial(long MaterialId, string MaterialName, string MaterialType, long? CurrentVersionId);
-    private sealed record DemandEdge(long ParentMaterialId, long ChildMaterialId, decimal Quantity, decimal LossRate);
     private sealed class DemandAnalysisBusinessException(DemandAnalysisError error, string message) : Exception(message) { public DemandAnalysisError Error { get; } = error; }
 }

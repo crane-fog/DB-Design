@@ -89,13 +89,6 @@ public class BomService(string connString)
                 return businessError;
             }
 
-            var cycle = CheckCycleInternal(conn, transaction, request.ParentMaterialId, request.ChildMaterialId, request.VersionId, null);
-            if (cycle.HasCycle)
-            {
-                transaction.Rollback();
-                return BomBusinessResult<Bom>.Fail(BomBusinessError.Conflict, "BOM 存在循环依赖");
-            }
-
             long newId;
             using (var cmd = conn.CreateCommand())
             {
@@ -117,6 +110,12 @@ public class BomService(string connString)
 
             transaction.Commit();
             return BomBusinessResult<Bom>.Success(GetBomInternal(conn, newId)!);
+        }
+        catch (OracleException ex)
+            when (OracleDomainErrorMapper.TryMap(ex, out int code, out string message))
+        {
+            transaction.Rollback();
+            return BomBusinessResult<Bom>.Fail((BomBusinessError)code, message);
         }
         catch (OracleException ex) when (ex.Number == 1 || ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
         {
@@ -157,13 +156,6 @@ public class BomService(string connString)
                 return businessError;
             }
 
-            var cycle = CheckCycleInternal(conn, transaction, request.ParentMaterialId, request.ChildMaterialId, request.VersionId, request.BomId);
-            if (cycle.HasCycle)
-            {
-                transaction.Rollback();
-                return BomBusinessResult<Bom>.Fail(BomBusinessError.Conflict, "BOM 存在循环依赖");
-            }
-
             using (var cmd = conn.CreateCommand())
             {
                 cmd.Transaction = transaction;
@@ -182,6 +174,12 @@ public class BomService(string connString)
             transaction.Commit();
             return BomBusinessResult<Bom>.Success(GetBomInternal(conn, request.BomId)!);
         }
+        catch (OracleException ex)
+            when (OracleDomainErrorMapper.TryMap(ex, out int code, out string message))
+        {
+            transaction.Rollback();
+            return BomBusinessResult<Bom>.Fail((BomBusinessError)code, message);
+        }
         catch (OracleException ex) when (ex.Number == 1 || ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
         {
             transaction.Rollback();
@@ -198,24 +196,69 @@ public class BomService(string connString)
 
         using var conn = new OracleConnection(connString);
         conn.Open();
+        using var transaction = conn.BeginTransaction();
 
-        if (GetBomInternal(conn, bomId) is null)
+        try
         {
-            return BomBusinessResult<object>.Fail(BomBusinessError.NotFound, "BOM 明细不存在");
-        }
+            if (GetBomInternal(conn, bomId, transaction) is null)
+            {
+                transaction.Rollback();
+                return BomBusinessResult<object>.Fail(BomBusinessError.NotFound, "BOM 明细不存在");
+            }
 
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM BOM WHERE BOM_ID = :bomId";
-        cmd.Parameters.Add(new OracleParameter("bomId", bomId));
-        cmd.ExecuteNonQuery();
-        return BomBusinessResult<object>.Success(new object());
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = transaction;
+                cmd.CommandText = "DELETE FROM BOM WHERE BOM_ID = :bomId";
+                cmd.Parameters.Add(new OracleParameter("bomId", bomId));
+                cmd.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+            return BomBusinessResult<object>.Success(new object());
+        }
+        catch (OracleException ex)
+            when (OracleDomainErrorMapper.TryMap(ex, out int code, out string message))
+        {
+            transaction.Rollback();
+            return BomBusinessResult<object>.Fail((BomBusinessError)code, message);
+        }
+        catch (OracleException ex) when (ex.Number == 1 || ex.Number == 2290 || ex.Number == 2291 || ex.Number == 2292)
+        {
+            transaction.Rollback();
+            return BomBusinessResult<object>.Fail(BomBusinessError.Conflict, "BOM 明细关联数据冲突");
+        }
     }
 
     public BomCycleCheckResult CheckCycle(BomCycleCheckRequest request)
     {
         using var conn = new OracleConnection(connString);
         conn.Open();
-        return CheckCycleInternal(conn, null, request.ParentMaterialId, request.ChildMaterialId, request.VersionId, null);
+        using var command = OracleCommandFactory.Create(
+            conn,
+            "BEGIN PKG_BOM_DOMAIN.CHECK_EDGE_CYCLE(:parentMaterialId, :childMaterialId, :versionId, :hasCycle, :cyclePath); END;");
+        command.Parameters.Add("parentMaterialId", OracleDbType.Int64).Value = request.ParentMaterialId;
+        command.Parameters.Add("childMaterialId", OracleDbType.Int64).Value = request.ChildMaterialId;
+        command.Parameters.Add("versionId", OracleDbType.Int64).Value = request.VersionId;
+        var hasCycle = command.Parameters.Add("hasCycle", OracleDbType.Int32);
+        hasCycle.Direction = System.Data.ParameterDirection.Output;
+        var cyclePath = command.Parameters.Add("cyclePath", OracleDbType.Varchar2, 4000);
+        cyclePath.Direction = System.Data.ParameterDirection.Output;
+        command.ExecuteNonQuery();
+
+        var found = Convert.ToInt32(hasCycle.Value.ToString()) == 1;
+        var path = found && cyclePath.Value is not null
+            ? cyclePath.Value.ToString()!
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => Convert.ToInt32(value))
+                .ToList()
+            : [];
+
+        return new BomCycleCheckResult
+        {
+            HasCycle = found,
+            CyclePath = path,
+        };
     }
 
     public BomBusinessResult<List<BomTreeNode>> GetBomTree(long materialId, long versionId)
@@ -227,25 +270,46 @@ public class BomService(string connString)
 
         using var conn = new OracleConnection(connString);
         conn.Open();
-        var graph = LoadBomQueryGraph(conn);
-
-        if (!graph.Materials.TryGetValue(materialId, out var rootMaterial))
+        try
         {
-            return BomBusinessResult<List<BomTreeNode>>.Fail(BomBusinessError.NotFound, "物料不存在");
-        }
+            using var command = OracleCommandFactory.Create(
+                conn,
+                "BEGIN PKG_BOM_DOMAIN.OPEN_TREE(:materialId, :versionId, :rootQty, :rows); END;");
+            command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
+            command.Parameters.Add("versionId", OracleDbType.Int64).Value = versionId;
+            command.Parameters.Add("rootQty", OracleDbType.Decimal).Value = 1;
+            command.Parameters.Add("rows", OracleDbType.RefCursor).Direction =
+                System.Data.ParameterDirection.Output;
 
-        if (!graph.Versions.TryGetValue(versionId, out var rootVersion) || rootVersion.MaterialId != materialId)
+            var nodes = new List<BomTreeNode>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                nodes.Add(new BomTreeNode
+                {
+                    MaterialId = Convert.ToInt32(reader.GetValue(0)),
+                    MaterialName = reader.GetString(1),
+                    Model = reader.IsDBNull(2) ? null! : reader.GetString(2),
+                    MaterialType = reader.GetString(3),
+                    Unit = reader.GetString(4),
+                    Quantity = decimal.ToDouble(reader.GetDecimal(5)),
+                    AccumulatedQuantity = decimal.ToDouble(reader.GetDecimal(6)),
+                    Depth = Convert.ToInt32(reader.GetValue(7)),
+                    ParentMaterialId = reader.IsDBNull(8)
+                        ? null
+                        : Convert.ToInt32(reader.GetValue(8)),
+                    Path = reader.GetString(9),
+                    IsLeaf = Convert.ToInt32(reader.GetValue(10)) == 1,
+                });
+            }
+
+            return BomBusinessResult<List<BomTreeNode>>.Success(nodes);
+        }
+        catch (OracleException exception)
+            when (OracleDomainErrorMapper.TryMap(exception, out int code, out string message))
         {
-            return BomBusinessResult<List<BomTreeNode>>.Fail(BomBusinessError.BadRequest, "BOM 版本不属于指定物料");
+            return BomBusinessResult<List<BomTreeNode>>.Fail((BomBusinessError)code, message);
         }
-
-        var nodes = new List<BomTreeNode>();
-        var rootPath = materialId.ToString();
-        var rootChildren = GetChildren(graph, versionId);
-        nodes.Add(ToBomTreeNode(rootMaterial, 1, 1, 0, null, rootPath, rootChildren.Count == 0));
-
-        ExpandBomTree(graph, materialId, versionId, 0, 1, rootPath, new HashSet<long> { materialId }, nodes);
-        return BomBusinessResult<List<BomTreeNode>>.Success(nodes);
     }
 
     public BomBusinessResult<List<ReverseTraceItem>> GetReverseTrace(
@@ -262,256 +326,50 @@ public class BomService(string connString)
 
         using var conn = new OracleConnection(connString);
         conn.Open();
-        var graph = LoadBomQueryGraph(conn);
-        if (!graph.Materials.ContainsKey(materialId))
+        try
         {
-            return BomBusinessResult<List<ReverseTraceItem>>.Fail(BomBusinessError.NotFound, "物料不存在");
-        }
+            using var command = OracleCommandFactory.Create(
+                conn,
+                "BEGIN PKG_BOM_DOMAIN.OPEN_REVERSE_USAGE(:materialId, :versionId, :includeHistory, :rows); END;");
+            command.Parameters.Add("materialId", OracleDbType.Int64).Value = materialId;
+            command.Parameters.Add("versionId", OracleDbType.Int64).Value = versionId;
+            command.Parameters.Add("includeHistory", OracleDbType.Int32).Value = includeHistory ? 1 : 0;
+            command.Parameters.Add("rows", OracleDbType.RefCursor).Direction =
+                System.Data.ParameterDirection.Output;
 
-        if (!graph.Versions.TryGetValue(versionId, out var selectedVersion))
+            var items = new List<ReverseTraceItem>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(new ReverseTraceItem
+                {
+                    ProductMaterialId = Convert.ToInt32(reader.GetValue(0)),
+                    ProductMaterialName = reader.GetString(1),
+                    VersionId = Convert.ToInt32(reader.GetValue(2)),
+                    VersionNo = reader.GetString(3),
+                    VersionStatus = reader.GetString(4) == "effective"
+                        ? ReverseTraceItem.VersionStatusEnum.EffectiveEnum
+                        : ReverseTraceItem.VersionStatusEnum.HistoryEnum,
+                    Quantity = decimal.ToDouble(reader.GetDecimal(5)),
+                    AccumulatedQuantity = decimal.ToDouble(reader.GetDecimal(6)),
+                    Depth = Convert.ToInt32(reader.GetValue(7)),
+                    Path = reader.GetString(8),
+                });
+            }
+
+            return BomBusinessResult<List<ReverseTraceItem>>.Success(items);
+        }
+        catch (OracleException exception)
+            when (OracleDomainErrorMapper.TryMap(exception, out int code, out string message))
         {
-            return BomBusinessResult<List<ReverseTraceItem>>.Fail(
-                BomBusinessError.NotFound,
-                "BOM 版本不存在");
+            return BomBusinessResult<List<ReverseTraceItem>>.Fail((BomBusinessError)code, message);
         }
-
-        if (selectedVersion.MaterialId != materialId)
-        {
-            return BomBusinessResult<List<ReverseTraceItem>>.Fail(
-                BomBusinessError.BadRequest,
-                "BOM 版本不属于指定物料");
-        }
-
-        var incomingEdges = graph.Edges
-            .Where(edge => includeHistory || graph.Materials[edge.ParentMaterialId].CurrentVersionId == edge.VersionId)
-            .GroupBy(edge => edge.ChildMaterialId)
-            .ToDictionary(group => group.Key, group => group.OrderBy(edge => edge.BomId).ToList());
-        var items = new List<ReverseTraceItem>();
-        ExpandReverseTrace(
-            graph,
-            incomingEdges,
-            materialId,
-            0,
-            1,
-            materialId.ToString(),
-            new HashSet<long> { materialId },
-            items);
-        return BomBusinessResult<List<ReverseTraceItem>>.Success(items);
     }
 
     private const string SelectColumns = @"
         SELECT b.BOM_ID, b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID,
                b.VERSION_ID, b.QUANTITY, b.LOSS_RATE
         FROM BOM b";
-
-    private static BomQueryGraph LoadBomQueryGraph(OracleConnection conn)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"SELECT m.MATERIAL_ID, m.MATERIAL_NAME, m.MODEL, m.MATERIAL_TYPE, m.UNIT,
-                                   current_bv.VERSION_ID, bv.VERSION_ID, bv.VERSION_NO,
-                                   b.BOM_ID, b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID, b.QUANTITY
-                            FROM MATERIAL m
-                            LEFT JOIN BOM_VERSION current_bv
-                              ON current_bv.VERSION_ID = m.CURRENT_VERSION_ID
-                             AND current_bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                             AND (current_bv.EXPIRE_DATE IS NULL OR current_bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
-                            LEFT JOIN BOM_VERSION bv ON bv.MATERIAL_ID = m.MATERIAL_ID
-                            LEFT JOIN BOM b ON b.VERSION_ID = bv.VERSION_ID
-                            ORDER BY m.MATERIAL_ID, bv.VERSION_ID, b.BOM_ID";
-
-        var materials = new Dictionary<long, BomQueryMaterial>();
-        var versions = new Dictionary<long, BomQueryVersion>();
-        var edges = new List<BomQueryEdge>();
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var materialId = Convert.ToInt64(reader.GetValue(0));
-            if (!materials.ContainsKey(materialId))
-            {
-                materials[materialId] = new BomQueryMaterial(
-                    materialId,
-                    reader.GetString(1),
-                    reader.IsDBNull(2) ? null : reader.GetString(2),
-                    reader.GetString(3),
-                    reader.GetString(4),
-                    reader.IsDBNull(5) ? null : Convert.ToInt64(reader.GetValue(5)));
-            }
-
-            if (reader.IsDBNull(6))
-            {
-                continue;
-            }
-
-            var versionId = Convert.ToInt64(reader.GetValue(6));
-            versions.TryAdd(versionId, new BomQueryVersion(versionId, materialId, reader.GetString(7)));
-            if (!reader.IsDBNull(8))
-            {
-                edges.Add(new BomQueryEdge(
-                    Convert.ToInt64(reader.GetValue(8)),
-                    Convert.ToInt64(reader.GetValue(9)),
-                    Convert.ToInt64(reader.GetValue(10)),
-                    versionId,
-                    reader.GetDecimal(11)));
-            }
-        }
-
-        var childrenByVersion = edges
-            .GroupBy(edge => edge.VersionId)
-            .ToDictionary(group => group.Key, group => group.OrderBy(edge => edge.BomId).ToList());
-        return new BomQueryGraph(materials, versions, edges, childrenByVersion);
-    }
-
-    private static List<BomQueryEdge> GetChildren(BomQueryGraph graph, long versionId) =>
-        graph.ChildrenByVersion.TryGetValue(versionId, out var children) ? children : [];
-
-    private static void ExpandBomTree(
-        BomQueryGraph graph,
-        long parentMaterialId,
-        long versionId,
-        int parentDepth,
-        decimal parentAccumulatedQuantity,
-        string parentPath,
-        IReadOnlySet<long> pathMaterials,
-        List<BomTreeNode> nodes)
-    {
-        foreach (var edge in GetChildren(graph, versionId).Where(edge => edge.ParentMaterialId == parentMaterialId))
-        {
-            if (!graph.Materials.TryGetValue(edge.ChildMaterialId, out var childMaterial) || pathMaterials.Contains(edge.ChildMaterialId))
-            {
-                continue;
-            }
-
-            var childPath = $"{parentPath}/{edge.ChildMaterialId}";
-            var childDepth = parentDepth + 1;
-            var childAccumulatedQuantity = parentAccumulatedQuantity * edge.Quantity;
-            var childVersionId = childMaterial.CurrentVersionId;
-            var childChildren = childVersionId.HasValue ? GetChildren(graph, childVersionId.Value) : [];
-            nodes.Add(ToBomTreeNode(
-                childMaterial,
-                edge.Quantity,
-                childAccumulatedQuantity,
-                childDepth,
-                parentMaterialId,
-                childPath,
-                childChildren.Count == 0));
-
-            if (!childVersionId.HasValue || childChildren.Count == 0)
-            {
-                continue;
-            }
-
-            var nextPathMaterials = new HashSet<long>(pathMaterials) { edge.ChildMaterialId };
-            ExpandBomTree(
-                graph,
-                edge.ChildMaterialId,
-                childVersionId.Value,
-                childDepth,
-                childAccumulatedQuantity,
-                childPath,
-                nextPathMaterials,
-                nodes);
-        }
-    }
-
-    private static BomTreeNode ToBomTreeNode(
-        BomQueryMaterial material,
-        decimal quantity,
-        decimal accumulatedQuantity,
-        int depth,
-        long? parentMaterialId,
-        string path,
-        bool isLeaf) => new()
-        {
-            MaterialId = Convert.ToInt32(material.MaterialId),
-            MaterialName = material.MaterialName,
-            Model = material.Model!,
-            MaterialType = material.MaterialType,
-            Unit = material.Unit,
-            Quantity = decimal.ToDouble(quantity),
-            AccumulatedQuantity = decimal.ToDouble(accumulatedQuantity),
-            Depth = depth,
-            ParentMaterialId = parentMaterialId.HasValue ? Convert.ToInt32(parentMaterialId.Value) : null,
-            Path = path,
-            IsLeaf = isLeaf,
-        };
-
-    private static void ExpandReverseTrace(
-        BomQueryGraph graph,
-        IReadOnlyDictionary<long, List<BomQueryEdge>> incomingEdges,
-        long childMaterialId,
-        int childDepth,
-        decimal childAccumulatedQuantity,
-        string childPath,
-        IReadOnlySet<long> pathMaterials,
-        List<ReverseTraceItem> items)
-    {
-        if (!incomingEdges.TryGetValue(childMaterialId, out var edges))
-        {
-            return;
-        }
-
-        foreach (var edge in edges)
-        {
-            if (!graph.Materials.TryGetValue(edge.ParentMaterialId, out var parentMaterial)
-                || !graph.Versions.TryGetValue(edge.VersionId, out var version)
-                || pathMaterials.Contains(edge.ParentMaterialId))
-            {
-                continue;
-            }
-
-            var parentPath = $"{childPath}/{edge.ParentMaterialId}";
-            var parentDepth = childDepth + 1;
-            var parentAccumulatedQuantity = childAccumulatedQuantity * edge.Quantity;
-            items.Add(new ReverseTraceItem
-            {
-                ProductMaterialId = Convert.ToInt32(parentMaterial.MaterialId),
-                ProductMaterialName = parentMaterial.MaterialName,
-                VersionId = Convert.ToInt32(version.VersionId),
-                VersionNo = version.VersionNo,
-                VersionStatus = parentMaterial.CurrentVersionId == version.VersionId
-                    ? ReverseTraceItem.VersionStatusEnum.EffectiveEnum
-                    : ReverseTraceItem.VersionStatusEnum.HistoryEnum,
-                Path = parentPath,
-                Depth = parentDepth,
-                Quantity = decimal.ToDouble(edge.Quantity),
-                AccumulatedQuantity = decimal.ToDouble(parentAccumulatedQuantity),
-            });
-
-            var nextPathMaterials = new HashSet<long>(pathMaterials) { edge.ParentMaterialId };
-            ExpandReverseTrace(
-                graph,
-                incomingEdges,
-                edge.ParentMaterialId,
-                parentDepth,
-                parentAccumulatedQuantity,
-                parentPath,
-                nextPathMaterials,
-                items);
-        }
-    }
-
-    private sealed record BomQueryGraph(
-        Dictionary<long, BomQueryMaterial> Materials,
-        Dictionary<long, BomQueryVersion> Versions,
-        List<BomQueryEdge> Edges,
-        Dictionary<long, List<BomQueryEdge>> ChildrenByVersion);
-
-    private sealed record BomQueryMaterial(
-        long MaterialId,
-        string MaterialName,
-        string? Model,
-        string MaterialType,
-        string Unit,
-        long? CurrentVersionId);
-
-    private sealed record BomQueryVersion(long VersionId, long MaterialId, string VersionNo);
-
-    private sealed record BomQueryEdge(
-        long BomId,
-        long ParentMaterialId,
-        long ChildMaterialId,
-        long VersionId,
-        decimal Quantity);
 
     private static List<string> BuildBomWhere(long versionId, long? parentMaterialId, long? childMaterialId)
     {
@@ -662,102 +520,4 @@ public class BomService(string connString)
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
-    private static BomCycleCheckResult CheckCycleInternal(
-        OracleConnection conn,
-        OracleTransaction? transaction,
-        long parentMaterialId,
-        long childMaterialId,
-        long versionId,
-        long? excludingBomId)
-    {
-        if (parentMaterialId <= 0 || childMaterialId <= 0 || versionId <= 0)
-        {
-            return new BomCycleCheckResult { HasCycle = false, CyclePath = [] };
-        }
-
-        if (parentMaterialId == childMaterialId)
-        {
-            return new BomCycleCheckResult
-            {
-                HasCycle = true,
-                CyclePath = [Convert.ToInt32(parentMaterialId), Convert.ToInt32(childMaterialId)],
-            };
-        }
-
-        var graph = LoadEffectiveBomGraph(conn, transaction, excludingBomId);
-        var path = new List<long> { childMaterialId };
-        var found = SearchPath(graph, childMaterialId, parentMaterialId, path);
-
-        return new BomCycleCheckResult
-        {
-            HasCycle = found,
-            CyclePath = found ? path.Select(Convert.ToInt32).ToList() : [],
-        };
-    }
-
-    private static Dictionary<long, List<long>> LoadEffectiveBomGraph(
-        OracleConnection conn,
-        OracleTransaction? transaction,
-        long? excludingBomId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.Transaction = transaction;
-        cmd.CommandText = @"SELECT b.PARENT_MATERIAL_ID, b.CHILD_MATERIAL_ID
-                            FROM BOM b
-                            JOIN MATERIAL m ON m.MATERIAL_ID = b.PARENT_MATERIAL_ID
-                            JOIN BOM_VERSION bv ON bv.VERSION_ID = b.VERSION_ID
-                            WHERE m.CURRENT_VERSION_ID = b.VERSION_ID
-                              AND bv.EFFECTIVE_DATE <= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                              AND (bv.EXPIRE_DATE IS NULL OR bv.EXPIRE_DATE >= TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS DATE)))
-                              AND (:bomId IS NULL OR b.BOM_ID <> :bomId)";
-        cmd.Parameters.Add(new OracleParameter("bomId", excludingBomId.HasValue ? excludingBomId.Value : DBNull.Value));
-
-        var graph = new Dictionary<long, List<long>>();
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var parent = Convert.ToInt64(reader.GetValue(0));
-            var child = Convert.ToInt64(reader.GetValue(1));
-            if (!graph.TryGetValue(parent, out var children))
-            {
-                children = [];
-                graph[parent] = children;
-            }
-
-            children.Add(child);
-        }
-
-        return graph;
-    }
-
-    private static bool SearchPath(Dictionary<long, List<long>> graph, long current, long target, List<long> path)
-    {
-        if (current == target)
-        {
-            return true;
-        }
-
-        if (!graph.TryGetValue(current, out var children))
-        {
-            return false;
-        }
-
-        foreach (var child in children)
-        {
-            if (path.Contains(child))
-            {
-                continue;
-            }
-
-            path.Add(child);
-            if (SearchPath(graph, child, target, path))
-            {
-                return true;
-            }
-
-            path.RemoveAt(path.Count - 1);
-        }
-
-        return false;
-    }
 }

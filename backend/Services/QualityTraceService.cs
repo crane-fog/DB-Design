@@ -18,8 +18,14 @@ public sealed record BatchConsumptionResult(
 
 /// <summary>
 /// 质量追溯主责 Service（C 模块）。维护 batch_consumption（生产订单↔采购明细的消耗关系），
-/// 并通过只读 JOIN 组装正向追溯（成品→原材料）、反向追溯（原材料→成品）和质量影响分析。
+/// 并通过只读视图组装正向追溯（成品→原材料）、反向追溯（原材料→成品）和质量影响分析。
 /// 采购明细 / 供应商 / 收货 / 物料等权威实体由 A、B 模块维护，本 Service 只查询不写入。
+/// <para>
+/// 追溯口径：batch_consumption 是订单级累计消耗，也是包含在制订单的权威事实，
+/// 三个对外追溯入口统一走 V_ORDER_MATERIAL_TRACE。finish_batch_consumption 只记录
+/// 「报工时新增登记的消耗增量」，不等于某个成品批次的真实用料分摊，因此其快照视图
+/// （V_PRODUCT_BATCH_TRACE / V_MATERIAL_BATCH_TRACE）仅供内部核对，不作为追溯数据源。
+/// </para>
 /// </summary>
 public class QualityTraceService(string connString)
 {
@@ -36,17 +42,17 @@ public class QualityTraceService(string connString)
         var where = new List<string>();
         if (orderId.HasValue)
         {
-            where.Add("bc.ORDER_ID = :orderId");
+            where.Add("trace.ORDER_ID = :orderId");
         }
 
         if (itemId.HasValue)
         {
-            where.Add("bc.ITEM_ID = :itemId");
+            where.Add("trace.ITEM_ID = :itemId");
         }
 
         if (materialId.HasValue)
         {
-            where.Add("poi.MATERIAL_ID = :materialId");
+            where.Add("trace.INPUT_MATERIAL_ID = :materialId");
         }
 
         var whereClause = where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : string.Empty;
@@ -72,8 +78,7 @@ public class QualityTraceService(string connString)
         int total;
         using (var countCmd = conn.CreateCommand())
         {
-            countCmd.CommandText = @"SELECT COUNT(*) FROM BATCH_CONSUMPTION bc
-                                     JOIN PURCHASE_ORDER_ITEM poi ON poi.ITEM_ID = bc.ITEM_ID" + whereClause;
+            countCmd.CommandText = "SELECT COUNT(*) FROM V_BATCH_CONSUMPTION_DETAIL trace" + whereClause;
             AddFilters(countCmd);
             total = Convert.ToInt32(countCmd.ExecuteScalar());
         }
@@ -82,15 +87,14 @@ public class QualityTraceService(string connString)
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"
-                SELECT bc.CONSUMPTION_ID, bc.ORDER_ID, bc.ITEM_ID, bc.CONSUME_QTY,
-                       po.MATERIAL_ID, pm.MATERIAL_NAME, po.PLAN_QTY, po.FINISHED_QTY, po.STATUS,
-                       poi.ORDER_ID, poi.MATERIAL_ID, im.MATERIAL_NAME, poi.QUANTITY, poi.RECEIVED_QTY, poi.UNIT_PRICE
-                FROM BATCH_CONSUMPTION bc
-                JOIN PURCHASE_ORDER_ITEM poi ON poi.ITEM_ID = bc.ITEM_ID
-                LEFT JOIN PRODUCTION_ORDER po ON po.ORDER_ID = bc.ORDER_ID
-                LEFT JOIN MATERIAL pm ON pm.MATERIAL_ID = po.MATERIAL_ID
-                LEFT JOIN MATERIAL im ON im.MATERIAL_ID = poi.MATERIAL_ID" + whereClause +
-                @" ORDER BY bc.CONSUMPTION_ID DESC
+                SELECT trace.CONSUMPTION_ID, trace.ORDER_ID, trace.ITEM_ID, trace.CONSUME_QTY,
+                       trace.PRODUCT_MATERIAL_ID, trace.PRODUCT_MATERIAL_NAME,
+                       trace.PLAN_QTY, trace.FINISHED_QTY, trace.PRODUCTION_STATUS,
+                       trace.PURCHASE_ORDER_ID, trace.INPUT_MATERIAL_ID,
+                       trace.INPUT_MATERIAL_NAME, trace.PURCHASE_QUANTITY,
+                       trace.RECEIVED_QTY, trace.UNIT_PRICE
+                FROM V_BATCH_CONSUMPTION_DETAIL trace" + whereClause +
+                @" ORDER BY trace.CONSUMPTION_ID DESC
                    OFFSET :skip ROWS FETCH NEXT :take ROWS ONLY";
             AddFilters(cmd);
             cmd.Parameters.Add(new OracleParameter("skip", (page - 1) * pageSize));
@@ -122,46 +126,41 @@ public class QualityTraceService(string connString)
 
         using var conn = new OracleConnection(connString);
         conn.Open();
-
-        if (!ProductionOrderExists(conn, request.OrderId))
+        using var transaction = conn.BeginTransaction();
+        try
         {
-            return BatchConsumptionResult.Fail(400, "生产订单不存在");
-        }
-
-        if (!OrderHasActualStart(conn, request.OrderId))
-        {
-            return BatchConsumptionResult.Fail(409, "仅已开工生产订单可录入消耗");
-        }
-
-        if (!PurchaseItemExists(conn, request.ItemId))
-        {
-            return BatchConsumptionResult.Fail(400, "采购订单明细不存在");
-        }
-
-        if (ConsumptionExists(conn, request.OrderId, request.ItemId))
-        {
-            return BatchConsumptionResult.Fail(409, "该原材料已存在消耗记录，请使用更新接口");
-        }
-
-        long newId;
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = @"INSERT INTO BATCH_CONSUMPTION (ORDER_ID, ITEM_ID, CONSUME_QTY)
-                                VALUES (:orderId, :itemId, :consumeQty)
-                                RETURNING CONSUMPTION_ID INTO :newId";
-            cmd.Parameters.Add(new OracleParameter("orderId", request.OrderId));
-            cmd.Parameters.Add(new OracleParameter("itemId", request.ItemId));
-            cmd.Parameters.Add(new OracleParameter("consumeQty", request.ConsumeQty));
-            var idParam = new OracleParameter("newId", OracleDbType.Int64)
+            using var command = OracleCommandFactory.Create(
+                conn,
+                "BEGIN PKG_TRACE_DOMAIN.SAVE_CONSUMPTION(:consumptionId, :orderId, :itemId, :consumeQty); END;",
+                transaction);
+            var idParameter = new OracleParameter("consumptionId", OracleDbType.Int64)
             {
-                Direction = System.Data.ParameterDirection.Output,
+                Direction = System.Data.ParameterDirection.InputOutput,
+                Value = DBNull.Value,
             };
-            cmd.Parameters.Add(idParam);
-            cmd.ExecuteNonQuery();
-            newId = Convert.ToInt64(idParam.Value.ToString());
-        }
+            command.Parameters.Add(idParameter);
+            command.Parameters.Add("orderId", OracleDbType.Int64).Value = request.OrderId;
+            command.Parameters.Add("itemId", OracleDbType.Int64).Value = request.ItemId;
+            command.Parameters.Add("consumeQty", OracleDbType.Decimal).Value = request.ConsumeQty;
+            command.ExecuteNonQuery();
 
-        return BatchConsumptionResult.Success(GetConsumption(conn, newId)!);
+            long newId = OracleCommandFactory.ReadIdentity(idParameter);
+            BatchConsumption record = GetConsumption(conn, newId)
+                ?? throw new InvalidOperationException("写入后无法读取消耗记录");
+            transaction.Commit();
+            return BatchConsumptionResult.Success(record);
+        }
+        catch (OracleException exception)
+            when (OracleDomainErrorMapper.TryMap(exception, out int code, out string message))
+        {
+            transaction.Rollback();
+            return BatchConsumptionResult.Fail(code, message);
+        }
+        catch (Exception exception)
+        {
+            transaction.Rollback();
+            return BatchConsumptionResult.Fail(500, $"新增消耗记录失败: {exception.Message}");
+        }
     }
 
     public BatchConsumptionResult UpdateConsumption(BatchConsumptionUpdateRequest request)
@@ -173,70 +172,75 @@ public class QualityTraceService(string connString)
 
         using var conn = new OracleConnection(connString);
         conn.Open();
-
-        if (!ConsumptionExists(conn, request.ConsumptionId))
+        using var transaction = conn.BeginTransaction();
+        try
         {
-            return BatchConsumptionResult.Fail(404, "批次消耗关系不存在");
-        }
+            using var command = OracleCommandFactory.Create(
+                conn,
+                "BEGIN PKG_TRACE_DOMAIN.SAVE_CONSUMPTION(:consumptionId, :orderId, :itemId, :consumeQty); END;",
+                transaction);
+            var idParameter = new OracleParameter("consumptionId", OracleDbType.Int64)
+            {
+                Direction = System.Data.ParameterDirection.InputOutput,
+                Value = request.ConsumptionId,
+            };
+            command.Parameters.Add(idParameter);
+            command.Parameters.Add("orderId", OracleDbType.Int64).Value = request.OrderId;
+            command.Parameters.Add("itemId", OracleDbType.Int64).Value = request.ItemId;
+            command.Parameters.Add("consumeQty", OracleDbType.Decimal).Value = request.ConsumeQty;
+            command.ExecuteNonQuery();
 
-        if (!ProductionOrderExists(conn, request.OrderId))
+            BatchConsumption record = GetConsumption(conn, request.ConsumptionId)
+                ?? throw new InvalidOperationException("更新后无法读取消耗记录");
+            transaction.Commit();
+            return BatchConsumptionResult.Success(record);
+        }
+        catch (OracleException exception)
+            when (OracleDomainErrorMapper.TryMap(exception, out int code, out string message))
         {
-            return BatchConsumptionResult.Fail(400, "生产订单不存在");
+            transaction.Rollback();
+            return BatchConsumptionResult.Fail(code, message);
         }
-
-        if (!OrderHasActualStart(conn, request.OrderId))
+        catch (Exception exception)
         {
-            return BatchConsumptionResult.Fail(409, "仅已开工生产订单可录入消耗");
+            transaction.Rollback();
+            return BatchConsumptionResult.Fail(500, $"更新消耗记录失败: {exception.Message}");
         }
-
-        if (!PurchaseItemExists(conn, request.ItemId))
-        {
-            return BatchConsumptionResult.Fail(400, "采购订单明细不存在");
-        }
-
-        using (var cmd = conn.CreateCommand())
-        {
-            // 消耗记录归属特定生产订单不可变更（仅允许修正 item_id 和 consume_qty），
-            // 如需跨订单调整应删除后重新录入（终态订单不可删除以保证追溯链完整）。
-            cmd.CommandText = @"UPDATE BATCH_CONSUMPTION
-                                SET ITEM_ID = :itemId, CONSUME_QTY = :consumeQty
-                                WHERE CONSUMPTION_ID = :consumptionId";
-            cmd.Parameters.Add(new OracleParameter("itemId", request.ItemId));
-            cmd.Parameters.Add(new OracleParameter("consumeQty", request.ConsumeQty));
-            cmd.Parameters.Add(new OracleParameter("consumptionId", request.ConsumptionId));
-            cmd.ExecuteNonQuery();
-        }
-
-        return BatchConsumptionResult.Success(GetConsumption(conn, request.ConsumptionId)!);
     }
 
     public BatchConsumptionResult DeleteConsumption(long consumptionId)
     {
         using var conn = new OracleConnection(connString);
         conn.Open();
-
-        if (!ConsumptionExists(conn, consumptionId))
+        using var transaction = conn.BeginTransaction();
+        try
         {
-            return BatchConsumptionResult.Fail(404, "批次消耗关系不存在");
+            using var command = OracleCommandFactory.Create(
+                conn,
+                "BEGIN PKG_TRACE_DOMAIN.DELETE_CONSUMPTION(:consumptionId); END;",
+                transaction);
+            command.Parameters.Add("consumptionId", OracleDbType.Int64).Value = consumptionId;
+            command.ExecuteNonQuery();
+            transaction.Commit();
+            return BatchConsumptionResult.Success(null!);
         }
-
-        // 仅 in_progress 状态允许删除，防止追溯链断裂。
-        if (!IsConsumptionOrderInProgress(conn, consumptionId))
+        catch (OracleException exception)
+            when (OracleDomainErrorMapper.TryMap(exception, out int code, out string message))
         {
-            return BatchConsumptionResult.Fail(409, "仅生产中订单可删除消耗记录");
+            transaction.Rollback();
+            return BatchConsumptionResult.Fail(code, message);
         }
-
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM BATCH_CONSUMPTION WHERE CONSUMPTION_ID = :consumptionId";
-        cmd.Parameters.Add(new OracleParameter("consumptionId", consumptionId));
-        cmd.ExecuteNonQuery();
-
-        return BatchConsumptionResult.Success(null!);
+        catch (Exception exception)
+        {
+            transaction.Rollback();
+            return BatchConsumptionResult.Fail(500, $"删除消耗记录失败: {exception.Message}");
+        }
     }
 
     /// <summary>
-    /// 正向追溯：从生产订单或成品批次号出发，查出该成品消耗的原材料采购批次、供应商和到货信息。
-    /// order_id 与 batch_no 至少提供一个。
+    /// 正向追溯：从生产订单或成品批次号出发，查出该订单消耗的原材料采购批次、供应商和到货信息。
+    /// order_id 与 batch_no 至少提供一个；只传 batch_no 时用它定位订单。
+    /// 返回的始终是订单级累计消耗，未报工的在制订单同样有数据，此时 batch_no 为 null。
     /// </summary>
     public ProductBatchTraceResult? TraceProductBatch(long? orderId, string? batchNo, bool includeSupplier)
     {
@@ -297,22 +301,18 @@ public class QualityTraceService(string connString)
             resolvedBatchNo = batchValue is null or DBNull ? null : batchValue.ToString();
         }
 
+        // 追溯口径：BATCH_CONSUMPTION 是订单级累计消耗，且是包含在制订单的权威事实。
+        // batch_no 只用于定位订单和展示，不参与筛选，否则未报工的订单会查不到用料。
         var consumed = new List<ConsumedMaterialBatch>();
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = @"
-                SELECT bc.ITEM_ID, poi.MATERIAL_ID, im.MATERIAL_NAME,
-                       pur.SUPPLIER_ID, s.SUPPLIER_NAME, poi.ORDER_ID,
-                       (SELECT MIN(rr.RECEIVE_DATE) FROM RECEIVE_RECORD rr
-                        WHERE rr.ORDER_ID = poi.ORDER_ID AND rr.MATERIAL_ID = poi.MATERIAL_ID) AS RECEIVE_DATE,
-                       bc.CONSUME_QTY
-                FROM BATCH_CONSUMPTION bc
-                JOIN PURCHASE_ORDER_ITEM poi ON poi.ITEM_ID = bc.ITEM_ID
-                LEFT JOIN PURCHASE_ORDER pur ON pur.ORDER_ID = poi.ORDER_ID
-                LEFT JOIN SUPPLIER s ON s.SUPPLIER_ID = pur.SUPPLIER_ID
-                LEFT JOIN MATERIAL im ON im.MATERIAL_ID = poi.MATERIAL_ID
-                WHERE bc.ORDER_ID = :orderId
-                ORDER BY bc.ITEM_ID";
+                SELECT trace.ITEM_ID, trace.INPUT_MATERIAL_ID, trace.INPUT_MATERIAL_NAME,
+                       trace.SUPPLIER_ID, trace.SUPPLIER_NAME, trace.PURCHASE_ORDER_ID,
+                       trace.FIRST_RECEIVE_DATE, trace.CONSUME_QTY
+                FROM V_ORDER_MATERIAL_TRACE trace
+                WHERE trace.ORDER_ID = :orderId
+                ORDER BY trace.ITEM_ID";
             cmd.Parameters.Add(new OracleParameter("orderId", resolvedOrderId.Value));
 
             using var reader = cmd.ExecuteReader();
@@ -345,6 +345,7 @@ public class QualityTraceService(string connString)
     /// <summary>
     /// 反向追溯：从采购明细 / 原材料 / 到货日期范围出发，查出问题批次流入的所有生产订单和成品批次。
     /// item_id、material_id 或完整到货日期范围至少提供一种。
+    /// 在制、尚未报工的订单必须出现在结果里（其成品批次号为 null）。
     /// </summary>
     public List<MaterialBatchTraceResult> TraceMaterialBatch(
         long? itemId,
@@ -441,6 +442,7 @@ public class QualityTraceService(string connString)
 
     /// <summary>
     /// 质量影响分析：按问题采购明细 / 原材料 / 到货日期范围，汇总受影响生产订单、成品批次和建议动作。
+    /// 数据源是订单级累计消耗，因此在制订单同样计入 AffectedOrderCount 与建议动作判定。
     /// </summary>
     public QualityImpactAnalyzeResult AnalyzeImpact(QualityImpactAnalyzeRequest request)
     {
@@ -556,14 +558,12 @@ public class QualityTraceService(string connString)
             }
 
             cmd.CommandText = $@"
-                SELECT bc.ITEM_ID, bc.ORDER_ID,
-                       (SELECT MAX(fi.BATCH_NO) FROM FINISH_INBOUND fi WHERE fi.ORDER_ID = bc.ORDER_ID) AS BATCH_NO,
-                       po.MATERIAL_ID, m.MATERIAL_NAME, po.STATUS, bc.CONSUME_QTY
-                FROM BATCH_CONSUMPTION bc
-                LEFT JOIN PRODUCTION_ORDER po ON po.ORDER_ID = bc.ORDER_ID
-                LEFT JOIN MATERIAL m ON m.MATERIAL_ID = po.MATERIAL_ID
-                WHERE bc.ITEM_ID IN ({string.Join(", ", placeholders)})
-                ORDER BY bc.ITEM_ID, bc.ORDER_ID";
+                SELECT trace.ITEM_ID, trace.ORDER_ID, trace.BATCH_NO,
+                       trace.PRODUCT_MATERIAL_ID, trace.PRODUCT_MATERIAL_NAME,
+                       trace.PRODUCTION_STATUS, trace.CONSUME_QTY
+                FROM V_ORDER_MATERIAL_TRACE trace
+                WHERE trace.ITEM_ID IN ({string.Join(", ", placeholders)})
+                ORDER BY trace.ITEM_ID, trace.ORDER_ID";
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -590,72 +590,18 @@ public class QualityTraceService(string connString)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-            SELECT bc.CONSUMPTION_ID, bc.ORDER_ID, bc.ITEM_ID, bc.CONSUME_QTY,
-                   po.MATERIAL_ID, pm.MATERIAL_NAME, po.PLAN_QTY, po.FINISHED_QTY, po.STATUS,
-                   poi.ORDER_ID, poi.MATERIAL_ID, im.MATERIAL_NAME, poi.QUANTITY, poi.RECEIVED_QTY, poi.UNIT_PRICE
-            FROM BATCH_CONSUMPTION bc
-            JOIN PURCHASE_ORDER_ITEM poi ON poi.ITEM_ID = bc.ITEM_ID
-            LEFT JOIN PRODUCTION_ORDER po ON po.ORDER_ID = bc.ORDER_ID
-            LEFT JOIN MATERIAL pm ON pm.MATERIAL_ID = po.MATERIAL_ID
-            LEFT JOIN MATERIAL im ON im.MATERIAL_ID = poi.MATERIAL_ID
-            WHERE bc.CONSUMPTION_ID = :consumptionId";
+            SELECT trace.CONSUMPTION_ID, trace.ORDER_ID, trace.ITEM_ID, trace.CONSUME_QTY,
+                   trace.PRODUCT_MATERIAL_ID, trace.PRODUCT_MATERIAL_NAME,
+                   trace.PLAN_QTY, trace.FINISHED_QTY, trace.PRODUCTION_STATUS,
+                   trace.PURCHASE_ORDER_ID, trace.INPUT_MATERIAL_ID,
+                   trace.INPUT_MATERIAL_NAME, trace.PURCHASE_QUANTITY,
+                   trace.RECEIVED_QTY, trace.UNIT_PRICE
+            FROM V_BATCH_CONSUMPTION_DETAIL trace
+            WHERE trace.CONSUMPTION_ID = :consumptionId";
         cmd.Parameters.Add(new OracleParameter("consumptionId", consumptionId));
 
         using var reader = cmd.ExecuteReader();
         return reader.Read() ? MapConsumption(reader) : null;
-    }
-
-    private static bool ProductionOrderExists(OracleConnection conn, long orderId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM PRODUCTION_ORDER WHERE ORDER_ID = :orderId";
-        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
-
-    private static bool OrderHasActualStart(OracleConnection conn, long orderId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM PRODUCTION_ORDER WHERE ORDER_ID = :orderId AND ACTUAL_START IS NOT NULL";
-        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
-
-    private static bool PurchaseItemExists(OracleConnection conn, long itemId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM PURCHASE_ORDER_ITEM WHERE ITEM_ID = :itemId";
-        cmd.Parameters.Add(new OracleParameter("itemId", itemId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
-
-    private static bool ConsumptionExists(OracleConnection conn, long consumptionId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM BATCH_CONSUMPTION WHERE CONSUMPTION_ID = :consumptionId";
-        cmd.Parameters.Add(new OracleParameter("consumptionId", consumptionId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
-
-    private static bool ConsumptionExists(OracleConnection conn, long orderId, long itemId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM BATCH_CONSUMPTION WHERE ORDER_ID = :orderId AND ITEM_ID = :itemId";
-        cmd.Parameters.Add(new OracleParameter("orderId", orderId));
-        cmd.Parameters.Add(new OracleParameter("itemId", itemId));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-    }
-
-    private static bool IsConsumptionOrderInProgress(OracleConnection conn, long consumptionId)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT COUNT(*) FROM BATCH_CONSUMPTION bc
-            JOIN PRODUCTION_ORDER po ON po.ORDER_ID = bc.ORDER_ID
-            WHERE bc.CONSUMPTION_ID = :consumptionId AND TRIM(po.STATUS) = :inProgress";
-        cmd.Parameters.Add(new OracleParameter("consumptionId", consumptionId));
-        cmd.Parameters.Add(new OracleParameter("inProgress", ProductionStatusMap.Db.InProgress));
-        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
     private static BatchConsumption MapConsumption(OracleDataReader reader)
