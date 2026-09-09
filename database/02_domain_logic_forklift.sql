@@ -407,7 +407,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_trace_domain AS
             IF l_existing_count > 0 THEN
                 pkg_app_error.fail(
                     pkg_app_error.c_state_conflict,
-                    '该原材料已存在消耗记录，请使用更新接口');
+                    '目标采购明细在该生产订单下已存在消耗记录');
             END IF;
         ELSE
             SELECT COUNT(*)
@@ -449,7 +449,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_trace_domain AS
             WHEN DUP_VAL_ON_INDEX THEN
                 pkg_app_error.fail(
                     pkg_app_error.c_state_conflict,
-                    '该原材料已存在消耗记录，请使用更新接口');
+                    '目标采购明细在该生产订单下已存在消耗记录');
         END;
     END save_consumption;
 
