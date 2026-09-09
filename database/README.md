@@ -1,3 +1,5 @@
+## 数据库初始化说明
+
 在 Oracle 数据库启动后，请依次执行以下命令（如为 Docker 容器环境，请先在设定正确字符集的情况下进入容器 `docker exec -it -e NLS_LANG="AMERICAN_AMERICA.AL32UTF8" oracle bash`）
 
 ```sh
