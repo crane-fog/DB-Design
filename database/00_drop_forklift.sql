@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 工业制造物料进销存管理系统 · 本地开发对象清理
--- 仅允许：PYZ2190@FREEPDB1
+-- 仅允许：DB_Design@FREEPDB1
 -- 本脚本只删除下列明确列出的项目对象，不删除用户、不扫描删除其他对象。
 -- ============================================================================
 
@@ -24,10 +24,10 @@ DECLARE
             END IF;
     END;
 BEGIN
-    IF l_user <> 'PYZ2190' OR l_service_name <> 'FREEPDB1' THEN
+    IF l_user <> 'DB_Design' OR l_service_name <> 'FREEPDB1' THEN
         RAISE_APPLICATION_ERROR(
             -20998,
-            'Refusing rebuild: expected PYZ2190@FREEPDB1, got '
+            'Refusing rebuild: expected DB_Design@FREEPDB1, got '
             || l_user || '@' || l_service_name);
     END IF;
 

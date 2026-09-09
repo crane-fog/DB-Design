@@ -1,7 +1,7 @@
 -- ============================================================================
 -- 本地开发数据库重建入口
 -- 调用示例（SQLcl/SQL*Plus）：@database/rebuild_local.sql
--- 仅允许连接到 PYZ2190@FREEPDB1 后执行。
+-- 仅允许连接到 DB_Design@FREEPDB1 后执行。
 -- ============================================================================
 
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
@@ -13,10 +13,10 @@ DECLARE
     l_user         VARCHAR2(128) := UPPER(USER);
     l_service_name VARCHAR2(128) := UPPER(SYS_CONTEXT('USERENV', 'SERVICE_NAME'));
 BEGIN
-    IF l_user <> 'PYZ2190' OR l_service_name <> 'FREEPDB1' THEN
+    IF l_user <> 'DB_Design' OR l_service_name <> 'FREEPDB1' THEN
         RAISE_APPLICATION_ERROR(
             -20998,
-            'Refusing rebuild: expected PYZ2190@FREEPDB1, got '
+            'Refusing rebuild: expected DB_Design@FREEPDB1, got '
             || l_user || '@' || l_service_name);
     END IF;
     DBMS_OUTPUT.PUT_LINE('Rebuilding ' || l_user || '@' || l_service_name);
