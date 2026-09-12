@@ -16,6 +16,8 @@ import { Delete, EditPen, Plus, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { type SystemUser, systemService } from '@/services/SystemService'
+import { materialService } from '@/services/MaterialService'
+import type { MaterialNameOption } from '@/types/material'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -83,10 +85,16 @@ async function loadLineTypeOptions() {
 }
 
 // ---------- 产能配置 ----------
-const configFilters = reactive({ materialId: '', typeId: undefined as number | undefined })
+const configFilters = reactive({
+  materialId: undefined as number | undefined,
+  typeId: undefined as number | undefined,
+})
 const configPage = ref(1)
 const configLoading = ref(false)
 const configError = ref('')
+const productMaterialOptions = ref<MaterialNameOption[]>([])
+const productMaterialOptionsError = ref('')
+const productMaterialOptionsLoading = ref(false)
 const configResult = ref<PageResult<CapacityConfigItem>>({
   items: [],
   page: 1,
@@ -124,6 +132,22 @@ const configRules: FormRules<CapacityConfigFormData> = {
   ],
 }
 
+async function loadProductMaterialOptions() {
+  productMaterialOptionsLoading.value = true
+  productMaterialOptionsError.value = ''
+  try {
+    productMaterialOptions.value = await materialService.listMaterialNameOptions([
+      'semiFinished',
+      'finished',
+    ])
+  } catch (requestError) {
+    productMaterialOptions.value = []
+    productMaterialOptionsError.value = getErrorMessage(requestError, '产品选项加载失败')
+  } finally {
+    productMaterialOptionsLoading.value = false
+  }
+}
+
 async function loadConfigs(targetPage = configPage.value) {
   if (!canViewConfigs.value) {
     return
@@ -132,7 +156,7 @@ async function loadConfigs(targetPage = configPage.value) {
   configError.value = ''
   try {
     configResult.value = await productionService.listCapacityConfigs({
-      materialId: parsePositiveInt(configFilters.materialId),
+      materialId: configFilters.materialId,
       page: targetPage,
       pageSize,
       typeId: configFilters.typeId,
@@ -146,7 +170,7 @@ async function loadConfigs(targetPage = configPage.value) {
 }
 
 function resetConfigFilters() {
-  configFilters.materialId = ''
+  configFilters.materialId = undefined
   configFilters.typeId = undefined
   void loadConfigs(1)
 }
@@ -531,6 +555,9 @@ async function loadUsers() {
 onMounted(() => {
   void loadLineTypeOptions()
   handleTabChange(activeTab.value)
+  if (canViewConfigs.value) {
+    void loadProductMaterialOptions()
+  }
   void loadUsers()
 })
 </script>
@@ -546,13 +573,38 @@ onMounted(() => {
       <!-- 产能配置 -->
       <el-tab-pane v-if="canViewConfigs" label="产能配置" name="configs">
         <el-card class="section-card" shadow="never">
+          <el-alert
+            v-if="productMaterialOptionsError"
+            class="section-error"
+            :closable="false"
+            show-icon
+            :title="productMaterialOptionsError"
+            type="warning"
+          >
+            <template #default>
+              <el-button link type="primary" @click="loadProductMaterialOptions">
+                重新加载产品选项
+              </el-button>
+            </template>
+          </el-alert>
           <el-form :model="configFilters" inline @submit.prevent="loadConfigs(1)">
-            <el-form-item label="产品物料 ID">
-              <el-input
-                v-model.trim="configFilters.materialId"
+            <el-form-item label="产品名">
+              <el-select
+                v-model="configFilters.materialId"
                 clearable
-                placeholder="按物料 ID 查询"
-              />
+                filterable
+                :loading="productMaterialOptionsLoading"
+                no-data-text="暂无半成品或成品"
+                placeholder="选择产品"
+                style="width: 220px"
+              >
+                <el-option
+                  v-for="material in productMaterialOptions"
+                  :key="material.materialId"
+                  :label="material.materialName"
+                  :value="material.materialId"
+                />
+              </el-select>
             </el-form-item>
             <el-form-item label="生产线类型">
               <el-select

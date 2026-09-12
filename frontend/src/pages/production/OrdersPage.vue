@@ -18,13 +18,19 @@ import type { PageResult } from '@/services/pagination'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import { getErrorMessage } from '@/utils/error'
-import { parsePositiveInt } from '@/utils/parse'
 import { productionOrderStatusLabels as statusLabels } from '@/constants/status'
 import { useAuthStore } from '@/stores/auth'
+import { materialService } from '@/services/MaterialService'
+import type { MaterialNameOption } from '@/types/material'
 
 const pageSize = 10
 const auth = useAuthStore()
-const filters = reactive({ materialId: '', planEndEnd: '', planEndStart: '', status: '' })
+const filters = reactive({
+  materialId: undefined as number | undefined,
+  planEndEnd: '',
+  planEndStart: '',
+  status: '',
+})
 const page = ref(1)
 const loading = ref(false)
 const error = ref('')
@@ -64,6 +70,9 @@ const productOptionsLoading = ref(false)
 const productOptionsError = ref('')
 let productOptionsLoaded = false
 let productOptionsPromise: Promise<void> | undefined = undefined
+const productMaterialOptions = ref<MaterialNameOption[]>([])
+const productMaterialOptionsLoading = ref(false)
+const productMaterialOptionsError = ref('')
 
 interface ProductionOrderFormModel extends Omit<ProductionOrderFormData, 'versionId'> {
   versionId?: number
@@ -150,16 +159,12 @@ function selectedStatus(): ProductionOrderStatus | undefined {
   return undefined
 }
 
-function parseMaterialId() {
-  return parsePositiveInt(filters.materialId)
-}
-
 async function loadOrders(targetPage = page.value) {
   loading.value = true
   error.value = ''
   try {
     result.value = await productionService.listOrders({
-      materialId: parseMaterialId(),
+      materialId: filters.materialId,
       page: targetPage,
       pageSize,
       planEndEnd: filters.planEndEnd || undefined,
@@ -175,8 +180,29 @@ async function loadOrders(targetPage = page.value) {
 }
 
 function resetFilters() {
-  Object.assign(filters, { materialId: '', planEndEnd: '', planEndStart: '', status: '' })
+  Object.assign(filters, {
+    materialId: undefined,
+    planEndEnd: '',
+    planEndStart: '',
+    status: '',
+  })
   void loadOrders(1)
+}
+
+async function loadProductMaterialOptions() {
+  productMaterialOptionsLoading.value = true
+  productMaterialOptionsError.value = ''
+  try {
+    productMaterialOptions.value = await materialService.listMaterialNameOptions([
+      'semiFinished',
+      'finished',
+    ])
+  } catch (requestError) {
+    productMaterialOptions.value = []
+    productMaterialOptionsError.value = getErrorMessage(requestError, '产品选项加载失败')
+  } finally {
+    productMaterialOptionsLoading.value = false
+  }
 }
 
 function resetOrderForm() {
@@ -504,6 +530,7 @@ function progressPercentage(order: ProductionOrderItem) {
 
 onMounted(() => {
   void loadOrders()
+  void loadProductMaterialOptions()
   if (canCreateOrder.value || canUpdateOrder.value) {
     void loadProductOptions()
   }
@@ -521,9 +548,38 @@ onMounted(() => {
     </PageHeader>
 
     <el-card class="search-card" shadow="never">
+      <el-alert
+        v-if="productMaterialOptionsError"
+        class="request-error"
+        :closable="false"
+        show-icon
+        :title="productMaterialOptionsError"
+        type="warning"
+      >
+        <template #default>
+          <el-button link type="primary" @click="loadProductMaterialOptions">
+            重新加载产品选项
+          </el-button>
+        </template>
+      </el-alert>
       <el-form :model="filters" inline @submit.prevent="loadOrders(1)">
-        <el-form-item label="产品物料 ID">
-          <el-input v-model.trim="filters.materialId" clearable placeholder="按物料 ID 查询" />
+        <el-form-item label="产品名">
+          <el-select
+            v-model="filters.materialId"
+            clearable
+            filterable
+            :loading="productMaterialOptionsLoading"
+            no-data-text="暂无半成品或成品"
+            placeholder="选择产品"
+            style="width: 220px"
+          >
+            <el-option
+              v-for="material in productMaterialOptions"
+              :key="material.materialId"
+              :label="material.materialName"
+              :value="material.materialId"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="订单状态">
           <el-select v-model="filters.status" clearable placeholder="全部" style="width: 140px">

@@ -20,6 +20,8 @@ import { getErrorMessage } from '@/utils/error'
 import { parsePositiveInt } from '@/utils/parse'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute } from 'vue-router'
+import { materialService } from '@/services/MaterialService'
+import type { MaterialNameOption } from '@/types/material'
 
 type TraceTab = 'consumption' | 'material' | 'product'
 
@@ -40,6 +42,9 @@ const references = ref<TraceConsumptionReferenceData>({})
 const suppliers = computed(() => references.value.suppliers ?? [])
 const referenceError = ref('')
 const referenceLoading = ref(false)
+const materialNameOptions = ref<MaterialNameOption[]>([])
+const materialNameOptionsError = ref('')
+const materialNameOptionsLoading = ref(false)
 const sectionMetadata: Record<TraceTab, { description: string; title: string }> = {
   consumption: {
     description: '维护生产订单与采购明细之间的真实批次消耗关系。',
@@ -69,8 +74,28 @@ async function loadReferences() {
   }
 }
 
+async function loadMaterialNameOptions() {
+  materialNameOptionsLoading.value = true
+  materialNameOptionsError.value = ''
+  try {
+    materialNameOptions.value = await materialService.listMaterialNameOptions([
+      'raw',
+      'semiFinished',
+    ])
+  } catch (error) {
+    materialNameOptions.value = []
+    materialNameOptionsError.value = getErrorMessage(error, '材料选项加载失败')
+  } finally {
+    materialNameOptionsLoading.value = false
+  }
+}
+
 // ---------- 批次消耗关系 ----------
-const consumptionFilters = reactive({ itemId: '', materialId: '', orderId: '' })
+const consumptionFilters = reactive({
+  itemId: '',
+  materialId: undefined as number | undefined,
+  orderId: '',
+})
 const consumptionPage = ref(1)
 const consumptionLoading = ref(false)
 const consumptionError = ref('')
@@ -128,7 +153,7 @@ async function loadConsumption(targetPage = consumptionPage.value) {
   try {
     consumptionResult.value = await traceService.listBatchConsumption({
       itemId: parsePositiveInt(consumptionFilters.itemId),
-      materialId: parsePositiveInt(consumptionFilters.materialId),
+      materialId: consumptionFilters.materialId,
       orderId: parsePositiveInt(consumptionFilters.orderId),
       page: targetPage,
       pageSize,
@@ -142,7 +167,7 @@ async function loadConsumption(targetPage = consumptionPage.value) {
 }
 
 function resetConsumptionFilters() {
-  Object.assign(consumptionFilters, { itemId: '', materialId: '', orderId: '' })
+  Object.assign(consumptionFilters, { itemId: '', materialId: undefined, orderId: '' })
   void loadConsumption(1)
 }
 
@@ -268,7 +293,7 @@ function resetProductFilters() {
 // ---------- 反向追溯（原材料 → 成品） ----------
 const materialFilters = reactive({
   itemId: '',
-  materialId: '',
+  materialId: undefined as number | undefined,
   receiveRange: [] as string[],
   supplierId: undefined as number | undefined,
 })
@@ -279,7 +304,7 @@ const materialResult = ref<MaterialBatchTraceItem[]>([])
 
 async function traceMaterial() {
   const itemId = parsePositiveInt(materialFilters.itemId)
-  const materialId = parsePositiveInt(materialFilters.materialId)
+  const { materialId } = materialFilters
   const [receiveDateStart, receiveDateEnd] = materialFilters.receiveRange
   if (
     !itemId &&
@@ -312,7 +337,7 @@ async function traceMaterial() {
 function resetMaterialFilters() {
   Object.assign(materialFilters, {
     itemId: '',
-    materialId: '',
+    materialId: undefined,
     receiveRange: [],
     supplierId: undefined,
   })
@@ -342,7 +367,7 @@ onMounted(async () => {
     initialRequests.push(loadConsumption())
   }
   if (section === 'consumption' || section === 'material') {
-    initialRequests.push(loadReferences())
+    initialRequests.push(loadReferences(), loadMaterialNameOptions())
   }
   await Promise.all(initialRequests)
 
@@ -378,6 +403,24 @@ onMounted(async () => {
       >
     </el-alert>
 
+    <el-alert
+      v-if="materialNameOptionsError"
+      class="trace-request-error"
+      :closable="false"
+      :title="materialNameOptionsError"
+      type="warning"
+      show-icon
+    >
+      <el-button
+        link
+        type="primary"
+        :loading="materialNameOptionsLoading"
+        @click="loadMaterialNameOptions"
+      >
+        重新加载材料选项
+      </el-button>
+    </el-alert>
+
     <template v-if="section === 'consumption'">
       <el-card class="trace-search-card" shadow="never">
         <el-form :model="consumptionFilters" inline @submit.prevent="loadConsumption(1)">
@@ -387,8 +430,23 @@ onMounted(async () => {
           <el-form-item label="采购明细 ID">
             <el-input v-model.trim="consumptionFilters.itemId" clearable placeholder="" />
           </el-form-item>
-          <el-form-item label="原材料 ID">
-            <el-input v-model.trim="consumptionFilters.materialId" clearable placeholder="" />
+          <el-form-item label="材料名">
+            <el-select
+              v-model="consumptionFilters.materialId"
+              clearable
+              filterable
+              :loading="materialNameOptionsLoading"
+              no-data-text="暂无原材料或半成品"
+              placeholder="选择材料"
+              style="width: 220px"
+            >
+              <el-option
+                v-for="material in materialNameOptions"
+                :key="material.materialId"
+                :label="material.materialName"
+                :value="material.materialId"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item>
             <el-button :loading="consumptionLoading" type="primary" @click="loadConsumption(1)"
@@ -602,8 +660,23 @@ onMounted(async () => {
           <el-form-item label="采购明细 ID">
             <el-input v-model.trim="materialFilters.itemId" clearable placeholder="可选" />
           </el-form-item>
-          <el-form-item label="原材料 ID">
-            <el-input v-model.trim="materialFilters.materialId" clearable placeholder="可选" />
+          <el-form-item label="材料名">
+            <el-select
+              v-model="materialFilters.materialId"
+              clearable
+              filterable
+              :loading="materialNameOptionsLoading"
+              no-data-text="暂无原材料或半成品"
+              placeholder="选择材料"
+              style="width: 220px"
+            >
+              <el-option
+                v-for="material in materialNameOptions"
+                :key="material.materialId"
+                :label="material.materialName"
+                :value="material.materialId"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="供应商筛选">
             <el-select

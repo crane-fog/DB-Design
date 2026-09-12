@@ -22,6 +22,7 @@ import type {
   MaterialCategory,
   MaterialForm,
   MaterialListQuery,
+  MaterialNameOption,
   MaterialRecord,
   MaterialSupplierOption,
   MaterialType,
@@ -386,6 +387,29 @@ export const materialService = {
       id: String(idNumber(row.category_id, '分类编号')),
       name: row.category_name ?? '',
     }))
+  },
+
+  async listMaterialNameOptions(types: readonly MaterialType[]): Promise<MaterialNameOption[]> {
+    const rows = await Promise.all(
+      types.map((type) =>
+        listAll<MaterialDetail>((page) =>
+          materialBomApi.listMaterialData({
+            materialType: apiMaterialTypes[type],
+            page,
+            pageSize,
+          }),
+        ),
+      ),
+    )
+    return rows
+      .flat()
+      .map(mapMaterial)
+      .filter((material) => Boolean(material.name.trim()))
+      .map((material) => ({
+        materialId: Number(material.id),
+        materialName: material.name,
+        type: material.type,
+      }))
   },
 
   async listMaterials(query: MaterialListQuery): Promise<PageResult<MaterialRecord>> {
