@@ -30,6 +30,12 @@ export interface MaterialRecord {
   updatedAt: string
 }
 
+export interface MaterialNameOption {
+  materialId: number
+  materialName: string
+  type: MaterialType
+}
+
 export interface MaterialListQuery extends PageRequest {
   categoryId?: string
   createdFrom?: string
